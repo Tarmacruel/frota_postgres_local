@@ -1,0 +1,157 @@
+import { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
+import api from '../api/client'
+import { useAuth } from '../context/AuthContext'
+import { getApiErrorMessage } from '../utils/apiError'
+
+export default function DashboardPage() {
+  const { user } = useAuth()
+  const [stats, setStats] = useState({ total: 0, ativos: 0, manutencao: 0, inativos: 0 })
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    async function load() {
+      try {
+        setLoading(true)
+        setError('')
+        const [all, ativos, manutencao, inativos] = await Promise.all([
+          api.get('/vehicles'),
+          api.get('/vehicles/em-atividade'),
+          api.get('/vehicles/em-manutencao'),
+          api.get('/vehicles/inativos'),
+        ])
+        setStats({
+          total: all.data.length,
+          ativos: ativos.data.length,
+          manutencao: manutencao.data.length,
+          inativos: inativos.data.length,
+        })
+      } catch (err) {
+        setError(getApiErrorMessage(err, 'Nao foi possivel carregar os indicadores da frota.'))
+      } finally {
+        setLoading(false)
+      }
+    }
+    load()
+  }, [])
+
+  const metricCards = [
+    {
+      label: 'Total de veiculos',
+      value: stats.total,
+      note: 'Base consolidada de acompanhamento institucional.',
+    },
+    {
+      label: 'Em atividade',
+      value: stats.ativos,
+      note: 'Prontos para operacao imediata.',
+    },
+    {
+      label: 'Em manutencao',
+      value: stats.manutencao,
+      note: 'Demandam acompanhamento tecnico.',
+    },
+    {
+      label: 'Inativos',
+      value: stats.inativos,
+      note: 'Fora de operacao no momento.',
+    },
+  ]
+
+  const actions = [
+    {
+      title: 'Veiculos em atividade',
+      description: 'Consulte rapidamente a frota liberada para uso e acompanhe lotacao atual.',
+      to: '/vehicles?status=ATIVO',
+      cta: 'Abrir ativos',
+    },
+    {
+      title: 'Veiculos em manutencao',
+      description: 'Visualize os itens em manutencao para apoiar priorizacao e retorno operacional.',
+      to: '/vehicles?status=MANUTENCAO',
+      cta: 'Abrir manutencao',
+    },
+    {
+      title: 'Veiculos inativos',
+      description: 'Separe com clareza os registros fora de circulacao ou indisponiveis.',
+      to: '/vehicles?status=INATIVO',
+      cta: 'Abrir inativos',
+    },
+  ]
+
+  if (user?.role === 'ADMIN') {
+    actions.unshift({
+      title: 'Cadastro e ajustes',
+      description: 'Crie novos registros e atualize historico de departamento sem sair da operacao.',
+      to: '/vehicles',
+      cta: 'Gerenciar frota',
+    })
+    actions.push({
+      title: 'Gestao de usuarios',
+      description: 'Controle administradores e perfis padrao com rastreabilidade simples.',
+      to: '/users',
+      cta: 'Abrir usuarios',
+    })
+  }
+
+  return (
+    <div className="surface-panel">
+      <div className="panel-heading">
+        <div>
+          <h2 className="section-title">Painel da frota</h2>
+          <p className="section-copy">Um resumo direto para abrir as areas certas sem precisar navegar por telas vazias.</p>
+        </div>
+      </div>
+
+      {error ? <div className="alert alert-error">{error}</div> : null}
+
+      <div className="metrics-grid">
+        {metricCards.map((item) => (
+          <article key={item.label} className="metric-card">
+            <span>{item.label}</span>
+            <div className="metric-value">{loading ? '--' : item.value}</div>
+            <div className="metric-note">{item.note}</div>
+          </article>
+        ))}
+      </div>
+
+      <div className="dashboard-grid" style={{ marginTop: 24 }}>
+        <section className="surface-panel" style={{ padding: 0, boxShadow: 'none', background: 'transparent', border: '0' }}>
+          <div className="panel-heading">
+            <div>
+              <h3 className="section-title">Acessos rapidos</h3>
+              <p className="section-copy">Atalhos para os fluxos que mais importam no dia a dia da secretaria.</p>
+            </div>
+          </div>
+          <div className="quick-stats">
+            {actions.map((item) => (
+              <Link key={item.title} to={item.to} className="action-card">
+                <strong>{item.title}</strong>
+                <p>{item.description}</p>
+                <footer>
+                  <span>{item.cta}</span>
+                  <span>→</span>
+                </footer>
+              </Link>
+            ))}
+          </div>
+        </section>
+
+        <section className="surface-panel" style={{ padding: 24 }}>
+          <div className="panel-heading">
+            <div>
+              <h3 className="section-title">Leitura operacional</h3>
+              <p className="section-copy">O ambiente local ja esta preparado para testar autenticacao, CRUD e historico.</p>
+            </div>
+          </div>
+          <ul className="bullet-list">
+            <li className="bullet-item">Use o painel de veiculos para cadastrar, editar e visualizar lotacao atual.</li>
+            <li className="bullet-item">Os filtros por status ajudam a separar rapidamente atividade, manutencao e inatividade.</li>
+            <li className="bullet-item">O perfil padrao navega em leitura, enquanto o perfil administrador libera gestao completa.</li>
+          </ul>
+        </section>
+      </div>
+    </div>
+  )
+}
