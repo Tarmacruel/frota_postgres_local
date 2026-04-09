@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import DriverBadge from '../components/DriverBadge'
 import Modal from '../components/Modal'
 import api from '../api/client'
 import { useAuth } from '../context/AuthContext'
@@ -44,7 +45,7 @@ export default function VehiclesPage() {
     const term = search.trim().toLowerCase()
     const matchesSearch =
       !term ||
-      [vehicle.plate, vehicle.brand, vehicle.model, vehicle.current_department]
+      [vehicle.plate, vehicle.brand, vehicle.model, vehicle.current_department, vehicle.current_driver_name]
         .filter(Boolean)
         .some((value) => value.toLowerCase().includes(term))
 
@@ -60,6 +61,7 @@ export default function VehiclesPage() {
     { header: 'Modelo', value: (vehicle) => vehicle.model },
     { header: 'Status', value: (vehicle) => vehicle.status },
     { header: 'Lotacao atual', value: (vehicle) => vehicle.current_department || 'Sem lotacao' },
+    { header: 'Condutor atual', value: (vehicle) => vehicle.current_driver_name || 'Sem condutor ativo' },
     { header: 'Atualizado em', value: (vehicle) => formatDate(vehicle.updated_at) },
   ]
 
@@ -253,7 +255,7 @@ export default function VehiclesPage() {
           <input
             className="app-input"
             style={{ minWidth: 280 }}
-            placeholder="Buscar por placa, marca, modelo ou departamento"
+            placeholder="Buscar por placa, marca, modelo, departamento ou condutor"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -290,6 +292,7 @@ export default function VehiclesPage() {
                 <th>Modelo</th>
                 <th>Status</th>
                 <th>Lotacao atual</th>
+                <th>Condutor atual</th>
                 <th>Atualizado em</th>
                 <th>Acoes</th>
               </tr>
@@ -297,11 +300,11 @@ export default function VehiclesPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="muted">Carregando veiculos...</td>
+                  <td colSpan="8" className="muted">Carregando veiculos...</td>
                 </tr>
               ) : filteredVehicles.length === 0 ? (
                 <tr>
-                  <td colSpan="7">
+                  <td colSpan="8">
                     <div className="empty-state">
                       Nenhum veiculo encontrado para os filtros aplicados. Ajuste a busca ou troque o status para revisar a base completa.
                     </div>
@@ -315,6 +318,7 @@ export default function VehiclesPage() {
                     <td>{vehicle.model}</td>
                     <td><span className={`status-badge status-${vehicle.status}`}>{vehicle.status}</span></td>
                     <td>{vehicle.current_department || 'Sem lotacao registrada'}</td>
+                    <td><DriverBadge name={vehicle.current_driver_name} /></td>
                     <td>{formatDate(vehicle.updated_at)}</td>
                     <td>
                       <div className="actions-inline">
@@ -338,6 +342,11 @@ export default function VehiclesPage() {
             <p className="section-copy">
               {selectedVehicle ? `Linha do tempo de ${selectedVehicle.plate}` : 'Selecione um veiculo na tabela para visualizar a cronologia de lotacao.'}
             </p>
+            {selectedVehicle ? (
+              <p className="section-copy" style={{ marginTop: 10 }}>
+                Condutor atual: {selectedVehicle.current_driver_name || 'Sem condutor ativo'}
+              </p>
+            ) : null}
           </div>
         </div>
         {selectedHistory.length > 0 ? (

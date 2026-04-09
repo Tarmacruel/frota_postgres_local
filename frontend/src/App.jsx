@@ -4,6 +4,8 @@ import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './context/AuthContext'
 import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
+import MaintenancePage from './pages/MaintenancePage'
+import PossessionPage from './pages/PossessionPage'
 import UsersPage from './pages/UsersPage'
 import VehiclesPage from './pages/VehiclesPage'
 
@@ -23,6 +25,8 @@ export default function App() {
           >
             <Route index element={<DashboardPage />} />
             <Route path="vehicles" element={<VehiclesPage />} />
+            <Route path="manutencoes" element={<MaintenancePage />} />
+            <Route path="condutores" element={<PossessionPage />} />
             <Route
               path="users"
               element={

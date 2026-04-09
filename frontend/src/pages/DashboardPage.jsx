@@ -6,7 +6,7 @@ import { getApiErrorMessage } from '../utils/apiError'
 
 export default function DashboardPage() {
   const { user } = useAuth()
-  const [stats, setStats] = useState({ total: 0, ativos: 0, manutencao: 0, inativos: 0 })
+  const [stats, setStats] = useState({ total: 0, ativos: 0, manutencao: 0, inativos: 0, manutencoesAbertas: 0, possesAtivas: 0 })
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
 
@@ -15,17 +15,21 @@ export default function DashboardPage() {
       try {
         setLoading(true)
         setError('')
-        const [all, ativos, manutencao, inativos] = await Promise.all([
+        const [all, ativos, manutencao, inativos, maintenance, possession] = await Promise.all([
           api.get('/vehicles'),
           api.get('/vehicles/em-atividade'),
           api.get('/vehicles/em-manutencao'),
           api.get('/vehicles/inativos'),
+          api.get('/maintenance'),
+          api.get('/possession/active'),
         ])
         setStats({
           total: all.data.length,
           ativos: ativos.data.length,
           manutencao: manutencao.data.length,
           inativos: inativos.data.length,
+          manutencoesAbertas: maintenance.data.filter((item) => !item.end_date).length,
+          possesAtivas: possession.data.length,
         })
       } catch (err) {
         setError(getApiErrorMessage(err, 'Nao foi possivel carregar os indicadores da frota.'))
@@ -57,6 +61,16 @@ export default function DashboardPage() {
       value: stats.inativos,
       note: 'Fora de operacao no momento.',
     },
+    {
+      label: 'Manutencoes abertas',
+      value: stats.manutencoesAbertas,
+      note: 'Servicos ainda em acompanhamento.',
+    },
+    {
+      label: 'Condutores ativos',
+      value: stats.possesAtivas,
+      note: 'Posses em vigor na consulta atual.',
+    },
   ]
 
   const actions = [
@@ -77,6 +91,18 @@ export default function DashboardPage() {
       description: 'Separe com clareza os registros fora de circulacao ou indisponiveis.',
       to: '/vehicles?status=INATIVO',
       cta: 'Abrir inativos',
+    },
+    {
+      title: 'Historico de manutencoes',
+      description: 'Consulte custos, servicos concluidos e demandas em andamento.',
+      to: '/manutencoes',
+      cta: 'Abrir manutencoes',
+    },
+    {
+      title: 'Posse de veiculos',
+      description: 'Veja quem esta com cada veiculo e acompanhe as transferencias.',
+      to: '/condutores',
+      cta: 'Abrir condutores',
     },
   ]
 
@@ -147,7 +173,7 @@ export default function DashboardPage() {
           </div>
           <ul className="bullet-list">
             <li className="bullet-item">Use o painel de veiculos para cadastrar, editar e visualizar lotacao atual.</li>
-            <li className="bullet-item">Os filtros por status ajudam a separar rapidamente atividade, manutencao e inatividade.</li>
+            <li className="bullet-item">As telas de manutencoes e condutores centralizam historico mecanico e posse atual por veiculo.</li>
             <li className="bullet-item">O perfil padrao navega em leitura, enquanto o perfil administrador libera gestao completa.</li>
           </ul>
         </section>

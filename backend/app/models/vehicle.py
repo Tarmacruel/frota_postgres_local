@@ -27,3 +27,5 @@ class Vehicle(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
 
     history: Mapped[list["LocationHistory"]] = relationship(back_populates="vehicle", passive_deletes=True)
+    maintenances: Mapped[list["MaintenanceRecord"]] = relationship(back_populates="vehicle", passive_deletes=True)
+    possessions: Mapped[list["VehiclePossession"]] = relationship(back_populates="vehicle", passive_deletes=True)

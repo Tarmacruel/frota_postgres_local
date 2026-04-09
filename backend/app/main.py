@@ -3,6 +3,8 @@ from __future__ import annotations
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.auth import router as auth_router
+from app.api.routes.maintenance import router as maintenance_router
+from app.api.routes.possession import router as possession_router
 from app.api.routes.users import router as users_router
 from app.api.routes.vehicles import router as vehicles_router
 from app.core.config import settings
@@ -20,6 +22,8 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(users_router)
 app.include_router(vehicles_router)
+app.include_router(maintenance_router)
+app.include_router(possession_router)
 
 
 @app.get("/")

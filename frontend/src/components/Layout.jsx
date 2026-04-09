@@ -9,6 +9,8 @@ export default function Layout() {
   const navItems = [
     { to: '/', label: 'Painel', description: 'Visao geral da operacao' },
     { to: '/vehicles', label: 'Veiculos', description: 'Cadastro e historico' },
+    { to: '/manutencoes', label: 'Manutencoes', description: 'Oficina e custos' },
+    { to: '/condutores', label: 'Condutores', description: 'Posse e historico' },
   ]
 
   if (user?.role === 'ADMIN') {
@@ -60,7 +62,7 @@ export default function Layout() {
           <div>
             <h1 className="page-title">Operacao da frota municipal</h1>
             <p className="page-copy">
-              Acompanhe disponibilidade, manutencao e lotacao dos veiculos com um fluxo mais claro, rapido e institucional.
+              Acompanhe disponibilidade, manutencao, lotacao e condutores com um fluxo mais claro, rapido e institucional.
             </p>
           </div>
           <div className="user-chip">

@@ -45,7 +45,8 @@ a {
 
 button,
 input,
-select {
+select,
+textarea {
   font: inherit;
 }
 
@@ -274,6 +275,7 @@ button {
 }
 
 .app-input,
+.app-textarea,
 .app-select,
 .app-button,
 .secondary-button,
@@ -283,6 +285,7 @@ button {
 }
 
 .app-input,
+.app-textarea,
 .app-select {
   width: 100%;
   border: 1px solid rgba(18, 57, 91, 0.16);
@@ -292,10 +295,16 @@ button {
 }
 
 .app-input:focus,
+.app-textarea:focus,
 .app-select:focus {
   outline: none;
   border-color: rgba(18, 57, 91, 0.48);
   box-shadow: 0 0 0 4px rgba(18, 57, 91, 0.08);
+}
+
+.app-textarea {
+  resize: vertical;
+  min-height: 120px;
 }
 
 .app-button,
@@ -707,6 +716,20 @@ button {
 .stack {
   display: grid;
   gap: 6px;
+}
+
+.driver-badge {
+  display: grid;
+  gap: 4px;
+}
+
+.driver-badge strong {
+  color: var(--navy);
+}
+
+.driver-badge span {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
 }
 
 .muted {

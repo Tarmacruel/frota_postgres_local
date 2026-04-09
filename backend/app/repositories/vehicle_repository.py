@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.location_history import LocationHistory
+from app.models.possession import VehiclePossession
 from app.models.vehicle import Vehicle, VehicleStatus
 
 
@@ -56,3 +57,11 @@ class VehicleRepository:
         await self.db.flush()
         await self.db.refresh(history)
         return history
+
+    async def get_active_possession(self, vehicle_id: UUID) -> VehiclePossession | None:
+        result = await self.db.execute(
+            select(VehiclePossession)
+            .where(VehiclePossession.vehicle_id == vehicle_id, VehiclePossession.end_date.is_(None))
+            .order_by(VehiclePossession.start_date.desc())
+        )
+        return result.scalar_one_or_none()

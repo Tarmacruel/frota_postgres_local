@@ -31,5 +31,6 @@ class VehicleOut(BaseModel):
     model: str
     status: VehicleStatus
     current_department: str | None = None
+    current_driver_name: str | None = None
     created_at: datetime
     updated_at: datetime

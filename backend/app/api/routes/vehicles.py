@@ -8,7 +8,9 @@ from app.db.session import get_db_session
 from app.models.vehicle import VehicleStatus
 from app.schemas.auth import MessageOut
 from app.schemas.history import LocationHistoryOut
+from app.schemas.possession import PossessionOut
 from app.schemas.vehicle import VehicleCreate, VehicleOut, VehicleUpdate
+from app.services.possession_service import PossessionService
 from app.services.vehicle_service import VehicleService
 
 router = APIRouter(prefix="/api/vehicles", tags=["Vehicles"])
@@ -53,6 +55,11 @@ async def update_vehicle(vehicle_id: UUID, data: VehicleUpdate, db: AsyncSession
 async def delete_vehicle(vehicle_id: UUID, db: AsyncSession = Depends(get_db_session)):
     await VehicleService(db).delete(vehicle_id)
     return {"message": "Removido"}
+
+
+@router.get("/{vehicle_id}/current-driver", response_model=PossessionOut, dependencies=[Depends(get_current_user)])
+async def current_driver(vehicle_id: UUID, db: AsyncSession = Depends(get_db_session)):
+    return await PossessionService(db).get_current_driver(vehicle_id)
 
 
 @router.get("/{vehicle_id}/historico", response_model=list[LocationHistoryOut], dependencies=[Depends(get_current_user)])

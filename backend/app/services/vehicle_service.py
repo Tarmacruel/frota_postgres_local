@@ -20,7 +20,9 @@ class VehicleService:
         vehicles = await self.vehicles.list(skip=skip, limit=limit, status=status_filter)
         for vehicle in vehicles:
             active = await self.vehicles.get_active_history(vehicle.id)
+            possession = await self.vehicles.get_active_possession(vehicle.id)
             vehicle.current_department = active.department if active else None
+            vehicle.current_driver_name = possession.driver_name if possession else None
         return vehicles
 
     async def get_history(self, vehicle_id: UUID):
@@ -53,6 +55,7 @@ class VehicleService:
 
         active = await self.vehicles.get_active_history(vehicle.id)
         vehicle.current_department = active.department if active else None
+        vehicle.current_driver_name = None
         return vehicle
 
     async def update(self, vehicle_id: UUID, data: VehicleUpdate) -> Vehicle:
@@ -92,7 +95,9 @@ class VehicleService:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar o veiculo") from exc
 
         active = await self.vehicles.get_active_history(vehicle.id)
+        possession = await self.vehicles.get_active_possession(vehicle.id)
         vehicle.current_department = active.department if active else None
+        vehicle.current_driver_name = possession.driver_name if possession else None
         return vehicle
 
     async def delete(self, vehicle_id: UUID) -> None:
