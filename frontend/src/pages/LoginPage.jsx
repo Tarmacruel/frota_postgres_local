@@ -56,6 +56,14 @@ export default function LoginPage() {
               <div className="login-brand-stage-copy">
                 <strong>Prefeitura Municipal</strong>
                 <span className="login-brand-stage-city">Teixeira de Freitas</span>
+                <p className="login-brand-stage-note">
+                  Plataforma oficial para acompanhamento da frota, condutores e manutenções em um fluxo mais ágil para operação e gestão.
+                </p>
+                <div className="login-brand-stage-pills">
+                  <span>Frota</span>
+                  <span>Manutenções</span>
+                  <span>Condutores</span>
+                </div>
               </div>
             </div>
 

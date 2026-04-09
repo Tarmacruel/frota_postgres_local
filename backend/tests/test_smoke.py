@@ -23,4 +23,5 @@ async def test_openapi_contains_new_routes(client):
     assert "/api/possession" in paths
     assert "/api/possession/active" in paths
     assert "/api/possession/{possession_id}/end" in paths
+    assert "/api/search" in paths
     assert "/api/vehicles/{vehicle_id}/current-driver" in paths

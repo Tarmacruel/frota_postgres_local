@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import MaintenanceForm from '../components/MaintenanceForm'
 import api from '../api/client'
@@ -24,6 +25,7 @@ function formatMoney(value) {
 
 export default function MaintenancePage() {
   const { canWrite, canDelete, isAdmin } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [vehicles, setVehicles] = useState([])
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(true)
@@ -36,6 +38,7 @@ export default function MaintenancePage() {
   const [endFilter, setEndFilter] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState(null)
+  const focusRecordId = searchParams.get('focus')
 
   const exportColumns = [
     { header: 'Veiculo', value: (record) => record.vehicle_plate },
@@ -87,7 +90,16 @@ export default function MaintenancePage() {
     loadRecords()
   }, [vehicleFilter, startFilter, endFilter])
 
-  const filteredRecords = useMemo(() => {
+  useEffect(() => {
+    if (!focusRecordId) return
+    setSearch('')
+    setStatusFilter('TODAS')
+    setVehicleFilter('')
+    setStartFilter('')
+    setEndFilter('')
+  }, [focusRecordId])
+
+  const baseFilteredRecords = useMemo(() => {
     return records.filter((record) => {
       const term = search.trim().toLowerCase()
       const matchesSearch =
@@ -105,6 +117,25 @@ export default function MaintenancePage() {
       return matchesSearch && matchesStatus
     })
   }, [records, search, statusFilter])
+
+  const focusedRecord = focusRecordId ? records.find((record) => record.id === focusRecordId) || null : null
+  const filteredRecords = focusedRecord ? [focusedRecord] : baseFilteredRecords
+
+  function patchSearchParams(updates) {
+    const next = new URLSearchParams(searchParams)
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === '') {
+        next.delete(key)
+      } else {
+        next.set(key, value)
+      }
+    })
+    setSearchParams(next)
+  }
+
+  function clearFocus() {
+    patchSearchParams({ focus: null })
+  }
 
   async function handleDelete(id) {
     if (!window.confirm('Confirma a exclusao deste registro de manutencao?')) return
@@ -189,36 +220,38 @@ export default function MaintenancePage() {
         </div>
       </div>
 
-      <div className="toolbar-row" style={{ marginBottom: 18 }}>
-        <div className="status-pills">
-          {statusOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={`status-pill${statusFilter === option.value ? ' active' : ''}`}
-              onClick={() => setStatusFilter(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <div className="filter-inline">
-          <input
-            className="app-input"
-            placeholder="Buscar por placa, servico ou pecas"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-          <select className="app-select" value={vehicleFilter} onChange={(event) => setVehicleFilter(event.target.value)}>
-            <option value="">Todos os veiculos</option>
-            {vehicles.map((vehicle) => (
-              <option key={vehicle.id} value={vehicle.id}>
-                {vehicle.plate}
-              </option>
+      <div className="toolbar-card">
+        <div className="toolbar-row">
+          <div className="status-pills">
+            {statusOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`status-pill${statusFilter === option.value ? ' active' : ''}`}
+                onClick={() => setStatusFilter(option.value)}
+              >
+                {option.label}
+              </button>
             ))}
-          </select>
-          <input type="datetime-local" className="app-input" value={startFilter} onChange={(event) => setStartFilter(event.target.value)} />
-          <input type="datetime-local" className="app-input" value={endFilter} onChange={(event) => setEndFilter(event.target.value)} />
+          </div>
+          <div className="filter-inline">
+            <input
+              className="app-input"
+              placeholder="Buscar por placa, servico ou pecas"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <select className="app-select" value={vehicleFilter} onChange={(event) => setVehicleFilter(event.target.value)}>
+              <option value="">Todos os veiculos</option>
+              {vehicles.map((vehicle) => (
+                <option key={vehicle.id} value={vehicle.id}>
+                  {vehicle.plate}
+                </option>
+              ))}
+            </select>
+            <input type="datetime-local" className="app-input" value={startFilter} onChange={(event) => setStartFilter(event.target.value)} />
+            <input type="datetime-local" className="app-input" value={endFilter} onChange={(event) => setEndFilter(event.target.value)} />
+          </div>
         </div>
       </div>
 
@@ -236,6 +269,16 @@ export default function MaintenancePage() {
           <span>concluidas</span>
         </div>
       </div>
+
+      {focusedRecord ? (
+        <div className="table-focus-banner">
+          <div>
+            <strong>Mostrando apenas a manutencao de {focusedRecord.vehicle_plate}</strong>
+            <span>Este foco veio de uma navegacao direta. Use o botao ao lado para voltar a lista completa.</span>
+          </div>
+          <button className="ghost-button" type="button" onClick={clearFocus}>Reexibir todas</button>
+        </div>
+      ) : null}
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
@@ -268,7 +311,7 @@ export default function MaintenancePage() {
                 </tr>
               ) : (
                 filteredRecords.map((record) => (
-                  <tr key={record.id}>
+                  <tr key={record.id} className={focusedRecord?.id === record.id ? 'is-focused-row' : ''}>
                     <td data-label="Veiculo"><strong>{record.vehicle_plate}</strong></td>
                     <td data-label="Inicio">{formatDate(record.start_date)}</td>
                     <td data-label="Conclusao">{formatDate(record.end_date)}</td>

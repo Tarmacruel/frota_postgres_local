@@ -39,6 +39,7 @@ export default function VehiclesPage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
 
   const statusFilter = searchParams.get('status') || 'TODOS'
+  const focusVehicleId = searchParams.get('focus')
   const departmentOptions = ['TODOS', ...Array.from(new Set(vehicles.map((vehicle) => vehicle.current_department).filter(Boolean))).sort()]
 
   const baseFilteredVehicles = vehicles.filter((vehicle) => {
@@ -94,6 +95,22 @@ export default function VehiclesPage() {
     loadVehicles()
   }, [statusFilter])
 
+  useEffect(() => {
+    if (!focusVehicleId) {
+      if (selectedVehicle) {
+        clearHistoryFocus(false)
+      }
+      return
+    }
+
+    if (selectedVehicle?.id === focusVehicleId) return
+
+    const hasVehicleLoaded = vehicles.some((vehicle) => vehicle.id === focusVehicleId)
+    if (!hasVehicleLoaded) return
+
+    loadHistory(focusVehicleId, { toggle: false, syncUrl: false })
+  }, [focusVehicleId, vehicles])
+
   async function handleSubmit(event) {
     event.preventDefault()
     try {
@@ -135,9 +152,23 @@ export default function VehiclesPage() {
     }
   }
 
-  async function loadHistory(id) {
-    if (selectedVehicle?.id === id) {
-      clearHistoryFocus()
+  function patchSearchParams(updates) {
+    const next = new URLSearchParams(searchParams)
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === '') {
+        next.delete(key)
+      } else {
+        next.set(key, value)
+      }
+    })
+    setSearchParams(next)
+  }
+
+  async function loadHistory(id, options = {}) {
+    const { toggle = true, syncUrl = true } = options
+
+    if (toggle && selectedVehicle?.id === id) {
+      clearHistoryFocus(syncUrl)
       return
     }
 
@@ -147,6 +178,9 @@ export default function VehiclesPage() {
       const vehicle = vehicles.find((item) => item.id === id) || null
       setSelectedVehicle(vehicle)
       setSelectedHistory(data)
+      if (syncUrl) {
+        patchSearchParams({ focus: id })
+      }
     } catch (err) {
       setError(getApiErrorMessage(err, 'Nao foi possivel carregar o historico.'))
     }
@@ -190,11 +224,15 @@ export default function VehiclesPage() {
     setSearch('')
     setDepartmentFilter('TODOS')
     setSearchParams({})
+    clearHistoryFocus(false)
   }
 
-  function clearHistoryFocus() {
+  function clearHistoryFocus(syncUrl = true) {
     setSelectedVehicle(null)
     setSelectedHistory([])
+    if (syncUrl) {
+      patchSearchParams({ focus: null })
+    }
   }
 
   function formatDate(value) {
@@ -288,32 +326,34 @@ export default function VehiclesPage() {
         </div>
       </div>
 
-      <div className="toolbar-row" style={{ marginBottom: 18 }}>
-        <div className="status-pills">
-          {statusOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={`status-pill${statusFilter === option.value ? ' active' : ''}`}
-              onClick={() => handleStatusChange(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <div className="filter-inline">
-          <input
-            className="app-input"
-            placeholder="Buscar por placa, marca, modelo, departamento ou condutor"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-          <select className="app-select" value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)}>
-            {departmentOptions.map((option) => (
-              <option key={option} value={option}>{option === 'TODOS' ? 'Todos os departamentos' : option}</option>
+      <div className="toolbar-card">
+        <div className="toolbar-row">
+          <div className="status-pills">
+            {statusOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`status-pill${statusFilter === option.value ? ' active' : ''}`}
+                onClick={() => handleStatusChange(option.value)}
+              >
+                {option.label}
+              </button>
             ))}
-          </select>
-          <button className="ghost-button" type="button" onClick={clearFilters}>Limpar filtros</button>
+          </div>
+          <div className="filter-inline">
+            <input
+              className="app-input"
+              placeholder="Buscar por placa, marca, modelo, departamento ou condutor"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <select className="app-select" value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)}>
+              {departmentOptions.map((option) => (
+                <option key={option} value={option}>{option === 'TODOS' ? 'Todos os departamentos' : option}</option>
+              ))}
+            </select>
+            <button className="ghost-button" type="button" onClick={clearFilters}>Limpar filtros</button>
+          </div>
         </div>
       </div>
 
@@ -371,7 +411,7 @@ export default function VehiclesPage() {
                 </tr>
               ) : (
                 filteredVehicles.map((vehicle) => (
-                  <tr key={vehicle.id}>
+                  <tr key={vehicle.id} className={selectedVehicle?.id === vehicle.id ? 'is-focused-row' : ''}>
                     <td data-label="Placa"><strong>{vehicle.plate}</strong></td>
                     <td data-label="Marca">{vehicle.brand}</td>
                     <td data-label="Modelo">{vehicle.model}</td>

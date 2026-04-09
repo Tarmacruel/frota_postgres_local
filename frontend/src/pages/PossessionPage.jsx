@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import DriverBadge from '../components/DriverBadge'
 import PossessionForm from '../components/PossessionForm'
@@ -28,6 +29,7 @@ function buildEndState(record) {
 
 export default function PossessionPage() {
   const { canWrite, isAdmin } = useAuth()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [vehicles, setVehicles] = useState([])
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(true)
@@ -40,6 +42,7 @@ export default function PossessionPage() {
   const [endingRecord, setEndingRecord] = useState(null)
   const [endForm, setEndForm] = useState(buildEndState(null))
   const [ending, setEnding] = useState(false)
+  const focusRecordId = searchParams.get('focus')
 
   const exportColumns = [
     { header: 'Veiculo', value: (record) => record.vehicle_plate },
@@ -101,7 +104,20 @@ export default function PossessionPage() {
     loadPossessions()
   }, [vehicleFilter, viewFilter])
 
-  const filteredRecords = useMemo(() => {
+  useEffect(() => {
+    if (focusRecordId && viewFilter !== 'TODAS') {
+      setViewFilter('TODAS')
+    }
+  }, [focusRecordId, viewFilter])
+
+  useEffect(() => {
+    if (!focusRecordId) return
+    setSearch('')
+    setVehicleFilter('')
+    setViewFilter('TODAS')
+  }, [focusRecordId])
+
+  const baseFilteredRecords = useMemo(() => {
     return records.filter((record) => {
       const term = search.trim().toLowerCase()
       if (!term) return true
@@ -110,6 +126,25 @@ export default function PossessionPage() {
         .some((value) => value.toLowerCase().includes(term))
     })
   }, [records, search])
+
+  const focusedRecord = focusRecordId ? records.find((record) => record.id === focusRecordId) || null : null
+  const filteredRecords = focusedRecord ? [focusedRecord] : baseFilteredRecords
+
+  function patchSearchParams(updates) {
+    const next = new URLSearchParams(searchParams)
+    Object.entries(updates).forEach(([key, value]) => {
+      if (value === null || value === undefined || value === '') {
+        next.delete(key)
+      } else {
+        next.set(key, value)
+      }
+    })
+    setSearchParams(next)
+  }
+
+  function clearFocus() {
+    patchSearchParams({ focus: null })
+  }
 
   function openEndModal(record) {
     setEndingRecord(record)
@@ -205,34 +240,36 @@ export default function PossessionPage() {
         </div>
       </div>
 
-      <div className="toolbar-row" style={{ marginBottom: 18 }}>
-        <div className="status-pills">
-          {viewOptions.map((option) => (
-            <button
-              key={option.value}
-              type="button"
-              className={`status-pill${viewFilter === option.value ? ' active' : ''}`}
-              onClick={() => setViewFilter(option.value)}
-            >
-              {option.label}
-            </button>
-          ))}
-        </div>
-        <div className="filter-inline">
-          <input
-            className="app-input"
-            placeholder="Buscar por placa, condutor ou contato"
-            value={search}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-          <select className="app-select" value={vehicleFilter} onChange={(event) => setVehicleFilter(event.target.value)}>
-            <option value="">Todos os veiculos</option>
-            {vehicles.map((vehicle) => (
-              <option key={vehicle.id} value={vehicle.id}>
-                {vehicle.plate}
-              </option>
+      <div className="toolbar-card">
+        <div className="toolbar-row">
+          <div className="status-pills">
+            {viewOptions.map((option) => (
+              <button
+                key={option.value}
+                type="button"
+                className={`status-pill${viewFilter === option.value ? ' active' : ''}`}
+                onClick={() => setViewFilter(option.value)}
+              >
+                {option.label}
+              </button>
             ))}
-          </select>
+          </div>
+          <div className="filter-inline">
+            <input
+              className="app-input"
+              placeholder="Buscar por placa, condutor ou contato"
+              value={search}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <select className="app-select" value={vehicleFilter} onChange={(event) => setVehicleFilter(event.target.value)}>
+              <option value="">Todos os veiculos</option>
+              {vehicles.map((vehicle) => (
+                <option key={vehicle.id} value={vehicle.id}>
+                  {vehicle.plate}
+                </option>
+              ))}
+            </select>
+          </div>
         </div>
       </div>
 
@@ -246,6 +283,16 @@ export default function PossessionPage() {
           <span>posses ativas</span>
         </div>
       </div>
+
+      {focusedRecord ? (
+        <div className="table-focus-banner">
+          <div>
+            <strong>Mostrando apenas o registro de {focusedRecord.driver_name}</strong>
+            <span>Esse foco foi aberto diretamente pela busca global. Reexiba a lista para continuar navegando.</span>
+          </div>
+          <button className="ghost-button" type="button" onClick={clearFocus}>Reexibir todos</button>
+        </div>
+      ) : null}
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
@@ -277,7 +324,7 @@ export default function PossessionPage() {
                 </tr>
               ) : (
                 filteredRecords.map((record) => (
-                  <tr key={record.id}>
+                  <tr key={record.id} className={focusedRecord?.id === record.id ? 'is-focused-row' : ''}>
                     <td data-label="Veiculo"><strong>{record.vehicle_plate}</strong></td>
                     <td data-label="Condutor">
                       <DriverBadge
