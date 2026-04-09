@@ -1,5 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import api from '../api/client'
+import { canDelete, canWrite, getRoleLabel, isAdmin } from '../utils/roles'
 
 const AuthContext = createContext(null)
 
@@ -43,7 +44,17 @@ export function AuthProvider({ children }) {
     setLoading(false)
   }
 
-  const value = useMemo(() => ({ user, loading, login, logout, reload: loadMe }), [user, loading])
+  const value = useMemo(() => ({
+    user,
+    loading,
+    login,
+    logout,
+    reload: loadMe,
+    isAdmin: isAdmin(user?.role),
+    canWrite: canWrite(user?.role),
+    canDelete: canDelete(user?.role),
+    roleLabel: getRoleLabel(user?.role),
+  }), [user, loading])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

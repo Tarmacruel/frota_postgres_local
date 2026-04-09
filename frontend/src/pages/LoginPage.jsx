@@ -41,7 +41,7 @@ export default function LoginPage() {
       <div className="login-stage">
         <div className="login-card">
           <section className="login-card-panel login-card-panel-brand">
-            <div>
+            <div className="login-brand-header">
               <span className="eyebrow">Acesso institucional protegido</span>
               <div className="login-brandline">
                 <img className="login-brand-logo" src={officialBrand.logoPath} alt="Brasao oficial da Prefeitura Municipal de Teixeira de Freitas" />
@@ -50,33 +50,19 @@ export default function LoginPage() {
                   <span>{officialBrand.subtitle}</span>
                 </div>
               </div>
-              <h1 className="login-title">Acesse a operacao oficial da frota municipal.</h1>
-              <p className="login-copy">
-                Entre com sua conta institucional para acompanhar veiculos, manutencoes e condutores em um ambiente alinhado a identidade oficial da Prefeitura Municipal de Teixeira de Freitas.
-              </p>
             </div>
 
-            <div className="hero-grid">
-              <div className="hero-figure">
-                <span>Fluxo centralizado</span>
-                <strong>Veiculos, oficinas e condutores</strong>
-                <span>Leitura imediata para operacao, consulta e decisao administrativa.</span>
-              </div>
-              <div className="hero-figure">
-                <span>Ambiente institucional</span>
-                <strong>Identidade oficial PMTF</strong>
-                <span>Brasao, subdominio e relatorios com aparencia profissional e padronizada.</span>
-              </div>
-              <div className="hero-figure">
-                <span>Base segura</span>
-                <strong>PostgreSQL nativo</strong>
-                <span>Execucao leve no host, pronta para publicacao em frota.sirel.com.br.</span>
+            <div className="login-brand-stage">
+              <div className="login-brand-stage-copy">
+                <strong>Prefeitura Municipal</strong>
+                <span className="login-brand-stage-city">Teixeira de Freitas</span>
               </div>
             </div>
 
             <div className="login-civic-bar">
               <span>{officialBrand.addressLine}</span>
               <span>CNPJ {officialBrand.cnpj}</span>
+              <span>Desenvolvido por Jonatas da Silva Sousa.</span>
             </div>
           </section>
 

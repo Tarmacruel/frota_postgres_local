@@ -10,6 +10,7 @@ from app.models.user import User
 from app.repositories.maintenance_repository import MaintenanceRepository
 from app.repositories.vehicle_repository import VehicleRepository
 from app.schemas.maintenance import MaintenanceCreate, MaintenanceUpdate
+from app.services.audit_service import AuditService
 
 
 class MaintenanceService:
@@ -17,6 +18,7 @@ class MaintenanceService:
         self.db = db
         self.records = MaintenanceRepository(db)
         self.vehicles = VehicleRepository(db)
+        self.audit = AuditService(db)
 
     async def list(
         self,
@@ -48,6 +50,21 @@ class MaintenanceService:
 
         try:
             await self.records.create(record)
+            await self.audit.record(
+                actor=current_user,
+                action="CREATE",
+                entity_type="MAINTENANCE",
+                entity_id=record.id,
+                entity_label=f"{record.vehicle.plate if record.vehicle else data.vehicle_id} - {record.service_description[:60]}",
+                details={
+                    "vehicle_id": str(record.vehicle_id),
+                    "service_description": record.service_description,
+                    "parts_replaced": record.parts_replaced,
+                    "total_cost": str(record.total_cost),
+                    "start_date": record.start_date.isoformat(),
+                    "end_date": record.end_date.isoformat() if record.end_date else None,
+                },
+            )
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
@@ -55,12 +72,18 @@ class MaintenanceService:
 
         return await self.get(record.id)
 
-    async def update(self, record_id: UUID, data: MaintenanceUpdate) -> dict:
+    async def update(self, record_id: UUID, data: MaintenanceUpdate, current_user: User) -> dict:
         record = await self.records.get_by_id(record_id)
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de manutencao nao encontrado")
 
         payload = data.model_dump(exclude_unset=True)
+        previous_values = {
+            "service_description": record.service_description,
+            "parts_replaced": record.parts_replaced,
+            "total_cost": str(record.total_cost),
+            "end_date": record.end_date.isoformat() if record.end_date else None,
+        }
         next_end_date = payload["end_date"] if "end_date" in payload else record.end_date
         if next_end_date and next_end_date < record.start_date:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data final nao pode ser anterior a data inicial")
@@ -69,6 +92,22 @@ class MaintenanceService:
             setattr(record, field, value)
 
         try:
+            await self.audit.record(
+                actor=current_user,
+                action="UPDATE",
+                entity_type="MAINTENANCE",
+                entity_id=record.id,
+                entity_label=f"{record.vehicle.plate if record.vehicle else record.vehicle_id} - {record.service_description[:60]}",
+                details={
+                    "before": previous_values,
+                    "after": {
+                        "service_description": record.service_description,
+                        "parts_replaced": record.parts_replaced,
+                        "total_cost": str(record.total_cost),
+                        "end_date": record.end_date.isoformat() if record.end_date else None,
+                    },
+                },
+            )
             await self.db.flush()
             await self.db.commit()
         except IntegrityError as exc:
@@ -77,12 +116,25 @@ class MaintenanceService:
 
         return await self.get(record.id)
 
-    async def delete(self, record_id: UUID) -> None:
+    async def delete(self, record_id: UUID, current_user: User) -> None:
         record = await self.records.get_by_id(record_id)
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de manutencao nao encontrado")
 
         try:
+            await self.audit.record(
+                actor=current_user,
+                action="DELETE",
+                entity_type="MAINTENANCE",
+                entity_id=record.id,
+                entity_label=f"{record.vehicle.plate if record.vehicle else record.vehicle_id} - {record.service_description[:60]}",
+                details={
+                    "parts_replaced": record.parts_replaced,
+                    "total_cost": str(record.total_cost),
+                    "start_date": record.start_date.isoformat(),
+                    "end_date": record.end_date.isoformat() if record.end_date else None,
+                },
+            )
             await self.records.delete(record)
             await self.db.commit()
         except IntegrityError as exc:

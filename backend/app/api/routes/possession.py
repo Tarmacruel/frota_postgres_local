@@ -3,8 +3,9 @@ from __future__ import annotations
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user, require_admin
+from app.api.deps import get_current_user, require_writer
 from app.db.session import get_db_session
+from app.models.user import User
 from app.schemas.possession import PossessionCreate, PossessionOut, PossessionUpdate
 from app.services.possession_service import PossessionService
 
@@ -25,11 +26,20 @@ async def list_active_possession(db: AsyncSession = Depends(get_db_session)):
     return await PossessionService(db).list_active()
 
 
-@router.post("", response_model=PossessionOut, dependencies=[Depends(require_admin)])
-async def create_possession(data: PossessionCreate, db: AsyncSession = Depends(get_db_session)):
-    return await PossessionService(db).start(data)
+@router.post("", response_model=PossessionOut)
+async def create_possession(
+    data: PossessionCreate,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_writer),
+):
+    return await PossessionService(db).start(data, current_user)
 
 
-@router.put("/{possession_id}/end", response_model=PossessionOut, dependencies=[Depends(require_admin)])
-async def end_possession(possession_id: UUID, data: PossessionUpdate, db: AsyncSession = Depends(get_db_session)):
-    return await PossessionService(db).end(possession_id, data)
+@router.put("/{possession_id}/end", response_model=PossessionOut)
+async def end_possession(
+    possession_id: UUID,
+    data: PossessionUpdate,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_writer),
+):
+    return await PossessionService(db).end(possession_id, data, current_user)

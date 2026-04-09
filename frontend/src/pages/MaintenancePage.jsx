@@ -23,7 +23,7 @@ function formatMoney(value) {
 }
 
 export default function MaintenancePage() {
-  const { user } = useAuth()
+  const { canWrite, canDelete, isAdmin } = useAuth()
   const [vehicles, setVehicles] = useState([])
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(true)
@@ -179,7 +179,7 @@ export default function MaintenancePage() {
           <p className="section-copy">Acompanhe revisoes concluidas e servicos ainda em aberto sem sair do painel principal.</p>
         </div>
         <div className="actions-inline">
-          {user?.role === 'ADMIN' ? (
+          {canWrite ? (
             <button className="app-button" type="button" onClick={() => setIsModalOpen(true)}>
               Nova manutencao
             </button>
@@ -252,17 +252,17 @@ export default function MaintenancePage() {
                 <th>Pecas</th>
                 <th>Custo</th>
                 <th>Status</th>
-                {user?.role === 'ADMIN' ? <th>Acoes</th> : null}
+                {canWrite ? <th>Acoes</th> : null}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={user?.role === 'ADMIN' ? 8 : 7} className="muted">Carregando manutencoes...</td>
+                  <td colSpan={canWrite ? 8 : 7} className="muted">Carregando manutencoes...</td>
                 </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={user?.role === 'ADMIN' ? 8 : 7}>
+                  <td colSpan={canWrite ? 8 : 7}>
                     <div className="empty-state">Nenhum registro encontrado para os filtros atuais.</div>
                   </td>
                 </tr>
@@ -276,6 +276,7 @@ export default function MaintenancePage() {
                       <div className="stack">
                         <strong>{record.service_description}</strong>
                         <span className="muted">Atualizado em {formatDate(record.updated_at)}</span>
+                        {isAdmin ? <span className="muted">Criado em {formatDate(record.created_at)}</span> : null}
                       </div>
                     </td>
                     <td data-label="Pecas">{record.parts_replaced || 'Sem observacao'}</td>
@@ -285,15 +286,17 @@ export default function MaintenancePage() {
                         {record.end_date ? 'CONCLUIDA' : 'EM ANDAMENTO'}
                       </span>
                     </td>
-                    {user?.role === 'ADMIN' ? (
+                    {canWrite ? (
                       <td data-label="Acoes">
                         <div className="actions-inline">
                           <button type="button" className="mini-button" onClick={() => { setEditingRecord(record); setIsModalOpen(true) }}>
                             Editar
                           </button>
-                          <button type="button" className="mini-button danger" onClick={() => handleDelete(record.id)}>
-                            Excluir
-                          </button>
+                          {canDelete ? (
+                            <button type="button" className="mini-button danger" onClick={() => handleDelete(record.id)}>
+                              Excluir
+                            </button>
+                          ) : null}
                         </div>
                       </td>
                     ) : null}

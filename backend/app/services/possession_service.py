@@ -5,10 +5,12 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.models.user import User
 from app.models.possession import VehiclePossession
 from app.repositories.possession_repository import PossessionRepository
 from app.repositories.vehicle_repository import VehicleRepository
 from app.schemas.possession import PossessionCreate, PossessionUpdate
+from app.services.audit_service import AuditService
 
 
 class PossessionService:
@@ -16,6 +18,7 @@ class PossessionService:
         self.db = db
         self.possessions = PossessionRepository(db)
         self.vehicles = VehicleRepository(db)
+        self.audit = AuditService(db)
 
     async def list(self, vehicle_id: UUID | None = None, active: bool | None = None) -> list[dict]:
         records = await self.possessions.list(vehicle_id=vehicle_id, active=active)
@@ -31,7 +34,7 @@ class PossessionService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nenhum condutor ativo encontrado para este veiculo")
         return self._serialize(record)
 
-    async def start(self, data: PossessionCreate) -> dict:
+    async def start(self, data: PossessionCreate, current_user: User) -> dict:
         await self._ensure_vehicle_exists(data.vehicle_id)
 
         effective_start = data.start_date or datetime.now(timezone.utc)
@@ -54,6 +57,20 @@ class PossessionService:
         try:
             await self.possessions.end_active_for_vehicle(data.vehicle_id, effective_start)
             await self.possessions.create(possession)
+            await self.audit.record(
+                actor=current_user,
+                action="CREATE",
+                entity_type="POSSESSION",
+                entity_id=possession.id,
+                entity_label=f"{possession.vehicle.plate if possession.vehicle else data.vehicle_id} - {possession.driver_name}",
+                details={
+                    "vehicle_id": str(possession.vehicle_id),
+                    "driver_document": possession.driver_document,
+                    "driver_contact": possession.driver_contact,
+                    "start_date": possession.start_date.isoformat(),
+                    "observation": possession.observation,
+                },
+            )
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
@@ -61,7 +78,7 @@ class PossessionService:
 
         return await self._get_by_id(possession.id)
 
-    async def end(self, possession_id: UUID, data: PossessionUpdate) -> dict:
+    async def end(self, possession_id: UUID, data: PossessionUpdate, current_user: User) -> dict:
         possession = await self.possessions.get_by_id(possession_id)
         if not possession:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse nao encontrado")
@@ -78,6 +95,18 @@ class PossessionService:
             possession.observation = payload["observation"]
 
         try:
+            await self.audit.record(
+                actor=current_user,
+                action="UPDATE",
+                entity_type="POSSESSION",
+                entity_id=possession.id,
+                entity_label=f"{possession.vehicle.plate if possession.vehicle else possession.vehicle_id} - {possession.driver_name}",
+                details={
+                    "event": "END_POSSESSION",
+                    "end_date": possession.end_date.isoformat() if possession.end_date else None,
+                    "observation": possession.observation,
+                },
+            )
             await self.db.flush()
             await self.db.commit()
         except IntegrityError as exc:

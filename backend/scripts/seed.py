@@ -36,6 +36,16 @@ async def seed() -> None:
                 )
                 session.add(standard)
 
+            production = await session.scalar(select(User).where(User.email == "producao@frota.local"))
+            if not production:
+                production = User(
+                    name="Usuario de Producao",
+                    email="producao@frota.local",
+                    password_hash=get_password_hash("Producao@1234"),
+                    role=UserRole.PRODUCAO,
+                )
+                session.add(production)
+
             vehicles_data = [
                 ("ABC-1D23", "Ford", "Ka", VehicleStatus.ATIVO, "Secretaria de Administracao"),
                 ("DEF-4E56", "Chevrolet", "Onix", VehicleStatus.MANUTENCAO, "Oficina Central"),

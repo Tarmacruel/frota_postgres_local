@@ -115,9 +115,15 @@ export default function DashboardPage() {
     })
     actions.push({
       title: 'Gestao de usuarios',
-      description: 'Controle administradores e perfis padrao com rastreabilidade simples.',
+      description: 'Controle administradores, operadores de producao e perfis de consulta.',
       to: '/users',
       cta: 'Abrir usuarios',
+    })
+    actions.push({
+      title: 'Auditoria administrativa',
+      description: 'Revise a trilha de criacoes, edicoes e exclusoes das areas sensiveis.',
+      to: '/auditoria',
+      cta: 'Abrir auditoria',
     })
   }
 
@@ -174,7 +180,7 @@ export default function DashboardPage() {
           <ul className="bullet-list">
             <li className="bullet-item">Use o painel de veiculos para cadastrar, editar e visualizar lotacao atual.</li>
             <li className="bullet-item">As telas de manutencoes e condutores centralizam historico mecanico e posse atual por veiculo.</li>
-            <li className="bullet-item">O perfil padrao navega em leitura, enquanto o perfil administrador libera gestao completa.</li>
+            <li className="bullet-item">O perfil padrao fica em leitura, o perfil de producao cadastra e edita, e o admin mantem controle total.</li>
           </ul>
         </section>
       </div>

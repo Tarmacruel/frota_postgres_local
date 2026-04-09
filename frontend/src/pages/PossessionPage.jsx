@@ -27,7 +27,7 @@ function buildEndState(record) {
 }
 
 export default function PossessionPage() {
-  const { user } = useAuth()
+  const { canWrite, isAdmin } = useAuth()
   const [vehicles, setVehicles] = useState([])
   const [records, setRecords] = useState([])
   const [loading, setLoading] = useState(true)
@@ -195,7 +195,7 @@ export default function PossessionPage() {
           <p className="section-copy">Controle quem esta com cada veiculo e mantenha um historico simples de transferencias.</p>
         </div>
         <div className="actions-inline">
-          {user?.role === 'ADMIN' ? (
+          {canWrite ? (
             <button className="app-button" type="button" onClick={() => setIsCreateModalOpen(true)}>
               Nova posse
             </button>
@@ -261,17 +261,17 @@ export default function PossessionPage() {
                 <th>Fim</th>
                 <th>Observacao</th>
                 <th>Status</th>
-                {user?.role === 'ADMIN' ? <th>Acoes</th> : null}
+                {canWrite ? <th>Acoes</th> : null}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={user?.role === 'ADMIN' ? 7 : 6} className="muted">Carregando posses...</td>
+                  <td colSpan={canWrite ? 7 : 6} className="muted">Carregando posses...</td>
                 </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={user?.role === 'ADMIN' ? 7 : 6}>
+                  <td colSpan={canWrite ? 7 : 6}>
                     <div className="empty-state">Nenhum registro de posse encontrado para os filtros atuais.</div>
                   </td>
                 </tr>
@@ -288,13 +288,18 @@ export default function PossessionPage() {
                     </td>
                     <td data-label="Inicio">{formatDate(record.start_date)}</td>
                     <td data-label="Fim">{formatDate(record.end_date)}</td>
-                    <td data-label="Observacao">{record.observation || 'Sem observacao'}</td>
+                    <td data-label="Observacao">
+                      <div className="stack">
+                        <span>{record.observation || 'Sem observacao'}</span>
+                        {isAdmin ? <span className="muted">Criado em {formatDate(record.created_at)}</span> : null}
+                      </div>
+                    </td>
                     <td data-label="Status">
                       <span className={`status-badge ${record.is_active ? 'status-ATIVO' : 'status-INATIVO'}`}>
                         {record.is_active ? 'ATIVA' : 'ENCERRADA'}
                       </span>
                     </td>
-                    {user?.role === 'ADMIN' ? (
+                    {canWrite ? (
                       <td data-label="Acoes">
                         {record.is_active ? (
                           <button type="button" className="mini-button" onClick={() => openEndModal(record)}>

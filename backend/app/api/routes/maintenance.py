@@ -4,7 +4,7 @@ from datetime import datetime
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user, require_admin
+from app.api.deps import get_current_user, require_admin, require_writer
 from app.db.session import get_db_session
 from app.models.user import User
 from app.schemas.auth import MessageOut
@@ -33,17 +33,26 @@ async def get_maintenance(record_id: UUID, db: AsyncSession = Depends(get_db_ses
 async def create_maintenance(
     data: MaintenanceCreate,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_writer),
 ):
     return await MaintenanceService(db).create(data, current_user)
 
 
-@router.put("/{record_id}", response_model=MaintenanceOut, dependencies=[Depends(require_admin)])
-async def update_maintenance(record_id: UUID, data: MaintenanceUpdate, db: AsyncSession = Depends(get_db_session)):
-    return await MaintenanceService(db).update(record_id, data)
+@router.put("/{record_id}", response_model=MaintenanceOut)
+async def update_maintenance(
+    record_id: UUID,
+    data: MaintenanceUpdate,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_writer),
+):
+    return await MaintenanceService(db).update(record_id, data, current_user)
 
 
-@router.delete("/{record_id}", response_model=MessageOut, dependencies=[Depends(require_admin)])
-async def delete_maintenance(record_id: UUID, db: AsyncSession = Depends(get_db_session)):
-    await MaintenanceService(db).delete(record_id)
+@router.delete("/{record_id}", response_model=MessageOut)
+async def delete_maintenance(
+    record_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_admin),
+):
+    await MaintenanceService(db).delete(record_id, current_user)
     return {"message": "Removido"}

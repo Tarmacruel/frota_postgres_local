@@ -6,7 +6,9 @@ from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.location_history import LocationHistory
+from app.models.user import User
 from app.models.vehicle import Vehicle, VehicleStatus
+from app.services.audit_service import AuditService
 from app.repositories.vehicle_repository import VehicleRepository
 from app.schemas.vehicle import VehicleCreate, VehicleUpdate
 
@@ -15,6 +17,7 @@ class VehicleService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.vehicles = VehicleRepository(db)
+        self.audit = AuditService(db)
 
     async def list(self, skip: int, limit: int, status_filter: VehicleStatus | None):
         vehicles = await self.vehicles.list(skip=skip, limit=limit, status=status_filter)
@@ -31,7 +34,7 @@ class VehicleService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
         return await self.vehicles.list_history(vehicle_id)
 
-    async def create(self, data: VehicleCreate) -> Vehicle:
+    async def create(self, data: VehicleCreate, current_user: User) -> Vehicle:
         existing = await self.vehicles.get_by_plate(data.plate.upper())
         if existing:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Placa ja cadastrada")
@@ -48,6 +51,19 @@ class VehicleService:
             vehicle = await self.vehicles.create(vehicle)
             history.vehicle_id = vehicle.id
             await self.vehicles.create_history(history)
+            await self.audit.record(
+                actor=current_user,
+                action="CREATE",
+                entity_type="VEHICLE",
+                entity_id=vehicle.id,
+                entity_label=vehicle.plate,
+                details={
+                    "brand": vehicle.brand,
+                    "model": vehicle.model,
+                    "status": vehicle.status.value,
+                    "department": history.department,
+                },
+            )
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
@@ -58,10 +74,19 @@ class VehicleService:
         vehicle.current_driver_name = None
         return vehicle
 
-    async def update(self, vehicle_id: UUID, data: VehicleUpdate) -> Vehicle:
+    async def update(self, vehicle_id: UUID, data: VehicleUpdate, current_user: User) -> Vehicle:
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+
+        previous_active = await self.vehicles.get_active_history(vehicle.id)
+        previous_values = {
+            "plate": vehicle.plate,
+            "brand": vehicle.brand,
+            "model": vehicle.model,
+            "status": vehicle.status.value,
+            "department": previous_active.department if previous_active else None,
+        }
 
         if data.plate and data.plate.upper().strip() != vehicle.plate:
             duplicate = await self.vehicles.get_by_plate(data.plate.upper().strip())
@@ -87,6 +112,24 @@ class VehicleService:
                     new_history = LocationHistory(vehicle_id=vehicle.id, department=data.department.strip())
                     await self.vehicles.create_history(new_history)
 
+            updated_active = await self.vehicles.get_active_history(vehicle.id)
+            await self.audit.record(
+                actor=current_user,
+                action="UPDATE",
+                entity_type="VEHICLE",
+                entity_id=vehicle.id,
+                entity_label=vehicle.plate,
+                details={
+                    "before": previous_values,
+                    "after": {
+                        "plate": vehicle.plate,
+                        "brand": vehicle.brand,
+                        "model": vehicle.model,
+                        "status": vehicle.status.value,
+                        "department": updated_active.department if updated_active else None,
+                    },
+                },
+            )
             await self.db.flush()
             await self.db.refresh(vehicle)
             await self.db.commit()
@@ -100,12 +143,29 @@ class VehicleService:
         vehicle.current_driver_name = possession.driver_name if possession else None
         return vehicle
 
-    async def delete(self, vehicle_id: UUID) -> None:
+    async def delete(self, vehicle_id: UUID, current_user: User) -> None:
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
 
+        active = await self.vehicles.get_active_history(vehicle.id)
+        possession = await self.vehicles.get_active_possession(vehicle.id)
+
         try:
+            await self.audit.record(
+                actor=current_user,
+                action="DELETE",
+                entity_type="VEHICLE",
+                entity_id=vehicle.id,
+                entity_label=vehicle.plate,
+                details={
+                    "brand": vehicle.brand,
+                    "model": vehicle.model,
+                    "status": vehicle.status.value,
+                    "department": active.department if active else None,
+                    "current_driver": possession.driver_name if possession else None,
+                },
+            )
             await self.vehicles.delete(vehicle)
             await self.db.commit()
         except IntegrityError as exc:

@@ -3,8 +3,9 @@ from __future__ import annotations
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user, require_admin
+from app.api.deps import get_current_user, require_admin, require_writer
 from app.db.session import get_db_session
+from app.models.user import User
 from app.models.vehicle import VehicleStatus
 from app.schemas.auth import MessageOut
 from app.schemas.history import LocationHistoryOut
@@ -41,19 +42,32 @@ async def vehicles_inactive(db: AsyncSession = Depends(get_db_session)):
     return await VehicleService(db).list(skip=0, limit=200, status_filter=VehicleStatus.INATIVO)
 
 
-@router.post("", response_model=VehicleOut, status_code=status.HTTP_201_CREATED, dependencies=[Depends(require_admin)])
-async def create_vehicle(data: VehicleCreate, db: AsyncSession = Depends(get_db_session)):
-    return await VehicleService(db).create(data)
+@router.post("", response_model=VehicleOut, status_code=status.HTTP_201_CREATED)
+async def create_vehicle(
+    data: VehicleCreate,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_writer),
+):
+    return await VehicleService(db).create(data, current_user)
 
 
-@router.put("/{vehicle_id}", response_model=VehicleOut, dependencies=[Depends(require_admin)])
-async def update_vehicle(vehicle_id: UUID, data: VehicleUpdate, db: AsyncSession = Depends(get_db_session)):
-    return await VehicleService(db).update(vehicle_id, data)
+@router.put("/{vehicle_id}", response_model=VehicleOut)
+async def update_vehicle(
+    vehicle_id: UUID,
+    data: VehicleUpdate,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_writer),
+):
+    return await VehicleService(db).update(vehicle_id, data, current_user)
 
 
-@router.delete("/{vehicle_id}", response_model=MessageOut, dependencies=[Depends(require_admin)])
-async def delete_vehicle(vehicle_id: UUID, db: AsyncSession = Depends(get_db_session)):
-    await VehicleService(db).delete(vehicle_id)
+@router.delete("/{vehicle_id}", response_model=MessageOut)
+async def delete_vehicle(
+    vehicle_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_admin),
+):
+    await VehicleService(db).delete(vehicle_id, current_user)
     return {"message": "Removido"}
 
 

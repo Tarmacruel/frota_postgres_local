@@ -23,7 +23,7 @@ const statusOptions = [
 ]
 
 export default function VehiclesPage() {
-  const { user } = useAuth()
+  const { canWrite, canDelete, isAdmin } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [vehicles, setVehicles] = useState([])
   const [form, setForm] = useState(initialForm)
@@ -41,7 +41,7 @@ export default function VehiclesPage() {
   const statusFilter = searchParams.get('status') || 'TODOS'
   const departmentOptions = ['TODOS', ...Array.from(new Set(vehicles.map((vehicle) => vehicle.current_department).filter(Boolean))).sort()]
 
-  const filteredVehicles = vehicles.filter((vehicle) => {
+  const baseFilteredVehicles = vehicles.filter((vehicle) => {
     const term = search.trim().toLowerCase()
     const matchesSearch =
       !term ||
@@ -54,6 +54,10 @@ export default function VehiclesPage() {
 
     return matchesSearch && matchesDepartment
   })
+
+  const filteredVehicles = selectedVehicle
+    ? vehicles.filter((vehicle) => vehicle.id === selectedVehicle.id)
+    : baseFilteredVehicles
 
   const exportColumns = [
     { header: 'Placa', value: (vehicle) => vehicle.plate },
@@ -72,6 +76,13 @@ export default function VehiclesPage() {
       const params = statusFilter !== 'TODOS' ? { status: statusFilter } : undefined
       const { data } = await api.get('/vehicles', { params })
       setVehicles(data)
+      if (selectedVehicle?.id) {
+        const updatedSelection = data.find((vehicle) => vehicle.id === selectedVehicle.id) || null
+        setSelectedVehicle(updatedSelection)
+        if (!updatedSelection) {
+          setSelectedHistory([])
+        }
+      }
     } catch (err) {
       setError(getApiErrorMessage(err, 'Nao foi possivel carregar os veiculos.'))
     } finally {
@@ -125,6 +136,11 @@ export default function VehiclesPage() {
   }
 
   async function loadHistory(id) {
+    if (selectedVehicle?.id === id) {
+      clearHistoryFocus()
+      return
+    }
+
     try {
       setError('')
       const { data } = await api.get(`/vehicles/${id}/historico`)
@@ -176,6 +192,11 @@ export default function VehiclesPage() {
     setSearchParams({})
   }
 
+  function clearHistoryFocus() {
+    setSelectedVehicle(null)
+    setSelectedHistory([])
+  }
+
   function formatDate(value) {
     if (!value) return 'Atual'
     return new Date(value).toLocaleString('pt-BR')
@@ -224,6 +245,35 @@ export default function VehiclesPage() {
     }
   }
 
+  async function handleExportHistoryPdf() {
+    if (!selectedVehicle || selectedHistory.length === 0) {
+      setFeedback('Selecione um veiculo com historico carregado para exportar o PDF.')
+      return
+    }
+
+    const historyColumns = [
+      { header: 'Veiculo', value: () => selectedVehicle.plate },
+      { header: 'Departamento', value: (item) => item.department || 'Sem departamento informado' },
+      { header: 'Inicio', value: (item) => formatDate(item.start_date) },
+      { header: 'Fim', value: (item) => item.end_date ? formatDate(item.end_date) : 'Atual' },
+    ]
+
+    try {
+      setError('')
+      setFeedback('')
+      await exportRowsToPdf({
+        title: `Frota PMTF - Historico ${selectedVehicle.plate}`,
+        fileName: `frota-pmtf-historico-${selectedVehicle.plate.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+        subtitle: `Historico de lotacao do veiculo ${selectedVehicle.plate} | ${selectedVehicle.brand} ${selectedVehicle.model} | Condutor atual: ${selectedVehicle.current_driver_name || 'Sem condutor ativo'}.`,
+        columns: historyColumns,
+        rows: selectedHistory,
+      })
+      setFeedback(`Historico de ${selectedVehicle.plate} exportado em PDF com sucesso.`)
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Nao foi possivel exportar o historico do veiculo em PDF.'))
+    }
+  }
+
   return (
     <div className="surface-panel">
       <div className="panel-heading">
@@ -232,7 +282,7 @@ export default function VehiclesPage() {
           <p className="section-copy">Tabela principal ampliada para consulta, filtros rapidos e cadastro via modal sem comprimir a visualizacao.</p>
         </div>
         <div className="actions-inline">
-          {user?.role === 'ADMIN' ? <button className="app-button" type="button" onClick={openNewVehicleModal}>Novo veiculo</button> : null}
+          {canWrite ? <button className="app-button" type="button" onClick={openNewVehicleModal}>Novo veiculo</button> : null}
           <button className="secondary-button" type="button" onClick={handleExportPdf}>Exportar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
@@ -278,6 +328,16 @@ export default function VehiclesPage() {
         </div>
       </div>
 
+      {selectedVehicle ? (
+        <div className="table-focus-banner">
+          <div>
+            <strong>Mostrando apenas {selectedVehicle.plate}</strong>
+            <span>Clique em Historico novamente no mesmo veiculo para voltar para a lista completa.</span>
+          </div>
+          <button className="ghost-button" type="button" onClick={clearHistoryFocus}>Reexibir todos</button>
+        </div>
+      ) : null}
+
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
@@ -321,9 +381,12 @@ export default function VehiclesPage() {
                     <td data-label="Atualizado em">{formatDate(vehicle.updated_at)}</td>
                     <td data-label="Acoes">
                       <div className="actions-inline">
-                        <button type="button" className="mini-button" onClick={() => loadHistory(vehicle.id)}>Historico</button>
-                        {user?.role === 'ADMIN' ? <button type="button" className="mini-button" onClick={() => editVehicle(vehicle)}>Editar</button> : null}
-                        {user?.role === 'ADMIN' ? <button type="button" className="mini-button danger" onClick={() => handleDelete(vehicle.id)}>Excluir</button> : null}
+                        <button type="button" className="mini-button" onClick={() => loadHistory(vehicle.id)}>
+                          {selectedVehicle?.id === vehicle.id ? 'Fechar historico' : 'Historico'}
+                        </button>
+                        {selectedVehicle?.id === vehicle.id ? <span className="focus-inline">em foco</span> : null}
+                        {canWrite ? <button type="button" className="mini-button" onClick={() => editVehicle(vehicle)}>Editar</button> : null}
+                        {canDelete ? <button type="button" className="mini-button danger" onClick={() => handleDelete(vehicle.id)}>Excluir</button> : null}
                       </div>
                     </td>
                   </tr>
@@ -347,6 +410,22 @@ export default function VehiclesPage() {
               </p>
             ) : null}
           </div>
+          {selectedVehicle ? (
+            <div className="actions-inline">
+              {selectedHistory.length > 0 ? (
+                <button className="secondary-button" type="button" onClick={handleExportHistoryPdf}>
+                  Historico em PDF
+                </button>
+              ) : null}
+              {isAdmin ? (
+                <div className="audit-card">
+                  <strong>Auditoria visivel para admin</strong>
+                  <span>Criado em {formatDate(selectedVehicle.created_at)}</span>
+                  <span>Atualizado em {formatDate(selectedVehicle.updated_at)}</span>
+                </div>
+              ) : null}
+            </div>
+          ) : null}
         </div>
         {selectedHistory.length > 0 ? (
           <ul className="history-list history-grid">

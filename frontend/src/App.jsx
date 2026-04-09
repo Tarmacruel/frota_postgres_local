@@ -3,6 +3,7 @@ import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './context/AuthContext'
 import DashboardPage from './pages/DashboardPage'
+import AuditPage from './pages/AuditPage'
 import LoginPage from './pages/LoginPage'
 import MaintenancePage from './pages/MaintenancePage'
 import PossessionPage from './pages/PossessionPage'
@@ -32,6 +33,14 @@ export default function App() {
               element={
                 <ProtectedRoute adminOnly>
                   <UsersPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="auditoria"
+              element={
+                <ProtectedRoute adminOnly>
+                  <AuditPage />
                 </ProtectedRoute>
               }
             />

@@ -146,4 +146,30 @@ foreach ($statement in $functionStatements) {
     }
 }
 
+$typeOwnerSql = @"
+SELECT format(
+    'ALTER TYPE %I.%I OWNER TO %I;',
+    n.nspname,
+    t.typname,
+    '$DbUser'
+)
+FROM pg_type t
+JOIN pg_namespace n ON n.oid = t.typnamespace
+WHERE n.nspname = 'public'
+  AND t.typname IN ('user_role', 'vehicle_status')
+  AND pg_get_userbyid(t.typowner) <> '$DbUser';
+"@
+
+$typeStatements = & $psqlExe -h 127.0.0.1 -p $Port -U postgres -d $Database -tA -c $typeOwnerSql
+foreach ($statement in $typeStatements) {
+    if ([string]::IsNullOrWhiteSpace($statement)) {
+        continue
+    }
+
+    & $psqlExe -h 127.0.0.1 -p $Port -U postgres -d $Database -c $statement | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        throw "Falha ao ajustar o proprietario de um tipo em '$Database'."
+    }
+}
+
 Write-Output "PostgreSQL local pronto em 127.0.0.1:$Port/$Database"
