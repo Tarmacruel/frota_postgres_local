@@ -5,7 +5,12 @@ import pytest
 async def test_root(client):
     resp = await client.get("/")
     assert resp.status_code == 200
-    assert resp.json()["message"] == "API da Frota PMTF"
+    content_type = resp.headers.get("content-type", "")
+    if "application/json" in content_type:
+        assert resp.json()["message"] == "API da Frota PMTF"
+    else:
+        assert "text/html" in content_type
+        assert "<div id=\"root\"></div>" in resp.text
 
 
 @pytest.mark.asyncio

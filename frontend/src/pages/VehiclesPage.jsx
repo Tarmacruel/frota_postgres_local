@@ -254,7 +254,6 @@ export default function VehiclesPage() {
         <div className="filter-inline">
           <input
             className="app-input"
-            style={{ minWidth: 280 }}
             placeholder="Buscar por placa, marca, modelo, departamento ou condutor"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -313,14 +312,14 @@ export default function VehiclesPage() {
               ) : (
                 filteredVehicles.map((vehicle) => (
                   <tr key={vehicle.id}>
-                    <td><strong>{vehicle.plate}</strong></td>
-                    <td>{vehicle.brand}</td>
-                    <td>{vehicle.model}</td>
-                    <td><span className={`status-badge status-${vehicle.status}`}>{vehicle.status}</span></td>
-                    <td>{vehicle.current_department || 'Sem lotacao registrada'}</td>
-                    <td><DriverBadge name={vehicle.current_driver_name} /></td>
-                    <td>{formatDate(vehicle.updated_at)}</td>
-                    <td>
+                    <td data-label="Placa"><strong>{vehicle.plate}</strong></td>
+                    <td data-label="Marca">{vehicle.brand}</td>
+                    <td data-label="Modelo">{vehicle.model}</td>
+                    <td data-label="Status"><span className={`status-badge status-${vehicle.status}`}>{vehicle.status}</span></td>
+                    <td data-label="Lotacao atual">{vehicle.current_department || 'Sem lotacao registrada'}</td>
+                    <td data-label="Condutor atual"><DriverBadge name={vehicle.current_driver_name} /></td>
+                    <td data-label="Atualizado em">{formatDate(vehicle.updated_at)}</td>
+                    <td data-label="Acoes">
                       <div className="actions-inline">
                         <button type="button" className="mini-button" onClick={() => loadHistory(vehicle.id)}>Historico</button>
                         {user?.role === 'ADMIN' ? <button type="button" className="mini-button" onClick={() => editVehicle(vehicle)}>Editar</button> : null}

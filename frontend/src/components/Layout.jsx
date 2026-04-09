@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
@@ -5,6 +6,9 @@ export default function Layout() {
   const { user, logout } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const [navOpen, setNavOpen] = useState(false)
+  const currentHost = typeof window !== 'undefined' ? window.location.host : 'localhost'
+  const isPublishedHost = currentHost.includes('frota.sirel.com.br')
 
   const navItems = [
     { to: '/', label: 'Painel', description: 'Visao geral da operacao' },
@@ -17,6 +21,10 @@ export default function Layout() {
     navItems.push({ to: '/users', label: 'Usuarios', description: 'Perfis e acessos' })
   }
 
+  useEffect(() => {
+    setNavOpen(false)
+  }, [location.pathname])
+
   async function handleLogout() {
     await logout()
     navigate('/login')
@@ -24,13 +32,24 @@ export default function Layout() {
 
   return (
     <div className="app-shell">
-      <aside className="app-sidebar">
-        <div className="brand-block">
-          <div className="brand-mark">PM</div>
-          <div className="brand-copy">
-            <strong>Frota PMTF</strong>
-            <span>Gerenciamento de veiculos, lotacao e acesso institucional em um unico ambiente.</span>
+      <aside className={`app-sidebar${navOpen ? ' is-open' : ''}`}>
+        <div className="sidebar-head">
+          <div className="brand-block">
+            <div className="brand-mark">PM</div>
+            <div className="brand-copy">
+              <strong>Frota PMTF</strong>
+              <span>Gerenciamento de veiculos, lotacao e acesso institucional em um unico ambiente.</span>
+            </div>
           </div>
+          <button
+            type="button"
+            className="nav-toggle"
+            aria-label={navOpen ? 'Fechar navegacao' : 'Abrir navegacao'}
+            aria-expanded={navOpen}
+            onClick={() => setNavOpen((current) => !current)}
+          >
+            {navOpen ? 'Fechar' : 'Menu'}
+          </button>
         </div>
 
         <nav className="nav-group" aria-label="Navegacao principal">
@@ -66,8 +85,8 @@ export default function Layout() {
             </p>
           </div>
           <div className="user-chip">
-            <strong>Ambiente local</strong>
-            <span>Backend em 8001 e frontend em 5175</span>
+            <strong>{isPublishedHost ? 'Subdominio publicado' : 'Ambiente local'}</strong>
+            <span>{currentHost}</span>
           </div>
         </header>
 

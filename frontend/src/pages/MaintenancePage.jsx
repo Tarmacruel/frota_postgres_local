@@ -5,6 +5,7 @@ import api from '../api/client'
 import { maintenanceAPI } from '../api/maintenance'
 import { useAuth } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
+import { exportRowsToPdf, exportRowsToXlsx } from '../utils/exportData'
 
 const statusOptions = [
   { value: 'TODAS', label: 'Todas' },
@@ -35,6 +36,17 @@ export default function MaintenancePage() {
   const [endFilter, setEndFilter] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState(null)
+
+  const exportColumns = [
+    { header: 'Veiculo', value: (record) => record.vehicle_plate },
+    { header: 'Inicio', value: (record) => formatDate(record.start_date) },
+    { header: 'Conclusao', value: (record) => formatDate(record.end_date) },
+    { header: 'Servico', value: (record) => record.service_description },
+    { header: 'Pecas', value: (record) => record.parts_replaced || 'Sem observacao' },
+    { header: 'Custo', value: (record) => formatMoney(record.total_cost) },
+    { header: 'Status', value: (record) => (record.end_date ? 'CONCLUIDA' : 'EM ANDAMENTO') },
+    { header: 'Atualizado em', value: (record) => formatDate(record.updated_at) },
+  ]
 
   async function loadVehicles() {
     const { data } = await api.get('/vehicles')
@@ -113,6 +125,49 @@ export default function MaintenancePage() {
     setIsModalOpen(false)
   }
 
+  async function handleExportPdf() {
+    if (filteredRecords.length === 0) {
+      setFeedback('Nao ha manutencoes filtradas para exportar.')
+      return
+    }
+
+    try {
+      setError('')
+      setFeedback('')
+      await exportRowsToPdf({
+        title: 'Frota PMTF - Manutencoes',
+        fileName: 'frota-pmtf-manutencoes',
+        subtitle: 'Relatorio das manutencoes filtradas no painel operacional.',
+        columns: exportColumns,
+        rows: filteredRecords,
+      })
+      setFeedback('Exportacao de manutencoes em PDF iniciada com sucesso.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Nao foi possivel exportar as manutencoes em PDF.'))
+    }
+  }
+
+  async function handleExportXlsx() {
+    if (filteredRecords.length === 0) {
+      setFeedback('Nao ha manutencoes filtradas para exportar.')
+      return
+    }
+
+    try {
+      setError('')
+      setFeedback('')
+      await exportRowsToXlsx({
+        fileName: 'frota-pmtf-manutencoes',
+        sheetName: 'Manutencoes',
+        columns: exportColumns,
+        rows: filteredRecords,
+      })
+      setFeedback('Exportacao de manutencoes em XLSX iniciada com sucesso.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Nao foi possivel exportar as manutencoes em XLSX.'))
+    }
+  }
+
   const openCount = filteredRecords.filter((item) => !item.end_date).length
   const closedCount = filteredRecords.length - openCount
 
@@ -123,11 +178,15 @@ export default function MaintenancePage() {
           <h2 className="section-title">Manutencoes</h2>
           <p className="section-copy">Acompanhe revisoes concluidas e servicos ainda em aberto sem sair do painel principal.</p>
         </div>
-        {user?.role === 'ADMIN' ? (
-          <button className="app-button" type="button" onClick={() => setIsModalOpen(true)}>
-            Nova manutencao
-          </button>
-        ) : null}
+        <div className="actions-inline">
+          {user?.role === 'ADMIN' ? (
+            <button className="app-button" type="button" onClick={() => setIsModalOpen(true)}>
+              Nova manutencao
+            </button>
+          ) : null}
+          <button className="secondary-button" type="button" onClick={handleExportPdf}>Exportar PDF</button>
+          <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
+        </div>
       </div>
 
       <div className="toolbar-row" style={{ marginBottom: 18 }}>
@@ -146,7 +205,6 @@ export default function MaintenancePage() {
         <div className="filter-inline">
           <input
             className="app-input"
-            style={{ minWidth: 280 }}
             placeholder="Buscar por placa, servico ou pecas"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -211,24 +269,24 @@ export default function MaintenancePage() {
               ) : (
                 filteredRecords.map((record) => (
                   <tr key={record.id}>
-                    <td><strong>{record.vehicle_plate}</strong></td>
-                    <td>{formatDate(record.start_date)}</td>
-                    <td>{formatDate(record.end_date)}</td>
-                    <td>
+                    <td data-label="Veiculo"><strong>{record.vehicle_plate}</strong></td>
+                    <td data-label="Inicio">{formatDate(record.start_date)}</td>
+                    <td data-label="Conclusao">{formatDate(record.end_date)}</td>
+                    <td data-label="Servico">
                       <div className="stack">
                         <strong>{record.service_description}</strong>
                         <span className="muted">Atualizado em {formatDate(record.updated_at)}</span>
                       </div>
                     </td>
-                    <td>{record.parts_replaced || 'Sem observacao'}</td>
-                    <td>{formatMoney(record.total_cost)}</td>
-                    <td>
+                    <td data-label="Pecas">{record.parts_replaced || 'Sem observacao'}</td>
+                    <td data-label="Custo">{formatMoney(record.total_cost)}</td>
+                    <td data-label="Status">
                       <span className={`status-badge ${record.end_date ? 'status-ATIVO' : 'status-MANUTENCAO'}`}>
                         {record.end_date ? 'CONCLUIDA' : 'EM ANDAMENTO'}
                       </span>
                     </td>
                     {user?.role === 'ADMIN' ? (
-                      <td>
+                      <td data-label="Acoes">
                         <div className="actions-inline">
                           <button type="button" className="mini-button" onClick={() => { setEditingRecord(record); setIsModalOpen(true) }}>
                             Editar

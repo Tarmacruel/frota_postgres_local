@@ -157,7 +157,7 @@ export default function DashboardPage() {
                 <p>{item.description}</p>
                 <footer>
                   <span>{item.cta}</span>
-                  <span>→</span>
+                  <span>{'->'}</span>
                 </footer>
               </Link>
             ))}

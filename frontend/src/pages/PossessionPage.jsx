@@ -6,6 +6,7 @@ import api from '../api/client'
 import { possessionAPI } from '../api/possession'
 import { useAuth } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
+import { exportRowsToPdf, exportRowsToXlsx } from '../utils/exportData'
 
 const viewOptions = [
   { value: 'ATIVAS', label: 'Ativas' },
@@ -39,6 +40,17 @@ export default function PossessionPage() {
   const [endingRecord, setEndingRecord] = useState(null)
   const [endForm, setEndForm] = useState(buildEndState(null))
   const [ending, setEnding] = useState(false)
+
+  const exportColumns = [
+    { header: 'Veiculo', value: (record) => record.vehicle_plate },
+    { header: 'Condutor', value: (record) => record.driver_name },
+    { header: 'Documento', value: (record) => record.driver_document || '-' },
+    { header: 'Contato', value: (record) => record.driver_contact || '-' },
+    { header: 'Inicio', value: (record) => formatDate(record.start_date) },
+    { header: 'Fim', value: (record) => formatDate(record.end_date) },
+    { header: 'Status', value: (record) => (record.is_active ? 'ATIVA' : 'ENCERRADA') },
+    { header: 'Observacao', value: (record) => record.observation || 'Sem observacao' },
+  ]
 
   async function loadVehicles() {
     const { data } = await api.get('/vehicles')
@@ -130,6 +142,49 @@ export default function PossessionPage() {
     }
   }
 
+  async function handleExportPdf() {
+    if (filteredRecords.length === 0) {
+      setFeedback('Nao ha registros de posse filtrados para exportar.')
+      return
+    }
+
+    try {
+      setError('')
+      setFeedback('')
+      await exportRowsToPdf({
+        title: 'Frota PMTF - Condutores e posse',
+        fileName: 'frota-pmtf-condutores',
+        subtitle: 'Relatorio dos condutores e posses filtrados no painel operacional.',
+        columns: exportColumns,
+        rows: filteredRecords,
+      })
+      setFeedback('Exportacao de condutores em PDF iniciada com sucesso.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Nao foi possivel exportar os condutores em PDF.'))
+    }
+  }
+
+  async function handleExportXlsx() {
+    if (filteredRecords.length === 0) {
+      setFeedback('Nao ha registros de posse filtrados para exportar.')
+      return
+    }
+
+    try {
+      setError('')
+      setFeedback('')
+      await exportRowsToXlsx({
+        fileName: 'frota-pmtf-condutores',
+        sheetName: 'Condutores',
+        columns: exportColumns,
+        rows: filteredRecords,
+      })
+      setFeedback('Exportacao de condutores em XLSX iniciada com sucesso.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Nao foi possivel exportar os condutores em XLSX.'))
+    }
+  }
+
   const activeCount = filteredRecords.filter((item) => item.is_active).length
 
   return (
@@ -139,11 +194,15 @@ export default function PossessionPage() {
           <h2 className="section-title">Condutores e posse</h2>
           <p className="section-copy">Controle quem esta com cada veiculo e mantenha um historico simples de transferencias.</p>
         </div>
-        {user?.role === 'ADMIN' ? (
-          <button className="app-button" type="button" onClick={() => setIsCreateModalOpen(true)}>
-            Nova posse
-          </button>
-        ) : null}
+        <div className="actions-inline">
+          {user?.role === 'ADMIN' ? (
+            <button className="app-button" type="button" onClick={() => setIsCreateModalOpen(true)}>
+              Nova posse
+            </button>
+          ) : null}
+          <button className="secondary-button" type="button" onClick={handleExportPdf}>Exportar PDF</button>
+          <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
+        </div>
       </div>
 
       <div className="toolbar-row" style={{ marginBottom: 18 }}>
@@ -162,7 +221,6 @@ export default function PossessionPage() {
         <div className="filter-inline">
           <input
             className="app-input"
-            style={{ minWidth: 280 }}
             placeholder="Buscar por placa, condutor ou contato"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -220,24 +278,24 @@ export default function PossessionPage() {
               ) : (
                 filteredRecords.map((record) => (
                   <tr key={record.id}>
-                    <td><strong>{record.vehicle_plate}</strong></td>
-                    <td>
+                    <td data-label="Veiculo"><strong>{record.vehicle_plate}</strong></td>
+                    <td data-label="Condutor">
                       <DriverBadge
                         name={record.driver_name}
                         document={record.driver_document}
                         contact={record.driver_contact}
                       />
                     </td>
-                    <td>{formatDate(record.start_date)}</td>
-                    <td>{formatDate(record.end_date)}</td>
-                    <td>{record.observation || 'Sem observacao'}</td>
-                    <td>
+                    <td data-label="Inicio">{formatDate(record.start_date)}</td>
+                    <td data-label="Fim">{formatDate(record.end_date)}</td>
+                    <td data-label="Observacao">{record.observation || 'Sem observacao'}</td>
+                    <td data-label="Status">
                       <span className={`status-badge ${record.is_active ? 'status-ATIVO' : 'status-INATIVO'}`}>
                         {record.is_active ? 'ATIVA' : 'ENCERRADA'}
                       </span>
                     </td>
                     {user?.role === 'ADMIN' ? (
-                      <td>
+                      <td data-label="Acoes">
                         {record.is_active ? (
                           <button type="button" className="mini-button" onClick={() => openEndModal(record)}>
                             Encerrar

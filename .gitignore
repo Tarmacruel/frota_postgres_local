@@ -14,6 +14,8 @@ frontend/node_modules/
 frontend/dist/
 
 .playwright-mcp/
+*.out.log
+*.err.log
 
 .DS_Store
 Thumbs.db

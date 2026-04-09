@@ -157,7 +157,6 @@ export default function UsersPage() {
         <div className="filter-inline">
           <input
             className="app-input"
-            style={{ minWidth: 280 }}
             placeholder="Buscar por nome, e-mail ou perfil"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
@@ -211,11 +210,11 @@ export default function UsersPage() {
               ) : (
                 filteredUsers.map((user) => (
                   <tr key={user.id}>
-                    <td><strong>{user.name}</strong></td>
-                    <td>{user.email}</td>
-                    <td><span className={`status-badge ${user.role === 'ADMIN' ? 'status-ATIVO' : 'status-MANUTENCAO'}`}>{user.role}</span></td>
-                    <td>{formatDate(user.created_at)}</td>
-                    <td>
+                    <td data-label="Nome"><strong>{user.name}</strong></td>
+                    <td data-label="E-mail">{user.email}</td>
+                    <td data-label="Perfil"><span className={`status-badge ${user.role === 'ADMIN' ? 'status-ATIVO' : 'status-MANUTENCAO'}`}>{user.role}</span></td>
+                    <td data-label="Criado em">{formatDate(user.created_at)}</td>
+                    <td data-label="Acoes">
                       <button type="button" className="mini-button danger" onClick={() => handleDelete(user.id)}>Excluir</button>
                     </td>
                   </tr>
