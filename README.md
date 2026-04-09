@@ -1,42 +1,42 @@
 # Sistema de Frota - PMTF
 
-Projeto para gerenciamento da frota municipal com FastAPI, React e PostgreSQL, agora preparado para rodar em modo leve no Windows, com frontend buildado e servido pelo proprio backend.
+Sistema oficial para gestao da frota da Prefeitura Municipal de Teixeira de Freitas, com backend FastAPI, frontend React e PostgreSQL rodando de forma nativa no Windows, sem Docker e em processo unico para publicacao no estilo do SIREL.
 
 ## Stack
 
 - Backend: FastAPI + SQLAlchemy Async + Alembic
 - Frontend: React + Vite + Axios + React Router
-- Banco: PostgreSQL
-- Execucao local: processo Python unico, no estilo do SIREL
-- Docker: opcional, apenas para o banco
+- Banco: PostgreSQL 16 local
+- Execucao: processo Python unico servindo API e frontend buildado
+- Identidade visual: brasao oficial da PMTF, tema azul royal e relatorios institucionais em PDF e XLSX
 
 ## O que o sistema faz
 
 - Autenticacao com cookie HttpOnly
 - Gestao de usuarios com perfis `ADMIN` e `PADRAO`
 - Cadastro de veiculos com historico de lotacao
-- Registro de manutencoes com custo, descricao e status
+- Registro de manutencoes com custo, descricao e periodo
 - Registro de posse de veiculos por condutor
 - Encerramento automatico da posse ativa anterior ao iniciar uma nova posse
-- Dashboard operacional com indicadores de frota
-- Layout mobile first com navegacao recolhivel e tabelas empilhadas no celular
+- Exportacao oficial em PDF e XLSX para veiculos, usuarios, manutencoes e condutores
+- Layout mobile first com navegacao recolhivel e leitura facilitada no celular
+
+## Identidade institucional
+
+- Logotipo e favicon: `brasao-pmtf.png`
+- Endereco institucional usado na interface e nos relatorios:
+  `Avenida Marechal Castelo Branco, 145 - Centro, Teixeira de Freitas - BA, CEP 45995-041`
+- CNPJ institucional usado nos relatorios:
+  `13.650.403/0001-28`
 
 ## Usuarios seed
 
 - Admin: `admin@frota.local` / `Admin@1234`
 - Padrao: `padrao@frota.local` / `User@1234`
 
-## Fluxo recomendado local
+## Fluxo local recomendado
 
 Esse e o modo mais leve e mais proximo do SIREL:
-
-1. Suba apenas o PostgreSQL, se precisar:
-
-```bash
-docker compose up -d postgres
-```
-
-2. Inicie a aplicacao completa em porta unica:
 
 ```bat
 Iniciar_Frota_Local.bat
@@ -44,62 +44,62 @@ Iniciar_Frota_Local.bat
 
 Esse atalho:
 
-- cria o `backend\.venv` em Python 3.12 quando necessario
-- instala dependencias
+- cria o `backend\.venv` quando necessario
+- instala dependencias Python
+- sobe um PostgreSQL local em `127.0.0.1:5434`
+- instala dependencias do frontend quando necessario
 - builda o frontend
 - aplica migrations
 - executa seed demo
-- sobe o FastAPI servindo o frontend junto
+- sobe o FastAPI servindo a aplicacao completa em `http://localhost:8000`
 
-## Acessos locais
+## Publicacao em `frota.sirel.com.br`
 
-- Aplicacao: `http://localhost:8000`
-- Healthcheck: `http://localhost:8000/api/health`
-- Swagger: `http://localhost:8000/docs`
-- Redoc: `http://localhost:8000/redoc`
-
-## Publicacao para `frota.sirel.com.br`
-
-O projeto esta pronto para ser publicado no mesmo estilo do SIREL: um unico processo web exposto no host.
-
-1. Ajuste o ambiente de producao com base em [backend/.env.production.example](/z:/FROTAS/frota_postgres_local/backend/.env.production.example)
-2. Garanta que `frota.sirel.com.br` aponte para o host correto
-3. Inicie a aplicacao na porta 80:
+Para publicar no subdominio institucional:
 
 ```bat
 Publicar_Frota_80.bat
 ```
 
-Observacoes importantes:
+Esse fluxo:
 
-- O Cloudflare aceita proxy HTTP nas portas `80`, `8080`, `8880`, `2052`, `2082`, `2086` e `2095`
-- O Cloudflare aceita proxy HTTPS nas portas `443`, `2053`, `2083`, `2087`, `2096` e `8443`
-- Para `https://frota.sirel.com.br` sem porta na URL, a opcao mais limpa e deixar a origem ouvindo em `80` ou `443`
-- Neste host, a porta `80` ficou validada localmente com a aplicacao respondendo
+- usa o mesmo PostgreSQL local do host
+- builda o frontend
+- sobe a aplicacao na porta `80`
+- ativa configuracao de producao com `COOKIE_SECURE=true`
+- restringe CORS ao subdominio institucional
 
-Referencia oficial:
+Arquivos de apoio:
 
-- Cloudflare network ports: https://developers.cloudflare.com/fundamentals/reference/network-ports/
+- Ambiente base: [backend/.env.example](/z:/FROTAS/frota_postgres_local/backend/.env.example)
+- Ambiente de producao: [backend/.env.production.example](/z:/FROTAS/frota_postgres_local/backend/.env.production.example)
+- Bootstrap do banco local: [scripts/start_local_postgres.ps1](/z:/FROTAS/frota_postgres_local/scripts/start_local_postgres.ps1)
+- Script principal: [scripts/start_frota.ps1](/z:/FROTAS/frota_postgres_local/scripts/start_frota.ps1)
 
 ## Banco de dados
 
-O `docker-compose.yml` foi simplificado para manter apenas o PostgreSQL:
+O projeto nao depende mais de Docker.
 
-```bash
-docker compose up -d postgres
-```
+O banco padrao roda localmente em:
 
-Porta padrao do container local:
+- Host: `127.0.0.1`
+- Porta: `5434`
+- Banco: `frota_db`
+- Usuario: `frota_user`
 
-- `127.0.0.1:5433 -> 5432`
+Se o cluster ainda nao existir, o script [scripts/start_local_postgres.ps1](/z:/FROTAS/frota_postgres_local/scripts/start_local_postgres.ps1) cria e inicializa tudo automaticamente em `%LOCALAPPDATA%\FrotaPMTF\postgres-data`.
 
-Se preferir usar um PostgreSQL ja instalado no Windows, basta ajustar `DATABASE_URL` em `backend/.env`.
+## Acessos
 
-O projeto aceita URLs com `asyncpg` ou `psycopg`.
+- Aplicacao local: `http://localhost:8000`
+- Publicacao: `http://frota.sirel.com.br` ou `https://frota.sirel.com.br`
+- Healthcheck: `/api/health`
+- Swagger: `/docs`
+- Redoc: `/redoc`
 
 ## Modo dev separado
 
-Se quiser mexer no frontend com Vite separado:
+Frontend com Vite:
 
 ```bash
 cd frontend
@@ -107,9 +107,7 @@ npm install
 npm run dev
 ```
 
-O Vite faz proxy automatico para a API local.
-
-Para subir so o backend nesse fluxo:
+Backend isolado:
 
 ```bash
 cd backend
@@ -120,8 +118,8 @@ cd backend
 
 - `/` painel operacional
 - `/vehicles` cadastro de veiculos, lotacao e condutor atual
-- `/manutencoes` historico e cadastro de manutencoes
-- `/condutores` posse de veiculos e historico de condutores
+- `/manutencoes` historico, cadastro e exportacao de manutencoes
+- `/condutores` posse de veiculos, encerramento e exportacao
 - `/users` administracao de usuarios
 
 ## Endpoints principais
@@ -190,3 +188,5 @@ $env:PYTHONPATH = (Get-Location).Path
 - A API continua disponivel em `/api/*`
 - A posse ativa e encerrada automaticamente ao iniciar uma nova para o mesmo veiculo
 - A exclusao de veiculo remove historico, manutencoes e posse vinculados por `ON DELETE CASCADE`
+- O Cloudflare aceita proxy HTTP nas portas `80`, `8080`, `8880`, `2052`, `2082`, `2086` e `2095`
+- O Cloudflare aceita proxy HTTPS nas portas `443`, `2053`, `2083`, `2087`, `2096` e `8443`

@@ -1,26 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
+import { officialBrand } from '../constants/officialBrand'
 import { getApiErrorMessage } from '../utils/apiError'
 
-const credentials = [
-  {
-    label: 'Administrador',
-    email: 'admin@frota.local',
-    password: 'Admin@1234',
-    hint: 'Acesso completo a veiculos e usuarios.',
-  },
-  {
-    label: 'Padrao',
-    email: 'padrao@frota.local',
-    password: 'User@1234',
-    hint: 'Consulta operacional em modo leitura.',
-  },
+const accessNotes = [
+  'Credenciais liberadas somente para servidores e setores autorizados.',
+  'Solicite criacao, redefinicao ou ajuste de perfil ao administrador responsavel.',
+  'Utilize o subdominio oficial `frota.sirel.com.br` para acesso externo.',
 ]
 
 export default function LoginPage() {
-  const [email, setEmail] = useState('admin@frota.local')
-  const [password, setPassword] = useState('Admin@1234')
+  const [email, setEmail] = useState('')
+  const [password, setPassword] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const { login, user } = useAuth()
@@ -46,92 +38,106 @@ export default function LoginPage() {
 
   return (
     <div className="login-shell">
-      <section className="login-hero">
-        <div>
-          <span className="eyebrow">Prefeitura Municipal de Teixeira de Freitas</span>
-          <h1 className="login-title">Frota PMTF em operacao continua.</h1>
-          <p className="login-copy">
-            Um acesso unico para acompanhar disponibilidade, historico de lotacao e manutencao da frota com leitura imediata e menos ruido visual.
-          </p>
-        </div>
+      <div className="login-stage">
+        <div className="login-card">
+          <section className="login-card-panel login-card-panel-brand">
+            <div>
+              <span className="eyebrow">Acesso institucional protegido</span>
+              <div className="login-brandline">
+                <img className="login-brand-logo" src={officialBrand.logoPath} alt="Brasao oficial da Prefeitura Municipal de Teixeira de Freitas" />
+                <div>
+                  <strong>{officialBrand.systemName}</strong>
+                  <span>{officialBrand.subtitle}</span>
+                </div>
+              </div>
+              <h1 className="login-title">Acesse a operacao oficial da frota municipal.</h1>
+              <p className="login-copy">
+                Entre com sua conta institucional para acompanhar veiculos, manutencoes e condutores em um ambiente alinhado a identidade oficial da Prefeitura Municipal de Teixeira de Freitas.
+              </p>
+            </div>
 
-        <div className="hero-grid">
-          <div className="hero-figure">
-            <span>Gestao centralizada</span>
-            <strong>3 fluxos</strong>
-            <span>Ativos, manutencao e inativos com leitura direta.</span>
-          </div>
-          <div className="hero-figure">
-            <span>Controle institucional</span>
-            <strong>2 perfis</strong>
-            <span>Administrador e usuario padrao com acesso coerente.</span>
-          </div>
-          <div className="hero-figure">
-            <span>Ambiente local</span>
-            <strong>PostgreSQL</strong>
-            <span>Base pronta para evolucao, validacao e entrega.</span>
-          </div>
-        </div>
-      </section>
+            <div className="hero-grid">
+              <div className="hero-figure">
+                <span>Fluxo centralizado</span>
+                <strong>Veiculos, oficinas e condutores</strong>
+                <span>Leitura imediata para operacao, consulta e decisao administrativa.</span>
+              </div>
+              <div className="hero-figure">
+                <span>Ambiente institucional</span>
+                <strong>Identidade oficial PMTF</strong>
+                <span>Brasao, subdominio e relatorios com aparencia profissional e padronizada.</span>
+              </div>
+              <div className="hero-figure">
+                <span>Base segura</span>
+                <strong>PostgreSQL nativo</strong>
+                <span>Execucao leve no host, pronta para publicacao em frota.sirel.com.br.</span>
+              </div>
+            </div>
 
-      <section className="login-panel">
-        <div className="login-panel-card">
-          <div>
-            <h2 className="panel-title">Entrar no sistema</h2>
-            <p className="panel-subtitle">Use um perfil seed para testar agora ou informe as credenciais operacionais do ambiente.</p>
-          </div>
+            <div className="login-civic-bar">
+              <span>{officialBrand.addressLine}</span>
+              <span>CNPJ {officialBrand.cnpj}</span>
+            </div>
+          </section>
 
-          <div className="credential-grid">
-            {credentials.map((credential) => (
-              <button
-                key={credential.label}
-                type="button"
-                className="credential-button"
-                onClick={() => {
-                  setEmail(credential.email)
-                  setPassword(credential.password)
-                  setError('')
-                }}
-              >
-                <strong>{credential.label}</strong>
-                <span>{credential.email}</span>
-                <span>{credential.hint}</span>
+          <section className="login-card-panel login-card-panel-form">
+            <div className="login-form-badge">
+              <img src={officialBrand.logoPath} alt="" />
+            </div>
+
+            <div>
+              <h2 className="panel-title">Bem-vindo de volta</h2>
+              <p className="panel-subtitle">Entre com a conta vinculada ao ambiente institucional da Prefeitura Municipal de Teixeira de Freitas.</p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="form-grid">
+              <div className="form-field">
+                <label htmlFor="email">Login institucional</label>
+                <div className="login-input-shell">
+                  <span className="login-input-icon">@</span>
+                  <input
+                    id="email"
+                    className="app-input login-app-input"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    placeholder="usuario@frota.local"
+                  />
+                </div>
+              </div>
+
+              <div className="form-field">
+                <label htmlFor="password">Sua senha</label>
+                <div className="login-input-shell">
+                  <span className="login-input-icon">#</span>
+                  <input
+                    id="password"
+                    className="app-input login-app-input"
+                    type="password"
+                    value={password}
+                    onChange={(e) => setPassword(e.target.value)}
+                    placeholder="Digite sua senha"
+                  />
+                </div>
+              </div>
+
+              {error ? <div className="alert alert-error">{error}</div> : null}
+
+              <button className="app-button login-submit-button" type="submit" disabled={submitting}>
+                {submitting ? 'Entrando...' : 'Entrar no sistema'}
               </button>
-            ))}
-          </div>
+            </form>
 
-          <form onSubmit={handleSubmit} className="form-grid">
-            <div className="form-field">
-              <label htmlFor="email">E-mail</label>
-              <input
-                id="email"
-                className="app-input"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="usuario@frota.local"
-              />
+            <div className="login-demo-block">
+              <strong>Orientacoes de acesso</strong>
+              <div className="alert alert-info">
+                {accessNotes.map((note) => (
+                  <div key={note}>{note}</div>
+                ))}
+              </div>
             </div>
-
-            <div className="form-field">
-              <label htmlFor="password">Senha</label>
-              <input
-                id="password"
-                className="app-input"
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="Sua senha"
-              />
-            </div>
-
-            {error ? <div className="alert alert-error">{error}</div> : null}
-
-            <button className="app-button" type="submit" disabled={submitting}>
-              {submitting ? 'Entrando...' : 'Acessar painel'}
-            </button>
-          </form>
+          </section>
         </div>
-      </section>
+      </div>
     </div>
   )
 }

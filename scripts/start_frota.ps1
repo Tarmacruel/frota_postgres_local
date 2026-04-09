@@ -4,8 +4,10 @@ param(
     [switch]$BuildFrontend,
     [switch]$Reload,
     [switch]$SkipMigrate,
+    [switch]$SkipLocalPostgres,
     [switch]$SeedDemoData,
-    [switch]$InstallDeps
+    [switch]$InstallDeps,
+    [switch]$Production
 )
 
 $ErrorActionPreference = "Stop"
@@ -13,6 +15,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Convert-Path (Split-Path -Parent $PSScriptRoot)
 $backendDir = Convert-Path (Join-Path $repoRoot "backend")
 $frontendDir = Convert-Path (Join-Path $repoRoot "frontend")
+$postgresBootstrapScript = Convert-Path (Join-Path $repoRoot "scripts\start_local_postgres.ps1")
 $venvDir = Join-Path $backendDir ".venv"
 $pythonExe = Join-Path $venvDir "Scripts\\python.exe"
 $alembicExe = Join-Path $venvDir "Scripts\\alembic.exe"
@@ -38,6 +41,12 @@ function Invoke-ExternalStep {
 
 if (-not (Test-Path $backendEnv) -and (Test-Path $backendEnvExample)) {
     Copy-Item $backendEnvExample $backendEnv
+}
+
+if ($Production) {
+    $env:APP_ENV = "production"
+    $env:COOKIE_SECURE = "true"
+    $env:CORS_ORIGINS = "[`"https://frota.sirel.com.br`",`"http://frota.sirel.com.br`"]"
 }
 
 if (-not (Test-Path $pythonExe)) {
@@ -83,6 +92,10 @@ if ($BuildFrontend) {
     finally {
         Pop-Location
     }
+}
+
+if (-not $SkipLocalPostgres) {
+    Invoke-ExternalStep "Inicializacao do PostgreSQL local" { & $postgresBootstrapScript }
 }
 
 Push-Location $backendDir

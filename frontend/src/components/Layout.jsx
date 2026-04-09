@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { officialBrand } from '../constants/officialBrand'
 import { useAuth } from '../context/AuthContext'
 
 export default function Layout() {
@@ -35,10 +36,12 @@ export default function Layout() {
       <aside className={`app-sidebar${navOpen ? ' is-open' : ''}`}>
         <div className="sidebar-head">
           <div className="brand-block">
-            <div className="brand-mark">PM</div>
+            <div className="brand-mark brand-mark-official">
+              <img src={officialBrand.logoPath} alt="Brasao oficial da Prefeitura Municipal de Teixeira de Freitas" />
+            </div>
             <div className="brand-copy">
-              <strong>Frota PMTF</strong>
-              <span>Gerenciamento de veiculos, lotacao e acesso institucional em um unico ambiente.</span>
+              <strong>{officialBrand.systemName}</strong>
+              <span>Gestao oficial da frota municipal com identidade institucional da Prefeitura de Teixeira de Freitas.</span>
             </div>
           </div>
           <button
@@ -81,7 +84,7 @@ export default function Layout() {
           <div>
             <h1 className="page-title">Operacao da frota municipal</h1>
             <p className="page-copy">
-              Acompanhe disponibilidade, manutencao, lotacao e condutores com um fluxo mais claro, rapido e institucional.
+              Acompanhe disponibilidade, manutencao, lotacao e condutores com um fluxo oficial, claro e pronto para publicacao em frota.sirel.com.br.
             </p>
           </div>
           <div className="user-chip">
