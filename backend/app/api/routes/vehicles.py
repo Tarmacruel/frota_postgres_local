@@ -71,9 +71,13 @@ async def delete_vehicle(
     return {"message": "Removido"}
 
 
-@router.get("/{vehicle_id}/current-driver", response_model=PossessionOut, dependencies=[Depends(get_current_user)])
-async def current_driver(vehicle_id: UUID, db: AsyncSession = Depends(get_db_session)):
-    return await PossessionService(db).get_current_driver(vehicle_id)
+@router.get("/{vehicle_id}/current-driver", response_model=PossessionOut)
+async def current_driver(
+    vehicle_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    return await PossessionService(db).get_current_driver(vehicle_id, current_user=current_user)
 
 
 @router.get("/{vehicle_id}/historico", response_model=list[LocationHistoryOut], dependencies=[Depends(get_current_user)])

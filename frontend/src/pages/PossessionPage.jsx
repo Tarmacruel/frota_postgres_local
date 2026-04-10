@@ -20,6 +20,28 @@ function formatDate(value) {
   return new Date(value).toLocaleString('pt-BR')
 }
 
+function formatTimestamp(value) {
+  if (!value) return '-'
+  return new Date(value).toLocaleString('pt-BR')
+}
+
+function formatCoordinates(location) {
+  if (!location) return '-'
+  return `${location.latitude.toFixed(6)}, ${location.longitude.toFixed(6)}`
+}
+
+function buildMapEmbedUrl(location) {
+  if (!location) return ''
+  const delta = 0.003
+  const bbox = [
+    (location.longitude - delta).toFixed(6),
+    (location.latitude - delta).toFixed(6),
+    (location.longitude + delta).toFixed(6),
+    (location.latitude + delta).toFixed(6),
+  ].join('%2C')
+  return `https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${location.latitude.toFixed(6)}%2C${location.longitude.toFixed(6)}`
+}
+
 function buildEndState(record) {
   return {
     end_date: new Date().toISOString().slice(0, 16),
@@ -42,6 +64,8 @@ export default function PossessionPage() {
   const [endingRecord, setEndingRecord] = useState(null)
   const [endForm, setEndForm] = useState(buildEndState(null))
   const [ending, setEnding] = useState(false)
+  const [photoRecord, setPhotoRecord] = useState(null)
+  const [locationRecord, setLocationRecord] = useState(null)
   const focusRecordId = searchParams.get('focus')
 
   const exportColumns = [
@@ -154,6 +178,14 @@ export default function PossessionPage() {
   function closeEndModal() {
     setEndingRecord(null)
     setEndForm(buildEndState(null))
+  }
+
+  function closePhotoModal() {
+    setPhotoRecord(null)
+  }
+
+  function closeLocationModal() {
+    setLocationRecord(null)
   }
 
   async function handleEndPossession(event) {
@@ -308,17 +340,17 @@ export default function PossessionPage() {
                 <th>Fim</th>
                 <th>Observacao</th>
                 <th>Status</th>
-                {canWrite ? <th>Acoes</th> : null}
+                <th>Acoes</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={canWrite ? 7 : 6} className="muted">Carregando posses...</td>
+                  <td colSpan={7} className="muted">Carregando posses...</td>
                 </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={canWrite ? 7 : 6}>
+                  <td colSpan={7}>
                     <div className="empty-state">Nenhum registro de posse encontrado para os filtros atuais.</div>
                   </td>
                 </tr>
@@ -338,6 +370,11 @@ export default function PossessionPage() {
                     <td data-label="Observacao">
                       <div className="stack">
                         <span>{record.observation || 'Sem observacao'}</span>
+                        {record.photo_available ? (
+                          <span className="muted">Foto registrada em {formatTimestamp(record.photo_captured_at)}</span>
+                        ) : (
+                          <span className="muted">Sem evidencia (legado)</span>
+                        )}
                         {isAdmin ? <span className="muted">Criado em {formatDate(record.created_at)}</span> : null}
                       </div>
                     </td>
@@ -346,17 +383,27 @@ export default function PossessionPage() {
                         {record.is_active ? 'ATIVA' : 'ENCERRADA'}
                       </span>
                     </td>
-                    {canWrite ? (
-                      <td data-label="Acoes">
+                    <td data-label="Acoes">
+                      <div className="actions-inline">
+                        {record.photo_available ? (
+                          <button type="button" className="mini-button" onClick={() => setPhotoRecord(record)}>
+                            Ver foto
+                          </button>
+                        ) : (
+                          <span className="muted">Legado</span>
+                        )}
+                        {isAdmin && record.capture_location ? (
+                          <button type="button" className="mini-button" onClick={() => setLocationRecord(record)}>
+                            Local
+                          </button>
+                        ) : null}
                         {record.is_active ? (
                           <button type="button" className="mini-button" onClick={() => openEndModal(record)}>
                             Encerrar
                           </button>
-                        ) : (
-                          <span className="muted">Historico</span>
-                        )}
-                      </td>
-                    ) : null}
+                        ) : null}
+                      </div>
+                    </td>
                   </tr>
                 ))
               )}
@@ -368,7 +415,7 @@ export default function PossessionPage() {
       <Modal
         open={isCreateModalOpen}
         title="Nova posse"
-        description="Ao registrar um novo condutor, qualquer posse ativa do mesmo veiculo sera encerrada automaticamente."
+        description="Ao registrar um novo condutor, qualquer posse ativa do mesmo veiculo sera encerrada automaticamente. Foto e localizacao sao obrigatorias."
         onClose={() => setIsCreateModalOpen(false)}
       >
         <PossessionForm
@@ -415,6 +462,70 @@ export default function PossessionPage() {
             <button className="ghost-button" type="button" onClick={closeEndModal}>Cancelar</button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={Boolean(photoRecord)}
+        title="Foto da posse"
+        description={photoRecord ? `Evidencia registrada para ${photoRecord.driver_name} no veiculo ${photoRecord.vehicle_plate}.` : ''}
+        onClose={closePhotoModal}
+      >
+        {photoRecord ? (
+          <div className="evidence-modal-grid">
+            <div className="evidence-image-card">
+              <img src={photoRecord.photo_url} alt={`Foto da posse do veiculo ${photoRecord.vehicle_plate}`} className="evidence-image" />
+            </div>
+            <div className="evidence-meta-card">
+              <strong>Detalhes da captura</strong>
+              <div className="stack">
+                <span><strong>Veiculo:</strong> {photoRecord.vehicle_plate}</span>
+                <span><strong>Condutor:</strong> {photoRecord.driver_name}</span>
+                <span><strong>Capturada em:</strong> {formatTimestamp(photoRecord.photo_captured_at)}</span>
+                <span>
+                  <strong>Evidencia:</strong> {photoRecord.photo_available ? 'Foto vinculada ao registro' : 'Sem evidencia'}
+                </span>
+              </div>
+            </div>
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={Boolean(locationRecord)}
+        title="Local da captura"
+        description={locationRecord ? `Georreferenciamento da foto registrada para ${locationRecord.vehicle_plate}.` : ''}
+        onClose={closeLocationModal}
+      >
+        {locationRecord?.capture_location ? (
+          <div className="evidence-modal-grid">
+            <div className="map-frame-card">
+              <iframe
+                title={`Mapa da posse de ${locationRecord.vehicle_plate}`}
+                src={buildMapEmbedUrl(locationRecord.capture_location)}
+                className="map-frame"
+                loading="lazy"
+                referrerPolicy="no-referrer-when-downgrade"
+              />
+            </div>
+            <div className="evidence-meta-card">
+              <strong>Coordenadas da captura</strong>
+              <div className="stack">
+                <span><strong>Veiculo:</strong> {locationRecord.vehicle_plate}</span>
+                <span><strong>Latitude/Longitude:</strong> {formatCoordinates(locationRecord.capture_location)}</span>
+                <span><strong>Precisao:</strong> {Math.round(locationRecord.capture_location.accuracy_meters)} m</span>
+                <span><strong>Capturada em:</strong> {formatTimestamp(locationRecord.photo_captured_at)}</span>
+              </div>
+              <a
+                href={locationRecord.capture_location.maps_url}
+                target="_blank"
+                rel="noreferrer"
+                className="secondary-button"
+              >
+                Abrir no mapa
+              </a>
+            </div>
+          </div>
+        ) : null}
       </Modal>
     </div>
   )

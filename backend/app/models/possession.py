@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from uuid import UUID
-from sqlalchemy import DateTime, ForeignKey, Index, String, Text, text
+from sqlalchemy import DateTime, Float, ForeignKey, Index, Integer, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
@@ -28,6 +28,13 @@ class VehiclePossession(Base):
     start_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     observation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    photo_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    photo_mime_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
+    photo_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    photo_captured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    capture_latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    capture_longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
+    capture_accuracy_meters: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
 
     vehicle: Mapped["Vehicle"] = relationship(back_populates="possessions")

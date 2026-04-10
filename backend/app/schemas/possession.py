@@ -12,6 +12,10 @@ class PossessionCreate(BaseModel):
     driver_contact: str | None = Field(default=None, max_length=50)
     start_date: datetime | None = None
     observation: str | None = Field(default=None, max_length=1000)
+    photo_captured_at: datetime
+    capture_latitude: float
+    capture_longitude: float
+    capture_accuracy_meters: float
 
     @field_validator("driver_name")
     @classmethod
@@ -29,6 +33,27 @@ class PossessionCreate(BaseModel):
         normalized = value.strip()
         return normalized or None
 
+    @field_validator("capture_latitude")
+    @classmethod
+    def validate_latitude(cls, value: float) -> float:
+        if value < -90 or value > 90:
+            raise ValueError("Latitude deve estar entre -90 e 90")
+        return value
+
+    @field_validator("capture_longitude")
+    @classmethod
+    def validate_longitude(cls, value: float) -> float:
+        if value < -180 or value > 180:
+            raise ValueError("Longitude deve estar entre -180 e 180")
+        return value
+
+    @field_validator("capture_accuracy_meters")
+    @classmethod
+    def validate_accuracy(cls, value: float) -> float:
+        if value <= 0:
+            raise ValueError("Precisao da localizacao deve ser maior que zero")
+        return value
+
 
 class PossessionUpdate(BaseModel):
     end_date: datetime | None = None
@@ -41,6 +66,13 @@ class PossessionUpdate(BaseModel):
             return None
         normalized = value.strip()
         return normalized or None
+
+
+class CaptureLocationOut(BaseModel):
+    latitude: float
+    longitude: float
+    accuracy_meters: float
+    maps_url: str
 
 
 class PossessionOut(BaseModel):
@@ -57,3 +89,7 @@ class PossessionOut(BaseModel):
     observation: str | None
     created_at: datetime
     is_active: bool
+    photo_available: bool
+    photo_url: str | None
+    photo_captured_at: datetime | None
+    capture_location: CaptureLocationOut | None

@@ -84,6 +84,7 @@ if (Test-Path $pythonExe) {
 if ($BuildFrontend) {
     Push-Location $frontendDir
     try {
+        Write-Output "Preparando build do frontend..."
         if (-not (Test-Path (Join-Path $frontendDir "node_modules"))) {
             Invoke-ExternalStep "Instalacao das dependencias do frontend" { npm install }
         }
@@ -95,16 +96,19 @@ if ($BuildFrontend) {
 }
 
 if (-not $SkipLocalPostgres) {
+    Write-Output "Garantindo PostgreSQL local..."
     Invoke-ExternalStep "Inicializacao do PostgreSQL local" { & $postgresBootstrapScript }
 }
 
 Push-Location $backendDir
 try {
     if (-not $SkipMigrate) {
+        Write-Output "Aplicando migracoes do banco..."
         Invoke-ExternalStep "Migracoes do banco" { & $alembicExe upgrade head }
     }
 
     if ($SeedDemoData) {
+        Write-Output "Executando seed inicial..."
         Invoke-ExternalStep "Seed inicial" { & $pythonExe -m scripts.seed }
     }
 
@@ -114,6 +118,7 @@ try {
         $uvicornArgs += "--reload"
     }
 
+    Write-Output "Iniciando servidor HTTP em ${AppHost}:$Port..."
     & $uvicornExe @uvicornArgs
 }
 finally {
