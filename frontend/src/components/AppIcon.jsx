@@ -129,6 +129,27 @@ export function AppIcon({ name, className }) {
           <path d="m9 6 6 6-6 6" />
         </svg>
       )
+    case 'chevron-down':
+      return (
+        <svg {...commonProps}>
+          <path d="m6 9 6 6 6-6" />
+        </svg>
+      )
+    case 'chevron-up':
+      return (
+        <svg {...commonProps}>
+          <path d="m6 15 6-6 6 6" />
+        </svg>
+      )
+    case 'catalog':
+      return (
+        <svg {...commonProps}>
+          <rect x="4" y="4" width="16" height="16" rx="2.6" />
+          <path d="M8 8h8" />
+          <path d="M8 12h8" />
+          <path d="M8 16h5" />
+        </svg>
+      )
     case 'spark':
       return (
         <svg {...commonProps}>

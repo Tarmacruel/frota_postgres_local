@@ -3,7 +3,9 @@ from __future__ import annotations
 from uuid import UUID
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 from app.models.location_history import LocationHistory
+from app.models.master_data import Allocation, Department
 from app.models.possession import VehiclePossession
 from app.models.vehicle import Vehicle, VehicleStatus
 
@@ -39,6 +41,7 @@ class VehicleRepository:
     async def get_active_history(self, vehicle_id: UUID) -> LocationHistory | None:
         result = await self.db.execute(
             select(LocationHistory)
+            .options(joinedload(LocationHistory.allocation).joinedload(Allocation.department).joinedload(Department.organization))
             .where(LocationHistory.vehicle_id == vehicle_id, LocationHistory.end_date.is_(None))
             .order_by(LocationHistory.start_date.desc())
         )
@@ -47,6 +50,7 @@ class VehicleRepository:
     async def list_history(self, vehicle_id: UUID) -> list[LocationHistory]:
         result = await self.db.execute(
             select(LocationHistory)
+            .options(joinedload(LocationHistory.allocation).joinedload(Allocation.department).joinedload(Department.organization))
             .where(LocationHistory.vehicle_id == vehicle_id)
             .order_by(LocationHistory.start_date.desc())
         )

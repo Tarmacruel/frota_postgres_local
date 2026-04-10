@@ -3,11 +3,12 @@ import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import DriverBadge from '../components/DriverBadge'
 import PossessionForm from '../components/PossessionForm'
+import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
 import { possessionAPI } from '../api/possession'
 import { useAuth } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
-import { exportRowsToPdf, exportRowsToXlsx } from '../utils/exportData'
+import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 
 const viewOptions = [
   { value: 'ATIVAS', label: 'Ativas' },
@@ -46,6 +47,16 @@ function buildEndState(record) {
   return {
     end_date: new Date().toISOString().slice(0, 16),
     observation: record?.observation || '',
+  }
+}
+
+function buildVehicleOption(vehicle) {
+  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
+  return {
+    value: vehicle.id,
+    label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
+    description: `${vehicle.ownership_type === 'LOCADO' ? 'Locado' : 'Proprio'} | ${locationLabel}`,
+    keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.chassis_number, locationLabel].filter(Boolean).join(' '),
   }
 }
 
@@ -209,25 +220,30 @@ export default function PossessionPage() {
     }
   }
 
-  async function handleExportPdf() {
+  async function handlePreviewPdf() {
     if (filteredRecords.length === 0) {
-      setFeedback('Nao ha registros de posse filtrados para exportar.')
+      setFeedback('Nao ha registros de posse filtrados para previsualizar.')
       return
     }
 
     try {
       setError('')
       setFeedback('')
-      await exportRowsToPdf({
+      await previewRowsToPdf({
         title: 'Frota PMTF - Condutores e posse',
         fileName: 'frota-pmtf-condutores',
         subtitle: 'Relatorio dos condutores e posses filtrados no painel operacional.',
         columns: exportColumns,
         rows: filteredRecords,
+        filters: [
+          { label: 'Status', value: viewOptions.find((option) => option.value === viewFilter)?.label || 'Todas' },
+          ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+          ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
+        ],
       })
-      setFeedback('Exportacao de condutores em PDF iniciada com sucesso.')
+      setFeedback('Pre-visualizacao do PDF de condutores aberta em nova guia.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar os condutores em PDF.'))
+      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o PDF dos condutores.'))
     }
   }
 
@@ -245,6 +261,11 @@ export default function PossessionPage() {
         sheetName: 'Condutores',
         columns: exportColumns,
         rows: filteredRecords,
+        filters: [
+          { label: 'Status', value: viewOptions.find((option) => option.value === viewFilter)?.label || 'Todas' },
+          ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+          ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
+        ],
       })
       setFeedback('Exportacao de condutores em XLSX iniciada com sucesso.')
     } catch (err) {
@@ -267,7 +288,7 @@ export default function PossessionPage() {
               Nova posse
             </button>
           ) : null}
-          <button className="secondary-button" type="button" onClick={handleExportPdf}>Exportar PDF</button>
+          <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Previsualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
       </div>
@@ -293,14 +314,13 @@ export default function PossessionPage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
-            <select className="app-select" value={vehicleFilter} onChange={(event) => setVehicleFilter(event.target.value)}>
-              <option value="">Todos os veiculos</option>
-              {vehicles.map((vehicle) => (
-                <option key={vehicle.id} value={vehicle.id}>
-                  {vehicle.plate}
-                </option>
-              ))}
-            </select>
+            <SearchableSelect
+              value={vehicleFilter}
+              onChange={setVehicleFilter}
+              options={[{ value: '', label: 'Todos os veiculos' }, ...vehicles.map(buildVehicleOption)]}
+              placeholder="Filtrar veiculo"
+              searchPlaceholder="Buscar veiculo por placa, modelo, chassi ou lotacao"
+            />
           </div>
         </div>
       </div>

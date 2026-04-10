@@ -2,8 +2,9 @@ import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './context/AuthContext'
-import DashboardPage from './pages/DashboardPage'
 import AuditPage from './pages/AuditPage'
+import CadastrosPage from './pages/CadastrosPage'
+import DashboardPage from './pages/DashboardPage'
 import LoginPage from './pages/LoginPage'
 import MaintenancePage from './pages/MaintenancePage'
 import PossessionPage from './pages/PossessionPage'
@@ -25,6 +26,7 @@ export default function App() {
             }
           >
             <Route index element={<DashboardPage />} />
+            <Route path="cadastros" element={<CadastrosPage />} />
             <Route path="vehicles" element={<VehiclesPage />} />
             <Route path="manutencoes" element={<MaintenancePage />} />
             <Route path="condutores" element={<PossessionPage />} />

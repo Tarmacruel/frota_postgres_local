@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import api from '../api/client'
 import { getApiErrorMessage } from '../utils/apiError'
-import { exportRowsToPdf, exportRowsToXlsx } from '../utils/exportData'
+import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 import { getRoleLabel } from '../utils/roles'
 
 const actionOptions = ['TODAS', 'CREATE', 'UPDATE', 'DELETE']
@@ -85,23 +85,28 @@ export default function AuditPage() {
 
   async function handleExportPdf() {
     if (filteredLogs.length === 0) {
-      setFeedback('Nao ha eventos de auditoria filtrados para exportar.')
+      setFeedback('Nao ha eventos de auditoria filtrados para previsualizar.')
       return
     }
 
     try {
       setError('')
       setFeedback('')
-      await exportRowsToPdf({
+      await previewRowsToPdf({
         title: 'Frota PMTF - Auditoria',
         fileName: 'frota-pmtf-auditoria',
         subtitle: 'Relatorio administrativo da trilha de auditoria filtrada.',
         columns: exportColumns,
         rows: filteredLogs,
+        filters: [
+          { label: 'Acao', value: actionFilter === 'TODAS' ? 'Todas' : actionFilter },
+          { label: 'Entidade', value: entityFilter === 'TODOS' ? 'Todas' : entityFilter },
+          ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
+        ],
       })
-      setFeedback('Exportacao de auditoria em PDF iniciada com sucesso.')
+      setFeedback('Pre-visualizacao do PDF de auditoria aberta em nova guia.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar a auditoria em PDF.'))
+      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o PDF da auditoria.'))
     }
   }
 
@@ -119,6 +124,11 @@ export default function AuditPage() {
         sheetName: 'Auditoria',
         columns: exportColumns,
         rows: filteredLogs,
+        filters: [
+          { label: 'Acao', value: actionFilter === 'TODAS' ? 'Todas' : actionFilter },
+          { label: 'Entidade', value: entityFilter === 'TODOS' ? 'Todas' : entityFilter },
+          ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
+        ],
       })
       setFeedback('Exportacao de auditoria em XLSX iniciada com sucesso.')
     } catch (err) {
@@ -134,7 +144,7 @@ export default function AuditPage() {
           <p className="section-copy">Acompanhe criacoes, edicoes e exclusoes registradas nas areas sensiveis do sistema.</p>
         </div>
         <div className="actions-inline">
-          <button className="secondary-button" type="button" onClick={handleExportPdf}>Exportar PDF</button>
+          <button className="secondary-button" type="button" onClick={handleExportPdf}>Previsualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
       </div>

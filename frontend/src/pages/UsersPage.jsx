@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import Modal from '../components/Modal'
 import api from '../api/client'
 import { getApiErrorMessage } from '../utils/apiError'
-import { exportRowsToPdf, exportRowsToXlsx } from '../utils/exportData'
+import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 import { getRoleLabel } from '../utils/roles'
 
 const initialForm = {
@@ -135,23 +135,27 @@ export default function UsersPage() {
 
   async function handleExportPdf() {
     if (filteredUsers.length === 0) {
-      setFeedback('Nao ha usuarios filtrados para exportar.')
+      setFeedback('Nao ha usuarios filtrados para previsualizar.')
       return
     }
 
     try {
       setError('')
       setFeedback('')
-      await exportRowsToPdf({
+      await previewRowsToPdf({
         title: 'Frota PMTF - Usuarios',
         fileName: 'frota-pmtf-usuarios',
         subtitle: 'Relatorio dos perfis administrativos, de producao e consulta.',
         columns: exportColumns,
         rows: filteredUsers,
+        filters: [
+          { label: 'Perfil', value: roleFilter === 'TODOS' ? 'Todos os perfis' : getRoleLabel(roleFilter) },
+          ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
+        ],
       })
-      setFeedback('Exportacao de usuarios em PDF iniciada com sucesso.')
+      setFeedback('Pre-visualizacao do PDF de usuarios aberta em nova guia.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar os usuarios em PDF.'))
+      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o PDF dos usuarios.'))
     }
   }
 
@@ -169,6 +173,10 @@ export default function UsersPage() {
         sheetName: 'Usuarios',
         columns: exportColumns,
         rows: filteredUsers,
+        filters: [
+          { label: 'Perfil', value: roleFilter === 'TODOS' ? 'Todos os perfis' : getRoleLabel(roleFilter) },
+          ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
+        ],
       })
       setFeedback('Exportacao de usuarios em XLSX iniciada com sucesso.')
     } catch (err) {
@@ -190,7 +198,7 @@ export default function UsersPage() {
         </div>
         <div className="actions-inline">
           <button className="app-button" type="button" onClick={openCreateModal}>Novo usuario</button>
-          <button className="secondary-button" type="button" onClick={handleExportPdf}>Exportar PDF</button>
+          <button className="secondary-button" type="button" onClick={handleExportPdf}>Previsualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
       </div>

@@ -15,13 +15,24 @@ class VehicleStatus(str, enum.Enum):
     INATIVO = "INATIVO"
 
 
+class VehicleOwnershipType(str, enum.Enum):
+    PROPRIO = "PROPRIO"
+    LOCADO = "LOCADO"
+
+
 class Vehicle(Base):
     __tablename__ = "vehicles"
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     plate: Mapped[str] = mapped_column(String(20), nullable=False, unique=True, index=True)
+    chassis_number: Mapped[str | None] = mapped_column(String(50), nullable=True, unique=True, index=True)
     brand: Mapped[str] = mapped_column(String(50), nullable=False)
     model: Mapped[str] = mapped_column(String(50), nullable=False)
+    ownership_type: Mapped[VehicleOwnershipType] = mapped_column(
+        Enum(VehicleOwnershipType, name="vehicle_ownership_type"),
+        nullable=False,
+        default=VehicleOwnershipType.PROPRIO,
+    )
     status: Mapped[VehicleStatus] = mapped_column(Enum(VehicleStatus, name="vehicle_status"), nullable=False, default=VehicleStatus.ATIVO)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))

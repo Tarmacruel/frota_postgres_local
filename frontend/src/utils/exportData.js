@@ -13,6 +13,19 @@ function createXlsxCell(value) {
   return { value: normalizeValue(value), type: 'string' }
 }
 
+function normalizeFilters(filters = []) {
+  return filters
+    .map((filter) => {
+      if (!filter) return null
+      if (typeof filter === 'string') return filter.trim() || null
+      const label = String(filter.label || '').trim()
+      const value = String(filter.value || '').trim()
+      if (!label || !value) return null
+      return `${label}: ${value}`
+    })
+    .filter(Boolean)
+}
+
 async function loadLogoAsDataUrl() {
   const response = await fetch(officialBrand.logoPath)
   if (!response.ok) {
@@ -28,14 +41,16 @@ async function loadLogoAsDataUrl() {
   })
 }
 
-export async function exportRowsToXlsx({ fileName, sheetName, columns, rows }) {
+export async function exportRowsToXlsx({ fileName, sheetName, columns, rows, filters = [] }) {
   const { default: zipcelx } = await import('zipcelx')
   const now = new Date().toLocaleString('pt-BR')
+  const normalizedFilters = normalizeFilters(filters)
   const sheetRows = [
     [createXlsxCell(officialBrand.municipality)],
     [createXlsxCell(`${officialBrand.systemName} | ${sheetName}`)],
     [createXlsxCell(officialBrand.addressLine)],
     [createXlsxCell(`CNPJ ${officialBrand.cnpj} | Gerado em ${now}`)],
+    ...(normalizedFilters.length ? normalizedFilters.map((filter) => [createXlsxCell(filter)]) : []),
     [],
     columns.map((column) => createXlsxCell(column.header)),
     ...rows.map((row) => columns.map((column) => createXlsxCell(column.value(row)))),
@@ -49,7 +64,7 @@ export async function exportRowsToXlsx({ fileName, sheetName, columns, rows }) {
   })
 }
 
-export async function exportRowsToPdf({ title, fileName, columns, rows, subtitle }) {
+async function buildPdfDocument({ title, columns, rows, subtitle, filters = [] }) {
   const [{ default: jsPDF }, { default: autoTable }] = await Promise.all([
     import('jspdf'),
     import('jspdf-autotable'),
@@ -57,6 +72,7 @@ export async function exportRowsToPdf({ title, fileName, columns, rows, subtitle
   const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' })
   const now = new Date().toLocaleString('pt-BR')
   const logoDataUrl = await loadLogoAsDataUrl().catch(() => null)
+  const normalizedFilters = normalizeFilters(filters)
 
   const brandBlue = [36, 82, 232]
   const brandBlueDark = [23, 57, 183]
@@ -89,18 +105,29 @@ export async function exportRowsToPdf({ title, fileName, columns, rows, subtitle
     doc.text(subtitle || 'Relatorio exportado do ambiente oficial da frota municipal.', pageWidth - 44, 76, { align: 'right' })
     doc.text(`Gerado em ${now}`, pageWidth - 44, 92, { align: 'right' })
 
+    let bottomY = 118
+    if (normalizedFilters.length) {
+      const filtersLabel = `Filtros ativos | ${normalizedFilters.join(' | ')}`
+      const wrappedFilters = doc.splitTextToSize(filtersLabel, pageWidth - 88)
+      doc.setTextColor(...brandBlueDark)
+      doc.setFontSize(9)
+      doc.text(wrappedFilters, 44, 116)
+      bottomY = 116 + (wrappedFilters.length * 12)
+    }
+
     doc.setDrawColor(215, 225, 242)
     doc.line(34, pageHeight - 28, pageWidth - 34, pageHeight - 28)
     doc.setTextColor(...softInk)
     doc.setFontSize(9)
     doc.text(officialBrand.reportFooter, 36, pageHeight - 14)
     doc.text(`Pagina ${doc.getCurrentPageInfo().pageNumber}`, pageWidth - 36, pageHeight - 14, { align: 'right' })
+    return bottomY
   }
 
-  drawOfficialHeader()
+  const tableStartY = drawOfficialHeader() + 18
 
   autoTable(doc, {
-    startY: 132,
+    startY: tableStartY,
     head: [columns.map((column) => column.header)],
     body: rows.map((row) => columns.map((column) => normalizeValue(column.value(row)))),
     margin: { left: 28, right: 28, bottom: 28 },
@@ -122,5 +149,65 @@ export async function exportRowsToPdf({ title, fileName, columns, rows, subtitle
     didDrawPage: drawOfficialHeader,
   })
 
-  doc.save(`${fileName}.pdf`)
+  return doc
+}
+
+function downloadBlob(blob, fileName) {
+  const url = URL.createObjectURL(blob)
+  const anchor = document.createElement('a')
+  anchor.href = url
+  anchor.download = `${fileName}.pdf`
+  anchor.click()
+  window.setTimeout(() => URL.revokeObjectURL(url), 3000)
+}
+
+export async function exportRowsToPdf(options) {
+  const doc = await buildPdfDocument(options)
+  const blob = doc.output('blob')
+  downloadBlob(blob, options.fileName)
+}
+
+export async function previewRowsToPdf(options) {
+  const previewWindow = window.open('', '_blank')
+  if (previewWindow) {
+    previewWindow.document.write(`
+      <html lang="pt-BR">
+        <head>
+          <title>Gerando PDF...</title>
+          <meta charset="utf-8" />
+          <style>
+            body {
+              margin: 0;
+              display: grid;
+              place-items: center;
+              min-height: 100vh;
+              font-family: Arial, sans-serif;
+              color: #1739b7;
+              background: #eef3fd;
+            }
+          </style>
+        </head>
+        <body>Gerando pre-visualizacao do PDF...</body>
+      </html>
+    `)
+    previewWindow.document.close()
+  }
+
+  try {
+    const doc = await buildPdfDocument(options)
+    const blob = doc.output('blob')
+    const url = URL.createObjectURL(blob)
+    if (previewWindow) {
+      previewWindow.location.replace(url)
+      window.setTimeout(() => URL.revokeObjectURL(url), 120000)
+      return
+    }
+
+    downloadBlob(blob, options.fileName)
+  } catch (error) {
+    if (previewWindow) {
+      previewWindow.close()
+    }
+    throw error
+  }
 }

@@ -1,18 +1,24 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import DriverBadge from '../components/DriverBadge'
 import Modal from '../components/Modal'
+import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
 import { useAuth } from '../context/AuthContext'
+import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
-import { exportRowsToPdf, exportRowsToXlsx } from '../utils/exportData'
+import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 
 const initialForm = {
   plate: '',
+  chassis_number: '',
   brand: '',
   model: '',
+  ownership_type: 'PROPRIO',
   status: 'ATIVO',
-  department: '',
+  organization_id: '',
+  department_id: '',
+  allocation_id: '',
 }
 
 const statusOptions = [
@@ -21,6 +27,58 @@ const statusOptions = [
   { value: 'MANUTENCAO', label: 'Manutencao' },
   { value: 'INATIVO', label: 'Inativos' },
 ]
+
+const ownershipOptions = [
+  { value: 'TODOS', label: 'Todos os tipos' },
+  { value: 'PROPRIO', label: 'Proprio' },
+  { value: 'LOCADO', label: 'Locado' },
+]
+
+function formatDate(value) {
+  if (!value) return 'Atual'
+  return new Date(value).toLocaleString('pt-BR')
+}
+
+function getOwnershipLabel(value) {
+  return value === 'LOCADO' ? 'Locado' : 'Proprio'
+}
+
+function buildVehicleLocationLabel(vehicle) {
+  return vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao registrada'
+}
+
+function buildVehicleOption(vehicle) {
+  const locationLabel = buildVehicleLocationLabel(vehicle)
+  return {
+    value: vehicle.id,
+    label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
+    description: `${getOwnershipLabel(vehicle.ownership_type)} | ${locationLabel}`,
+    keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.chassis_number, locationLabel, vehicle.current_driver_name]
+      .filter(Boolean)
+      .join(' '),
+  }
+}
+
+function buildFilterSummary(statusFilter, ownershipFilter, locationFilter, search, locationOptions) {
+  const filters = []
+  const statusLabel = statusOptions.find((option) => option.value === statusFilter)?.label
+  if (statusLabel) filters.push({ label: 'Status', value: statusLabel })
+
+  if (ownershipFilter !== 'TODOS') {
+    filters.push({ label: 'Tipo', value: getOwnershipLabel(ownershipFilter) })
+  }
+
+  if (locationFilter !== 'TODOS') {
+    const locationLabel = locationOptions.find((option) => option.value === locationFilter)?.label || locationFilter
+    filters.push({ label: 'Lotacao', value: locationLabel })
+  }
+
+  if (search.trim()) {
+    filters.push({ label: 'Busca', value: search.trim() })
+  }
+
+  return filters
+}
 
 export default function VehiclesPage() {
   const { canWrite, canDelete, isAdmin } = useAuth()
@@ -31,41 +89,74 @@ export default function VehiclesPage() {
   const [selectedVehicle, setSelectedVehicle] = useState(null)
   const [editingId, setEditingId] = useState(null)
   const [search, setSearch] = useState('')
-  const [departmentFilter, setDepartmentFilter] = useState('TODOS')
+  const [locationFilter, setLocationFilter] = useState('TODOS')
+  const [ownershipFilter, setOwnershipFilter] = useState('TODOS')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const {
+    organizations,
+    allocations,
+    loading: catalogLoading,
+    error: catalogError,
+    getDepartmentsByOrganization,
+    getAllocationsByDepartment,
+  } = useMasterDataCatalog()
 
   const statusFilter = searchParams.get('status') || 'TODOS'
   const focusVehicleId = searchParams.get('focus')
-  const departmentOptions = ['TODOS', ...Array.from(new Set(vehicles.map((vehicle) => vehicle.current_department).filter(Boolean))).sort()]
 
-  const baseFilteredVehicles = vehicles.filter((vehicle) => {
-    const term = search.trim().toLowerCase()
-    const matchesSearch =
-      !term ||
-      [vehicle.plate, vehicle.brand, vehicle.model, vehicle.current_department, vehicle.current_driver_name]
-        .filter(Boolean)
-        .some((value) => value.toLowerCase().includes(term))
+  const organizationOptions = organizations.map((organization) => ({
+    value: organization.id,
+    label: organization.name,
+    description: `${organization.departments.length} departamento(s)`,
+  }))
 
-    const matchesDepartment =
-      departmentFilter === 'TODOS' || (vehicle.current_department || '').toLowerCase() === departmentFilter.toLowerCase()
+  const departmentOptions = (form.organization_id ? getDepartmentsByOrganization(form.organization_id) : []).map((department) => ({
+    value: department.id,
+    label: department.name,
+    description: department.organization_name,
+  }))
 
-    return matchesSearch && matchesDepartment
-  })
+  const allocationOptions = (form.department_id ? getAllocationsByDepartment(form.department_id) : []).map((allocation) => ({
+    value: allocation.id,
+    label: allocation.name,
+    description: allocation.display_name,
+    keywords: allocation.display_name,
+  }))
 
-  const filteredVehicles = selectedVehicle
-    ? vehicles.filter((vehicle) => vehicle.id === selectedVehicle.id)
-    : baseFilteredVehicles
+  const locationOptions = useMemo(() => {
+    const unique = new Map()
+
+    allocations.forEach((allocation) => {
+      unique.set(allocation.display_name, {
+        value: allocation.display_name,
+        label: allocation.display_name,
+      })
+    })
+
+    vehicles
+      .map((vehicle) => buildVehicleLocationLabel(vehicle))
+      .filter(Boolean)
+      .forEach((label) => {
+        if (!unique.has(label)) {
+          unique.set(label, { value: label, label })
+        }
+      })
+
+    return [{ value: 'TODOS', label: 'Todas as lotacoes' }, ...Array.from(unique.values()).sort((a, b) => a.label.localeCompare(b.label))]
+  }, [allocations, vehicles])
 
   const exportColumns = [
     { header: 'Placa', value: (vehicle) => vehicle.plate },
+    { header: 'Chassi', value: (vehicle) => vehicle.chassis_number || 'Nao informado' },
     { header: 'Marca', value: (vehicle) => vehicle.brand },
     { header: 'Modelo', value: (vehicle) => vehicle.model },
+    { header: 'Tipo', value: (vehicle) => getOwnershipLabel(vehicle.ownership_type) },
     { header: 'Status', value: (vehicle) => vehicle.status },
-    { header: 'Lotacao atual', value: (vehicle) => vehicle.current_department || 'Sem lotacao' },
+    { header: 'Lotacao atual', value: (vehicle) => buildVehicleLocationLabel(vehicle) },
     { header: 'Condutor atual', value: (vehicle) => vehicle.current_driver_name || 'Sem condutor ativo' },
     { header: 'Atualizado em', value: (vehicle) => formatDate(vehicle.updated_at) },
   ]
@@ -77,6 +168,7 @@ export default function VehiclesPage() {
       const params = statusFilter !== 'TODOS' ? { status: statusFilter } : undefined
       const { data } = await api.get('/vehicles', { params })
       setVehicles(data)
+
       if (selectedVehicle?.id) {
         const updatedSelection = data.find((vehicle) => vehicle.id === selectedVehicle.id) || null
         setSelectedVehicle(updatedSelection)
@@ -111,46 +203,31 @@ export default function VehiclesPage() {
     loadHistory(focusVehicleId, { toggle: false, syncUrl: false })
   }, [focusVehicleId, vehicles])
 
-  async function handleSubmit(event) {
-    event.preventDefault()
-    try {
-      setSubmitting(true)
-      setError('')
-      setFeedback('')
-      if (editingId) {
-        await api.put(`/vehicles/${editingId}`, form)
-        setFeedback('Veiculo atualizado com sucesso.')
-      } else {
-        await api.post('/vehicles', form)
-        setFeedback('Veiculo cadastrado com sucesso.')
-      }
-      closeVehicleModal()
-      await loadVehicles()
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o veiculo.'))
-    } finally {
-      setSubmitting(false)
-    }
-  }
+  const baseFilteredVehicles = vehicles.filter((vehicle) => {
+    const term = search.trim().toLowerCase()
+    const matchesSearch =
+      !term ||
+      [
+        vehicle.plate,
+        vehicle.chassis_number,
+        vehicle.brand,
+        vehicle.model,
+        buildVehicleLocationLabel(vehicle),
+        vehicle.current_driver_name,
+        getOwnershipLabel(vehicle.ownership_type),
+      ]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(term))
 
-  async function handleDelete(id) {
-    if (!window.confirm('Confirma a exclusao?')) return
+    const matchesLocation = locationFilter === 'TODOS' || buildVehicleLocationLabel(vehicle) === locationFilter
+    const matchesOwnership = ownershipFilter === 'TODOS' || vehicle.ownership_type === ownershipFilter
 
-    try {
-      setError('')
-      setFeedback('')
-      await api.delete(`/vehicles/${id}`)
-      if (editingId === id) closeVehicleModal()
-      if (selectedVehicle?.id === id) {
-        setSelectedVehicle(null)
-        setSelectedHistory([])
-      }
-      setFeedback('Veiculo removido com sucesso.')
-      await loadVehicles()
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel excluir o veiculo.'))
-    }
-  }
+    return matchesSearch && matchesLocation && matchesOwnership
+  })
+
+  const filteredVehicles = selectedVehicle
+    ? vehicles.filter((vehicle) => vehicle.id === selectedVehicle.id)
+    : baseFilteredVehicles
 
   function patchSearchParams(updates) {
     const next = new URLSearchParams(searchParams)
@@ -186,6 +263,24 @@ export default function VehiclesPage() {
     }
   }
 
+  function clearHistoryFocus(syncUrl = true) {
+    setSelectedVehicle(null)
+    setSelectedHistory([])
+    if (syncUrl) {
+      patchSearchParams({ focus: null })
+    }
+  }
+
+  function handleStatusChange(nextStatus) {
+    if (nextStatus === 'TODOS') {
+      const next = new URLSearchParams(searchParams)
+      next.delete('status')
+      setSearchParams(next)
+      return
+    }
+    patchSearchParams({ status: nextStatus })
+  }
+
   function openNewVehicleModal() {
     setEditingId(null)
     setForm(initialForm)
@@ -198,10 +293,14 @@ export default function VehiclesPage() {
     setError('')
     setForm({
       plate: vehicle.plate,
+      chassis_number: vehicle.chassis_number || '',
       brand: vehicle.brand,
       model: vehicle.model,
+      ownership_type: vehicle.ownership_type,
       status: vehicle.status,
-      department: vehicle.current_department || '',
+      organization_id: vehicle.current_location?.organization_id || '',
+      department_id: vehicle.current_location?.department_id || '',
+      allocation_id: vehicle.current_location?.allocation_id || '',
     })
     setIsModalOpen(true)
   }
@@ -212,53 +311,110 @@ export default function VehiclesPage() {
     setIsModalOpen(false)
   }
 
-  function handleStatusChange(nextStatus) {
-    if (nextStatus === 'TODOS') {
-      setSearchParams({})
-      return
-    }
-    setSearchParams({ status: nextStatus })
-  }
-
   function clearFilters() {
     setSearch('')
-    setDepartmentFilter('TODOS')
-    setSearchParams({})
+    setLocationFilter('TODOS')
+    setOwnershipFilter('TODOS')
     clearHistoryFocus(false)
+    const next = new URLSearchParams(searchParams)
+    next.delete('status')
+    next.delete('focus')
+    setSearchParams(next)
   }
 
-  function clearHistoryFocus(syncUrl = true) {
-    setSelectedVehicle(null)
-    setSelectedHistory([])
-    if (syncUrl) {
-      patchSearchParams({ focus: null })
+  async function handleSubmit(event) {
+    event.preventDefault()
+
+    const isEditingLegacyWithoutLocation = Boolean(editingId) && !form.allocation_id && !vehicles.find((vehicle) => vehicle.id === editingId)?.current_location
+    const touchedLocationSelection = Boolean(form.organization_id || form.department_id || form.allocation_id)
+
+    if (!editingId && !form.allocation_id) {
+      setError('Selecione a lotacao completa para cadastrar o veiculo.')
+      return
+    }
+
+    if (editingId && touchedLocationSelection && !form.allocation_id) {
+      setError('Conclua a selecao ate a lotacao para salvar a alteracao.')
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      setError('')
+      setFeedback('')
+
+      const payload = {
+        plate: form.plate,
+        chassis_number: form.chassis_number || null,
+        brand: form.brand,
+        model: form.model,
+        ownership_type: form.ownership_type,
+        status: form.status,
+      }
+
+      if (form.allocation_id) {
+        payload.allocation_id = form.allocation_id
+      } else if (!editingId) {
+        payload.allocation_id = form.allocation_id
+      } else if (!isEditingLegacyWithoutLocation) {
+        // Mantem a lotacao atual sem forcar atualizacao.
+      }
+
+      if (editingId) {
+        await api.put(`/vehicles/${editingId}`, payload)
+        setFeedback('Veiculo atualizado com sucesso.')
+      } else {
+        await api.post('/vehicles', payload)
+        setFeedback('Veiculo cadastrado com sucesso.')
+      }
+
+      closeVehicleModal()
+      await loadVehicles()
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o veiculo.'))
+    } finally {
+      setSubmitting(false)
     }
   }
 
-  function formatDate(value) {
-    if (!value) return 'Atual'
-    return new Date(value).toLocaleString('pt-BR')
+  async function handleDelete(id) {
+    if (!window.confirm('Confirma a exclusao?')) return
+
+    try {
+      setError('')
+      setFeedback('')
+      await api.delete(`/vehicles/${id}`)
+      if (editingId === id) closeVehicleModal()
+      if (selectedVehicle?.id === id) {
+        clearHistoryFocus(false)
+      }
+      setFeedback('Veiculo removido com sucesso.')
+      await loadVehicles()
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Nao foi possivel excluir o veiculo.'))
+    }
   }
 
-  async function handleExportPdf() {
+  async function handlePreviewPdf() {
     if (filteredVehicles.length === 0) {
-      setFeedback('Nao ha veiculos filtrados para exportar.')
+      setFeedback('Nao ha veiculos filtrados para previsualizar em PDF.')
       return
     }
 
     try {
       setError('')
       setFeedback('')
-      await exportRowsToPdf({
+      await previewRowsToPdf({
         title: 'Frota PMTF - Veiculos',
         fileName: 'frota-pmtf-veiculos',
         subtitle: 'Relatorio dos veiculos filtrados no painel operacional.',
         columns: exportColumns,
         rows: filteredVehicles,
+        filters: buildFilterSummary(statusFilter, ownershipFilter, locationFilter, search, locationOptions),
       })
-      setFeedback('Exportacao em PDF iniciada com sucesso.')
+      setFeedback('Pre-visualizacao do PDF aberta em nova guia.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar os veiculos em PDF.'))
+      setError(getApiErrorMessage(err, 'Nao foi possivel gerar a pre-visualizacao em PDF.'))
     }
   }
 
@@ -276,6 +432,7 @@ export default function VehiclesPage() {
         sheetName: 'Veiculos',
         columns: exportColumns,
         rows: filteredVehicles,
+        filters: buildFilterSummary(statusFilter, ownershipFilter, locationFilter, search, locationOptions),
       })
       setFeedback('Exportacao em XLSX iniciada com sucesso.')
     } catch (err) {
@@ -283,45 +440,56 @@ export default function VehiclesPage() {
     }
   }
 
-  async function handleExportHistoryPdf() {
+  async function handlePreviewHistoryPdf() {
     if (!selectedVehicle || selectedHistory.length === 0) {
-      setFeedback('Selecione um veiculo com historico carregado para exportar o PDF.')
+      setFeedback('Selecione um veiculo com historico carregado para previsualizar o PDF.')
       return
     }
 
     const historyColumns = [
       { header: 'Veiculo', value: () => selectedVehicle.plate },
-      { header: 'Departamento', value: (item) => item.department || 'Sem departamento informado' },
+      { header: 'Orgao', value: (item) => item.organization_name || 'Legado' },
+      { header: 'Departamento', value: (item) => item.department_name || item.department || 'Sem departamento' },
+      { header: 'Lotacao', value: (item) => item.allocation_name || item.display_name || 'Sem lotacao' },
+      { header: 'Local completo', value: (item) => item.display_name || item.department },
       { header: 'Inicio', value: (item) => formatDate(item.start_date) },
-      { header: 'Fim', value: (item) => item.end_date ? formatDate(item.end_date) : 'Atual' },
+      { header: 'Fim', value: (item) => (item.end_date ? formatDate(item.end_date) : 'Atual') },
     ]
 
     try {
       setError('')
       setFeedback('')
-      await exportRowsToPdf({
+      await previewRowsToPdf({
         title: `Frota PMTF - Historico ${selectedVehicle.plate}`,
         fileName: `frota-pmtf-historico-${selectedVehicle.plate.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-        subtitle: `Historico de lotacao do veiculo ${selectedVehicle.plate} | ${selectedVehicle.brand} ${selectedVehicle.model} | Condutor atual: ${selectedVehicle.current_driver_name || 'Sem condutor ativo'}.`,
+        subtitle: `Historico de lotacao do veiculo ${selectedVehicle.plate} | ${selectedVehicle.brand} ${selectedVehicle.model}.`,
         columns: historyColumns,
         rows: selectedHistory,
+        filters: [
+          { label: 'Veiculo', value: selectedVehicle.plate },
+          { label: 'Tipo', value: getOwnershipLabel(selectedVehicle.ownership_type) },
+          { label: 'Status', value: selectedVehicle.status },
+        ],
       })
-      setFeedback(`Historico de ${selectedVehicle.plate} exportado em PDF com sucesso.`)
+      setFeedback(`Pre-visualizacao do historico de ${selectedVehicle.plate} aberta em nova guia.`)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar o historico do veiculo em PDF.'))
+      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o PDF do historico do veiculo.'))
     }
   }
+
+  const visibleOwnVehicles = filteredVehicles.filter((vehicle) => vehicle.ownership_type === 'PROPRIO').length
+  const visibleRentedVehicles = filteredVehicles.filter((vehicle) => vehicle.ownership_type === 'LOCADO').length
 
   return (
     <div className="surface-panel">
       <div className="panel-heading">
         <div>
           <h2 className="section-title">Operacao de veiculos</h2>
-          <p className="section-copy">Tabela principal ampliada para consulta, filtros rapidos e cadastro via modal sem comprimir a visualizacao.</p>
+          <p className="section-copy">Gerencie placa, chassi, tipo do veiculo e lotacao estruturada sem sair da consulta principal.</p>
         </div>
         <div className="actions-inline">
           {canWrite ? <button className="app-button" type="button" onClick={openNewVehicleModal}>Novo veiculo</button> : null}
-          <button className="secondary-button" type="button" onClick={handleExportPdf}>Exportar PDF</button>
+          <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Previsualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
       </div>
@@ -343,13 +511,20 @@ export default function VehiclesPage() {
           <div className="filter-inline">
             <input
               className="app-input"
-              placeholder="Buscar por placa, marca, modelo, departamento ou condutor"
+              placeholder="Buscar por placa, chassi, marca, modelo, lotacao ou condutor"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
-            <select className="app-select" value={departmentFilter} onChange={(event) => setDepartmentFilter(event.target.value)}>
-              {departmentOptions.map((option) => (
-                <option key={option} value={option}>{option === 'TODOS' ? 'Todos os departamentos' : option}</option>
+            <SearchableSelect
+              value={locationFilter}
+              onChange={setLocationFilter}
+              options={locationOptions}
+              placeholder="Filtrar lotacao"
+              searchPlaceholder="Buscar lotacao"
+            />
+            <select className="app-select" value={ownershipFilter} onChange={(event) => setOwnershipFilter(event.target.value)}>
+              {ownershipOptions.map((option) => (
+                <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
             <button className="ghost-button" type="button" onClick={clearFilters}>Limpar filtros</button>
@@ -363,8 +538,12 @@ export default function VehiclesPage() {
           <span>veiculos exibidos</span>
         </div>
         <div className="metric-inline">
-          <strong>{vehicles.length}</strong>
-          <span>registros na consulta atual</span>
+          <strong>{visibleOwnVehicles}</strong>
+          <span>proprios visiveis</span>
+        </div>
+        <div className="metric-inline">
+          <strong>{visibleRentedVehicles}</strong>
+          <span>locados visiveis</span>
         </div>
       </div>
 
@@ -372,13 +551,14 @@ export default function VehiclesPage() {
         <div className="table-focus-banner">
           <div>
             <strong>Mostrando apenas {selectedVehicle.plate}</strong>
-            <span>Clique em Historico novamente no mesmo veiculo para voltar para a lista completa.</span>
+            <span>Clique novamente em Historico no mesmo veiculo para voltar a lista completa.</span>
           </div>
           <button className="ghost-button" type="button" onClick={clearHistoryFocus}>Reexibir todos</button>
         </div>
       ) : null}
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
+      {catalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
       <div className="surface-panel panel-nested">
@@ -387,8 +567,10 @@ export default function VehiclesPage() {
             <thead>
               <tr>
                 <th>Placa</th>
+                <th>Chassi</th>
                 <th>Marca</th>
                 <th>Modelo</th>
+                <th>Tipo</th>
                 <th>Status</th>
                 <th>Lotacao atual</th>
                 <th>Condutor atual</th>
@@ -399,13 +581,13 @@ export default function VehiclesPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="8" className="muted">Carregando veiculos...</td>
+                  <td colSpan="10" className="muted">Carregando veiculos...</td>
                 </tr>
               ) : filteredVehicles.length === 0 ? (
                 <tr>
-                  <td colSpan="8">
+                  <td colSpan="10">
                     <div className="empty-state">
-                      Nenhum veiculo encontrado para os filtros aplicados. Ajuste a busca ou troque o status para revisar a base completa.
+                      Nenhum veiculo encontrado para os filtros aplicados. Ajuste a busca, a lotacao ou o tipo para revisar a base completa.
                     </div>
                   </td>
                 </tr>
@@ -413,10 +595,12 @@ export default function VehiclesPage() {
                 filteredVehicles.map((vehicle) => (
                   <tr key={vehicle.id} className={selectedVehicle?.id === vehicle.id ? 'is-focused-row' : ''}>
                     <td data-label="Placa"><strong>{vehicle.plate}</strong></td>
+                    <td data-label="Chassi">{vehicle.chassis_number || 'Nao informado'}</td>
                     <td data-label="Marca">{vehicle.brand}</td>
                     <td data-label="Modelo">{vehicle.model}</td>
+                    <td data-label="Tipo">{getOwnershipLabel(vehicle.ownership_type)}</td>
                     <td data-label="Status"><span className={`status-badge status-${vehicle.status}`}>{vehicle.status}</span></td>
-                    <td data-label="Lotacao atual">{vehicle.current_department || 'Sem lotacao registrada'}</td>
+                    <td data-label="Lotacao atual">{buildVehicleLocationLabel(vehicle)}</td>
                     <td data-label="Condutor atual"><DriverBadge name={vehicle.current_driver_name} /></td>
                     <td data-label="Atualizado em">{formatDate(vehicle.updated_at)}</td>
                     <td data-label="Acoes">
@@ -446,15 +630,15 @@ export default function VehiclesPage() {
             </p>
             {selectedVehicle ? (
               <p className="section-copy" style={{ marginTop: 10 }}>
-                Condutor atual: {selectedVehicle.current_driver_name || 'Sem condutor ativo'}
+                Chassi: {selectedVehicle.chassis_number || 'Nao informado'} | Condutor atual: {selectedVehicle.current_driver_name || 'Sem condutor ativo'}
               </p>
             ) : null}
           </div>
           {selectedVehicle ? (
             <div className="actions-inline">
               {selectedHistory.length > 0 ? (
-                <button className="secondary-button" type="button" onClick={handleExportHistoryPdf}>
-                  Historico em PDF
+                <button className="secondary-button" type="button" onClick={handlePreviewHistoryPdf}>
+                  Previsualizar PDF
                 </button>
               ) : null}
               {isAdmin ? (
@@ -471,7 +655,10 @@ export default function VehiclesPage() {
           <ul className="history-list history-grid">
             {selectedHistory.map((item) => (
               <li className="history-item" key={item.id}>
-                <strong>{item.department}</strong>
+                <strong>{item.display_name || item.department}</strong>
+                <div className="muted">Orgao: {item.organization_name || 'Legado'}</div>
+                <div className="muted">Departamento: {item.department_name || item.department || 'Sem departamento'}</div>
+                <div className="muted">Lotacao: {item.allocation_name || 'Nao estruturada'}</div>
                 <div className="muted">Inicio: {formatDate(item.start_date)}</div>
                 <div className="muted">Fim: {item.end_date ? formatDate(item.end_date) : 'Atual'}</div>
               </li>
@@ -485,13 +672,23 @@ export default function VehiclesPage() {
       <Modal
         open={isModalOpen}
         title={editingId ? 'Editar veiculo' : 'Novo veiculo'}
-        description="Preencha os dados operacionais do veiculo sem sair da consulta principal."
+        description="Preencha os dados do veiculo e vincule a lotacao por orgao, departamento e lotacao cadastrados."
         onClose={closeVehicleModal}
       >
         <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
           <div className="form-field">
             <label htmlFor="plate">Placa</label>
             <input id="plate" className="app-input" placeholder="ABC-1D23" value={form.plate} onChange={(event) => setForm({ ...form, plate: event.target.value })} />
+          </div>
+          <div className="form-field">
+            <label htmlFor="chassis_number">Numero do chassi</label>
+            <input
+              id="chassis_number"
+              className="app-input"
+              placeholder="17 caracteres ou identificador interno"
+              value={form.chassis_number}
+              onChange={(event) => setForm({ ...form, chassis_number: event.target.value.toUpperCase() })}
+            />
           </div>
           <div className="form-field">
             <label htmlFor="brand">Marca</label>
@@ -502,6 +699,13 @@ export default function VehiclesPage() {
             <input id="model" className="app-input" placeholder="Ex.: Ranger" value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })} />
           </div>
           <div className="form-field">
+            <label htmlFor="ownership_type">Tipo do veiculo</label>
+            <select id="ownership_type" className="app-select" value={form.ownership_type} onChange={(event) => setForm({ ...form, ownership_type: event.target.value })}>
+              <option value="PROPRIO">Proprio</option>
+              <option value="LOCADO">Locado</option>
+            </select>
+          </div>
+          <div className="form-field">
             <label htmlFor="status">Status</label>
             <select id="status" className="app-select" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
               <option value="ATIVO">ATIVO</option>
@@ -509,18 +713,48 @@ export default function VehiclesPage() {
               <option value="INATIVO">INATIVO</option>
             </select>
           </div>
-          <div className="form-field modal-field-span">
-            <label htmlFor="department">Departamento / lotacao</label>
-            <input
-              id="department"
-              className="app-input"
-              placeholder="Secretaria responsavel"
-              value={form.department}
-              onChange={(event) => setForm({ ...form, department: event.target.value })}
+
+          <div className="form-field">
+            <label>Orgao</label>
+            <SearchableSelect
+              value={form.organization_id}
+              onChange={(value) => setForm({ ...form, organization_id: value, department_id: '', allocation_id: '' })}
+              options={organizationOptions}
+              placeholder={catalogLoading ? 'Carregando orgaos...' : 'Selecione o orgao'}
+              searchPlaceholder="Buscar orgao"
+              disabled={catalogLoading || organizationOptions.length === 0}
             />
           </div>
+
+          <div className="form-field">
+            <label>Departamento</label>
+            <SearchableSelect
+              value={form.department_id}
+              onChange={(value) => setForm({ ...form, department_id: value, allocation_id: '' })}
+              options={departmentOptions}
+              placeholder={!form.organization_id ? 'Selecione primeiro o orgao' : 'Selecione o departamento'}
+              searchPlaceholder="Buscar departamento"
+              disabled={!form.organization_id || departmentOptions.length === 0}
+            />
+          </div>
+
+          <div className="form-field modal-field-span">
+            <label>Lotacao</label>
+            <SearchableSelect
+              value={form.allocation_id}
+              onChange={(value) => setForm({ ...form, allocation_id: value })}
+              options={allocationOptions}
+              placeholder={!form.department_id ? 'Selecione primeiro o departamento' : 'Selecione a lotacao'}
+              searchPlaceholder="Buscar lotacao"
+              disabled={!form.department_id || allocationOptions.length === 0}
+            />
+            {editingId && !form.allocation_id && vehicles.find((vehicle) => vehicle.id === editingId)?.current_department ? (
+              <span className="helper-text">Registro legado atual: {vehicles.find((vehicle) => vehicle.id === editingId)?.current_department}</span>
+            ) : null}
+          </div>
+
           <div className="actions-inline modal-actions">
-            <button className="app-button" type="submit" disabled={submitting}>
+            <button className="app-button" type="submit" disabled={submitting || catalogLoading}>
               {submitting ? 'Salvando...' : editingId ? 'Atualizar veiculo' : 'Cadastrar veiculo'}
             </button>
             <button className="ghost-button" type="button" onClick={closeVehicleModal}>Cancelar</button>

@@ -29,6 +29,7 @@ class SearchRepository:
             .where(
                 or_(
                     Vehicle.plate.ilike(query),
+                    Vehicle.chassis_number.ilike(query),
                     Vehicle.brand.ilike(query),
                     Vehicle.model.ilike(query),
                     active_history.department.ilike(query),
@@ -49,6 +50,7 @@ class SearchRepository:
             .where(
                 or_(
                     Vehicle.plate.ilike(query),
+                    Vehicle.chassis_number.ilike(query),
                     Vehicle.brand.ilike(query),
                     Vehicle.model.ilike(query),
                     VehiclePossession.driver_name.ilike(query),
@@ -71,6 +73,7 @@ class SearchRepository:
             .where(
                 or_(
                     Vehicle.plate.ilike(query),
+                    Vehicle.chassis_number.ilike(query),
                     Vehicle.brand.ilike(query),
                     Vehicle.model.ilike(query),
                     MaintenanceRecord.service_description.ilike(query),

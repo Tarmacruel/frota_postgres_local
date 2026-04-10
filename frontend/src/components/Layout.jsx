@@ -34,6 +34,7 @@ export default function Layout() {
       {
         title: 'Operacional',
         items: [
+          { to: '/cadastros', label: 'Cadastros', description: 'Órgãos, departamentos e lotações', icon: 'catalog' },
           { to: '/vehicles', label: 'Veículos', description: 'Cadastro, consulta e histórico', icon: 'vehicles' },
           { to: '/manutencoes', label: 'Manutenções', description: 'Custos, serviços e oficina', icon: 'maintenance' },
           { to: '/condutores', label: 'Condutores', description: 'Posse, alocação e responsáveis', icon: 'drivers' },

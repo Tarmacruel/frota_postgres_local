@@ -10,7 +10,12 @@ class LocationHistoryOut(BaseModel):
 
     id: UUID
     vehicle_id: UUID
+    allocation_id: UUID | None = None
     department: str
+    display_name: str
+    organization_name: str | None = None
+    department_name: str | None = None
+    allocation_name: str | None = None
     start_date: datetime
     end_date: datetime | None
     created_at: datetime

@@ -2,11 +2,12 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import MaintenanceForm from '../components/MaintenanceForm'
+import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
 import { maintenanceAPI } from '../api/maintenance'
 import { useAuth } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
-import { exportRowsToPdf, exportRowsToXlsx } from '../utils/exportData'
+import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 
 const statusOptions = [
   { value: 'TODAS', label: 'Todas' },
@@ -21,6 +22,16 @@ function formatDate(value) {
 
 function formatMoney(value) {
   return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(value || 0))
+}
+
+function buildVehicleOption(vehicle) {
+  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
+  return {
+    value: vehicle.id,
+    label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
+    description: `${vehicle.ownership_type === 'LOCADO' ? 'Locado' : 'Proprio'} | ${locationLabel}`,
+    keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.chassis_number, locationLabel].filter(Boolean).join(' '),
+  }
 }
 
 export default function MaintenancePage() {
@@ -158,23 +169,30 @@ export default function MaintenancePage() {
 
   async function handleExportPdf() {
     if (filteredRecords.length === 0) {
-      setFeedback('Nao ha manutencoes filtradas para exportar.')
+      setFeedback('Nao ha manutencoes filtradas para previsualizar.')
       return
     }
 
     try {
       setError('')
       setFeedback('')
-      await exportRowsToPdf({
+      await previewRowsToPdf({
         title: 'Frota PMTF - Manutencoes',
         fileName: 'frota-pmtf-manutencoes',
         subtitle: 'Relatorio das manutencoes filtradas no painel operacional.',
         columns: exportColumns,
         rows: filteredRecords,
+        filters: [
+          { label: 'Status', value: statusOptions.find((option) => option.value === statusFilter)?.label || 'Todas' },
+          ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+          ...(startFilter ? [{ label: 'Inicio a partir de', value: formatDate(new Date(startFilter).toISOString()) }] : []),
+          ...(endFilter ? [{ label: 'Fim ate', value: formatDate(new Date(endFilter).toISOString()) }] : []),
+          ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
+        ],
       })
-      setFeedback('Exportacao de manutencoes em PDF iniciada com sucesso.')
+      setFeedback('Pre-visualizacao do PDF de manutencoes aberta em nova guia.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar as manutencoes em PDF.'))
+      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o PDF de manutencoes.'))
     }
   }
 
@@ -192,6 +210,11 @@ export default function MaintenancePage() {
         sheetName: 'Manutencoes',
         columns: exportColumns,
         rows: filteredRecords,
+        filters: [
+          { label: 'Status', value: statusOptions.find((option) => option.value === statusFilter)?.label || 'Todas' },
+          ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+          ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
+        ],
       })
       setFeedback('Exportacao de manutencoes em XLSX iniciada com sucesso.')
     } catch (err) {
@@ -215,7 +238,7 @@ export default function MaintenancePage() {
               Nova manutencao
             </button>
           ) : null}
-          <button className="secondary-button" type="button" onClick={handleExportPdf}>Exportar PDF</button>
+          <button className="secondary-button" type="button" onClick={handleExportPdf}>Previsualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
       </div>
@@ -241,14 +264,13 @@ export default function MaintenancePage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
-            <select className="app-select" value={vehicleFilter} onChange={(event) => setVehicleFilter(event.target.value)}>
-              <option value="">Todos os veiculos</option>
-              {vehicles.map((vehicle) => (
-                <option key={vehicle.id} value={vehicle.id}>
-                  {vehicle.plate}
-                </option>
-              ))}
-            </select>
+            <SearchableSelect
+              value={vehicleFilter}
+              onChange={setVehicleFilter}
+              options={[{ value: '', label: 'Todos os veiculos' }, ...vehicles.map(buildVehicleOption)]}
+              placeholder="Filtrar veiculo"
+              searchPlaceholder="Buscar veiculo por placa, modelo ou chassi"
+            />
             <input type="datetime-local" className="app-input" value={startFilter} onChange={(event) => setStartFilter(event.target.value)} />
             <input type="datetime-local" className="app-input" value={endFilter} onChange={(event) => setEndFilter(event.target.value)} />
           </div>

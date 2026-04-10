@@ -8,9 +8,10 @@ from app.core.database import AsyncSessionFactory
 from app.core.security import get_password_hash
 from app.models.location_history import LocationHistory
 from app.models.maintenance import MaintenanceRecord
+from app.models.master_data import Allocation, Department, Organization
 from app.models.possession import VehiclePossession
 from app.models.user import User, UserRole
-from app.models.vehicle import Vehicle, VehicleStatus
+from app.models.vehicle import Vehicle, VehicleOwnershipType, VehicleStatus
 
 
 async def seed() -> None:
@@ -46,19 +47,97 @@ async def seed() -> None:
                 )
                 session.add(production)
 
+            async def ensure_organization(name: str) -> Organization:
+                organization = await session.scalar(select(Organization).where(Organization.name == name))
+                if organization:
+                    return organization
+                organization = Organization(name=name)
+                session.add(organization)
+                await session.flush()
+                return organization
+
+            async def ensure_department(organization: Organization, name: str) -> Department:
+                department = await session.scalar(
+                    select(Department).where(Department.organization_id == organization.id, Department.name == name)
+                )
+                if department:
+                    return department
+                department = Department(organization_id=organization.id, name=name)
+                session.add(department)
+                await session.flush()
+                return department
+
+            async def ensure_allocation(department: Department, name: str) -> Allocation:
+                allocation = await session.scalar(
+                    select(Allocation).where(Allocation.department_id == department.id, Allocation.name == name)
+                )
+                if allocation:
+                    return allocation
+                allocation = Allocation(department_id=department.id, name=name)
+                session.add(allocation)
+                await session.flush()
+                return allocation
+
+            admin_org = await ensure_organization("Secretaria de Administracao")
+            admin_dep = await ensure_department(admin_org, "Gestao Administrativa")
+            admin_alloc = await ensure_allocation(admin_dep, "Garagem Central")
+
+            works_org = await ensure_organization("Secretaria de Infraestrutura")
+            works_dep = await ensure_department(works_org, "Oficina")
+            works_alloc = await ensure_allocation(works_dep, "Oficina Central")
+
+            health_org = await ensure_organization("Secretaria de Saude")
+            health_dep = await ensure_department(health_org, "Transporte")
+            health_alloc = await ensure_allocation(health_dep, "Patio Municipal")
+
             vehicles_data = [
-                ("ABC-1D23", "Ford", "Ka", VehicleStatus.ATIVO, "Secretaria de Administracao"),
-                ("DEF-4E56", "Chevrolet", "Onix", VehicleStatus.MANUTENCAO, "Oficina Central"),
-                ("GHI-7F89", "Toyota", "Corolla", VehicleStatus.INATIVO, "Patio Municipal"),
+                ("ABC-1D23", "9BFZH55L0G1234567", "Ford", "Ka", VehicleOwnershipType.PROPRIO, VehicleStatus.ATIVO, admin_alloc),
+                ("DEF-4E56", "9BWZZZ377VT004251", "Chevrolet", "Onix", VehicleOwnershipType.LOCADO, VehicleStatus.MANUTENCAO, works_alloc),
+                ("GHI-7F89", "8AWZZZ6K2VA012345", "Toyota", "Corolla", VehicleOwnershipType.PROPRIO, VehicleStatus.INATIVO, health_alloc),
             ]
 
-            for plate, brand, model, status, department in vehicles_data:
+            for plate, chassis_number, brand, model, ownership_type, status, allocation in vehicles_data:
                 existing = await session.scalar(select(Vehicle).where(Vehicle.plate == plate))
-                if not existing:
-                    vehicle = Vehicle(plate=plate, brand=brand, model=model, status=status)
-                    session.add(vehicle)
-                    await session.flush()
-                    session.add(LocationHistory(vehicle_id=vehicle.id, department=department))
+                if existing:
+                    changed = False
+                    if not existing.chassis_number:
+                        existing.chassis_number = chassis_number
+                        changed = True
+                    if not existing.ownership_type:
+                        existing.ownership_type = ownership_type
+                        changed = True
+
+                    active_history = await session.scalar(
+                        select(LocationHistory)
+                        .where(LocationHistory.vehicle_id == existing.id, LocationHistory.end_date.is_(None))
+                        .order_by(LocationHistory.start_date.desc())
+                    )
+                    if active_history and not active_history.allocation_id:
+                        active_history.allocation_id = allocation.id
+                        active_history.department = allocation.display_name
+                        changed = True
+
+                    if changed:
+                        await session.flush()
+                    continue
+
+                vehicle = Vehicle(
+                    plate=plate,
+                    chassis_number=chassis_number,
+                    brand=brand,
+                    model=model,
+                    ownership_type=ownership_type,
+                    status=status,
+                )
+                session.add(vehicle)
+                await session.flush()
+                session.add(
+                    LocationHistory(
+                        vehicle_id=vehicle.id,
+                        allocation_id=allocation.id,
+                        department=allocation.display_name,
+                    )
+                )
 
             await session.flush()
 

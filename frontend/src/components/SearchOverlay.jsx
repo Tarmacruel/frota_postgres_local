@@ -109,7 +109,7 @@ export default function SearchOverlay({ open, onClose, onSelect }) {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={handleInputKeyDown}
-              placeholder="Buscar veiculo, condutor, secretaria ou manutencao"
+              placeholder="Buscar veiculo, chassi, condutor, lotacao ou manutencao"
             />
           </div>
           <button type="button" className="icon-button" onClick={onClose} aria-label="Fechar busca">

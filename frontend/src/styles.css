@@ -1738,6 +1738,142 @@ button {
   border: 0;
 }
 
+.searchable-select {
+  position: relative;
+  width: 100%;
+  min-width: 0;
+}
+
+.searchable-select-trigger {
+  width: 100%;
+  min-height: 50px;
+  padding: 12px 14px;
+  border-radius: 16px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-strong) 94%, transparent);
+  color: var(--ink-strong);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.searchable-select-value {
+  display: block;
+  text-align: left;
+}
+
+.searchable-select-value.is-placeholder {
+  color: var(--ink-soft);
+}
+
+.searchable-select-panel {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  z-index: 40;
+  display: grid;
+  gap: 10px;
+  padding: 12px;
+  border-radius: 18px;
+  border: 1px solid var(--line);
+  background: var(--surface-strong);
+  box-shadow: var(--shadow);
+}
+
+.searchable-select-input-shell {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 12px;
+  border-radius: 14px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface-strong) 96%, transparent);
+}
+
+.searchable-select-input-shell .app-icon {
+  color: var(--navy);
+}
+
+.searchable-select-input {
+  width: 100%;
+  min-height: 42px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-strong);
+}
+
+.searchable-select-input:focus {
+  outline: none;
+}
+
+.searchable-select-options {
+  max-height: 240px;
+  overflow: auto;
+  display: grid;
+  gap: 6px;
+}
+
+.searchable-select-option {
+  width: 100%;
+  border: 1px solid transparent;
+  border-radius: 14px;
+  padding: 10px 12px;
+  text-align: left;
+  display: grid;
+  gap: 2px;
+  background: var(--chip-surface);
+  color: var(--ink-strong);
+}
+
+.searchable-select-option strong {
+  font-size: 0.92rem;
+}
+
+.searchable-select-option span {
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.searchable-select-option:hover,
+.searchable-select-option.is-selected {
+  border-color: color-mix(in srgb, var(--navy) 20%, transparent);
+  background: color-mix(in srgb, var(--navy) 8%, transparent);
+}
+
+.searchable-select-empty {
+  padding: 14px 10px;
+  color: var(--ink-soft);
+  text-align: center;
+}
+
+.searchable-select-clear {
+  justify-self: start;
+  border: 0;
+  background: transparent;
+  color: var(--navy);
+  font-weight: 700;
+}
+
+.searchable-select.is-disabled .searchable-select-trigger {
+  opacity: 0.62;
+  cursor: not-allowed;
+}
+
+.cadastros-grid {
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  align-items: start;
+}
+
+.helper-text {
+  display: block;
+  margin-top: 8px;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  line-height: 1.5;
+}
+
 .desktop-only {
   display: none;
 }
@@ -1772,6 +1908,11 @@ button {
     flex-basis: 100%;
     max-width: none;
     order: 1;
+  }
+
+  .searchable-select-panel {
+    position: static;
+    box-shadow: none;
   }
 
   .topbar-search-hint {

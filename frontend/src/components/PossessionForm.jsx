@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { possessionAPI } from '../api/possession'
+import SearchableSelect from './SearchableSelect'
 import { getApiErrorMessage } from '../utils/apiError'
 
 function toDateTimeInput(value) {
@@ -71,7 +72,7 @@ function canvasToJpegBlob(canvas) {
 
 export default function PossessionForm({ vehicles, onClose, onSuccess }) {
   const [form, setForm] = useState({
-    vehicle_id: vehicles[0]?.id || '',
+    vehicle_id: '',
     driver_name: '',
     driver_document: '',
     driver_contact: '',
@@ -132,6 +133,18 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       URL.revokeObjectURL(photoPreviewUrl)
     }
     setPhotoPreviewUrl('')
+  }
+
+  function buildVehicleOption(vehicle) {
+    const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
+    return {
+      value: vehicle.id,
+      label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
+      description: `${vehicle.ownership_type === 'LOCADO' ? 'Locado' : 'Proprio'} | ${locationLabel}`,
+      keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.chassis_number, vehicle.current_driver_name, locationLabel]
+        .filter(Boolean)
+        .join(' '),
+    }
   }
 
   async function startEvidenceCapture() {
@@ -286,20 +299,15 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
 
       <div className="form-field">
-        <label htmlFor="possession-vehicle">Veiculo</label>
-        <select
-          id="possession-vehicle"
-          className="app-select"
+        <label>Veiculo</label>
+        <SearchableSelect
           value={form.vehicle_id}
-          onChange={(event) => setForm({ ...form, vehicle_id: event.target.value })}
-        >
-          <option value="">Selecione</option>
-          {vehicles.map((vehicle) => (
-            <option key={vehicle.id} value={vehicle.id}>
-              {vehicle.plate} - {vehicle.brand} {vehicle.model}
-            </option>
-          ))}
-        </select>
+          onChange={(value) => setForm({ ...form, vehicle_id: value })}
+          options={vehicles.map(buildVehicleOption)}
+          placeholder="Selecione o veiculo"
+          searchPlaceholder="Buscar veiculo por placa, modelo, chassi ou lotacao"
+          emptyLabel="Nenhum veiculo disponivel."
+        />
       </div>
 
       <div className="form-field">
@@ -402,7 +410,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
                 <img src={photoPreviewUrl} alt="Foto capturada do veiculo" className="evidence-image" />
               </div>
               <div className="evidence-meta-card">
-                <strong>{evidenceReady ? 'Evidencia pronta para envio' : 'Revise a evidência capturada'}</strong>
+                <strong>{evidenceReady ? 'Evidencia pronta para envio' : 'Revise a evidencia capturada'}</strong>
                 <div className="stack">
                   <span><strong>Horario:</strong> {formatDateTime(photoCapturedAt)}</span>
                   <span>

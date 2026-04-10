@@ -19,6 +19,7 @@ async def test_openapi_contains_new_routes(client):
     assert resp.status_code == 200
     paths = resp.json()["paths"]
     assert "/api/maintenance" in paths
+    assert "/api/master-data/catalog" in paths
     assert "/api/maintenance/{record_id}" in paths
     assert "/api/possession" in paths
     assert "/api/possession/active" in paths

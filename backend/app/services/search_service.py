@@ -46,10 +46,11 @@ class SearchService:
             "type": "vehicle",
             "id": vehicle.id,
             "title": vehicle.plate,
-            "subtitle": f"{vehicle.brand} {vehicle.model}",
+            "subtitle": f"{vehicle.brand} {vehicle.model} | {vehicle.ownership_type.value}",
             "status": vehicle.status.value,
             "route": f"/vehicles?focus={vehicle.id}",
             "context": {
+                "chassis_number": vehicle.chassis_number,
                 "department": current_department,
                 "driver_name": driver_name,
                 "status_label": vehicle.status.value,

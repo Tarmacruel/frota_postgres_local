@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import { maintenanceAPI } from '../api/maintenance'
+import SearchableSelect from './SearchableSelect'
 import { getApiErrorMessage } from '../utils/apiError'
 
 function toDateTimeInput(value) {
@@ -22,12 +23,22 @@ function buildInitialState(initialData, vehicles) {
   }
 
   return {
-    vehicle_id: vehicles[0]?.id || '',
+    vehicle_id: '',
     start_date: toDateTimeInput(new Date().toISOString()),
     end_date: '',
     service_description: '',
     parts_replaced: '',
     total_cost: '',
+  }
+}
+
+function buildVehicleOption(vehicle) {
+  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
+  return {
+    value: vehicle.id,
+    label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
+    description: `${vehicle.ownership_type === 'LOCADO' ? 'Locado' : 'Proprio'} | ${locationLabel}`,
+    keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.chassis_number, locationLabel].filter(Boolean).join(' '),
   }
 }
 
@@ -87,21 +98,16 @@ export default function MaintenanceForm({ vehicles, initialData = null, onClose,
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
 
       <div className="form-field">
-        <label htmlFor="maintenance-vehicle">Veiculo</label>
-        <select
-          id="maintenance-vehicle"
-          className="app-select"
+        <label>Veiculo</label>
+        <SearchableSelect
           value={form.vehicle_id}
+          onChange={(value) => setForm({ ...form, vehicle_id: value })}
+          options={vehicles.map(buildVehicleOption)}
+          placeholder="Selecione o veiculo"
+          searchPlaceholder="Buscar veiculo por placa, modelo ou chassi"
           disabled={isEdit}
-          onChange={(event) => setForm({ ...form, vehicle_id: event.target.value })}
-        >
-          <option value="">Selecione</option>
-          {vehicles.map((vehicle) => (
-            <option key={vehicle.id} value={vehicle.id}>
-              {vehicle.plate} - {vehicle.brand} {vehicle.model}
-            </option>
-          ))}
-        </select>
+          emptyLabel="Nenhum veiculo disponivel."
+        />
       </div>
 
       <div className="form-field">

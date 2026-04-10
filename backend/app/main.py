@@ -7,6 +7,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.audit import router as audit_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.maintenance import router as maintenance_router
+from app.api.routes.master_data import router as master_data_router
 from app.api.routes.possession import router as possession_router
 from app.api.routes.search import router as search_router
 from app.api.routes.users import router as users_router
@@ -29,6 +30,7 @@ app.add_middleware(
 app.include_router(auth_router)
 app.include_router(audit_router)
 app.include_router(users_router)
+app.include_router(master_data_router)
 app.include_router(vehicles_router)
 app.include_router(maintenance_router)
 app.include_router(possession_router)
