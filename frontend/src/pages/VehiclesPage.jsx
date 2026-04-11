@@ -40,13 +40,64 @@ const ownershipOptions = [
 
 function formatDate(value) {
   if (!value) return 'Atual'
-  return new Date(value).toLocaleString('pt-BR')
+  const date = new Date(value)
+  const dateLabel = new Intl.DateTimeFormat('pt-BR', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  }).format(date)
+  const timeLabel = new Intl.DateTimeFormat('pt-BR', {
+    hour: '2-digit',
+    minute: '2-digit',
+  }).format(date)
+  return `${dateLabel} as ${timeLabel}`
+}
+
+function formatPlate(value) {
+  const normalized = String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+  if (normalized.length === 7) {
+    return `${normalized.slice(0, 3)}-${normalized.slice(3)}`
+  }
+  return value || '-'
+}
+
+function formatChassis(value) {
+  const normalized = String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
+  if (!normalized) return 'Nao informado'
+  const segments = [normalized.slice(0, 4), normalized.slice(4, 8), normalized.slice(8, 12), normalized.slice(12)]
+  return segments.filter(Boolean).join('-')
+}
+
+function getStatusLabel(value) {
+  if (value === 'MANUTENCAO') return 'Em manutencao'
+  if (value === 'INATIVO') return 'Inativo'
+  return 'Ativo'
 }
 
 function getOwnershipLabel(value) {
   if (value === 'LOCADO') return 'Locado'
   if (value === 'CEDIDO') return 'Cedido'
   return 'Proprio'
+}
+
+function getStatusBadgeColors(value) {
+  if (value === 'Ativo') {
+    return { fillColor: [234, 247, 239], textColor: [29, 122, 70] }
+  }
+  if (value === 'Em manutencao') {
+    return { fillColor: [255, 245, 225], textColor: [165, 102, 0] }
+  }
+  return { fillColor: [253, 236, 235], textColor: [180, 35, 24] }
+}
+
+function getOwnershipBadgeColors(value) {
+  if (value === 'Locado') {
+    return { fillColor: [255, 245, 225], textColor: [165, 102, 0] }
+  }
+  if (value === 'Cedido') {
+    return { fillColor: [232, 243, 255], textColor: [36, 82, 232] }
+  }
+  return { fillColor: [234, 247, 239], textColor: [29, 122, 70] }
 }
 
 function buildVehicleLocationLabel(vehicle) {
@@ -87,7 +138,7 @@ function buildFilterSummary(statusFilter, ownershipFilter, locationFilter, searc
 }
 
 export default function VehiclesPage() {
-  const { canWrite, canDelete, isAdmin } = useAuth()
+  const { user, canWrite, canDelete, isAdmin } = useAuth()
   const [searchParams, setSearchParams] = useSearchParams()
   const [vehicles, setVehicles] = useState([])
   const [form, setForm] = useState(initialForm)
@@ -157,15 +208,14 @@ export default function VehiclesPage() {
   }, [allocations, vehicles])
 
   const exportColumns = [
-    { header: 'Placa', value: (vehicle) => vehicle.plate },
-    { header: 'Chassi', value: (vehicle) => vehicle.chassis_number || 'Nao informado' },
-    { header: 'Marca', value: (vehicle) => vehicle.brand },
-    { header: 'Modelo', value: (vehicle) => vehicle.model },
-    { header: 'Tipo', value: (vehicle) => getOwnershipLabel(vehicle.ownership_type) },
-    { header: 'Status', value: (vehicle) => vehicle.status },
+    { header: 'Placa', value: (vehicle) => formatPlate(vehicle.plate), align: 'center', width: 66 },
+    { header: 'Chassi', value: (vehicle) => formatChassis(vehicle.chassis_number), align: 'center', width: 118 },
+    { header: 'Marca / Modelo', value: (vehicle) => `${vehicle.brand}\n${vehicle.model}` },
+    { header: 'Tipo', value: (vehicle) => getOwnershipLabel(vehicle.ownership_type), align: 'center', width: 74, badgeColors: getOwnershipBadgeColors },
+    { header: 'Status', value: (vehicle) => getStatusLabel(vehicle.status), align: 'center', width: 88, badgeColors: getStatusBadgeColors },
     { header: 'Lotacao atual', value: (vehicle) => buildVehicleLocationLabel(vehicle) },
-    { header: 'Condutor atual', value: (vehicle) => vehicle.current_driver_name || 'Sem condutor ativo' },
-    { header: 'Atualizado em', value: (vehicle) => formatDate(vehicle.updated_at) },
+    { header: 'Condutor atual', value: (vehicle) => vehicle.current_driver_name || '—' },
+    { header: 'Atualizado em', value: (vehicle) => formatDate(vehicle.updated_at), align: 'center', width: 92 },
   ]
 
   async function loadVehicles() {
@@ -424,6 +474,16 @@ export default function VehiclesPage() {
         columns: exportColumns,
         rows: filteredVehicles,
         filters: buildFilterSummary(statusFilter, ownershipFilter, locationFilter, search, locationOptions),
+        summaryMetrics: vehicleReportMetrics,
+        summaryChartItems: [
+          { label: 'Ativos', value: visibleActiveVehicles, tone: 'green' },
+          { label: 'Manutencao', value: visibleMaintenanceVehicles, tone: 'amber' },
+          { label: 'Inativos', value: visibleInactiveVehicles, tone: 'red' },
+          { label: 'Sem condutor', value: visibleWithoutDriver, tone: 'slate' },
+        ],
+        referenceLabel: latestUpdate ? `Referencia dos dados: atualizado ate ${formatDate(latestUpdate)}` : 'Referencia dos dados: painel operacional atual',
+        responsibleSector: 'Secretaria Municipal de Administracao | Departamento de Gestao da Frota',
+        generatedBy: user?.name || user?.email || 'Usuario autenticado',
       })
       setFeedback('Pre-visualizacao do PDF aberta em nova guia.')
     } catch (err) {
@@ -478,11 +538,20 @@ export default function VehiclesPage() {
         subtitle: `Historico de lotacao do veiculo ${selectedVehicle.plate} | ${selectedVehicle.brand} ${selectedVehicle.model}.`,
         columns: historyColumns,
         rows: selectedHistory,
+        summaryMetrics: [
+          { label: 'Veiculo', value: selectedVehicle.plate, tone: 'blue' },
+          { label: 'Movimentacoes', value: selectedHistory.length, tone: 'blue' },
+          { label: 'Tipo', value: getOwnershipLabel(selectedVehicle.ownership_type), tone: 'blue' },
+          { label: 'Status', value: getStatusLabel(selectedVehicle.status), tone: selectedVehicle.status === 'ATIVO' ? 'green' : selectedVehicle.status === 'MANUTENCAO' ? 'amber' : 'red' },
+        ],
         filters: [
           { label: 'Veiculo', value: selectedVehicle.plate },
           { label: 'Tipo', value: getOwnershipLabel(selectedVehicle.ownership_type) },
-          { label: 'Status', value: selectedVehicle.status },
+          { label: 'Status', value: getStatusLabel(selectedVehicle.status) },
         ],
+        referenceLabel: selectedVehicle.updated_at ? `Referencia dos dados: atualizado ate ${formatDate(selectedVehicle.updated_at)}` : 'Historico consolidado da frota municipal',
+        responsibleSector: 'Secretaria Municipal de Administracao | Departamento de Gestao da Frota',
+        generatedBy: user?.name || user?.email || 'Usuario autenticado',
       })
       setFeedback(`Pre-visualizacao do historico de ${selectedVehicle.plate} aberta em nova guia.`)
     } catch (err) {
@@ -493,6 +562,24 @@ export default function VehiclesPage() {
   const visibleOwnVehicles = filteredVehicles.filter((vehicle) => vehicle.ownership_type === 'PROPRIO').length
   const visibleRentedVehicles = filteredVehicles.filter((vehicle) => vehicle.ownership_type === 'LOCADO').length
   const visibleAssignedVehicles = filteredVehicles.filter((vehicle) => vehicle.ownership_type === 'CEDIDO').length
+  const visibleActiveVehicles = filteredVehicles.filter((vehicle) => vehicle.status === 'ATIVO').length
+  const visibleMaintenanceVehicles = filteredVehicles.filter((vehicle) => vehicle.status === 'MANUTENCAO').length
+  const visibleInactiveVehicles = filteredVehicles.filter((vehicle) => vehicle.status === 'INATIVO').length
+  const visibleWithoutDriver = filteredVehicles.filter((vehicle) => !vehicle.current_driver_name).length
+  const latestUpdate = filteredVehicles
+    .map((vehicle) => vehicle.updated_at)
+    .filter(Boolean)
+    .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0]
+  const vehicleReportMetrics = [
+    { label: 'Total de veiculos', value: filteredVehicles.length, tone: 'blue' },
+    { label: 'Ativos', value: visibleActiveVehicles, tone: 'green' },
+    { label: 'Em manutencao', value: visibleMaintenanceVehicles, tone: 'amber' },
+    { label: 'Inativos', value: visibleInactiveVehicles, tone: 'red' },
+    { label: 'Sem condutor', value: visibleWithoutDriver, tone: 'slate' },
+    { label: 'Proprios', value: visibleOwnVehicles, tone: 'green' },
+    { label: 'Locados', value: visibleRentedVehicles, tone: 'amber' },
+    { label: 'Cedidos', value: visibleAssignedVehicles, tone: 'blue' },
+  ]
 
   return (
     <div className="surface-panel">
