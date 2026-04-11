@@ -4,13 +4,16 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user, require_admin, require_writer
+from app.models.claim import ClaimStatus, ClaimType
 from app.db.session import get_db_session
 from app.models.user import User
-from app.models.vehicle import VehicleStatus
+from app.models.vehicle import VehicleOwnershipType, VehicleStatus
 from app.schemas.auth import MessageOut
+from app.schemas.claim import ClaimListResponse
 from app.schemas.history import LocationHistoryOut
 from app.schemas.possession import PossessionOut
-from app.schemas.vehicle import VehicleCreate, VehicleOut, VehicleUpdate
+from app.schemas.vehicle import VehicleCreate, VehicleListResponse, VehicleOut, VehicleUpdate
+from app.services.claim_service import ClaimService
 from app.services.possession_service import PossessionService
 from app.services.vehicle_service import VehicleService
 
@@ -25,6 +28,28 @@ async def list_vehicles(
     db: AsyncSession = Depends(get_db_session),
 ):
     return await VehicleService(db).list(skip=skip, limit=limit, status_filter=status_filter)
+
+
+@router.get("/paginated", response_model=VehicleListResponse, dependencies=[Depends(get_current_user)])
+async def list_vehicles_paginated(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=10, ge=1, le=100),
+    status_filter: VehicleStatus | None = Query(default=None, alias="status"),
+    ownership_type: VehicleOwnershipType | None = Query(default=None),
+    search: str | None = Query(default=None),
+    sort: str = Query(default="created_at"),
+    order: str = Query(default="desc"),
+    db: AsyncSession = Depends(get_db_session),
+):
+    return await VehicleService(db).list_paginated(
+        page=page,
+        limit=limit,
+        status_filter=status_filter,
+        ownership_type=ownership_type,
+        search=search,
+        sort=sort,
+        order=order,
+    )
 
 
 @router.get("/em-atividade", response_model=list[VehicleOut], dependencies=[Depends(get_current_user)])
@@ -83,3 +108,23 @@ async def current_driver(
 @router.get("/{vehicle_id}/historico", response_model=list[LocationHistoryOut], dependencies=[Depends(get_current_user)])
 async def history_vehicle(vehicle_id: UUID, db: AsyncSession = Depends(get_db_session)):
     return await VehicleService(db).get_history(vehicle_id)
+
+
+@router.get("/{vehicle_id}/claims", response_model=ClaimListResponse, dependencies=[Depends(get_current_user)])
+async def vehicle_claims(
+    vehicle_id: UUID,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=10, ge=1, le=100),
+    status_filter: ClaimStatus | None = Query(default=None, alias="status"),
+    tipo: ClaimType | None = Query(default=None),
+    search: str | None = Query(default=None),
+    db: AsyncSession = Depends(get_db_session),
+):
+    return await ClaimService(db).list(
+        page=page,
+        limit=limit,
+        vehicle_id=vehicle_id,
+        status_filter=status_filter,
+        tipo=tipo,
+        search=search,
+    )

@@ -4,7 +4,9 @@ import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './context/AuthContext'
 import AuditPage from './pages/AuditPage'
 import CadastrosPage from './pages/CadastrosPage'
+import ClaimsPage from './pages/ClaimsPage'
 import DashboardPage from './pages/DashboardPage'
+import DriversPage from './pages/DriversPage'
 import LoginPage from './pages/LoginPage'
 import MaintenancePage from './pages/MaintenancePage'
 import PossessionPage from './pages/PossessionPage'
@@ -28,8 +30,10 @@ export default function App() {
             <Route index element={<DashboardPage />} />
             <Route path="cadastros" element={<CadastrosPage />} />
             <Route path="vehicles" element={<VehiclesPage />} />
+            <Route path="posses" element={<PossessionPage />} />
+            <Route path="condutores" element={<DriversPage />} />
             <Route path="manutencoes" element={<MaintenancePage />} />
-            <Route path="condutores" element={<PossessionPage />} />
+            <Route path="sinistros" element={<ClaimsPage />} />
             <Route
               path="users"
               element={

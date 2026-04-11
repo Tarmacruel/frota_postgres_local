@@ -22,6 +22,12 @@ class VehiclePossession(Base):
         ForeignKey("vehicles.id", ondelete="CASCADE", onupdate="CASCADE"),
         nullable=False,
     )
+    driver_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("drivers.id", ondelete="SET NULL", onupdate="CASCADE"),
+        nullable=True,
+        index=True,
+    )
     driver_name: Mapped[str] = mapped_column(String(150), nullable=False)
     driver_document: Mapped[str | None] = mapped_column(String(20), nullable=True)
     driver_contact: Mapped[str | None] = mapped_column(String(50), nullable=True)
@@ -32,12 +38,24 @@ class VehiclePossession(Base):
     photo_mime_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     photo_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
     photo_captured_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    document_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    document_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    document_mime_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    document_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    document_uploaded_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     capture_latitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     capture_longitude: Mapped[float | None] = mapped_column(Float, nullable=True)
     capture_accuracy_meters: Mapped[float | None] = mapped_column(Float, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
 
     vehicle: Mapped["Vehicle"] = relationship(back_populates="possessions")
+    driver: Mapped["Driver | None"] = relationship(back_populates="possessions")
+    photos: Mapped[list["VehiclePossessionPhoto"]] = relationship(
+        back_populates="possession",
+        passive_deletes=True,
+        cascade="all, delete-orphan",
+        order_by="VehiclePossessionPhoto.created_at.asc()",
+    )
 
     @property
     def is_active(self) -> bool:

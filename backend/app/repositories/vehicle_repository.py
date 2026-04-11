@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 from uuid import UUID
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.models.location_history import LocationHistory
 from app.models.master_data import Allocation, Department
 from app.models.possession import VehiclePossession
-from app.models.vehicle import Vehicle, VehicleStatus
+from app.models.vehicle import Vehicle, VehicleOwnershipType, VehicleStatus
 
 
 class VehicleRepository:
@@ -28,6 +28,51 @@ class VehicleRepository:
             stmt = stmt.where(Vehicle.status == status)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
+
+    async def list_paginated(
+        self,
+        *,
+        page: int,
+        limit: int,
+        status: VehicleStatus | None = None,
+        ownership_type: VehicleOwnershipType | None = None,
+        search: str | None = None,
+        sort: str = "created_at",
+        order: str = "desc",
+    ) -> tuple[list[Vehicle], int]:
+        sort_map = {
+            "created_at": Vehicle.created_at,
+            "updated_at": Vehicle.updated_at,
+            "plate": Vehicle.plate,
+            "brand": Vehicle.brand,
+            "model": Vehicle.model,
+        }
+        sort_column = sort_map.get(sort, Vehicle.created_at)
+        sort_column = sort_column.asc() if order.lower() == "asc" else sort_column.desc()
+
+        stmt = select(Vehicle)
+        count_stmt = select(func.count(Vehicle.id))
+        if status:
+            stmt = stmt.where(Vehicle.status == status)
+            count_stmt = count_stmt.where(Vehicle.status == status)
+        if ownership_type:
+            stmt = stmt.where(Vehicle.ownership_type == ownership_type)
+            count_stmt = count_stmt.where(Vehicle.ownership_type == ownership_type)
+        if search:
+            term = f"%{search.strip()}%"
+            filter_clause = (
+                Vehicle.plate.ilike(term)
+                | Vehicle.chassis_number.ilike(term)
+                | Vehicle.brand.ilike(term)
+                | Vehicle.model.ilike(term)
+            )
+            stmt = stmt.where(filter_clause)
+            count_stmt = count_stmt.where(filter_clause)
+
+        stmt = stmt.order_by(sort_column).offset((page - 1) * limit).limit(limit)
+        total = int((await self.db.execute(count_stmt)).scalar_one())
+        items = list((await self.db.execute(stmt)).scalars().all())
+        return items, total
 
     async def create(self, vehicle: Vehicle) -> Vehicle:
         self.db.add(vehicle)

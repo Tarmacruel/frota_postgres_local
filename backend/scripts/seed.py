@@ -6,6 +6,8 @@ from decimal import Decimal
 from sqlalchemy import select
 from app.core.database import AsyncSessionFactory
 from app.core.security import get_password_hash
+from app.models.claim import Claim, ClaimStatus, ClaimType
+from app.models.driver import Driver, DriverLicenseCategory
 from app.models.location_history import LocationHistory
 from app.models.maintenance import MaintenanceRecord
 from app.models.master_data import Allocation, Department, Organization
@@ -93,7 +95,7 @@ async def seed() -> None:
             vehicles_data = [
                 ("ABC-1D23", "9BFZH55L0G1234567", "Ford", "Ka", VehicleOwnershipType.PROPRIO, VehicleStatus.ATIVO, admin_alloc),
                 ("DEF-4E56", "9BWZZZ377VT004251", "Chevrolet", "Onix", VehicleOwnershipType.LOCADO, VehicleStatus.MANUTENCAO, works_alloc),
-                ("GHI-7F89", "8AWZZZ6K2VA012345", "Toyota", "Corolla", VehicleOwnershipType.PROPRIO, VehicleStatus.INATIVO, health_alloc),
+                ("GHI-7F89", "8AWZZZ6K2VA012345", "Toyota", "Corolla", VehicleOwnershipType.CEDIDO, VehicleStatus.INATIVO, health_alloc),
             ]
 
             for plate, chassis_number, brand, model, ownership_type, status, allocation in vehicles_data:
@@ -146,6 +148,28 @@ async def seed() -> None:
                 for vehicle in (await session.scalars(select(Vehicle).order_by(Vehicle.created_at.asc()))).all()
             }
 
+            drivers_data = [
+                ("Joao Silva", "123.456.789-00", "(11) 99999-8888", "joao.silva@pmtf.local", DriverLicenseCategory.B, datetime.now(timezone.utc).date() + timedelta(days=400)),
+                ("Maria Oliveira", "987.654.321-00", "(11) 98888-7777", "maria.oliveira@pmtf.local", DriverLicenseCategory.D, datetime.now(timezone.utc).date() + timedelta(days=240)),
+                ("Carlos Souza", "456.123.789-55", "(11) 97777-6666", None, DriverLicenseCategory.C, None),
+            ]
+
+            driver_map: dict[str, Driver] = {}
+            for nome, documento, contato, email, categoria, validade in drivers_data:
+                driver = await session.scalar(select(Driver).where(Driver.documento == documento))
+                if not driver:
+                    driver = Driver(
+                        nome_completo=nome,
+                        documento=documento,
+                        contato=contato,
+                        email=email,
+                        cnh_categoria=categoria,
+                        cnh_validade=validade,
+                    )
+                    session.add(driver)
+                    await session.flush()
+                driver_map[documento] = driver
+
             has_maintenance = await session.scalar(select(MaintenanceRecord.id).limit(1))
             if not has_maintenance and admin:
                 session.add_all(
@@ -176,6 +200,7 @@ async def seed() -> None:
                     [
                         VehiclePossession(
                             vehicle_id=vehicle_map["ABC-1D23"].id,
+                            driver_id=driver_map["123.456.789-00"].id,
                             driver_name="Joao Silva",
                             driver_document="123.456.789-00",
                             driver_contact="(11) 99999-8888",
@@ -183,6 +208,7 @@ async def seed() -> None:
                         ),
                         VehiclePossession(
                             vehicle_id=vehicle_map["GHI-7F89"].id,
+                            driver_id=driver_map["987.654.321-00"].id,
                             driver_name="Maria Oliveira",
                             driver_document="987.654.321-00",
                             driver_contact="(11) 98888-7777",
@@ -190,6 +216,24 @@ async def seed() -> None:
                             observation="Posse temporaria para treinamento",
                         ),
                     ]
+                )
+
+            has_claims = await session.scalar(select(Claim.id).limit(1))
+            if not has_claims and admin:
+                session.add(
+                    Claim(
+                        vehicle_id=vehicle_map["DEF-4E56"].id,
+                        driver_id=None,
+                        data_ocorrencia=datetime.now(timezone.utc) - timedelta(days=2),
+                        tipo=ClaimType.AVERIA,
+                        descricao="Avaria registrada durante deslocamento para oficina, com dano lateral e necessidade de avaliacao tecnica.",
+                        local="Avenida Principal, proximo ao patio municipal",
+                        boletim_ocorrencia="BO-2026-001",
+                        valor_estimado=Decimal("1850.00"),
+                        status=ClaimStatus.EM_ANALISE,
+                        anexos=["foto-lateral.jpg"],
+                        created_by=admin.id,
+                    )
                 )
 
     print("Seed concluido com sucesso.")

@@ -4,6 +4,7 @@ from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from app.schemas.common import PaginatedResponse
 
 
 class MaintenanceCreate(BaseModel):
@@ -76,3 +77,7 @@ class MaintenanceOut(BaseModel):
     created_by: UUID
     created_at: datetime
     updated_at: datetime
+
+
+class MaintenanceListResponse(PaginatedResponse[MaintenanceOut]):
+    pass

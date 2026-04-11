@@ -1,7 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { possessionAPI } from '../api/possession'
+import DriverSelect from './DriverSelect'
 import SearchableSelect from './SearchableSelect'
 import { getApiErrorMessage } from '../utils/apiError'
+
+const MAX_DOCUMENT_SIZE_BYTES = 12 * 1024 * 1024
+const ALLOWED_DOCUMENT_TYPES = [
+  'application/pdf',
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'application/msword',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+]
 
 function toDateTimeInput(value) {
   if (!value) return ''
@@ -70,9 +81,24 @@ function canvasToJpegBlob(canvas) {
   })
 }
 
+function formatFileSize(bytes) {
+  if (!bytes) return '-'
+  if (bytes >= 1024 * 1024) {
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
+  return `${Math.round(bytes / 1024)} KB`
+}
+
+function revokePreviewUrl(url) {
+  if (url) {
+    URL.revokeObjectURL(url)
+  }
+}
+
 export default function PossessionForm({ vehicles, onClose, onSuccess }) {
   const [form, setForm] = useState({
     vehicle_id: '',
+    driver_id: '',
     driver_name: '',
     driver_document: '',
     driver_contact: '',
@@ -83,13 +109,18 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
   const [error, setError] = useState('')
   const [captureError, setCaptureError] = useState('')
   const [captureState, setCaptureState] = useState('idle')
-  const [capturedPhotoBlob, setCapturedPhotoBlob] = useState(null)
-  const [photoPreviewUrl, setPhotoPreviewUrl] = useState('')
-  const [captureLocation, setCaptureLocation] = useState(null)
-  const [photoCapturedAt, setPhotoCapturedAt] = useState('')
-  const [evidenceReady, setEvidenceReady] = useState(false)
+  const [capturedPhotos, setCapturedPhotos] = useState([])
+  const [draftPhotoBlob, setDraftPhotoBlob] = useState(null)
+  const [draftPreviewUrl, setDraftPreviewUrl] = useState('')
+  const [draftCaptureLocation, setDraftCaptureLocation] = useState(null)
+  const [draftPhotoCapturedAt, setDraftPhotoCapturedAt] = useState('')
+  const [signedDocument, setSignedDocument] = useState(null)
+  const [documentError, setDocumentError] = useState('')
   const videoRef = useRef(null)
   const streamRef = useRef(null)
+  const documentInputRef = useRef(null)
+  const capturedPhotosRef = useRef([])
+  const draftPreviewUrlRef = useRef('')
   const secureCaptureContext = isSecureCaptureContext()
 
   useEffect(() => {
@@ -102,13 +133,20 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
   }, [captureState])
 
   useEffect(() => {
+    capturedPhotosRef.current = capturedPhotos
+  }, [capturedPhotos])
+
+  useEffect(() => {
+    draftPreviewUrlRef.current = draftPreviewUrl
+  }, [draftPreviewUrl])
+
+  useEffect(() => {
     return () => {
       stopCameraStream()
-      if (photoPreviewUrl) {
-        URL.revokeObjectURL(photoPreviewUrl)
-      }
+      revokePreviewUrl(draftPreviewUrlRef.current)
+      capturedPhotosRef.current.forEach((photo) => revokePreviewUrl(photo.previewUrl))
     }
-  }, [photoPreviewUrl])
+  }, [])
 
   function stopCameraStream() {
     if (streamRef.current) {
@@ -121,29 +159,65 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
     }
   }
 
-  function clearEvidenceState() {
+  function clearDraftEvidence() {
     stopCameraStream()
     setCaptureState('idle')
-    setCaptureLocation(null)
-    setPhotoCapturedAt('')
-    setCapturedPhotoBlob(null)
-    setEvidenceReady(false)
+    setDraftCaptureLocation(null)
+    setDraftPhotoCapturedAt('')
+    setDraftPhotoBlob(null)
     setCaptureError('')
-    if (photoPreviewUrl) {
-      URL.revokeObjectURL(photoPreviewUrl)
-    }
-    setPhotoPreviewUrl('')
+    revokePreviewUrl(draftPreviewUrl)
+    setDraftPreviewUrl('')
   }
 
   function buildVehicleOption(vehicle) {
     const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
+    const ownershipLabel = vehicle.ownership_type === 'LOCADO' ? 'Locado' : vehicle.ownership_type === 'CEDIDO' ? 'Cedido' : 'Proprio'
     return {
       value: vehicle.id,
       label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
-      description: `${vehicle.ownership_type === 'LOCADO' ? 'Locado' : 'Proprio'} | ${locationLabel}`,
+      description: `${ownershipLabel} | ${locationLabel}`,
       keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.chassis_number, vehicle.current_driver_name, locationLabel]
         .filter(Boolean)
         .join(' '),
+    }
+  }
+
+  function handleDocumentChange(event) {
+    const nextFile = event.target.files?.[0] || null
+    if (!nextFile) {
+      setSignedDocument(null)
+      setDocumentError('')
+      return
+    }
+
+    if (!ALLOWED_DOCUMENT_TYPES.includes(nextFile.type)) {
+      setSignedDocument(null)
+      setDocumentError('Anexe PDF, imagem, DOC ou DOCX para arquivar o termo assinado.')
+      if (documentInputRef.current) {
+        documentInputRef.current.value = ''
+      }
+      return
+    }
+
+    if (nextFile.size > MAX_DOCUMENT_SIZE_BYTES) {
+      setSignedDocument(null)
+      setDocumentError('O documento anexado deve ter no maximo 12 MB.')
+      if (documentInputRef.current) {
+        documentInputRef.current.value = ''
+      }
+      return
+    }
+
+    setSignedDocument(nextFile)
+    setDocumentError('')
+  }
+
+  function clearDocument() {
+    setSignedDocument(null)
+    setDocumentError('')
+    if (documentInputRef.current) {
+      documentInputRef.current.value = ''
     }
   }
 
@@ -158,7 +232,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       return
     }
 
-    clearEvidenceState()
+    clearDraftEvidence()
     setCaptureError('')
     setCaptureState('requesting')
 
@@ -179,7 +253,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       })
 
       streamRef.current = stream
-      setCaptureLocation({
+      setDraftCaptureLocation({
         latitude: position.coords.latitude,
         longitude: position.coords.longitude,
         accuracy_meters: position.coords.accuracy,
@@ -188,16 +262,15 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
     } catch (captureIssue) {
       stopCameraStream()
       setCaptureState('idle')
-      setCaptureLocation(null)
-      setPhotoCapturedAt('')
-      setCapturedPhotoBlob(null)
-      setEvidenceReady(false)
+      setDraftCaptureLocation(null)
+      setDraftPhotoCapturedAt('')
+      setDraftPhotoBlob(null)
       setCaptureError(getEvidenceErrorMessage(captureIssue))
     }
   }
 
   async function handleTakePhoto() {
-    if (!videoRef.current || !captureLocation) {
+    if (!videoRef.current || !draftCaptureLocation) {
       setCaptureError('Localizacao e camera precisam estar ativas antes da captura.')
       return
     }
@@ -221,13 +294,10 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       const previewUrl = URL.createObjectURL(blob)
 
       stopCameraStream()
-      if (photoPreviewUrl) {
-        URL.revokeObjectURL(photoPreviewUrl)
-      }
-      setCapturedPhotoBlob(blob)
-      setPhotoPreviewUrl(previewUrl)
-      setPhotoCapturedAt(new Date().toISOString())
-      setEvidenceReady(false)
+      revokePreviewUrl(draftPreviewUrl)
+      setDraftPhotoBlob(blob)
+      setDraftPreviewUrl(previewUrl)
+      setDraftPhotoCapturedAt(new Date().toISOString())
       setCaptureState('review')
       setCaptureError('')
     } catch (captureIssue) {
@@ -236,14 +306,37 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
   }
 
   function confirmCapturedEvidence() {
-    if (!capturedPhotoBlob || !captureLocation) {
+    if (!draftPhotoBlob || !draftCaptureLocation || !draftPhotoCapturedAt || !draftPreviewUrl) {
       setCaptureError('Foto e localizacao precisam ser capturadas antes de continuar.')
       return
     }
 
-    setEvidenceReady(true)
-    setCaptureState('ready')
+    setCapturedPhotos((current) => [
+      ...current,
+      {
+        id: typeof crypto !== 'undefined' && crypto.randomUUID ? crypto.randomUUID() : `${Date.now()}-${current.length}`,
+        blob: draftPhotoBlob,
+        previewUrl: draftPreviewUrl,
+        capturedAt: draftPhotoCapturedAt,
+        captureLocation: draftCaptureLocation,
+      },
+    ])
+    setDraftPhotoBlob(null)
+    setDraftPreviewUrl('')
+    setDraftPhotoCapturedAt('')
+    setDraftCaptureLocation(null)
+    setCaptureState('idle')
     setCaptureError('')
+  }
+
+  function removeCapturedPhoto(photoId) {
+    setCapturedPhotos((current) => {
+      const target = current.find((photo) => photo.id === photoId)
+      if (target) {
+        revokePreviewUrl(target.previewUrl)
+      }
+      return current.filter((photo) => photo.id !== photoId)
+    })
   }
 
   async function handleSubmit(event) {
@@ -254,7 +347,12 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       return
     }
 
-    if (!evidenceReady || !capturedPhotoBlob || !captureLocation || !photoCapturedAt) {
+    if (!form.driver_id) {
+      setError('Selecione um condutor cadastrado para registrar a posse.')
+      return
+    }
+
+    if (capturedPhotos.length === 0) {
       setCaptureError('Foto e localizacao sao obrigatorias para registrar a posse.')
       return
     }
@@ -266,16 +364,29 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
 
       const payload = new FormData()
       payload.append('vehicle_id', form.vehicle_id)
+      if (form.driver_id) payload.append('driver_id', form.driver_id)
       payload.append('driver_name', form.driver_name)
       if (form.driver_document) payload.append('driver_document', form.driver_document)
       if (form.driver_contact) payload.append('driver_contact', form.driver_contact)
       if (form.start_date) payload.append('start_date', new Date(form.start_date).toISOString())
       if (form.observation) payload.append('observation', form.observation)
-      payload.append('photo_captured_at', photoCapturedAt)
-      payload.append('capture_latitude', String(captureLocation.latitude))
-      payload.append('capture_longitude', String(captureLocation.longitude))
-      payload.append('capture_accuracy_meters', String(captureLocation.accuracy_meters))
-      payload.append('photo', capturedPhotoBlob, `posse-${form.vehicle_id}.jpg`)
+      payload.append(
+        'photo_metadata_json',
+        JSON.stringify(
+          capturedPhotos.map((photo) => ({
+            photo_captured_at: photo.capturedAt,
+            capture_latitude: photo.captureLocation.latitude,
+            capture_longitude: photo.captureLocation.longitude,
+            capture_accuracy_meters: photo.captureLocation.accuracy_meters,
+          })),
+        ),
+      )
+      capturedPhotos.forEach((photo, index) => {
+        payload.append('photos', photo.blob, `posse-${form.vehicle_id}-${index + 1}.jpg`)
+      })
+      if (signedDocument) {
+        payload.append('signed_document', signedDocument, signedDocument.name)
+      }
 
       await possessionAPI.create(payload)
       onSuccess?.('Posse registrada com sucesso. Se havia posse ativa, ela foi encerrada automaticamente.')
@@ -290,8 +401,8 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
   const captureButtonLabel =
     captureState === 'requesting'
       ? 'Solicitando acesso...'
-      : evidenceReady
-        ? 'Refazer captura'
+      : capturedPhotos.length > 0
+        ? 'Adicionar outra foto'
         : 'Capturar foto e localizacao'
 
   return (
@@ -322,13 +433,16 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       </div>
 
       <div className="form-field">
-        <label htmlFor="possession-name">Condutor</label>
-        <input
-          id="possession-name"
-          className="app-input"
-          placeholder="Nome completo"
-          value={form.driver_name}
-          onChange={(event) => setForm({ ...form, driver_name: event.target.value })}
+        <label>Condutor cadastrado</label>
+        <DriverSelect
+          value={form.driver_id}
+          onChange={(driver) => setForm({
+            ...form,
+            driver_id: driver?.id || '',
+            driver_name: driver?.nome_completo || '',
+            driver_document: driver?.documento || '',
+            driver_contact: driver?.contato || '',
+          })}
         />
       </div>
 
@@ -337,9 +451,9 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
         <input
           id="possession-document"
           className="app-input"
-          placeholder="CPF ou documento"
+          placeholder="Documento do condutor"
           value={form.driver_document}
-          onChange={(event) => setForm({ ...form, driver_document: event.target.value })}
+          readOnly
         />
       </div>
 
@@ -350,7 +464,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
           className="app-input"
           placeholder="Telefone ou contato rapido"
           value={form.driver_contact}
-          onChange={(event) => setForm({ ...form, driver_contact: event.target.value })}
+          readOnly
         />
       </div>
 
@@ -371,10 +485,10 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
         <div className="evidence-shell">
           <div className="evidence-copy">
             <strong>Foto e localizacao sao obrigatorias para registrar a posse.</strong>
-            <span>Use a camera do dispositivo para capturar o veiculo no local da troca.</span>
+            <span>Use a camera do dispositivo para registrar quantas fotos forem necessarias das partes do veiculo.</span>
           </div>
 
-          {!photoPreviewUrl && captureState !== 'preview' ? (
+          {!draftPreviewUrl && captureState !== 'preview' ? (
             <div className="actions-inline">
               <button
                 className="secondary-button"
@@ -398,46 +512,95 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
                 <span className="muted">Enquadre o veiculo e capture a evidencia atual.</span>
                 <div className="actions-inline">
                   <button className="app-button" type="button" onClick={handleTakePhoto}>Capturar</button>
-                  <button className="ghost-button" type="button" onClick={clearEvidenceState}>Cancelar</button>
+                  <button className="ghost-button" type="button" onClick={clearDraftEvidence}>Cancelar</button>
                 </div>
               </div>
             </div>
           ) : null}
 
-          {photoPreviewUrl ? (
+          {draftPreviewUrl ? (
             <div className="evidence-review-grid">
               <div className="evidence-image-card">
-                <img src={photoPreviewUrl} alt="Foto capturada do veiculo" className="evidence-image" />
+                <img src={draftPreviewUrl} alt="Foto capturada do veiculo" className="evidence-image" />
               </div>
               <div className="evidence-meta-card">
-                <strong>{evidenceReady ? 'Evidencia pronta para envio' : 'Revise a evidencia capturada'}</strong>
+                <strong>Revise a evidencia capturada</strong>
                 <div className="stack">
-                  <span><strong>Horario:</strong> {formatDateTime(photoCapturedAt)}</span>
+                  <span><strong>Horario:</strong> {formatDateTime(draftPhotoCapturedAt)}</span>
                   <span>
-                    <strong>Localizacao:</strong> {captureLocation ? `${captureLocation.latitude.toFixed(6)}, ${captureLocation.longitude.toFixed(6)}` : '-'}
+                    <strong>Localizacao:</strong> {draftCaptureLocation ? `${draftCaptureLocation.latitude.toFixed(6)}, ${draftCaptureLocation.longitude.toFixed(6)}` : '-'}
                   </span>
                   <span>
-                    <strong>Precisao:</strong> {captureLocation ? `${Math.round(captureLocation.accuracy_meters)} m` : '-'}
+                    <strong>Precisao:</strong> {draftCaptureLocation ? `${Math.round(draftCaptureLocation.accuracy_meters)} m` : '-'}
                   </span>
                 </div>
                 <div className="actions-inline">
-                  {!evidenceReady ? (
-                    <>
-                      <button className="app-button" type="button" onClick={confirmCapturedEvidence}>Usar foto</button>
-                      <button className="ghost-button" type="button" onClick={startEvidenceCapture}>Refazer</button>
-                    </>
-                  ) : (
-                    <button className="ghost-button" type="button" onClick={startEvidenceCapture}>Refazer captura</button>
-                  )}
+                  <button className="app-button" type="button" onClick={confirmCapturedEvidence}>Adicionar ao registro</button>
+                  <button className="ghost-button" type="button" onClick={startEvidenceCapture}>Refazer</button>
                 </div>
               </div>
+            </div>
+          ) : null}
+
+          {capturedPhotos.length > 0 ? (
+            <div className="evidence-gallery-grid">
+              {capturedPhotos.map((photo, index) => (
+                <article key={photo.id} className="evidence-thumb-card">
+                  <img src={photo.previewUrl} alt={`Foto ${index + 1} da posse`} className="evidence-thumb-image" />
+                  <div className="stack">
+                    <strong>Foto {index + 1}</strong>
+                    <span className="muted">{formatDateTime(photo.capturedAt)}</span>
+                    <span className="muted">
+                      {photo.captureLocation.latitude.toFixed(6)}, {photo.captureLocation.longitude.toFixed(6)} . {Math.round(photo.captureLocation.accuracy_meters)} m
+                    </span>
+                  </div>
+                  <button className="ghost-button" type="button" onClick={() => removeCapturedPhoto(photo.id)}>
+                    Remover
+                  </button>
+                </article>
+              ))}
             </div>
           ) : null}
         </div>
       </div>
 
+      <div className="form-field modal-field-span">
+        <label htmlFor="signed-document">Documento assinado</label>
+        <div className="evidence-shell">
+          <div className="evidence-copy">
+            <strong>Anexe o termo assinado pelo responsavel, se ele ja estiver pronto.</strong>
+            <span>O arquivo fica vinculado ao registro de posse para consulta posterior no modulo de condutores.</span>
+          </div>
+
+          <input
+            ref={documentInputRef}
+            id="signed-document"
+            type="file"
+            className="app-input"
+            accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+            onChange={handleDocumentChange}
+          />
+
+          {documentError ? <div className="alert alert-error evidence-alert">{documentError}</div> : null}
+
+          {signedDocument ? (
+            <div className="camera-stage-footer">
+              <div className="stack">
+                <strong>{signedDocument.name}</strong>
+                <span className="muted">Tipo: {signedDocument.type || 'Arquivo compativel'} | Tamanho: {formatFileSize(signedDocument.size)}</span>
+              </div>
+              <div className="actions-inline">
+                <button className="ghost-button" type="button" onClick={clearDocument}>Remover anexo</button>
+              </div>
+            </div>
+          ) : (
+            <span className="helper-text">Aceita PDF, imagem, DOC e DOCX. O anexo e opcional.</span>
+          )}
+        </div>
+      </div>
+
       <div className="actions-inline modal-actions">
-        <button className="app-button" type="submit" disabled={submitting || vehicles.length === 0 || !evidenceReady}>
+        <button className="app-button" type="submit" disabled={submitting || vehicles.length === 0 || capturedPhotos.length === 0 || !form.driver_id}>
           {submitting ? 'Salvando...' : 'Registrar posse'}
         </button>
         <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>

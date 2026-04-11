@@ -1,7 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
+import AccordionSection from '../components/AccordionSection'
+import BadgeOwnership from '../components/BadgeOwnership'
 import DriverBadge from '../components/DriverBadge'
 import Modal from '../components/Modal'
+import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
 import { useAuth } from '../context/AuthContext'
@@ -32,6 +35,7 @@ const ownershipOptions = [
   { value: 'TODOS', label: 'Todos os tipos' },
   { value: 'PROPRIO', label: 'Proprio' },
   { value: 'LOCADO', label: 'Locado' },
+  { value: 'CEDIDO', label: 'Cedido' },
 ]
 
 function formatDate(value) {
@@ -40,7 +44,9 @@ function formatDate(value) {
 }
 
 function getOwnershipLabel(value) {
-  return value === 'LOCADO' ? 'Locado' : 'Proprio'
+  if (value === 'LOCADO') return 'Locado'
+  if (value === 'CEDIDO') return 'Cedido'
+  return 'Proprio'
 }
 
 function buildVehicleLocationLabel(vehicle) {
@@ -96,6 +102,7 @@ export default function VehiclesPage() {
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [currentPage, setCurrentPage] = useState(1)
   const {
     organizations,
     allocations,
@@ -188,6 +195,10 @@ export default function VehiclesPage() {
   }, [statusFilter])
 
   useEffect(() => {
+    setCurrentPage(1)
+  }, [search, locationFilter, ownershipFilter, statusFilter, selectedVehicle?.id, vehicles.length])
+
+  useEffect(() => {
     if (!focusVehicleId) {
       if (selectedVehicle) {
         clearHistoryFocus(false)
@@ -228,6 +239,8 @@ export default function VehiclesPage() {
   const filteredVehicles = selectedVehicle
     ? vehicles.filter((vehicle) => vehicle.id === selectedVehicle.id)
     : baseFilteredVehicles
+  const totalPages = Math.max(1, Math.ceil(filteredVehicles.length / 10))
+  const paginatedVehicles = selectedVehicle ? filteredVehicles : filteredVehicles.slice((currentPage - 1) * 10, currentPage * 10)
 
   function patchSearchParams(updates) {
     const next = new URLSearchParams(searchParams)
@@ -479,6 +492,7 @@ export default function VehiclesPage() {
 
   const visibleOwnVehicles = filteredVehicles.filter((vehicle) => vehicle.ownership_type === 'PROPRIO').length
   const visibleRentedVehicles = filteredVehicles.filter((vehicle) => vehicle.ownership_type === 'LOCADO').length
+  const visibleAssignedVehicles = filteredVehicles.filter((vehicle) => vehicle.ownership_type === 'CEDIDO').length
 
   return (
     <div className="surface-panel">
@@ -545,6 +559,10 @@ export default function VehiclesPage() {
           <strong>{visibleRentedVehicles}</strong>
           <span>locados visiveis</span>
         </div>
+        <div className="metric-inline">
+          <strong>{visibleAssignedVehicles}</strong>
+          <span>cedidos visiveis</span>
+        </div>
       </div>
 
       {selectedVehicle ? (
@@ -592,13 +610,13 @@ export default function VehiclesPage() {
                   </td>
                 </tr>
               ) : (
-                filteredVehicles.map((vehicle) => (
+                paginatedVehicles.map((vehicle) => (
                   <tr key={vehicle.id} className={selectedVehicle?.id === vehicle.id ? 'is-focused-row' : ''}>
                     <td data-label="Placa"><strong>{vehicle.plate}</strong></td>
                     <td data-label="Chassi">{vehicle.chassis_number || 'Nao informado'}</td>
                     <td data-label="Marca">{vehicle.brand}</td>
                     <td data-label="Modelo">{vehicle.model}</td>
-                    <td data-label="Tipo">{getOwnershipLabel(vehicle.ownership_type)}</td>
+                    <td data-label="Tipo"><BadgeOwnership value={vehicle.ownership_type} /></td>
                     <td data-label="Status"><span className={`status-badge status-${vehicle.status}`}>{vehicle.status}</span></td>
                     <td data-label="Lotacao atual">{buildVehicleLocationLabel(vehicle)}</td>
                     <td data-label="Condutor atual"><DriverBadge name={vehicle.current_driver_name} /></td>
@@ -620,6 +638,8 @@ export default function VehiclesPage() {
           </table>
         </div>
       </div>
+
+      {!selectedVehicle ? <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} /> : null}
 
       <section className="surface-panel history-panel">
         <div className="panel-heading">
@@ -675,83 +695,61 @@ export default function VehiclesPage() {
         description="Preencha os dados do veiculo e vincule a lotacao por orgao, departamento e lotacao cadastrados."
         onClose={closeVehicleModal}
       >
-        <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
-          <div className="form-field">
-            <label htmlFor="plate">Placa</label>
-            <input id="plate" className="app-input" placeholder="ABC-1D23" value={form.plate} onChange={(event) => setForm({ ...form, plate: event.target.value })} />
-          </div>
-          <div className="form-field">
-            <label htmlFor="chassis_number">Numero do chassi</label>
-            <input
-              id="chassis_number"
-              className="app-input"
-              placeholder="17 caracteres ou identificador interno"
-              value={form.chassis_number}
-              onChange={(event) => setForm({ ...form, chassis_number: event.target.value.toUpperCase() })}
-            />
-          </div>
-          <div className="form-field">
-            <label htmlFor="brand">Marca</label>
-            <input id="brand" className="app-input" placeholder="Ex.: Ford" value={form.brand} onChange={(event) => setForm({ ...form, brand: event.target.value })} />
-          </div>
-          <div className="form-field">
-            <label htmlFor="model">Modelo</label>
-            <input id="model" className="app-input" placeholder="Ex.: Ranger" value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })} />
-          </div>
-          <div className="form-field">
-            <label htmlFor="ownership_type">Tipo do veiculo</label>
-            <select id="ownership_type" className="app-select" value={form.ownership_type} onChange={(event) => setForm({ ...form, ownership_type: event.target.value })}>
-              <option value="PROPRIO">Proprio</option>
-              <option value="LOCADO">Locado</option>
-            </select>
-          </div>
-          <div className="form-field">
-            <label htmlFor="status">Status</label>
-            <select id="status" className="app-select" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
-              <option value="ATIVO">ATIVO</option>
-              <option value="MANUTENCAO">MANUTENCAO</option>
-              <option value="INATIVO">INATIVO</option>
-            </select>
-          </div>
+        <form onSubmit={handleSubmit} className="stack">
+          <AccordionSection title="Dados basicos" subtitle="Identificacao e classificacao" open>
+            <div className="form-grid modal-form-grid">
+              <div className="form-field">
+                <label htmlFor="plate">Placa</label>
+                <input id="plate" className="app-input" placeholder="ABC-1D23" value={form.plate} onChange={(event) => setForm({ ...form, plate: event.target.value })} />
+              </div>
+              <div className="form-field">
+                <label htmlFor="chassis_number">Numero do chassi</label>
+                <input id="chassis_number" className="app-input" placeholder="17 caracteres ou identificador interno" value={form.chassis_number} onChange={(event) => setForm({ ...form, chassis_number: event.target.value.toUpperCase() })} />
+              </div>
+              <div className="form-field">
+                <label htmlFor="brand">Marca</label>
+                <input id="brand" className="app-input" placeholder="Ex.: Ford" value={form.brand} onChange={(event) => setForm({ ...form, brand: event.target.value })} />
+              </div>
+              <div className="form-field">
+                <label htmlFor="model">Modelo</label>
+                <input id="model" className="app-input" placeholder="Ex.: Ranger" value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })} />
+              </div>
+              <div className="form-field">
+                <label htmlFor="ownership_type">Tipo do veiculo</label>
+                <select id="ownership_type" className="app-select" value={form.ownership_type} onChange={(event) => setForm({ ...form, ownership_type: event.target.value })}>
+                  <option value="PROPRIO">Proprio</option>
+                  <option value="LOCADO">Locado</option>
+                  <option value="CEDIDO">Cedido</option>
+                </select>
+              </div>
+              <div className="form-field">
+                <label htmlFor="status">Status</label>
+                <select id="status" className="app-select" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
+                  <option value="ATIVO">ATIVO</option>
+                  <option value="MANUTENCAO">MANUTENCAO</option>
+                  <option value="INATIVO">INATIVO</option>
+                </select>
+              </div>
+            </div>
+          </AccordionSection>
 
-          <div className="form-field">
-            <label>Orgao</label>
-            <SearchableSelect
-              value={form.organization_id}
-              onChange={(value) => setForm({ ...form, organization_id: value, department_id: '', allocation_id: '' })}
-              options={organizationOptions}
-              placeholder={catalogLoading ? 'Carregando orgaos...' : 'Selecione o orgao'}
-              searchPlaceholder="Buscar orgao"
-              disabled={catalogLoading || organizationOptions.length === 0}
-            />
-          </div>
-
-          <div className="form-field">
-            <label>Departamento</label>
-            <SearchableSelect
-              value={form.department_id}
-              onChange={(value) => setForm({ ...form, department_id: value, allocation_id: '' })}
-              options={departmentOptions}
-              placeholder={!form.organization_id ? 'Selecione primeiro o orgao' : 'Selecione o departamento'}
-              searchPlaceholder="Buscar departamento"
-              disabled={!form.organization_id || departmentOptions.length === 0}
-            />
-          </div>
-
-          <div className="form-field modal-field-span">
-            <label>Lotacao</label>
-            <SearchableSelect
-              value={form.allocation_id}
-              onChange={(value) => setForm({ ...form, allocation_id: value })}
-              options={allocationOptions}
-              placeholder={!form.department_id ? 'Selecione primeiro o departamento' : 'Selecione a lotacao'}
-              searchPlaceholder="Buscar lotacao"
-              disabled={!form.department_id || allocationOptions.length === 0}
-            />
-            {editingId && !form.allocation_id && vehicles.find((vehicle) => vehicle.id === editingId)?.current_department ? (
-              <span className="helper-text">Registro legado atual: {vehicles.find((vehicle) => vehicle.id === editingId)?.current_department}</span>
-            ) : null}
-          </div>
+          <AccordionSection title="Lotacao" subtitle="Orgao, departamento e lotacao">
+            <div className="form-grid modal-form-grid">
+              <div className="form-field">
+                <label>Orgao</label>
+                <SearchableSelect value={form.organization_id} onChange={(value) => setForm({ ...form, organization_id: value, department_id: '', allocation_id: '' })} options={organizationOptions} placeholder={catalogLoading ? 'Carregando orgaos...' : 'Selecione o orgao'} searchPlaceholder="Buscar orgao" disabled={catalogLoading || organizationOptions.length === 0} />
+              </div>
+              <div className="form-field">
+                <label>Departamento</label>
+                <SearchableSelect value={form.department_id} onChange={(value) => setForm({ ...form, department_id: value, allocation_id: '' })} options={departmentOptions} placeholder={!form.organization_id ? 'Selecione primeiro o orgao' : 'Selecione o departamento'} searchPlaceholder="Buscar departamento" disabled={!form.organization_id || departmentOptions.length === 0} />
+              </div>
+              <div className="form-field modal-field-span">
+                <label>Lotacao</label>
+                <SearchableSelect value={form.allocation_id} onChange={(value) => setForm({ ...form, allocation_id: value })} options={allocationOptions} placeholder={!form.department_id ? 'Selecione primeiro o departamento' : 'Selecione a lotacao'} searchPlaceholder="Buscar lotacao" disabled={!form.department_id || allocationOptions.length === 0} />
+                {editingId && !form.allocation_id && vehicles.find((vehicle) => vehicle.id === editingId)?.current_department ? <span className="helper-text">Registro legado atual: {vehicles.find((vehicle) => vehicle.id === editingId)?.current_department}</span> : null}
+              </div>
+            </div>
+          </AccordionSection>
 
           <div className="actions-inline modal-actions">
             <button className="app-button" type="submit" disabled={submitting || catalogLoading}>

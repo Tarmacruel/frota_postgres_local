@@ -18,6 +18,7 @@ class VehicleStatus(str, enum.Enum):
 class VehicleOwnershipType(str, enum.Enum):
     PROPRIO = "PROPRIO"
     LOCADO = "LOCADO"
+    CEDIDO = "CEDIDO"
 
 
 class Vehicle(Base):
@@ -40,3 +41,4 @@ class Vehicle(Base):
     history: Mapped[list["LocationHistory"]] = relationship(back_populates="vehicle", passive_deletes=True)
     maintenances: Mapped[list["MaintenanceRecord"]] = relationship(back_populates="vehicle", passive_deletes=True)
     possessions: Mapped[list["VehiclePossession"]] = relationship(back_populates="vehicle", passive_deletes=True)
+    claims: Mapped[list["Claim"]] = relationship(back_populates="vehicle", passive_deletes=True)

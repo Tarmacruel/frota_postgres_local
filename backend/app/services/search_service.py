@@ -65,7 +65,7 @@ class SearchService:
             "title": record.driver_name,
             "subtitle": f"Condutor de {vehicle_plate}" if vehicle_plate else "Condutor",
             "status": "ATIVA" if record.is_active else "ENCERRADA",
-            "route": f"/condutores?focus={record.id}",
+            "route": f"/posses?focus={record.id}",
             "context": {
                 "vehicle_plate": vehicle_plate,
                 "driver_document": record.driver_document,

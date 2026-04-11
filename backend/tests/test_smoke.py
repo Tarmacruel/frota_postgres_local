@@ -18,12 +18,24 @@ async def test_openapi_contains_new_routes(client):
     resp = await client.get("/openapi.json")
     assert resp.status_code == 200
     paths = resp.json()["paths"]
+    assert "/api/claims" in paths
+    assert "/api/claims/{claim_id}" in paths
+    assert "/api/drivers" in paths
+    assert "/api/drivers/active" in paths
+    assert "/api/drivers/{driver_id}" in paths
     assert "/api/maintenance" in paths
+    assert "/api/maintenance/paginated" in paths
     assert "/api/master-data/catalog" in paths
     assert "/api/maintenance/{record_id}" in paths
     assert "/api/possession" in paths
     assert "/api/possession/active" in paths
+    assert "/api/possession/paginated" in paths
+    assert "/api/possession/{possession_id}" in paths
+    assert "/api/possession/{possession_id}/document" in paths
     assert "/api/possession/{possession_id}/photo" in paths
+    assert "/api/possession/{possession_id}/photos/{photo_id}" in paths
     assert "/api/possession/{possession_id}/end" in paths
     assert "/api/search" in paths
+    assert "/api/vehicles/paginated" in paths
+    assert "/api/vehicles/{vehicle_id}/claims" in paths
     assert "/api/vehicles/{vehicle_id}/current-driver" in paths

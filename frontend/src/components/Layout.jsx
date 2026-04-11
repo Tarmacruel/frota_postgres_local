@@ -28,25 +28,27 @@ export default function Layout() {
       {
         title: 'Visao geral',
         items: [
-          { to: '/', label: 'Início', description: 'Hub operacional da frota', icon: 'dashboard' },
+          { to: '/', label: 'Inicio', description: 'Hub operacional da frota', icon: 'dashboard' },
         ],
       },
       {
         title: 'Operacional',
         items: [
-          { to: '/cadastros', label: 'Cadastros', description: 'Órgãos, departamentos e lotações', icon: 'catalog' },
-          { to: '/vehicles', label: 'Veículos', description: 'Cadastro, consulta e histórico', icon: 'vehicles' },
-          { to: '/manutencoes', label: 'Manutenções', description: 'Custos, serviços e oficina', icon: 'maintenance' },
-          { to: '/condutores', label: 'Condutores', description: 'Posse, alocação e responsáveis', icon: 'drivers' },
+          { to: '/cadastros', label: 'Cadastros', description: 'Orgaos, departamentos e lotacoes', icon: 'catalog' },
+          { to: '/vehicles', label: 'Veiculos', description: 'Cadastro, consulta e historico', icon: 'vehicles' },
+          { to: '/posses', label: 'Posses', description: 'Posse, alocacao e responsaveis', icon: 'drivers' },
+          { to: '/condutores', label: 'Condutores', description: 'Base reutilizavel de motoristas', icon: 'users' },
+          { to: '/manutencoes', label: 'Manutencoes', description: 'Custos, servicos e oficina', icon: 'maintenance' },
+          { to: '/sinistros', label: 'Sinistros', description: 'Ocorrencias, BO e prejuizos', icon: 'audit' },
         ],
       },
     ]
 
     if (isAdmin) {
       sections.push({
-        title: 'Gestão',
+        title: 'Gestao',
         items: [
-          { to: '/users', label: 'Usuários', description: 'Perfis e níveis de acesso', icon: 'users' },
+          { to: '/users', label: 'Usuarios', description: 'Perfis e niveis de acesso', icon: 'users' },
           { to: '/auditoria', label: 'Auditoria', description: 'Rastreabilidade administrativa', icon: 'audit' },
         ],
       })
@@ -62,9 +64,8 @@ export default function Layout() {
   const currentItem =
     navSections
       .flatMap((section) => section.items)
-      .find((item) => item.to === '/'
-        ? location.pathname === '/'
-        : location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)) || navSections[0]?.items[0]
+      .find((item) => (item.to === '/' ? location.pathname === '/' : location.pathname === item.to || location.pathname.startsWith(`${item.to}/`))) ||
+    navSections[0]?.items[0]
 
   useEffect(() => {
     setNavOpen(false)
@@ -103,18 +104,14 @@ export default function Layout() {
     navigate('/login')
   }
 
-  function handleSearchSelect(result) {
-    navigate(result.route)
-  }
-
-  function renderNavLink(item, extraClass = '') {
+  function renderNavLink(item) {
     return (
       <NavLink
         key={item.to}
         to={item.to}
         end={item.to === '/'}
         title={item.label}
-        className={({ isActive }) => `nav-link${isActive ? ' active' : ''}${extraClass}`}
+        className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
       >
         <span className="nav-icon" aria-hidden="true">
           <AppIcon name={item.icon} className="app-icon" />
@@ -129,14 +126,9 @@ export default function Layout() {
 
   return (
     <div className={`app-shell${sidebarCompact ? ' sidebar-compact' : ''}`}>
-      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} onSelect={handleSearchSelect} />
+      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} onSelect={(result) => navigate(result.route)} />
 
-      <button
-        type="button"
-        className={`sidebar-scrim${navOpen ? ' is-visible' : ''}`}
-        aria-label="Fechar navegacao"
-        onClick={() => setNavOpen(false)}
-      />
+      <button type="button" className={`sidebar-scrim${navOpen ? ' is-visible' : ''}`} aria-label="Fechar navegacao" onClick={() => setNavOpen(false)} />
 
       <aside className={`app-sidebar${navOpen ? ' is-open' : ''}${sidebarCompact ? ' is-compact' : ''}`}>
         <div className="sidebar-head">
@@ -149,13 +141,7 @@ export default function Layout() {
               <span className="brand-subtitle">Teixeira de Freitas</span>
             </div>
           </div>
-
-          <button
-            type="button"
-            className="icon-button desktop-only"
-            aria-label={sidebarCompact ? 'Expandir menu lateral' : 'Rebater menu lateral'}
-            onClick={() => setSidebarCompact((current) => !current)}
-          >
+          <button type="button" className="icon-button desktop-only" aria-label={sidebarCompact ? 'Expandir menu lateral' : 'Rebater menu lateral'} onClick={() => setSidebarCompact((current) => !current)}>
             <AppIcon name={sidebarCompact ? 'panel-open' : 'panel-close'} className="app-icon" />
           </button>
         </div>
@@ -165,7 +151,7 @@ export default function Layout() {
             <div className="nav-section" key={section.title}>
               <div className="nav-section-title">{section.title}</div>
               <nav className="nav-group" aria-label={section.title}>
-                {section.items.map((item) => renderNavLink(item))}
+                {section.items.map(renderNavLink)}
               </nav>
             </div>
           ))}
@@ -188,44 +174,26 @@ export default function Layout() {
       <div className="content-shell">
         <header className="app-topbar">
           <div className="topbar-leading">
-            <button
-              type="button"
-              className="icon-button mobile-only"
-              aria-label={navOpen ? 'Fechar navegacao' : 'Abrir navegacao'}
-              aria-expanded={navOpen}
-              onClick={() => setNavOpen((current) => !current)}
-            >
+            <button type="button" className="icon-button mobile-only" aria-label={navOpen ? 'Fechar navegacao' : 'Abrir navegacao'} aria-expanded={navOpen} onClick={() => setNavOpen((current) => !current)}>
               <AppIcon name="menu" className="app-icon" />
             </button>
 
             <div className="topbar-route">
               <span className="topbar-kicker">Frota PMTF . acompanhamento operacional</span>
-              <h1 className="page-title topbar-route-title">{currentItem?.label || 'Início'}</h1>
+              <h1 className="page-title topbar-route-title">{currentItem?.label || 'Inicio'}</h1>
             </div>
           </div>
 
           <div className="topbar-actions">
-            <button
-              type="button"
-              className="topbar-search-trigger"
-              aria-label="Abrir busca global"
-              onClick={() => setSearchOpen(true)}
-              onFocus={() => setSearchOpen(true)}
-            >
+            <button type="button" className="topbar-search-trigger" aria-label="Abrir busca global" onClick={() => setSearchOpen(true)} onFocus={() => setSearchOpen(true)}>
               <span className="topbar-search-copy">
                 <AppIcon name="search" className="app-icon" />
-                <span>Buscar veículo, condutor ou manutenção</span>
+                <span>Buscar veiculo, posse ou manutencao</span>
               </span>
               <span className="topbar-search-hint">Ctrl K</span>
             </button>
 
-            <button
-              type="button"
-              className="icon-button theme-button"
-              aria-label={darkMode ? 'Ativar modo claro' : 'Ativar modo escuro'}
-              title={darkMode ? 'Modo claro' : 'Modo escuro'}
-              onClick={() => setDarkMode((current) => !current)}
-            >
+            <button type="button" className="icon-button theme-button" aria-label={darkMode ? 'Ativar modo claro' : 'Ativar modo escuro'} title={darkMode ? 'Modo claro' : 'Modo escuro'} onClick={() => setDarkMode((current) => !current)}>
               <AppIcon name={darkMode ? 'sun' : 'moon'} className="app-icon" />
             </button>
           </div>
@@ -238,12 +206,7 @@ export default function Layout() {
 
       <nav className="mobile-bottom-bar" aria-label="Navegacao mobile">
         {mobileTabs.map((item) => (
-          <NavLink
-            key={item.to}
-            to={item.to}
-            end={item.to === '/'}
-            className={({ isActive }) => `mobile-bottom-link${isActive ? ' active' : ''}`}
-          >
+          <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({ isActive }) => `mobile-bottom-link${isActive ? ' active' : ''}`}>
             <AppIcon name={item.icon} className="app-icon" />
             <span>{item.label}</span>
           </NavLink>

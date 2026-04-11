@@ -13,6 +13,7 @@ from app.models.vehicle import Vehicle, VehicleOwnershipType, VehicleStatus
 from app.repositories.master_data_repository import MasterDataRepository
 from app.services.audit_service import AuditService
 from app.repositories.vehicle_repository import VehicleRepository
+from app.schemas.common import PaginatedResponse, build_pagination
 from app.schemas.vehicle import VehicleCreate, VehicleUpdate
 
 
@@ -31,6 +32,33 @@ class VehicleService:
             possession = await self.vehicles.get_active_possession(vehicle.id)
             items.append(self._serialize_vehicle(vehicle, active, possession))
         return items
+
+    async def list_paginated(
+        self,
+        *,
+        page: int,
+        limit: int,
+        status_filter: VehicleStatus | None = None,
+        ownership_type: VehicleOwnershipType | None = None,
+        search: str | None = None,
+        sort: str = "created_at",
+        order: str = "desc",
+    ) -> PaginatedResponse[dict]:
+        vehicles, total = await self.vehicles.list_paginated(
+            page=page,
+            limit=limit,
+            status=status_filter,
+            ownership_type=ownership_type,
+            search=search,
+            sort=sort,
+            order=order,
+        )
+        items = []
+        for vehicle in vehicles:
+            active = await self.vehicles.get_active_history(vehicle.id)
+            possession = await self.vehicles.get_active_possession(vehicle.id)
+            items.append(self._serialize_vehicle(vehicle, active, possession))
+        return PaginatedResponse[dict](data=items, pagination=build_pagination(page, limit, total))
 
     async def get_history(self, vehicle_id: UUID):
         vehicle = await self.vehicles.get_by_id(vehicle_id)

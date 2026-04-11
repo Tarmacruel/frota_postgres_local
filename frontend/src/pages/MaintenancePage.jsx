@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import MaintenanceForm from '../components/MaintenanceForm'
+import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
 import { maintenanceAPI } from '../api/maintenance'
@@ -49,6 +50,7 @@ export default function MaintenancePage() {
   const [endFilter, setEndFilter] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState(null)
+  const [currentPage, setCurrentPage] = useState(1)
   const focusRecordId = searchParams.get('focus')
 
   const exportColumns = [
@@ -131,6 +133,12 @@ export default function MaintenancePage() {
 
   const focusedRecord = focusRecordId ? records.find((record) => record.id === focusRecordId) || null : null
   const filteredRecords = focusedRecord ? [focusedRecord] : baseFilteredRecords
+  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / 10))
+  const paginatedRecords = focusedRecord ? filteredRecords : filteredRecords.slice((currentPage - 1) * 10, currentPage * 10)
+
+  useEffect(() => {
+    setCurrentPage(1)
+  }, [search, statusFilter, vehicleFilter, startFilter, endFilter, focusRecordId, records.length])
 
   function patchSearchParams(updates) {
     const next = new URLSearchParams(searchParams)
@@ -332,7 +340,7 @@ export default function MaintenancePage() {
                   </td>
                 </tr>
               ) : (
-                filteredRecords.map((record) => (
+                paginatedRecords.map((record) => (
                   <tr key={record.id} className={focusedRecord?.id === record.id ? 'is-focused-row' : ''}>
                     <td data-label="Veiculo"><strong>{record.vehicle_plate}</strong></td>
                     <td data-label="Inicio">{formatDate(record.start_date)}</td>
@@ -372,6 +380,8 @@ export default function MaintenancePage() {
           </table>
         </div>
       </div>
+
+      {!focusedRecord ? <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} /> : null}
 
       <Modal
         open={isModalOpen}

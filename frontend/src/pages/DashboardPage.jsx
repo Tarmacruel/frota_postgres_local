@@ -83,8 +83,8 @@ export default function DashboardPage() {
     {
       title: 'Ver veiculos sem condutor',
       description: 'Encontre rapidamente os ativos sem posse vigente para redistribuição.',
-      to: '/condutores',
-      cta: 'Abrir condutores',
+      to: '/posses',
+      cta: 'Abrir posses',
     },
     {
       title: canWrite ? 'Cadastrar novo veiculo' : 'Consultar base completa',

@@ -9,6 +9,7 @@ from app.models.maintenance import MaintenanceRecord
 from app.models.user import User
 from app.repositories.maintenance_repository import MaintenanceRepository
 from app.repositories.vehicle_repository import VehicleRepository
+from app.schemas.common import PaginatedResponse, build_pagination
 from app.schemas.maintenance import MaintenanceCreate, MaintenanceUpdate
 from app.services.audit_service import AuditService
 
@@ -34,6 +35,28 @@ class MaintenanceService:
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de manutencao nao encontrado")
         return self._serialize(record)
+
+    async def list_paginated(
+        self,
+        *,
+        page: int,
+        limit: int,
+        vehicle_id: UUID | None = None,
+        start: datetime | None = None,
+        end: datetime | None = None,
+        only_open: bool | None = None,
+        search: str | None = None,
+    ) -> PaginatedResponse[dict]:
+        records, total = await self.records.list_paginated(
+            page=page,
+            limit=limit,
+            vehicle_id=vehicle_id,
+            start=start,
+            end=end,
+            only_open=only_open,
+            search=search,
+        )
+        return PaginatedResponse[dict](data=[self._serialize(record) for record in records], pagination=build_pagination(page, limit, total))
 
     async def create(self, data: MaintenanceCreate, current_user: User) -> dict:
         await self._ensure_vehicle_exists(data.vehicle_id)
