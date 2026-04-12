@@ -14,7 +14,7 @@ branch_labels = None
 depends_on = None
 
 claim_status = postgresql.ENUM("ABERTO", "EM_ANALISE", "ENCERRADO", name="claim_status", create_type=False)
-claim_type = postgresql.ENUM("COLISAO", "ROUBO", "FURTO", "AVERIA", "OUTRO", name="claim_type", create_type=False)
+claim_type = postgresql.ENUM("COLISAO", "ROUBO", "FURTO", "AVARIA", "OUTRO", name="claim_type", create_type=False)
 driver_license_category = postgresql.ENUM("A", "B", "C", "D", "E", name="driver_license_category", create_type=False)
 
 

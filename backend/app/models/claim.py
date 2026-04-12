@@ -20,7 +20,7 @@ class ClaimType(str, enum.Enum):
     COLISAO = "COLISAO"
     ROUBO = "ROUBO"
     FURTO = "FURTO"
-    AVERIA = "AVERIA"
+    AVARIA = "AVARIA"
     OUTRO = "OUTRO"
 
 

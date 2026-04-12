@@ -4,7 +4,7 @@ import DriverSelect from './DriverSelect'
 import SearchableSelect from './SearchableSelect'
 import { getApiErrorMessage } from '../utils/apiError'
 
-const typeOptions = ['COLISAO', 'ROUBO', 'FURTO', 'AVERIA', 'OUTRO']
+const typeOptions = ['COLISAO', 'ROUBO', 'FURTO', 'AVARIA', 'OUTRO']
 const statusOptions = ['ABERTO', 'EM_ANALISE', 'ENCERRADO']
 
 function vehicleOption(vehicle) {

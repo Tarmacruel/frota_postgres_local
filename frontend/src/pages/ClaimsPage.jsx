@@ -9,7 +9,7 @@ import { useAuth } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 
-const typeOptions = ['TODOS', 'COLISAO', 'ROUBO', 'FURTO', 'AVERIA', 'OUTRO']
+const typeOptions = ['TODOS', 'COLISAO', 'ROUBO', 'FURTO', 'AVARIA', 'OUTRO']
 const statusOptions = ['TODOS', 'ABERTO', 'EM_ANALISE', 'ENCERRADO']
 
 function formatDate(value) {
