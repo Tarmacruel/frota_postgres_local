@@ -17,8 +17,10 @@ class AuthService:
 
     async def authenticate(self, data: LoginInput) -> User:
         user = await self.users.get_by_email(data.email.lower())
-        if not user or not verify_password(data.password, user.password_hash):
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciais inválidas")
+        if not user:
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario nao encontrado")
+        if not verify_password(data.password, user.password_hash):
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Senha incorreta")
         return user
 
     async def change_password(self, *, user: User, current_password: str, new_password: str) -> None:

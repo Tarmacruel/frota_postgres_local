@@ -33,7 +33,6 @@ class ChangePasswordInput(BaseModel):
         return normalized
 
 
-
 class CurrentUserOut(BaseModel):
     id: UUID
     name: str
