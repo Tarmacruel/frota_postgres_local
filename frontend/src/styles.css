@@ -907,6 +907,7 @@ button {
   place-items: center;
   padding: 0;
   flex: 0 0 auto;
+  position: relative;
 }
 
 .icon-button:hover {
@@ -1203,6 +1204,7 @@ button {
 .search-result-meta {
   justify-items: end;
   flex: 0 0 auto;
+  position: relative;
 }
 
 .search-result-status {
@@ -2377,4 +2379,19 @@ button {
   .app-sidebar.is-compact .account-action {
     margin-top: 4px;
   }
+}
+
+.badge-counter {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 18px;
+  height: 18px;
+  border-radius: 999px;
+  background: #d14343;
+  color: #fff;
+  font-size: 0.68rem;
+  line-height: 18px;
+  text-align: center;
+  padding: 0 5px;
 }

@@ -14,6 +14,7 @@ class PossessionCreate(BaseModel):
     driver_contact: str | None = Field(default=None, max_length=50)
     start_date: datetime | None = None
     observation: str | None = Field(default=None, max_length=1000)
+    start_odometer_km: float | None = Field(default=None, ge=0)
 
     @field_validator("driver_name")
     @classmethod
@@ -35,6 +36,7 @@ class PossessionCreate(BaseModel):
 class PossessionUpdate(BaseModel):
     end_date: datetime | None = None
     observation: str | None = Field(default=None, max_length=1000)
+    end_odometer_km: float | None = Field(default=None, ge=0)
 
     @field_validator("observation")
     @classmethod
@@ -53,6 +55,8 @@ class PossessionAdminUpdate(BaseModel):
     start_date: datetime
     end_date: datetime | None = None
     observation: str | None = Field(default=None, max_length=1000)
+    start_odometer_km: float | None = Field(default=None, ge=0)
+    end_odometer_km: float | None = Field(default=None, ge=0)
     edit_reason: str = Field(min_length=8, max_length=500)
 
     @field_validator("driver_name")
@@ -136,6 +140,9 @@ class PossessionOut(BaseModel):
     start_date: datetime
     end_date: datetime | None
     observation: str | None
+    start_odometer_km: float | None
+    end_odometer_km: float | None
+    kilometers_driven: float | None
     created_at: datetime
     is_active: bool
     photo_available: bool
