@@ -103,6 +103,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
     driver_document: '',
     driver_contact: '',
     start_date: toDateTimeInput(new Date().toISOString()),
+    start_odometer_km: '',
     observation: '',
   })
   const [submitting, setSubmitting] = useState(false)
@@ -369,6 +370,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       if (form.driver_document) payload.append('driver_document', form.driver_document)
       if (form.driver_contact) payload.append('driver_contact', form.driver_contact)
       if (form.start_date) payload.append('start_date', new Date(form.start_date).toISOString())
+      if (form.start_odometer_km !== '') payload.append('start_odometer_km', String(Number(form.start_odometer_km)))
       if (form.observation) payload.append('observation', form.observation)
       payload.append(
         'photo_metadata_json',
@@ -429,6 +431,20 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
           className="app-input"
           value={form.start_date}
           onChange={(event) => setForm({ ...form, start_date: event.target.value })}
+        />
+      </div>
+
+      <div className="form-field">
+        <label htmlFor="possession-start-odometer">Odometro inicial (km)</label>
+        <input
+          id="possession-start-odometer"
+          type="number"
+          min="0"
+          step="0.1"
+          className="app-input"
+          value={form.start_odometer_km}
+          onChange={(event) => setForm({ ...form, start_odometer_km: event.target.value })}
+          placeholder="Informe a quilometragem inicial"
         />
       </div>
 

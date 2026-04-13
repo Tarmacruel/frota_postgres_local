@@ -83,6 +83,7 @@ function buildMapEmbedUrl(location) {
 function buildEndState(record) {
   return {
     end_date: new Date().toISOString().slice(0, 16),
+    end_odometer_km: record?.end_odometer_km ?? '',
     observation: record?.observation || '',
   }
 }
@@ -126,6 +127,8 @@ export default function PossessionPage() {
     start_date: '',
     end_date: '',
     observation: '',
+    start_odometer_km: '',
+    end_odometer_km: '',
     edit_reason: '',
   })
   const [savingEdit, setSavingEdit] = useState(false)
@@ -148,6 +151,9 @@ export default function PossessionPage() {
     { header: 'Inicio', value: (record) => formatDate(record.start_date) },
     { header: 'Fim', value: (record) => formatDate(record.end_date) },
     { header: 'Status', value: (record) => (record.is_active ? 'ATIVA' : 'ENCERRADA') },
+    { header: 'Km inicial', value: (record) => record.start_odometer_km ?? '-' },
+    { header: 'Km final', value: (record) => record.end_odometer_km ?? '-' },
+    { header: 'Km rodados', value: (record) => record.kilometers_driven ?? '-' },
     { header: 'Observacao', value: (record) => record.observation || 'Sem observacao' },
   ]
 
@@ -263,6 +269,8 @@ export default function PossessionPage() {
       start_date: toDateTimeInput(record.start_date),
       end_date: toDateTimeInput(record.end_date),
       observation: record.observation || '',
+      start_odometer_km: record.start_odometer_km ?? '',
+      end_odometer_km: record.end_odometer_km ?? '',
       edit_reason: '',
     })
     setEditDocumentFile(null)
@@ -292,6 +300,8 @@ export default function PossessionPage() {
       start_date: '',
       end_date: '',
       observation: '',
+      start_odometer_km: '',
+      end_odometer_km: '',
       edit_reason: '',
     })
     setEditDocumentFile(null)
@@ -401,6 +411,7 @@ export default function PossessionPage() {
       setError('')
       await possessionAPI.end(endingRecord.id, {
         end_date: endForm.end_date ? new Date(endForm.end_date).toISOString() : null,
+        end_odometer_km: endForm.end_odometer_km === '' ? null : Number(endForm.end_odometer_km),
         observation: endForm.observation || null,
       })
       setFeedback('Posse encerrada com sucesso.')
@@ -428,6 +439,8 @@ export default function PossessionPage() {
       payload.append('start_date', new Date(editForm.start_date).toISOString())
       if (editForm.end_date) payload.append('end_date', new Date(editForm.end_date).toISOString())
       if (editForm.observation) payload.append('observation', editForm.observation)
+      if (editForm.start_odometer_km !== '') payload.append('start_odometer_km', String(Number(editForm.start_odometer_km)))
+      if (editForm.end_odometer_km !== '') payload.append('end_odometer_km', String(Number(editForm.end_odometer_km)))
       payload.append('edit_reason', editForm.edit_reason)
       if (editDocumentFile) {
         payload.append('signed_document', editDocumentFile, editDocumentFile.name)
@@ -587,17 +600,20 @@ export default function PossessionPage() {
                 <th>Fim</th>
                 <th>Observacao</th>
                 <th>Status</th>
+                <th>Km inicial</th>
+                <th>Km final</th>
+                <th>Km rodados</th>
                 <th>Acoes</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="muted">Carregando posses...</td>
+                  <td colSpan={10} className="muted">Carregando posses...</td>
                 </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={7}>
+                  <td colSpan={10}>
                     <div className="empty-state">Nenhum registro de posse encontrado para os filtros atuais.</div>
                   </td>
                 </tr>
@@ -639,6 +655,9 @@ export default function PossessionPage() {
                         {record.is_active ? 'ATIVA' : 'ENCERRADA'}
                       </span>
                     </td>
+                    <td data-label="Km inicial">{record.start_odometer_km ?? '-'}</td>
+                    <td data-label="Km final">{record.end_odometer_km ?? '-'}</td>
+                    <td data-label="Km rodados">{record.kilometers_driven ?? '-'}</td>
                     <td data-label="Acoes">
                       <div className="actions-inline">
                         {record.photo_available ? (
@@ -750,6 +769,32 @@ export default function PossessionPage() {
               onChange={(event) => setEditForm({ ...editForm, end_date: event.target.value })}
             />
           </div>
+          <div className="form-field">
+            <label htmlFor="edit-possession-start-odometer">Odometro inicial (km)</label>
+            <input
+              id="edit-possession-start-odometer"
+              type="number"
+              min="0"
+              step="0.1"
+              className="app-input"
+              value={editForm.start_odometer_km}
+              onChange={(event) => setEditForm({ ...editForm, start_odometer_km: event.target.value })}
+            />
+          </div>
+
+          <div className="form-field">
+            <label htmlFor="edit-possession-end-odometer">Odometro final (km)</label>
+            <input
+              id="edit-possession-end-odometer"
+              type="number"
+              min="0"
+              step="0.1"
+              className="app-input"
+              value={editForm.end_odometer_km}
+              onChange={(event) => setEditForm({ ...editForm, end_odometer_km: event.target.value })}
+            />
+          </div>
+
           <div className="form-field modal-field-span">
             <label htmlFor="edit-possession-observation">Observacao</label>
             <textarea
@@ -855,6 +900,19 @@ export default function PossessionPage() {
               onChange={(event) => setEndForm({ ...endForm, end_date: event.target.value })}
             />
           </div>
+          <div className="form-field">
+            <label htmlFor="end-possession-odometer">Odometro final (km)</label>
+            <input
+              id="end-possession-odometer"
+              type="number"
+              min="0"
+              step="0.1"
+              className="app-input"
+              value={endForm.end_odometer_km}
+              onChange={(event) => setEndForm({ ...endForm, end_odometer_km: event.target.value })}
+            />
+          </div>
+
           <div className="form-field modal-field-span">
             <label htmlFor="end-possession-note">Observacao</label>
             <textarea

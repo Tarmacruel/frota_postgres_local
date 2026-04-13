@@ -71,6 +71,7 @@ def parse_possession_form(
     driver_contact: str | None = Form(default=None),
     start_date: datetime | None = Form(default=None),
     observation: str | None = Form(default=None),
+    start_odometer_km: float | None = Form(default=None),
 ) -> PossessionCreate:
     try:
         return PossessionCreate(
@@ -81,6 +82,7 @@ def parse_possession_form(
             driver_contact=driver_contact,
             start_date=start_date,
             observation=observation,
+            start_odometer_km=start_odometer_km,
         )
     except ValidationError as exc:
         raise RequestValidationError(exc.errors()) from exc
@@ -100,6 +102,8 @@ def parse_admin_update_form(
     start_date: datetime = Form(...),
     end_date: datetime | None = Form(default=None),
     observation: str | None = Form(default=None),
+    start_odometer_km: float | None = Form(default=None),
+    end_odometer_km: float | None = Form(default=None),
     edit_reason: str = Form(...),
 ) -> PossessionAdminUpdate:
     try:
@@ -111,6 +115,8 @@ def parse_admin_update_form(
             start_date=start_date,
             end_date=end_date,
             observation=observation,
+            start_odometer_km=start_odometer_km,
+            end_odometer_km=end_odometer_km,
             edit_reason=edit_reason,
         )
     except ValidationError as exc:

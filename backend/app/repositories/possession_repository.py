@@ -104,11 +104,15 @@ class PossessionRepository:
         )
         return result.scalar_one_or_none() is not None
 
-    async def end_active_for_vehicle(self, vehicle_id: UUID, end_date: datetime) -> None:
+    async def end_active_for_vehicle(self, vehicle_id: UUID, end_date: datetime, *, end_odometer_km: float | None = None) -> None:
+        values = {"end_date": end_date}
+        if end_odometer_km is not None:
+            values["end_odometer_km"] = end_odometer_km
+
         await self.db.execute(
             update(VehiclePossession)
             .where(VehiclePossession.vehicle_id == vehicle_id, VehiclePossession.end_date.is_(None))
-            .values(end_date=end_date)
+            .values(**values)
         )
 
     async def create(self, possession: VehiclePossession) -> VehiclePossession:
