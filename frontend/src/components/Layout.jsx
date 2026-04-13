@@ -4,6 +4,8 @@ import { officialBrand } from '../constants/officialBrand'
 import { useAuth } from '../context/AuthContext'
 import { AppIcon, getInitials } from './AppIcon'
 import SearchOverlay from './SearchOverlay'
+import Modal from './Modal'
+import api from '../api/client'
 
 const THEME_STORAGE_KEY = 'frota-theme'
 const SIDEBAR_STORAGE_KEY = 'frota-sidebar-compact'
@@ -22,6 +24,9 @@ export default function Layout() {
   const [searchOpen, setSearchOpen] = useState(false)
   const [sidebarCompact, setSidebarCompact] = useState(() => readStorage(SIDEBAR_STORAGE_KEY, '0') === '1')
   const [darkMode, setDarkMode] = useState(() => readStorage(THEME_STORAGE_KEY, 'light') === 'dark')
+  const [passwordModalOpen, setPasswordModalOpen] = useState(false)
+  const [passwordForm, setPasswordForm] = useState({ current_password: '', new_password: '', confirm_password: '' })
+  const [passwordFeedback, setPasswordFeedback] = useState('')
 
   const navSections = useMemo(() => {
     const sections = [
@@ -40,6 +45,7 @@ export default function Layout() {
           { to: '/condutores', label: 'Condutores', description: 'Base reutilizavel de motoristas', icon: 'users' },
           { to: '/manutencoes', label: 'Manutencoes', description: 'Custos, servicos e oficina', icon: 'maintenance' },
           { to: '/sinistros', label: 'Sinistros', description: 'Ocorrencias, BO e prejuizos', icon: 'audit' },
+          { to: '/multas', label: 'Multas', description: 'Autos, vencimentos e pagamentos', icon: 'catalog' },
         ],
       },
     ]
@@ -104,6 +110,25 @@ export default function Layout() {
     navigate('/login')
   }
 
+  async function handlePasswordChange(event) {
+    event.preventDefault()
+    setPasswordFeedback('')
+    try {
+      if (passwordForm.new_password !== passwordForm.confirm_password) {
+        setPasswordFeedback('A confirmacao da nova senha nao confere.')
+        return
+      }
+      await api.post('/auth/change-password', {
+        current_password: passwordForm.current_password,
+        new_password: passwordForm.new_password,
+      })
+      setPasswordFeedback('Senha alterada com sucesso.')
+      setPasswordForm({ current_password: '', new_password: '', confirm_password: '' })
+    } catch {
+      setPasswordFeedback('Nao foi possivel alterar a senha. Confira a senha atual.')
+    }
+  }
+
   function renderNavLink(item) {
     return (
       <NavLink
@@ -164,6 +189,9 @@ export default function Layout() {
               <strong>{user?.name || officialBrand.systemName}</strong>
               <span>{roleLabel}</span>
             </div>
+            <button type="button" className="icon-button account-action" aria-label="Alterar senha" onClick={() => setPasswordModalOpen(true)}>
+              <AppIcon name="users" className="app-icon" />
+            </button>
             <button type="button" className="icon-button account-action" aria-label="Encerrar sessao" onClick={handleLogout}>
               <AppIcon name="logout" className="app-icon" />
             </button>
@@ -212,6 +240,18 @@ export default function Layout() {
           </NavLink>
         ))}
       </nav>
+
+      <Modal open={passwordModalOpen} title="Alterar senha" description="Defina uma nova senha para seu acesso." onClose={() => setPasswordModalOpen(false)}>
+        <form onSubmit={handlePasswordChange} className="stack">
+          <input className="app-input" type="password" placeholder="Senha atual" value={passwordForm.current_password} onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })} required />
+          <input className="app-input" type="password" placeholder="Nova senha (minimo 8 caracteres)" value={passwordForm.new_password} onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })} required />
+          <input className="app-input" type="password" placeholder="Confirmar nova senha" value={passwordForm.confirm_password} onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })} required />
+          {passwordFeedback ? <div className="alert alert-info">{passwordFeedback}</div> : null}
+          <div className="actions-inline modal-actions">
+            <button className="app-button" type="submit">Salvar senha</button>
+          </div>
+        </form>
+      </Modal>
     </div>
   )
 }

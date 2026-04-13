@@ -7,6 +7,7 @@ import CadastrosPage from './pages/CadastrosPage'
 import ClaimsPage from './pages/ClaimsPage'
 import DashboardPage from './pages/DashboardPage'
 import DriversPage from './pages/DriversPage'
+import FinesPage from './pages/FinesPage'
 import LoginPage from './pages/LoginPage'
 import MaintenancePage from './pages/MaintenancePage'
 import PossessionPage from './pages/PossessionPage'
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="condutores" element={<DriversPage />} />
             <Route path="manutencoes" element={<MaintenancePage />} />
             <Route path="sinistros" element={<ClaimsPage />} />
+            <Route path="multas" element={<FinesPage />} />
             <Route
               path="users"
               element={
