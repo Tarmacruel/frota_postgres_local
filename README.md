@@ -189,6 +189,91 @@ $env:PYTHONPATH = (Get-Location).Path
 .venv\Scripts\python.exe -m pytest tests\test_smoke.py -q
 ```
 
+## Operacao local (passo a passo)
+
+### 1) Atualizar codigo e aplicar banco
+
+```powershell
+cd Z:\FROTAS\frota_postgres_local
+git checkout main
+git pull origin main
+cd backend
+alembic upgrade heads
+```
+
+> Quando houver mais de um `head` no Alembic, prefira `alembic upgrade heads` (plural).
+
+### 2) Build do frontend para publicacao local (porta 80)
+
+```powershell
+cd Z:\FROTAS\frota_postgres_local\frontend
+npm install
+npm run build
+```
+
+### 3) Subir ambiente completo para publicacao local
+
+```powershell
+cd Z:\FROTAS\frota_postgres_local
+Publicar_Frota_80.bat
+```
+
+### 4) Modo desenvolvimento (hot reload)
+
+Backend:
+
+```powershell
+cd Z:\FROTAS\frota_postgres_local\backend
+uvicorn app.main:app --reload
+```
+
+Frontend:
+
+```powershell
+cd Z:\FROTAS\frota_postgres_local\frontend
+npm run dev
+```
+
+## Parar processos e liberar portas
+
+### Encerrar rapidamente app local (atalho)
+
+```bat
+Parar_Frota_Local.bat
+```
+
+### Descobrir e matar processo da porta 80 (PowerShell Admin)
+
+```powershell
+$pid80 = (Get-NetTCPConnection -LocalPort 80 -State Listen | Select-Object -First 1 -ExpandProperty OwningProcess)
+Get-Process -Id $pid80
+Stop-Process -Id $pid80 -Force
+```
+
+Validacao:
+
+```powershell
+Get-NetTCPConnection -LocalPort 80 -State Listen
+```
+
+Se nao retornar nada, a porta 80 esta livre.
+
+## Rotina recomendada quando frontend nao atualiza
+
+1. Parar o processo antigo (`Parar_Frota_Local.bat` ou `Stop-Process` da porta 80).
+2. Rodar novo build do frontend (`npm run build` em `frontend`).
+3. Subir novamente com `Publicar_Frota_80.bat`.
+4. Fazer `Ctrl+F5` no navegador e testar em aba anonima.
+5. Se usar Cloudflare Tunnel, limpar cache do Cloudflare e reiniciar o tunnel se necessario.
+
+## Scripts utilitarios
+
+- `Iniciar_Frota_Local.bat`: sobe stack local e builda frontend.
+- `Publicar_Frota_80.bat`: publica em modo producao na porta 80.
+- `Parar_Frota_Local.bat`: encerra processos locais (8000, 5173 e 80).
+- `Backup_Frota_Local.bat`: gera backup SQL em `%LOCALAPPDATA%\FrotaPMTF\backups`.
+- `Resetar_Frota_Local.bat`: reseta schema `public` e reaplica migrations.
+
 ## Observacoes
 
 - O frontend nao grava token em `localStorage`
