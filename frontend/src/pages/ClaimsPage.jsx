@@ -33,7 +33,7 @@ function vehicleOption(vehicle) {
 }
 
 export default function ClaimsPage() {
-  const { isAdmin } = useAuth()
+  const { canWrite } = useAuth()
   const [vehicles, setVehicles] = useState([])
   const [records, setRecords] = useState([])
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0, limit: 10 })
@@ -131,7 +131,7 @@ export default function ClaimsPage() {
           <p className="section-copy">Registre ocorrencias, acompanhe o status e mantenha o historico de prejuizos e analises da frota.</p>
         </div>
         <div className="actions-inline">
-          {isAdmin ? <button className="app-button" type="button" onClick={() => { setEditingRecord(null); setIsModalOpen(true) }}>Novo sinistro</button> : null}
+          {canWrite ? <button className="app-button" type="button" onClick={() => { setEditingRecord(null); setIsModalOpen(true) }}>Novo sinistro</button> : null}
           <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Previsualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
@@ -180,14 +180,14 @@ export default function ClaimsPage() {
                 <th>Status</th>
                 <th>Local</th>
                 <th>Valor</th>
-                {isAdmin ? <th>Acoes</th> : null}
+                {canWrite ? <th>Acoes</th> : null}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={isAdmin ? 8 : 7} className="muted">Carregando sinistros...</td></tr>
+                <tr><td colSpan={canWrite ? 8 : 7} className="muted">Carregando sinistros...</td></tr>
               ) : !records.length ? (
-                <tr><td colSpan={isAdmin ? 8 : 7}><div className="empty-state">Nenhum sinistro encontrado para os filtros aplicados.</div></td></tr>
+                <tr><td colSpan={canWrite ? 8 : 7}><div className="empty-state">Nenhum sinistro encontrado para os filtros aplicados.</div></td></tr>
               ) : (
                 records.map((record) => (
                   <tr key={record.id}>
@@ -198,7 +198,7 @@ export default function ClaimsPage() {
                     <td data-label="Status"><span className={`status-badge status-${record.status === 'ENCERRADO' ? 'ATIVO' : 'MANUTENCAO'}`}>{record.status}</span></td>
                     <td data-label="Local">{record.local}</td>
                     <td data-label="Valor">{formatMoney(record.valor_estimado)}</td>
-                    {isAdmin ? (
+                    {canWrite ? (
                       <td data-label="Acoes">
                         <button type="button" className="mini-button" onClick={() => { setEditingRecord(record); setIsModalOpen(true) }}>Editar</button>
                       </td>
