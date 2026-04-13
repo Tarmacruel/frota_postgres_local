@@ -104,7 +104,18 @@ Push-Location $backendDir
 try {
     if (-not $SkipMigrate) {
         Write-Output "Aplicando migracoes do banco..."
-        Invoke-ExternalStep "Migracoes do banco" { & $alembicExe upgrade head }
+        try {
+            Invoke-ExternalStep "Migracoes do banco" { & $alembicExe upgrade head }
+        }
+        catch {
+            if ($_.Exception.Message -like "*Multiple head revisions are present*") {
+                Write-Warning "Multiplos heads detectados no Alembic. Aplicando todas as heads automaticamente..."
+                Invoke-ExternalStep "Migracoes do banco (heads)" { & $alembicExe upgrade heads }
+            }
+            else {
+                throw
+            }
+        }
     }
 
     if ($SeedDemoData) {

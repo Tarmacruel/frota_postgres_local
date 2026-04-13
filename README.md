@@ -53,6 +53,14 @@ Esse atalho:
 - executa seed demo
 - sobe o FastAPI servindo a aplicacao completa em `http://localhost:8000`
 
+Atalhos adicionais:
+
+- `Parar_Frota_Local.bat`: encerra processos nas portas locais da aplicacao (`8000`, `5173`, `80`)
+- `Backup_Frota_Local.bat`: gera backup SQL em `%LOCALAPPDATA%\\FrotaPMTF\\backups`
+- `Resetar_Frota_Local.bat`: recria `public` no banco local e reaplica migrations
+
+> Se a interface continuar com visual antigo, execute novamente `Iniciar_Frota_Local.bat` para forcar novo build do frontend ou rode `npm run dev` em `frontend` para desenvolvimento em tempo real.
+
 ## Publicacao em `frota.sirel.com.br`
 
 Para publicar no subdominio institucional:

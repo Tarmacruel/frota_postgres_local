@@ -249,16 +249,16 @@ export default function DriversPage() {
                 <th>Contato</th>
                 <th>E-mail</th>
                 <th>CNH</th>
-                <th>Status</th>
                 <th>Alerta CNH</th>
+                <th>Status</th>
                 {canWrite ? <th>Acoes</th> : null}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={canWrite ? 7 : 6} className="muted">Carregando condutores...</td></tr>
+                <tr><td colSpan={canWrite ? 8 : 7} className="muted">Carregando condutores...</td></tr>
               ) : !records.length ? (
-                <tr><td colSpan={canWrite ? 7 : 6}><div className="empty-state">Nenhum condutor encontrado para o filtro atual.</div></td></tr>
+                <tr><td colSpan={canWrite ? 8 : 7}><div className="empty-state">Nenhum condutor encontrado para o filtro atual.</div></td></tr>
               ) : (
                 records.map((record) => {
                   const cnhAlert = getCnhAlert(record.cnh_validade)
