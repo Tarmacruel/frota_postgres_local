@@ -28,6 +28,25 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString('pt-BR')
 }
 
+function vehicleOption(vehicle) {
+  const location = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
+  return {
+    value: vehicle.id,
+    label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
+    description: `${vehicle.ownership_type} | ${location}`,
+    keywords: [vehicle.plate, vehicle.brand, vehicle.model, location].join(' '),
+  }
+}
+
+function driverOption(driver) {
+  return {
+    value: driver.id,
+    label: driver.nome_completo,
+    description: `${driver.documento} | CNH ${driver.cnh_categoria}${driver.cnh_validade ? ` | validade ${formatDate(driver.cnh_validade)}` : ''}`,
+    keywords: [driver.nome_completo, driver.documento, driver.email || '', driver.contato || ''].join(' '),
+  }
+}
+
 export default function FinesPage() {
   const { canWrite } = useAuth()
   const [vehicles, setVehicles] = useState([])
@@ -103,6 +122,10 @@ export default function FinesPage() {
     event.preventDefault()
     try {
       setSubmitting(true)
+      if (!form.vehicle_id) {
+        setError('Selecione um veiculo para registrar a multa.')
+        return
+      }
       const payload = { ...form, driver_id: form.driver_id || null, due_date: form.due_date || null, location: form.location || null, amount: Number(form.amount) }
       if (editingRecord) {
         await finesAPI.update(editingRecord.id, payload)
@@ -168,7 +191,13 @@ export default function FinesPage() {
       <div className="toolbar-row" style={{ marginBottom: 18 }}>
         <div className="filter-inline">
           <input className="app-input" placeholder="Buscar por auto, descricao ou local" value={search} onChange={(e) => setSearch(e.target.value)} />
-          <SearchableSelect value={vehicleFilter} onChange={setVehicleFilter} options={[{ value: '', label: 'Todos os veiculos' }, ...vehicles.map((v) => ({ value: v.id, label: `${v.plate} - ${v.brand} ${v.model}` }))]} placeholder="Filtrar veiculo" searchPlaceholder="Buscar veiculo" />
+          <SearchableSelect
+            value={vehicleFilter}
+            onChange={setVehicleFilter}
+            options={[{ value: '', label: 'Todos os veiculos' }, ...vehicles.map(vehicleOption)]}
+            placeholder="Filtrar veiculo"
+            searchPlaceholder="Buscar veiculo"
+          />
           <select className="app-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>{statusOptions.map((o) => <option key={o} value={o}>{o}</option>)}</select>
         </div>
       </div>
@@ -202,8 +231,26 @@ export default function FinesPage() {
 
       <Modal open={isModalOpen} title={editingRecord ? 'Editar multa' : 'Nova multa'} onClose={() => setIsModalOpen(false)}>
         <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
-          <div className="form-field"><label>Veiculo</label><select className="app-select" value={form.vehicle_id} onChange={(e) => setForm({ ...form, vehicle_id: e.target.value })} required><option value="">Selecione</option>{vehicles.map((v) => <option key={v.id} value={v.id}>{v.plate} - {v.brand} {v.model}</option>)}</select></div>
-          <div className="form-field"><label>Condutor</label><select className="app-select" value={form.driver_id} onChange={(e) => setForm({ ...form, driver_id: e.target.value })}><option value="">Nao informado</option>{drivers.map((d) => <option key={d.id} value={d.id}>{d.nome_completo}</option>)}</select></div>
+          <div className="form-field">
+            <label>Veiculo</label>
+            <SearchableSelect
+              value={form.vehicle_id}
+              onChange={(value) => setForm({ ...form, vehicle_id: value })}
+              options={vehicles.map(vehicleOption)}
+              placeholder="Selecionar veiculo"
+              searchPlaceholder="Buscar veiculo por placa, marca ou modelo"
+            />
+          </div>
+          <div className="form-field">
+            <label>Condutor</label>
+            <SearchableSelect
+              value={form.driver_id}
+              onChange={(value) => setForm({ ...form, driver_id: value })}
+              options={[{ value: '', label: 'Nao informado' }, ...drivers.map(driverOption)]}
+              placeholder="Selecionar condutor"
+              searchPlaceholder="Buscar condutor por nome ou documento"
+            />
+          </div>
           <div className="form-field"><label>Numero do auto</label><input className="app-input" value={form.ticket_number} onChange={(e) => setForm({ ...form, ticket_number: e.target.value })} required /></div>
           <div className="form-field"><label>Data infracao</label><input type="date" className="app-input" value={form.infraction_date} onChange={(e) => setForm({ ...form, infraction_date: e.target.value })} required /></div>
           <div className="form-field"><label>Vencimento</label><input type="date" className="app-input" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></div>
