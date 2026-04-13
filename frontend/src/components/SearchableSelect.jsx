@@ -68,6 +68,10 @@ export default function SearchableSelect({
     setQuery('')
   }
 
+  function handleWheel(event) {
+    event.stopPropagation()
+  }
+
   return (
     <div ref={rootRef} className={`searchable-select${open ? ' is-open' : ''}${disabled ? ' is-disabled' : ''}`}>
       <button
@@ -102,7 +106,7 @@ export default function SearchableSelect({
             </button>
           ) : null}
 
-          <div className="searchable-select-options">
+          <div className="searchable-select-options" onWheel={handleWheel}>
             {filteredOptions.length === 0 ? (
               <div className="searchable-select-empty">{emptyLabel}</div>
             ) : (

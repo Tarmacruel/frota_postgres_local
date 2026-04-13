@@ -8,6 +8,7 @@ from app.api.routes.audit import router as audit_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.claims import router as claims_router
 from app.api.routes.drivers import router as drivers_router
+from app.api.routes.fines import router as fines_router
 from app.api.routes.maintenance import router as maintenance_router
 from app.api.routes.master_data import router as master_data_router
 from app.api.routes.possession import router as possession_router
@@ -38,6 +39,7 @@ app.include_router(vehicles_router)
 app.include_router(maintenance_router)
 app.include_router(possession_router)
 app.include_router(claims_router)
+app.include_router(fines_router)
 app.include_router(search_router)
 
 
