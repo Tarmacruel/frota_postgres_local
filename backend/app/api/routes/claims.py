@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user, require_admin
+from app.api.deps import get_current_user, require_writer
 from app.db.session import get_db_session
 from app.models.claim import ClaimStatus, ClaimType
 from app.schemas.claim import ClaimCreate, ClaimListResponse, ClaimOut, ClaimUpdate
@@ -41,7 +41,7 @@ async def get_claim(claim_id: UUID, db: AsyncSession = Depends(get_db_session)):
 async def create_claim(
     data: ClaimCreate,
     db: AsyncSession = Depends(get_db_session),
-    current_user=Depends(require_admin),
+    current_user=Depends(require_writer),
 ):
     return await ClaimService(db).create(data, current_user)
 
@@ -51,6 +51,6 @@ async def update_claim(
     claim_id: UUID,
     data: ClaimUpdate,
     db: AsyncSession = Depends(get_db_session),
-    current_user=Depends(require_admin),
+    current_user=Depends(require_writer),
 ):
     return await ClaimService(db).update(claim_id, data, current_user)

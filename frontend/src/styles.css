@@ -1925,10 +1925,33 @@ button {
 }
 
 .searchable-select-options {
-  max-height: 240px;
-  overflow: auto;
+  max-height: 400px;
+  min-height: 120px;
+  overflow-y: auto;
+  overflow-x: hidden;
   display: grid;
   gap: 6px;
+  padding-right: 8px;
+  scrollbar-width: thin;
+  scrollbar-color: #1e3a5f #e0e0e0;
+}
+
+.searchable-select-options::-webkit-scrollbar {
+  width: 6px;
+}
+
+.searchable-select-options::-webkit-scrollbar-track {
+  background: #e0e0e0;
+  border-radius: 10px;
+}
+
+.searchable-select-options::-webkit-scrollbar-thumb {
+  background: #1e3a5f;
+  border-radius: 10px;
+}
+
+.searchable-select-options::-webkit-scrollbar-thumb:hover {
+  background: #2a527a;
 }
 
 .searchable-select-option {

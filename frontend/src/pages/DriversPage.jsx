@@ -21,8 +21,30 @@ function formatDate(value) {
   return new Date(value).toLocaleDateString('pt-BR')
 }
 
+function getCnhAlert(cnhDate) {
+  if (!cnhDate) return null
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const validade = new Date(cnhDate)
+  validade.setHours(0, 0, 0, 0)
+  const diffDays = Math.floor((validade - today) / (1000 * 60 * 60 * 24))
+  if (diffDays < 0) return { label: 'CNH vencida', tone: 'alert-error' }
+  if (diffDays <= 30) return { label: `Vence em ${diffDays} dias`, tone: 'alert-error' }
+  if (diffDays <= 60) return { label: `Vence em ${diffDays} dias`, tone: 'alert-info' }
+  return null
+}
+
+function getDaysToExpire(cnhDate) {
+  if (!cnhDate) return null
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const validade = new Date(cnhDate)
+  validade.setHours(0, 0, 0, 0)
+  return Math.floor((validade - today) / (1000 * 60 * 60 * 24))
+}
+
 export default function DriversPage() {
-  const { isAdmin } = useAuth()
+  const { canWrite, isAdmin } = useAuth()
   const [records, setRecords] = useState([])
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0, limit: 10 })
   const [search, setSearch] = useState('')
@@ -168,7 +190,7 @@ export default function DriversPage() {
           <p className="section-copy">Mantenha a base reutilizavel de condutores para posse, busca e futuros modulos operacionais.</p>
         </div>
         <div className="actions-inline">
-          {isAdmin ? <button className="app-button" type="button" onClick={openCreateModal}>Novo condutor</button> : null}
+          {canWrite ? <button className="app-button" type="button" onClick={openCreateModal}>Novo condutor</button> : null}
           <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Previsualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
@@ -194,6 +216,24 @@ export default function DriversPage() {
           <strong>{pagination.total}</strong>
           <span>condutores no filtro</span>
         </div>
+        <div className="metric-inline">
+          <strong>{records.filter((item) => getCnhAlert(item.cnh_validade)?.label === 'CNH vencida').length}</strong>
+          <span>CNHs vencidas</span>
+        </div>
+        <div className="metric-inline">
+          <strong>{records.filter((item) => {
+            const days = getDaysToExpire(item.cnh_validade)
+            return days !== null && days >= 0 && days <= 30
+          }).length}</strong>
+          <span>CNHs em até 30 dias</span>
+        </div>
+        <div className="metric-inline">
+          <strong>{records.filter((item) => {
+            const days = getDaysToExpire(item.cnh_validade)
+            return days !== null && days > 30 && days <= 60
+          }).length}</strong>
+          <span>CNHs em até 60 dias</span>
+        </div>
       </div>
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
@@ -209,34 +249,41 @@ export default function DriversPage() {
                 <th>Contato</th>
                 <th>E-mail</th>
                 <th>CNH</th>
+                <th>Alerta CNH</th>
                 <th>Status</th>
-                {isAdmin ? <th>Acoes</th> : null}
+                {canWrite ? <th>Acoes</th> : null}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={isAdmin ? 7 : 6} className="muted">Carregando condutores...</td></tr>
+                <tr><td colSpan={canWrite ? 8 : 7} className="muted">Carregando condutores...</td></tr>
               ) : !records.length ? (
-                <tr><td colSpan={isAdmin ? 7 : 6}><div className="empty-state">Nenhum condutor encontrado para o filtro atual.</div></td></tr>
+                <tr><td colSpan={canWrite ? 8 : 7}><div className="empty-state">Nenhum condutor encontrado para o filtro atual.</div></td></tr>
               ) : (
-                records.map((record) => (
+                records.map((record) => {
+                  const cnhAlert = getCnhAlert(record.cnh_validade)
+                  return (
                   <tr key={record.id}>
                     <td data-label="Nome"><strong>{record.nome_completo}</strong></td>
                     <td data-label="Documento">{record.documento}</td>
                     <td data-label="Contato">{record.contato || '-'}</td>
                     <td data-label="E-mail">{record.email || '-'}</td>
                     <td data-label="CNH">{record.cnh_categoria} {record.cnh_validade ? `| validade ${formatDate(record.cnh_validade)}` : ''}</td>
+                    <td data-label="Alerta CNH">
+                      {cnhAlert ? <span className={`alert ${cnhAlert.tone}`}>{cnhAlert.label}</span> : '-'}
+                    </td>
                     <td data-label="Status"><span className={`status-badge ${record.ativo ? 'status-ATIVO' : 'status-INATIVO'}`}>{record.ativo ? 'ATIVO' : 'INATIVO'}</span></td>
-                    {isAdmin ? (
+                    {canWrite ? (
                       <td data-label="Acoes">
                         <div className="actions-inline">
                           <button type="button" className="mini-button" onClick={() => openEditModal(record)}>Editar</button>
-                          {record.ativo ? <button type="button" className="mini-button danger" onClick={() => handleDeactivate(record)}>Inativar</button> : null}
+                          {isAdmin && record.ativo ? <button type="button" className="mini-button danger" onClick={() => handleDeactivate(record)}>Inativar</button> : null}
                         </div>
                       </td>
                     ) : null}
                   </tr>
-                ))
+                  )
+                })
               )}
             </tbody>
           </table>
