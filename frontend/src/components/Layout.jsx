@@ -110,7 +110,7 @@ export default function Layout() {
     navigate('/login')
   }
 
-  async function handlePasswordChange(event) {
+    async function handlePasswordChange(event) {
     event.preventDefault()
     setPasswordFeedback('')
     try {
@@ -240,7 +240,7 @@ export default function Layout() {
           </NavLink>
         ))}
       </nav>
-
+      
       <Modal open={passwordModalOpen} title="Alterar senha" description="Defina uma nova senha para seu acesso." onClose={() => setPasswordModalOpen(false)}>
         <form onSubmit={handlePasswordChange} className="stack">
           <input className="app-input" type="password" placeholder="Senha atual" value={passwordForm.current_password} onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })} required />
