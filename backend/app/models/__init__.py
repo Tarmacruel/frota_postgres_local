@@ -1,6 +1,7 @@
 from app.models.audit_log import AuditLog
 from app.models.claim import Claim, ClaimStatus, ClaimType
 from app.models.driver import Driver, DriverLicenseCategory
+from app.models.fine import Fine, FineStatus
 from app.models.master_data import Allocation, Department, Organization
 from app.models.user import User, UserRole
 from app.models.vehicle import Vehicle, VehicleOwnershipType, VehicleStatus
@@ -16,6 +17,8 @@ __all__ = [
     "ClaimType",
     "Driver",
     "DriverLicenseCategory",
+    "Fine",
+    "FineStatus",
     "Organization",
     "Department",
     "Allocation",
