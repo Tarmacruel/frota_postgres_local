@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user, require_admin
+from app.api.deps import get_current_user, require_admin, require_writer
 from app.db.session import get_db_session
 from app.schemas.auth import MessageOut
 from app.schemas.driver import DriverCreate, DriverListResponse, DriverOut, DriverUpdate
@@ -41,7 +41,7 @@ async def get_driver(driver_id: UUID, db: AsyncSession = Depends(get_db_session)
 async def create_driver(
     data: DriverCreate,
     db: AsyncSession = Depends(get_db_session),
-    current_user=Depends(require_admin),
+    current_user=Depends(require_writer),
 ):
     return await DriverService(db).create(data, current_user)
 
@@ -51,7 +51,7 @@ async def update_driver(
     driver_id: UUID,
     data: DriverUpdate,
     db: AsyncSession = Depends(get_db_session),
-    current_user=Depends(require_admin),
+    current_user=Depends(require_writer),
 ):
     return await DriverService(db).update(driver_id, data, current_user)
 

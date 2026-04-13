@@ -42,3 +42,4 @@ class Vehicle(Base):
     maintenances: Mapped[list["MaintenanceRecord"]] = relationship(back_populates="vehicle", passive_deletes=True)
     possessions: Mapped[list["VehiclePossession"]] = relationship(back_populates="vehicle", passive_deletes=True)
     claims: Mapped[list["Claim"]] = relationship(back_populates="vehicle", passive_deletes=True)
+    fines: Mapped[list["Fine"]] = relationship(back_populates="vehicle", passive_deletes=True)
