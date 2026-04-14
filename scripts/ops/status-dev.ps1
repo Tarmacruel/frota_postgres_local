@@ -14,7 +14,7 @@ $pidFromFile = Get-ProcessIdFromFile -Path $paths.AppPidFile
 $pidAlive = $false
 
 if ($pidFromFile) {
-    $pidAlive = Test-ProcessAlive -Pid $pidFromFile
+    $pidAlive = Test-ProcessAlive -ProcessId $pidFromFile
 }
 
 $portOwner = Get-PortOwnerPid -Port $Port
