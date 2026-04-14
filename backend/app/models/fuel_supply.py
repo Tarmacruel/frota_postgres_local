@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from datetime import datetime
-from typing import Optional
 from uuid import UUID
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
@@ -21,8 +20,10 @@ class FuelSupply(Base):
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     vehicle_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False)
-    driver_id = mapped_column(PGUUID(as_uuid=True), ForeignKey("drivers.id", ondelete="SET NULL"), nullable=True)
-    organization_id = mapped_column(
+    driver_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("drivers.id", ondelete="SET NULL"), nullable=True
+    )
+    organization_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("master_organizations.id", ondelete="SET NULL"),
         nullable=True,
@@ -30,13 +31,13 @@ class FuelSupply(Base):
     supplied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     odometer_km: Mapped[float] = mapped_column(Float, nullable=False)
     liters: Mapped[float] = mapped_column(Float, nullable=False)
-    total_amount = mapped_column(Numeric(12, 2), nullable=True)
-    fuel_station = mapped_column(String(180), nullable=True)
-    notes = mapped_column(Text, nullable=True)
+    total_amount: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    fuel_station: Mapped[str | None] = mapped_column(String(180), nullable=True)
+    notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
-    consumption_km_l = mapped_column(Float, nullable=True)
+    consumption_km_l: Mapped[float | None] = mapped_column(Float, nullable=True)
     is_consumption_anomaly: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("false"))
-    anomaly_details = mapped_column(Text, nullable=True)
+    anomaly_details: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     receipt_path: Mapped[str] = mapped_column(String(255), nullable=False)
     receipt_mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
@@ -47,5 +48,5 @@ class FuelSupply(Base):
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
 
     vehicle: Mapped["Vehicle"] = relationship(back_populates="fuel_supplies")
-    driver = relationship(back_populates="fuel_supplies")
-    organization = relationship()
+    driver: Mapped["Driver | None"] = relationship(back_populates="fuel_supplies")
+    organization: Mapped["Organization | None"] = relationship()
