@@ -15,6 +15,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Convert-Path (Split-Path -Parent $PSScriptRoot)
 $backendDir = Convert-Path (Join-Path $repoRoot "backend")
 $frontendDir = Convert-Path (Join-Path $repoRoot "frontend")
+$frontendIndex = Join-Path $frontendDir "dist\\index.html"
 $postgresBootstrapScript = Convert-Path (Join-Path $repoRoot "scripts\start_local_postgres.ps1")
 $venvDir = Join-Path $backendDir ".venv"
 $pythonExe = Join-Path $venvDir "Scripts\\python.exe"
@@ -99,6 +100,10 @@ if ($BuildFrontend) {
     finally {
         Pop-Location
     }
+}
+
+if ($Production -and -not (Test-Path -LiteralPath $frontendIndex)) {
+    throw "Build do frontend não encontrado em '$frontendIndex'. Execute o fluxo de publicação com build habilitado."
 }
 
 if (-not $SkipLocalPostgres) {

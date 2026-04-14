@@ -38,7 +38,7 @@ function Invoke-Action {
             & (Join-Path $opsRoot "start-dev.ps1") -Port $Port -BuildFrontend:$BuildFrontend -SeedDemoData:$SeedDemoData
         }
         "Publish" {
-            & (Join-Path $opsRoot "start-dev.ps1") -Port 80 -AppHost "127.0.0.1" -Production -BuildFrontend:$BuildFrontend -SeedDemoData:$SeedDemoData
+            & (Join-Path $opsRoot "start-dev.ps1") -Port 80 -AppHost "127.0.0.1" -Production -BuildFrontend -SeedDemoData:$SeedDemoData
         }
         "Stop" {
             & (Join-Path $opsRoot "stop-dev.ps1") -Port $Port
