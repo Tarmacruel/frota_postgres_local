@@ -68,8 +68,10 @@ Esse fluxo:
 
 - usa o mesmo PostgreSQL local do host
 - builda o frontend
-- sobe a aplicacao na porta `80`
-- faz bind em `127.0.0.1` para compatibilidade com tunnel Cloudflare
+- sobe o **frontend** na porta `80` (Vite com proxy interno)
+- sobe a **API backend** separadamente na porta `8000`
+- faz bind do frontend em `127.0.0.1` para compatibilidade com tunnel Cloudflare
+- configura proxy do frontend para `/api` -> `http://127.0.0.1:8000`
 - ativa configuracao de producao (em loopback, `COOKIE_SECURE=false` para permitir login via HTTP local)
 - ajusta CORS automaticamente (loopback + domínio institucional quando em `127.0.0.1`)
 
