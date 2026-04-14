@@ -34,6 +34,8 @@ class VehiclePossession(Base):
     start_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
     observation: Mapped[str | None] = mapped_column(Text, nullable=True)
+    start_odometer_km: Mapped[float | None] = mapped_column(Float, nullable=True)
+    end_odometer_km: Mapped[float | None] = mapped_column(Float, nullable=True)
     photo_path: Mapped[str | None] = mapped_column(String(255), nullable=True)
     photo_mime_type: Mapped[str | None] = mapped_column(String(100), nullable=True)
     photo_size_bytes: Mapped[int | None] = mapped_column(Integer, nullable=True)

@@ -18,6 +18,7 @@ from app.repositories.possession_repository import PossessionRepository
 from app.repositories.vehicle_repository import VehicleRepository
 from app.schemas.common import PaginatedResponse, build_pagination
 from app.schemas.possession import PossessionAdminUpdate, PossessionCreate, PossessionPhotoCreate, PossessionUpdate
+from app.services.admin_notification_service import AdminNotificationService
 from app.services.audit_service import AuditService
 
 MAX_PHOTO_SIZE_BYTES = 8 * 1024 * 1024
@@ -45,6 +46,7 @@ class PossessionService:
         self.vehicles = VehicleRepository(db)
         self.drivers = DriverRepository(db)
         self.audit = AuditService(db)
+        self.admin_notifications = AdminNotificationService(db)
 
     async def list(self, vehicle_id: UUID | None = None, active: bool | None = None, current_user: User | None = None) -> list[dict]:
         records = await self.possessions.list(vehicle_id=vehicle_id, active=active)
@@ -113,6 +115,24 @@ class PossessionService:
                 detail="Nova posse nao pode iniciar antes da posse ativa atual",
             )
 
+        auto_close_end_odometer = data.start_odometer_km
+        pending_admin_notification_payload: dict | None = None
+        if current_active and data.start_odometer_km is not None:
+            if current_active.end_odometer_km is None:
+                auto_close_end_odometer = data.start_odometer_km
+            else:
+                auto_close_end_odometer = current_active.end_odometer_km
+                gap_km = round(float(data.start_odometer_km - current_active.end_odometer_km), 2)
+                if abs(gap_km) > 0:
+                    pending_admin_notification_payload = {
+                        "vehicle_id": str(data.vehicle_id),
+                        "previous_possession_id": str(current_active.id),
+                        "previous_end_odometer_km": current_active.end_odometer_km,
+                        "new_start_odometer_km": data.start_odometer_km,
+                        "gap_km": gap_km,
+                        "auto_closed_at": effective_start.isoformat(),
+                    }
+
         possession = VehiclePossession(
             vehicle_id=data.vehicle_id,
             driver_id=selected_driver["driver_id"],
@@ -121,6 +141,7 @@ class PossessionService:
             driver_contact=selected_driver["driver_contact"],
             start_date=effective_start,
             observation=data.observation,
+            start_odometer_km=data.start_odometer_km,
             document_name=document_payload["filename"] if document_payload else None,
             document_mime_type=document_payload["mime_type"] if document_payload else None,
             document_size_bytes=document_payload["size_bytes"] if document_payload else None,
@@ -130,7 +151,11 @@ class PossessionService:
         stored_document_path: Path | None = None
         stored_photo_paths: list[Path] = []
         try:
-            await self.possessions.end_active_for_vehicle(data.vehicle_id, effective_start)
+            await self.possessions.end_active_for_vehicle(
+                data.vehicle_id,
+                effective_start,
+                end_odometer_km=auto_close_end_odometer,
+            )
             await self.possessions.create(possession)
 
             if document_payload:
@@ -155,6 +180,8 @@ class PossessionService:
                     "driver_contact": possession.driver_contact,
                     "start_date": possession.start_date.isoformat(),
                     "observation": possession.observation,
+                    "start_odometer_km": possession.start_odometer_km,
+                    "kilometers_driven": self._calculate_kilometers_driven(possession.start_odometer_km, possession.end_odometer_km),
                     "photo_count": len(photo_payloads),
                     "signed_document_attached": bool(document_payload),
                     "signed_document_name": possession.document_name,
@@ -163,6 +190,17 @@ class PossessionService:
                     "capture_accuracy_meters": [payload["capture_accuracy_meters"] for payload in photo_payloads],
                 },
             )
+            if pending_admin_notification_payload:
+                await self.admin_notifications.notify(
+                    title="Divergencia de quilometragem entre posses",
+                    message=(
+                        f"Veiculo {vehicle.plate}: nova posse iniciou em {data.start_odometer_km:.1f} km "
+                        f"e a posse anterior encerrada tinha {current_active.end_odometer_km:.1f} km."
+                    ),
+                    event_type="POSSESSION_ODOMETER_GAP",
+                    severity="WARNING",
+                    payload=pending_admin_notification_payload,
+                )
             await self.db.flush()
             await self.db.commit()
         except IntegrityError as exc:
@@ -201,6 +239,8 @@ class PossessionService:
         possession.end_date = effective_end
         if "observation" in payload:
             possession.observation = payload["observation"]
+        if "end_odometer_km" in payload:
+            possession.end_odometer_km = payload["end_odometer_km"]
 
         try:
             await self.audit.record(
@@ -213,6 +253,8 @@ class PossessionService:
                     "event": "END_POSSESSION",
                     "end_date": possession.end_date.isoformat() if possession.end_date else None,
                     "observation": possession.observation,
+                    "end_odometer_km": possession.end_odometer_km,
+                    "kilometers_driven": self._calculate_kilometers_driven(possession.start_odometer_km, possession.end_odometer_km),
                 },
             )
             await self.db.flush()
@@ -266,6 +308,8 @@ class PossessionService:
             "start_date": possession.start_date.isoformat() if possession.start_date else None,
             "end_date": possession.end_date.isoformat() if possession.end_date else None,
             "observation": possession.observation,
+            "start_odometer_km": possession.start_odometer_km,
+            "end_odometer_km": possession.end_odometer_km,
             "document_name": possession.document_name,
             "photo_count": len(existing_entries),
         }
@@ -277,6 +321,8 @@ class PossessionService:
         possession.start_date = data.start_date
         possession.end_date = data.end_date
         possession.observation = data.observation
+        possession.start_odometer_km = data.start_odometer_km
+        possession.end_odometer_km = data.end_odometer_km
 
         old_document_path = self._resolve_document_path(possession.document_path) if possession.document_path else None
         old_document_path_str = possession.document_path
@@ -305,6 +351,9 @@ class PossessionService:
                 "start_date": possession.start_date.isoformat() if possession.start_date else None,
                 "end_date": possession.end_date.isoformat() if possession.end_date else None,
                 "observation": possession.observation,
+                "start_odometer_km": possession.start_odometer_km,
+                "end_odometer_km": possession.end_odometer_km,
+                "kilometers_driven": self._calculate_kilometers_driven(possession.start_odometer_km, possession.end_odometer_km),
                 "document_name": possession.document_name,
                 "photo_count": len(existing_entries) + len(photo_payloads),
             }
@@ -675,6 +724,9 @@ class PossessionService:
             "start_date": record.start_date,
             "end_date": record.end_date,
             "observation": record.observation,
+            "start_odometer_km": record.start_odometer_km,
+            "end_odometer_km": record.end_odometer_km,
+            "kilometers_driven": self._calculate_kilometers_driven(record.start_odometer_km, record.end_odometer_km),
             "created_at": record.created_at,
             "is_active": record.is_active,
             "photo_available": bool(photos),
@@ -725,6 +777,14 @@ class PossessionService:
             )
 
         return entries
+
+
+    def _calculate_kilometers_driven(self, start_odometer_km: float | None, end_odometer_km: float | None) -> float | None:
+        if start_odometer_km is None or end_odometer_km is None:
+            return None
+        if end_odometer_km < start_odometer_km:
+            return None
+        return round(float(end_odometer_km - start_odometer_km), 2)
 
     def _build_capture_location(
         self,

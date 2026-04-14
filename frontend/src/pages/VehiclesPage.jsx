@@ -17,6 +17,7 @@ const initialForm = {
   chassis_number: '',
   brand: '',
   model: '',
+  vehicle_type: 'SEDAN',
   ownership_type: 'PROPRIO',
   status: 'ATIVO',
   organization_id: '',
@@ -36,6 +37,20 @@ const ownershipOptions = [
   { value: 'PROPRIO', label: 'Proprio' },
   { value: 'LOCADO', label: 'Locado' },
   { value: 'CEDIDO', label: 'Cedido' },
+]
+
+const vehicleTypeOptions = [
+  { value: 'SEDAN', label: 'Sedan' },
+  { value: 'HATCH', label: 'Hatch' },
+  { value: 'PICAPE', label: 'Picape' },
+  { value: 'SUV', label: 'SUV' },
+  { value: 'PERUA_SW', label: 'Perua/SW' },
+  { value: 'VAN', label: 'Van' },
+  { value: 'MICRO_ONIBUS', label: 'Micro-onibus' },
+  { value: 'ONIBUS', label: 'Onibus' },
+  { value: 'CAMINHAO', label: 'Caminhao' },
+  { value: 'MOTOCICLETA', label: 'Motocicleta' },
+  { value: 'MAQUINA', label: 'Maquina' },
 ]
 
 function formatDate(value) {
@@ -78,6 +93,10 @@ function getOwnershipLabel(value) {
   if (value === 'LOCADO') return 'Locado'
   if (value === 'CEDIDO') return 'Cedido'
   return 'Proprio'
+}
+
+function getVehicleTypeLabel(value) {
+  return vehicleTypeOptions.find((option) => option.value === value)?.label || value || 'Nao informado'
 }
 
 function getStatusBadgeColors(value) {
@@ -211,7 +230,8 @@ export default function VehiclesPage() {
     { header: 'Placa', value: (vehicle) => formatPlate(vehicle.plate), align: 'center', width: 66 },
     { header: 'Chassi', value: (vehicle) => formatChassis(vehicle.chassis_number), align: 'center', width: 118 },
     { header: 'Marca / Modelo', value: (vehicle) => `${vehicle.brand}\n${vehicle.model}` },
-    { header: 'Tipo', value: (vehicle) => getOwnershipLabel(vehicle.ownership_type), align: 'center', width: 74, badgeColors: getOwnershipBadgeColors },
+    { header: 'Tipo veiculo', value: (vehicle) => getVehicleTypeLabel(vehicle.vehicle_type), align: 'center', width: 82 },
+    { header: 'Tipo propriedade', value: (vehicle) => getOwnershipLabel(vehicle.ownership_type), align: 'center', width: 74, badgeColors: getOwnershipBadgeColors },
     { header: 'Status', value: (vehicle) => getStatusLabel(vehicle.status), align: 'center', width: 88, badgeColors: getStatusBadgeColors },
     { header: 'Lotacao atual', value: (vehicle) => buildVehicleLocationLabel(vehicle) },
     { header: 'Condutor atual', value: (vehicle) => vehicle.current_driver_name || '—' },
@@ -359,6 +379,7 @@ export default function VehiclesPage() {
       chassis_number: vehicle.chassis_number || '',
       brand: vehicle.brand,
       model: vehicle.model,
+      vehicle_type: vehicle.vehicle_type || 'SEDAN',
       ownership_type: vehicle.ownership_type,
       status: vehicle.status,
       organization_id: vehicle.current_location?.organization_id || '',
@@ -411,6 +432,7 @@ export default function VehiclesPage() {
         chassis_number: form.chassis_number || null,
         brand: form.brand,
         model: form.model,
+        vehicle_type: form.vehicle_type,
         ownership_type: form.ownership_type,
         status: form.status,
       }
@@ -675,7 +697,8 @@ export default function VehiclesPage() {
                 <th>Chassi</th>
                 <th>Marca</th>
                 <th>Modelo</th>
-                <th>Tipo</th>
+                <th>Tipo veiculo</th>
+                <th>Propriedade</th>
                 <th>Status</th>
                 <th>Lotacao atual</th>
                 <th>Condutor atual</th>
@@ -686,11 +709,11 @@ export default function VehiclesPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="10" className="muted">Carregando veiculos...</td>
+                  <td colSpan="11" className="muted">Carregando veiculos...</td>
                 </tr>
               ) : filteredVehicles.length === 0 ? (
                 <tr>
-                  <td colSpan="10">
+                  <td colSpan="11">
                     <div className="empty-state">
                       Nenhum veiculo encontrado para os filtros aplicados. Ajuste a busca, a lotacao ou o tipo para revisar a base completa.
                     </div>
@@ -703,7 +726,8 @@ export default function VehiclesPage() {
                     <td data-label="Chassi">{vehicle.chassis_number || 'Nao informado'}</td>
                     <td data-label="Marca">{vehicle.brand}</td>
                     <td data-label="Modelo">{vehicle.model}</td>
-                    <td data-label="Tipo"><BadgeOwnership value={vehicle.ownership_type} /></td>
+                    <td data-label="Tipo veiculo">{getVehicleTypeLabel(vehicle.vehicle_type)}</td>
+                    <td data-label="Propriedade"><BadgeOwnership value={vehicle.ownership_type} /></td>
                     <td data-label="Status"><span className={`status-badge status-${vehicle.status}`}>{vehicle.status}</span></td>
                     <td data-label="Lotacao atual">{buildVehicleLocationLabel(vehicle)}</td>
                     <td data-label="Condutor atual"><DriverBadge name={vehicle.current_driver_name} /></td>
@@ -802,7 +826,15 @@ export default function VehiclesPage() {
                 <input id="model" className="app-input" placeholder="Ex.: Ranger" value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })} />
               </div>
               <div className="form-field">
-                <label htmlFor="ownership_type">Tipo do veiculo</label>
+                <label htmlFor="vehicle_type">Categoria do veiculo</label>
+                <select id="vehicle_type" className="app-select" value={form.vehicle_type} onChange={(event) => setForm({ ...form, vehicle_type: event.target.value })}>
+                  {vehicleTypeOptions.map((option) => (
+                    <option key={option.value} value={option.value}>{option.label}</option>
+                  ))}
+                </select>
+              </div>
+              <div className="form-field">
+                <label htmlFor="ownership_type">Tipo de propriedade</label>
                 <select id="ownership_type" className="app-select" value={form.ownership_type} onChange={(event) => setForm({ ...form, ownership_type: event.target.value })}>
                   <option value="PROPRIO">Proprio</option>
                   <option value="LOCADO">Locado</option>

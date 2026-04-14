@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field
-from app.models.vehicle import VehicleOwnershipType, VehicleStatus
+from app.models.vehicle import VehicleOwnershipType, VehicleStatus, VehicleType
 from app.schemas.common import PaginatedResponse
 
 
@@ -22,6 +22,7 @@ class VehicleCreate(BaseModel):
     chassis_number: str | None = Field(default=None, min_length=5, max_length=50)
     brand: str = Field(min_length=1, max_length=50)
     model: str = Field(min_length=1, max_length=50)
+    vehicle_type: VehicleType
     ownership_type: VehicleOwnershipType = VehicleOwnershipType.PROPRIO
     status: VehicleStatus = VehicleStatus.ATIVO
     allocation_id: UUID
@@ -32,6 +33,7 @@ class VehicleUpdate(BaseModel):
     chassis_number: str | None = Field(default=None, min_length=5, max_length=50)
     brand: str | None = Field(default=None, min_length=1, max_length=50)
     model: str | None = Field(default=None, min_length=1, max_length=50)
+    vehicle_type: VehicleType | None = None
     ownership_type: VehicleOwnershipType | None = None
     status: VehicleStatus | None = None
     allocation_id: UUID | None = None
@@ -45,6 +47,7 @@ class VehicleOut(BaseModel):
     chassis_number: str | None = None
     brand: str
     model: str
+    vehicle_type: VehicleType
     ownership_type: VehicleOwnershipType
     status: VehicleStatus
     current_department: str | None = None

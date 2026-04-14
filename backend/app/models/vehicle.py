@@ -21,6 +21,20 @@ class VehicleOwnershipType(str, enum.Enum):
     CEDIDO = "CEDIDO"
 
 
+class VehicleType(str, enum.Enum):
+    SEDAN = "SEDAN"
+    HATCH = "HATCH"
+    PICAPE = "PICAPE"
+    SUV = "SUV"
+    PERUA_SW = "PERUA_SW"
+    VAN = "VAN"
+    MICRO_ONIBUS = "MICRO_ONIBUS"
+    ONIBUS = "ONIBUS"
+    CAMINHAO = "CAMINHAO"
+    MOTOCICLETA = "MOTOCICLETA"
+    MAQUINA = "MAQUINA"
+
+
 class Vehicle(Base):
     __tablename__ = "vehicles"
 
@@ -29,6 +43,11 @@ class Vehicle(Base):
     chassis_number: Mapped[str | None] = mapped_column(String(50), nullable=True, unique=True, index=True)
     brand: Mapped[str] = mapped_column(String(50), nullable=False)
     model: Mapped[str] = mapped_column(String(50), nullable=False)
+    vehicle_type: Mapped[VehicleType] = mapped_column(
+        Enum(VehicleType, name="vehicle_type"),
+        nullable=False,
+        default=VehicleType.SEDAN,
+    )
     ownership_type: Mapped[VehicleOwnershipType] = mapped_column(
         Enum(VehicleOwnershipType, name="vehicle_ownership_type"),
         nullable=False,
@@ -43,3 +62,4 @@ class Vehicle(Base):
     possessions: Mapped[list["VehiclePossession"]] = relationship(back_populates="vehicle", passive_deletes=True)
     claims: Mapped[list["Claim"]] = relationship(back_populates="vehicle", passive_deletes=True)
     fines: Mapped[list["Fine"]] = relationship(back_populates="vehicle", passive_deletes=True)
+    fuel_supplies: Mapped[list["FuelSupply"]] = relationship(back_populates="vehicle", passive_deletes=True)
