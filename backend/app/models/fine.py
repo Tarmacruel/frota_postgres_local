@@ -3,6 +3,7 @@ from __future__ import annotations
 import enum
 from datetime import date, datetime
 from decimal import Decimal
+from typing import Optional
 from uuid import UUID
 from sqlalchemy import Date, DateTime, Enum, ForeignKey, Index, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
@@ -27,13 +28,13 @@ class Fine(Base):
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     vehicle_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False)
-    driver_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("drivers.id", ondelete="SET NULL"), nullable=True)
+    driver_id = mapped_column(PGUUID(as_uuid=True), ForeignKey("drivers.id", ondelete="SET NULL"), nullable=True)
     ticket_number: Mapped[str] = mapped_column(String(50), nullable=False)
     infraction_date: Mapped[date] = mapped_column(Date, nullable=False)
-    due_date: Mapped[date | None] = mapped_column(Date, nullable=True)
+    due_date = mapped_column(Date, nullable=True)
     amount: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     description: Mapped[str] = mapped_column(Text, nullable=False)
-    location: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    location = mapped_column(String(200), nullable=True)
     status: Mapped[FineStatus] = mapped_column(Enum(FineStatus, name="fine_status"), nullable=False, server_default=text("'PENDENTE'"))
     created_by: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))

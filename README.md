@@ -34,7 +34,35 @@ Sistema oficial para gestao da frota da Prefeitura Municipal de Teixeira de Frei
 - Admin: `admin@frota.local` / `Admin@1234`
 - Padrao: `padrao@frota.local` / `User@1234`
 
-## Fluxo local recomendado
+## 🚀 Início rápido
+
+### Primeira execução
+
+```powershell
+# 1. Verificar saúde do sistema
+.\Diagnostico.ps1
+
+# 2. Se tudo OK, iniciar em 1 clique
+.\Iniciar_Stack_Dev.bat
+
+# 3. Acessar
+# Frontend:  http://localhost:3001
+# Backend:   http://localhost:8000
+# API Docs:  http://localhost:8000/docs
+```
+
+### Se houver problemas
+
+```powershell
+# Consulte o guia de troubleshooting
+.\TROUBLESHOOTING.md
+
+# Ou inicie manualmente PostgreSQL
+.\Iniciar_PostgreSQL.bat
+# → Escolha opção "1" para aplicar migrations
+```
+
+## 📋 Fluxo local recomendado
 
 Esse e o modo mais leve e mais proximo do SIREL (agora centralizado na **Central Operacional**):
 
@@ -44,15 +72,21 @@ FROTA_Iniciar.bat
 
 Esse atalho abre um menu unico para iniciar, parar, resetar, atualizar, aplicar migrations, backup, logs e status, reduzindo manutencao de scripts duplicados.
 
-Atalhos diretos principais:
+### Atalhos diretos principais:
 
-- `Iniciar_Frota_Local.bat`: inicia ambiente local completo em `http://localhost:8000`
-- `Publicar_Frota_80.bat`: inicia em modo publicacao na porta `80`
-- `Parar_Frota_Local.bat`: encerra a execucao local
-- `FROTA_Atualizar.bat`: executa `git pull --ff-only`, migrations e build frontend
-- `FROTA_Migracoes.bat`: aplica `alembic upgrade heads`
-- `Backup_Frota_Local.bat`: gera backup operacional versionado
-- `Resetar_Frota_Local.bat`: reset completo do banco local e reaplica migrations
+| Script | Funcionalidade |
+|--------|---|
+| `Iniciar_Stack_Dev.bat` | ⚡ **RECOMENDADO** - Inicia backend + frontend |
+| `Iniciar_Dev_Server.bat` | Backend único em `http://localhost:8000` |
+| `Iniciar_Frontend_Dev.bat` | Frontend único em `http://localhost:3001` |
+| `Iniciar_PostgreSQL.bat` | Gerencia PostgreSQL + migrations |
+| `Diagnostico.ps1` | Verifica saúde do sistema |
+| `Publicar_Frota_80.bat` | Modo publicação na porta `80` |
+| `Parar_Frota_Local.bat` | Encerra a execução local |
+| `FROTA_Atualizar.bat` | `git pull`, migrations e build frontend |
+| `FROTA_Migracoes.bat` | Aplica `alembic upgrade heads` |
+| `Backup_Frota_Local.bat` | Backup operacional versionado |
+| `Resetar_Frota_Local.bat` | Reset completo do banco + migrations |
 
 > Se a interface continuar com visual antigo, execute novamente `Iniciar_Frota_Local.bat` para forcar novo build do frontend ou rode `npm run dev` em `frontend` para desenvolvimento em tempo real.
 
@@ -89,19 +123,29 @@ O projeto nao depende mais de Docker.
 O banco padrao roda localmente em:
 
 - Host: `127.0.0.1`
-- Porta: `5434`
+- Porta: `5432`
 - Banco: `frota_db`
-- Usuario: `frota_user`
+- Usuario: `postgres`
+- Senha: `postgres`
+- URL padrao: `postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/frota_db`
 
-Se o cluster ainda nao existir, o script [scripts/start_local_postgres.ps1](/z:/FROTAS/frota_postgres_local/scripts/start_local_postgres.ps1) cria e inicializa tudo automaticamente em `%LOCALAPPDATA%\FrotaPMTF\postgres-data`.
+O script [scripts/start_local_postgres.ps1](/z:/FROTAS/frota_postgres_local/scripts/start_local_postgres.ps1):
+
+- reutiliza um PostgreSQL ja ativo na porta `5432` (ex.: servico Windows),
+- cria role/banco/permissoes quando necessario,
+- e, quando o banco `frota_db` for criado do zero, restaura automaticamente o backup mais recente de `storage/backups/frota-backup-*.zip` (arquivo `database.sql`).
+
+Se o cluster gerenciado local ainda nao existir (modo `%LOCALAPPDATA%\FrotaPMTF\postgres-data`), o script inicializa automaticamente.
 
 ## Acessos
 
 - Aplicacao local: `http://localhost:8000`
+- Frontend (dev): `http://localhost:3001` (ou próximo disponível)
+- API REST: `http://localhost:8000/api`
+- Swagger: `http://localhost:8000/docs`
+- ReDoc: `http://localhost:8000/redoc`
 - Publicacao: `http://frota.sirel.com.br` ou `https://frota.sirel.com.br`
 - Healthcheck: `/api/health`
-- Swagger: `/docs`
-- Redoc: `/redoc`
 
 ## Modo dev separado
 
@@ -120,6 +164,13 @@ Backend isolado:
 ```bash
 cd backend
 .venv\Scripts\uvicorn.exe app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Bootstrap do PostgreSQL (dentro de `backend`, usando wrapper):
+
+```powershell
+cd backend
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_local_postgres.ps1 -Port 5432 -Database frota_db -DbUser postgres -DbPassword postgres -SuperUser postgres -SuperPassword postgres
 ```
 
 ## Areas da aplicacao
@@ -188,6 +239,8 @@ cd backend
 $env:PYTHONPATH = (Get-Location).Path
 .venv\Scripts\python.exe -m pytest tests\test_smoke.py -q
 ```
+uvicorn main:app --host 0.0.0.0 --port 8000 --reload
+
 
 ## Operacao local (passo a passo)
 
@@ -197,11 +250,15 @@ $env:PYTHONPATH = (Get-Location).Path
 cd Z:\FROTAS\frota_postgres_local
 git checkout main
 git pull origin main
-cd backend
-alembic upgrade heads
+Setup_PostgreSQL_Local.bat
 ```
 
-> Quando houver mais de um `head` no Alembic, prefira `alembic upgrade heads` (plural).
+O `Setup_PostgreSQL_Local.bat` agora:
+1. garante o PostgreSQL local em `127.0.0.1:5432`,
+2. configura banco/credenciais,
+3. restaura o backup mais recente se o banco for criado do zero,
+4. aplica `alembic upgrade heads`,
+5. executa `scripts/seed.py`.
 
 ### 2) Build do frontend para publicacao local (porta 80)
 
@@ -271,7 +328,8 @@ Se nao retornar nada, a porta 80 esta livre.
 - `Iniciar_Frota_Local.bat`: sobe stack local e builda frontend.
 - `Publicar_Frota_80.bat`: publica em modo producao na porta 80.
 - `Parar_Frota_Local.bat`: encerra processos locais (8000, 5173 e 80).
-- `Backup_Frota_Local.bat`: gera backup SQL em `%LOCALAPPDATA%\FrotaPMTF\backups`.
+- `Backup_Frota_Local.bat`: gera backup SQL versionado em `storage/backups`.
+- `Setup_PostgreSQL_Local.bat`: garante PostgreSQL local, aplica migrations e seed.
 - `Resetar_Frota_Local.bat`: reseta schema `public` e reaplica migrations.
 
 ## Observacoes

@@ -13,7 +13,7 @@ class LocationHistory(Base):
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     vehicle_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("vehicles.id", ondelete="CASCADE", onupdate="CASCADE"), nullable=False, index=True)
-    allocation_id: Mapped[UUID | None] = mapped_column(
+    allocation_id = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("master_allocations.id", ondelete="RESTRICT", onupdate="CASCADE"),
         nullable=True,
@@ -21,7 +21,7 @@ class LocationHistory(Base):
     )
     department: Mapped[str] = mapped_column(String(255), nullable=False)
     start_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
-    end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_date = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
 
     vehicle: Mapped["Vehicle"] = relationship(back_populates="history")

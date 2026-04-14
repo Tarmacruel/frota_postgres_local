@@ -40,7 +40,7 @@ class Vehicle(Base):
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     plate: Mapped[str] = mapped_column(String(20), nullable=False, unique=True, index=True)
-    chassis_number: Mapped[str | None] = mapped_column(String(50), nullable=True, unique=True, index=True)
+    chassis_number = mapped_column(String(50), nullable=True, unique=True, index=True)
     brand: Mapped[str] = mapped_column(String(50), nullable=False)
     model: Mapped[str] = mapped_column(String(50), nullable=False)
     vehicle_type: Mapped[VehicleType] = mapped_column(

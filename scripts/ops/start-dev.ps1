@@ -16,19 +16,19 @@ $paths = Get-FrotaPaths
 
 $currentPid = Get-ProcessIdFromFile -Path $paths.AppPidFile
 if ($currentPid -and (Test-ProcessAlive -ProcessId $currentPid)) {
-    Write-Host "O Frota já está em execução no PID $currentPid." -ForegroundColor Yellow
+    Write-Host "Frota already running on PID $currentPid." -ForegroundColor Yellow
     exit 0
 }
 
 $portOwner = Get-PortOwnerPid -Port $Port
 if ($portOwner) {
-    throw "A porta $Port já está em uso pelo PID $portOwner."
+    throw "Port $Port is already in use by PID $portOwner."
 }
 
 Remove-IfExists -Path $paths.AppPidFile
 Remove-IfExists -Path $paths.SessionFile
 
-Write-Host "Iniciando ambiente local do Frota..." -ForegroundColor Cyan
+Write-Host "Starting Frota local environment..." -ForegroundColor Cyan
 
 $argumentList = @(
     "-NoProfile"
@@ -77,11 +77,11 @@ while ((Get-Date) -lt $deadline) {
 }
 
 if (-not (Test-ProcessAlive -ProcessId $process.Id)) {
-    throw "O processo do Frota encerrou logo após iniciar. Verifique os logs em storage\logs."
+    throw "Frota process terminated soon after starting. Check logs in storage\logs."
 }
 
 if (-not $portReady) {
-    throw "O processo iniciou (PID $($process.Id)), mas a porta $Port não ficou disponível em ${timeoutSeconds}s. Verifique os logs em storage\logs."
+    throw "Process started (PID $($process.Id)), but port $Port not available in ${timeoutSeconds}s. Check logs in storage\logs."
 }
 
 Write-FrotaSession `
@@ -91,8 +91,8 @@ Write-FrotaSession `
     -SeedDemoData ([bool]$SeedDemoData) `
     -Production ([bool]$Production)
 
-Write-Host "Frota iniciado com sucesso." -ForegroundColor Green
+Write-Host "Frota started successfully." -ForegroundColor Green
 Write-Host "PID: $($process.Id)"
 Write-Host "URL: http://localhost:$Port"
 Write-Host "Log: $($paths.AppLogFile)"
-Write-Host "Erro: $($paths.AppErrLogFile)"
+Write-Host "Error: $($paths.AppErrLogFile)"

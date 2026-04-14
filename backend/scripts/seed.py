@@ -1,9 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import sys
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from sqlalchemy import select
+
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
 from app.core.database import AsyncSessionFactory
 from app.core.security import get_password_hash
 from app.models.claim import Claim, ClaimStatus, ClaimType
@@ -225,7 +232,7 @@ async def seed() -> None:
                         vehicle_id=vehicle_map["DEF-4E56"].id,
                         driver_id=None,
                         data_ocorrencia=datetime.now(timezone.utc) - timedelta(days=2),
-                        tipo=ClaimType.AVERIA,
+                        tipo=ClaimType.AVARIA,
                         descricao="Avaria registrada durante deslocamento para oficina, com dano lateral e necessidade de avaliacao tecnica.",
                         local="Avenida Principal, proximo ao patio municipal",
                         boletim_ocorrencia="BO-2026-001",

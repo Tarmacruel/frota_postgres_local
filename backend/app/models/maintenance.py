@@ -25,9 +25,9 @@ class MaintenanceRecord(Base):
         nullable=False,
     )
     start_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
-    end_date: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    end_date = mapped_column(DateTime(timezone=True), nullable=True)
     service_description: Mapped[str] = mapped_column(Text, nullable=False)
-    parts_replaced: Mapped[str | None] = mapped_column(Text, nullable=True)
+    parts_replaced = mapped_column(Text, nullable=True)
     total_cost: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     created_by: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True),
