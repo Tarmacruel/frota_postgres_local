@@ -1,1 +1,7 @@
-pg_ctl: outro servidor pode estar executando; tentando iniciar o servidor assim mesmo
+Binarios do PostgreSQL 18 nao encontrados em 'C:\Program Files\PostgreSQL\18\bin'.
+No Z:\FROTAS\frota_postgres_local\scripts\start_local_postgres.ps1:19 caractere:5
++     throw "Binarios do PostgreSQL 18 nao encontrados em '$pgBin'."
++     ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    + CategoryInfo          : OperationStopped: (Binarios do Pos...greSQL\18\bin'.:String) [], RuntimeException
+    + FullyQualifiedErrorId : Binarios do PostgreSQL 18 nao encontrados em 'C:\Program Files\PostgreSQL\18\bin'.
+ 

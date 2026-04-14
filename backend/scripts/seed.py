@@ -225,7 +225,7 @@ async def seed() -> None:
                         vehicle_id=vehicle_map["DEF-4E56"].id,
                         driver_id=None,
                         data_ocorrencia=datetime.now(timezone.utc) - timedelta(days=2),
-                        tipo=ClaimType.AVERIA,
+                        tipo=ClaimType.AVARIA,
                         descricao="Avaria registrada durante deslocamento para oficina, com dano lateral e necessidade de avaliacao tecnica.",
                         local="Avenida Principal, proximo ao patio municipal",
                         boletim_ocorrencia="BO-2026-001",
