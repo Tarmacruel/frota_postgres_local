@@ -1,0 +1,10 @@
+﻿{
+    "startedAt":  "2026-04-14T00:27:18",
+    "pid":  36536,
+    "port":  80,
+    "buildFrontend":  true,
+    "seedDemoData":  true,
+    "production":  true,
+    "machine":  "SFI61ADM010",
+    "user":  "078364"
+}
