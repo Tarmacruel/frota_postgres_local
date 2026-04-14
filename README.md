@@ -69,8 +69,9 @@ Esse fluxo:
 - usa o mesmo PostgreSQL local do host
 - builda o frontend
 - sobe a aplicacao na porta `80`
-- ativa configuracao de producao com `COOKIE_SECURE=true`
-- restringe CORS ao subdominio institucional
+- faz bind em `127.0.0.1` para compatibilidade com tunnel Cloudflare
+- ativa configuracao de producao (em loopback, `COOKIE_SECURE=false` para permitir login via HTTP local)
+- ajusta CORS automaticamente (loopback + domínio institucional quando em `127.0.0.1`)
 
 Arquivos de apoio:
 

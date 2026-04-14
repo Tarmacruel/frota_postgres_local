@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [int]$Port = 8000,
+    [string]$AppHost = "0.0.0.0",
     [switch]$Production,
     [switch]$SeedDemoData = $true,
     [switch]$BuildFrontend = $true
@@ -33,6 +34,7 @@ $argumentList = @(
     "-NoProfile"
     "-ExecutionPolicy", "Bypass"
     "-File", "`"$($paths.StartScript)`""
+    "-AppHost", "$AppHost"
     "-Port", "$Port"
 )
 
