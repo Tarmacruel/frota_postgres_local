@@ -66,7 +66,7 @@ export default function FuelSuppliesPage() {
     try {
       setLoading(true)
       setError('')
-      const params = { limit: 200, page: 1 }
+      const params = { limit: 100, page: 1 }
       if (filters.vehicle_id) params.vehicle_id = filters.vehicle_id
       if (filters.driver_id) params.driver_id = filters.driver_id
       if (filters.organization_id) params.organization_id = filters.organization_id
