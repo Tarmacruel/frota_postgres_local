@@ -8,7 +8,7 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$pgBin = "C:\Program Files\PostgreSQL\16\bin"
+$pgBin = "C:\Program Files\PostgreSQL\18\bin"
 $initdbExe = Join-Path $pgBin "initdb.exe"
 $pgCtlExe = Join-Path $pgBin "pg_ctl.exe"
 $psqlExe = Join-Path $pgBin "psql.exe"
@@ -16,7 +16,7 @@ $configPath = Join-Path $DataDir "postgresql.conf"
 $logPath = Join-Path $DataDir "postgres.log"
 
 if (-not (Test-Path $initdbExe) -or -not (Test-Path $pgCtlExe) -or -not (Test-Path $psqlExe)) {
-    throw "Binarios do PostgreSQL 16 nao encontrados em '$pgBin'."
+    throw "Binarios do PostgreSQL 18 nao encontrados em '$pgBin'."
 }
 
 if (-not (Test-Path $DataDir)) {

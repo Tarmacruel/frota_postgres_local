@@ -3,6 +3,7 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 from decimal import Decimal
+from typing import Optional
 from uuid import UUID
 from sqlalchemy import DateTime, Enum, ForeignKey, Index, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
@@ -39,7 +40,7 @@ class Claim(Base):
         ForeignKey("vehicles.id", ondelete="CASCADE"),
         nullable=False,
     )
-    driver_id: Mapped[UUID | None] = mapped_column(
+    driver_id = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("drivers.id", ondelete="SET NULL"),
         nullable=True,
@@ -48,15 +49,15 @@ class Claim(Base):
     tipo: Mapped[ClaimType] = mapped_column(Enum(ClaimType, name="claim_type"), nullable=False)
     descricao: Mapped[str] = mapped_column(Text, nullable=False)
     local: Mapped[str] = mapped_column(String(200), nullable=False)
-    boletim_ocorrencia: Mapped[str | None] = mapped_column(String(50), nullable=True)
-    valor_estimado: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    boletim_ocorrencia = mapped_column(String(50), nullable=True)
+    valor_estimado = mapped_column(Numeric(12, 2), nullable=True)
     status: Mapped[ClaimStatus] = mapped_column(
         Enum(ClaimStatus, name="claim_status"),
         nullable=False,
         server_default=text("'ABERTO'"),
     )
-    justificativa_encerramento: Mapped[str | None] = mapped_column(Text, nullable=True)
-    anexos: Mapped[list[str] | None] = mapped_column(JSONB, nullable=True)
+    justificativa_encerramento = mapped_column(Text, nullable=True)
+    anexos = mapped_column(JSONB, nullable=True)
     created_by: Mapped[UUID] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("users.id", ondelete="RESTRICT"),

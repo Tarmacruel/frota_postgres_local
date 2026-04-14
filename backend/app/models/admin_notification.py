@@ -21,6 +21,6 @@ class AdminNotification(Base):
     message: Mapped[str] = mapped_column(Text, nullable=False)
     event_type: Mapped[str] = mapped_column(String(80), nullable=False)
     severity: Mapped[str] = mapped_column(String(20), nullable=False, server_default=text("'INFO'"))
-    payload: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
-    read_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
+    payload = mapped_column(JSONB, nullable=True)
+    read_at = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))

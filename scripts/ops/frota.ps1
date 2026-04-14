@@ -26,7 +26,7 @@ function Invoke-CheckedCommand {
 
     & $Command
     if ($LASTEXITCODE -ne 0) {
-        throw "$Label falhou com codigo $LASTEXITCODE."
+        throw "$Label failed with exit code $LASTEXITCODE."
     }
 }
 
@@ -60,12 +60,12 @@ function Invoke-Action {
             try {
                 $alembic = Join-Path $repoRoot "backend\.venv\Scripts\alembic.exe"
                 if (-not (Test-Path -LiteralPath $alembic)) {
-                    throw "Alembic não encontrado em '$alembic'. Inicie o ambiente uma vez para criar a venv."
+                    throw "Alembic not found at '$alembic'. Start the environment once to create venv."
                 }
 
-                Write-Host "Aplicando migrations (upgrade heads)..." -ForegroundColor Cyan
+                Write-Host "Applying migrations (upgrade heads)..." -ForegroundColor Cyan
                 Invoke-CheckedCommand -Label "Alembic upgrade heads" -Command { & $alembic upgrade heads }
-                Write-Host "Migrations aplicadas com sucesso." -ForegroundColor Green
+                Write-Host "Migrations applied successfully." -ForegroundColor Green
             }
             finally {
                 Pop-Location
@@ -75,14 +75,14 @@ function Invoke-Action {
             Set-Location $repoRoot
 
             if (-not $SkipGitPull) {
-                Write-Host "Atualizando repositório (git pull --ff-only)..." -ForegroundColor Cyan
+                Write-Host "Updating repository (git pull --ff-only)..." -ForegroundColor Cyan
                 Invoke-CheckedCommand -Label "git pull" -Command { git pull --ff-only }
             }
 
             if ($InstallDeps) {
                 $python = Join-Path $repoRoot "backend\.venv\Scripts\python.exe"
                 if (Test-Path -LiteralPath $python) {
-                    Write-Host "Atualizando dependências Python..." -ForegroundColor Cyan
+                    Write-Host "Updating Python dependencies..." -ForegroundColor Cyan
                     Invoke-CheckedCommand -Label "pip install -r requirements.txt" -Command { & $python -m pip install -r (Join-Path $repoRoot "backend\requirements.txt") }
                 }
             }
@@ -93,10 +93,10 @@ function Invoke-Action {
                 Push-Location (Join-Path $repoRoot "frontend")
                 try {
                     if (-not (Test-Path -LiteralPath "node_modules")) {
-                        Write-Host "Instalando dependências do frontend..." -ForegroundColor Cyan
+                        Write-Host "Installing frontend dependencies..." -ForegroundColor Cyan
                         Invoke-CheckedCommand -Label "npm install" -Command { npm install }
                     }
-                    Write-Host "Gerando build do frontend..." -ForegroundColor Cyan
+                    Write-Host "Building frontend..." -ForegroundColor Cyan
                     Invoke-CheckedCommand -Label "npm run build" -Command { npm run build }
                 }
                 finally {
@@ -104,13 +104,13 @@ function Invoke-Action {
                 }
             }
 
-            Write-Host "Atualização concluída." -ForegroundColor Green
+            Write-Host "Update completed." -ForegroundColor Green
         }
         "FullReset" {
             & (Join-Path $repoRoot "scripts\reset_frota.ps1")
         }
         default {
-            throw "Ação não suportada: $SelectedAction"
+            throw "Unsupported action: $SelectedAction"
         }
     }
 }
@@ -118,22 +118,22 @@ function Invoke-Action {
 function Show-Menu {
     Clear-Host
     Write-Host "===========================================" -ForegroundColor Cyan
-    Write-Host " FROTA - Central Operacional" -ForegroundColor Cyan
+    Write-Host "         FROTA - Operations Center        " -ForegroundColor Cyan
     Write-Host "===========================================" -ForegroundColor Cyan
-    Write-Host "[1] Iniciar local (porta 8000)"
-    Write-Host "[2] Publicar local (porta 80)"
-    Write-Host "[3] Parar ambiente"
-    Write-Host "[4] Reset operacional (app/logs)"
+    Write-Host "[1] Start local (port 8000)"
+    Write-Host "[2] Publish local (port 80)"
+    Write-Host "[3] Stop environment"
+    Write-Host "[4] Reset operational (app/logs)"
     Write-Host "[5] Status"
     Write-Host "[6] Logs"
     Write-Host "[7] Backup"
-    Write-Host "[8] Aplicar migrations"
-    Write-Host "[9] Atualizar (git pull + migrate + build)"
-    Write-Host "[10] Reset completo do banco"
-    Write-Host "[0] Sair"
+    Write-Host "[8] Apply migrations"
+    Write-Host "[9] Update (git pull + migrate + build)"
+    Write-Host "[10] Full database reset"
+    Write-Host "[0] Exit"
     Write-Host ""
 
-    $option = Read-Host "Escolha uma opção"
+    $option = Read-Host "Choose an option"
     $selectedAction = switch ($option) {
         "1" { "Start" }
         "2" { "Publish" }
@@ -150,12 +150,12 @@ function Show-Menu {
     }
 
     if ($selectedAction -eq "Invalid") {
-        Write-Host "Opção inválida." -ForegroundColor Red
+        Write-Host "Invalid option." -ForegroundColor Red
         return $true
     }
 
     if (-not $selectedAction) {
-        Write-Host "Encerrando central operacional." -ForegroundColor Yellow
+        Write-Host "Closing operations center." -ForegroundColor Yellow
         return $false
     }
 
@@ -167,7 +167,7 @@ if ($Action -eq "Menu") {
     $keepRunning = Show-Menu
     if ($keepRunning -and -not $NoPause) {
         Write-Host ""
-        Read-Host "Pressione Enter para fechar"
+        Read-Host "Press Enter to close"
     }
     exit 0
 }
@@ -176,5 +176,5 @@ Invoke-Action -SelectedAction $Action
 
 if (-not $NoPause) {
     Write-Host ""
-    Read-Host "Concluído. Pressione Enter para fechar"
+    Read-Host "Done. Press Enter to close"
 }
