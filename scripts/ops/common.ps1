@@ -61,14 +61,14 @@ function Get-ProcessIdFromFile {
 }
 
 function Test-ProcessAlive {
-    param([int]$Pid)
+    param([int]$ProcessId)
 
-    if (-not $Pid) {
+    if (-not $ProcessId) {
         return $false
     }
 
     try {
-        $null = Get-Process -Id $Pid -ErrorAction Stop
+        $null = Get-Process -Id $ProcessId -ErrorAction Stop
         return $true
     }
     catch {
@@ -101,14 +101,14 @@ function Get-PortOwnerPid {
 }
 
 function Stop-ProcessTreeSafe {
-    param([int]$Pid)
+    param([int]$ProcessId)
 
-    if (-not $Pid) {
+    if (-not $ProcessId) {
         return
     }
 
     try {
-        Stop-Process -Id $Pid -Force -ErrorAction Stop
+        Stop-Process -Id $ProcessId -Force -ErrorAction Stop
     }
     catch {
     }
@@ -116,7 +116,7 @@ function Stop-ProcessTreeSafe {
 
 function Write-FrotaSession {
     param(
-        [int]$Pid,
+        [int]$ProcessId,
         [int]$Port,
         [bool]$BuildFrontend,
         [bool]$SeedDemoData,
@@ -126,7 +126,7 @@ function Write-FrotaSession {
     $paths = Get-FrotaPaths
     $payload = [ordered]@{
         startedAt     = (Get-Date).ToString("s")
-        pid           = $Pid
+        pid           = $ProcessId
         port          = $Port
         buildFrontend = $BuildFrontend
         seedDemoData  = $SeedDemoData
@@ -136,7 +136,7 @@ function Write-FrotaSession {
     } | ConvertTo-Json -Depth 4
 
     Set-Content -LiteralPath $paths.SessionFile -Value $payload -Encoding UTF8
-    Set-Content -LiteralPath $paths.AppPidFile -Value "$Pid" -Encoding ASCII
+    Set-Content -LiteralPath $paths.AppPidFile -Value "$ProcessId" -Encoding ASCII
 }
 
 function Read-FrotaSession {
