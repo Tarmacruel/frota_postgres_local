@@ -23,6 +23,8 @@ $alembicExe = Join-Path $venvDir "Scripts\\alembic.exe"
 $uvicornExe = Join-Path $venvDir "Scripts\\uvicorn.exe"
 $backendEnv = Join-Path $backendDir ".env"
 $backendEnvExample = Join-Path $backendDir ".env.example"
+$backendProductionEnv = Join-Path $backendDir ".env.production"
+$backendProductionEnvExample = Join-Path $backendDir ".env.production.example"
 $pyLauncher = Get-Command py -ErrorAction SilentlyContinue
 $systemPython = Get-Command python -ErrorAction SilentlyContinue
 
@@ -40,8 +42,42 @@ function Invoke-ExternalStep {
     }
 }
 
+function Import-EnvFile {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path)) {
+        return
+    }
+
+    Get-Content -LiteralPath $Path | ForEach-Object {
+        $line = $_.Trim()
+        if (-not $line -or $line.StartsWith("#")) {
+            return
+        }
+
+        $separatorIndex = $line.IndexOf("=")
+        if ($separatorIndex -lt 1) {
+            return
+        }
+
+        $key = $line.Substring(0, $separatorIndex).Trim()
+        $value = $line.Substring($separatorIndex + 1).Trim()
+        [Environment]::SetEnvironmentVariable($key, $value)
+    }
+}
+
 if (-not (Test-Path $backendEnv) -and (Test-Path $backendEnvExample)) {
     Copy-Item $backendEnvExample $backendEnv
+}
+
+Import-EnvFile -Path $backendEnv
+
+if ($Production -and -not (Test-Path $backendProductionEnv) -and (Test-Path $backendProductionEnvExample)) {
+    Copy-Item $backendProductionEnvExample $backendProductionEnv
+}
+
+if ($Production) {
+    Import-EnvFile -Path $backendProductionEnv
 }
 
 if ($Production) {
@@ -88,7 +124,7 @@ if (Test-Path $pythonExe) {
     $uvicornExe = Convert-Path $uvicornExe
 }
 
-if ($BuildFrontend) {
+if ($BuildFrontend -and -not $Production) {
     Push-Location $frontendDir
     try {
         Write-Output "Preparando build do frontend..."
@@ -100,10 +136,6 @@ if ($BuildFrontend) {
     finally {
         Pop-Location
     }
-}
-
-if ($Production -and -not (Test-Path -LiteralPath $frontendIndex)) {
-    throw "Build do frontend não encontrado em '$frontendIndex'. Execute o fluxo de publicação com build habilitado."
 }
 
 if (-not $SkipLocalPostgres) {
@@ -124,6 +156,46 @@ try {
     }
 
     $env:PYTHONPATH = $backendDir
+
+    if ($Production) {
+        $apiHost = "127.0.0.1"
+        $apiPort = 8000
+        $frontendHost = $AppHost
+        $frontendPort = $Port
+        $frontendProcess = $null
+
+        Write-Output "Iniciando backend (API) em ${apiHost}:$apiPort..."
+        $backendArgs = @("app.main:app", "--host", $apiHost, "--port", "$apiPort")
+        $frontendProcess = Start-Process `
+            -FilePath $uvicornExe `
+            -ArgumentList $backendArgs `
+            -WorkingDirectory $backendDir `
+            -PassThru
+
+        try {
+            Push-Location $frontendDir
+            try {
+                if (-not (Test-Path (Join-Path $frontendDir "node_modules"))) {
+                    Invoke-ExternalStep "Instalacao das dependencias do frontend" { npm install }
+                }
+
+                $env:VITE_API_PROXY_TARGET = "http://127.0.0.1:$apiPort"
+                Write-Output "Iniciando frontend em ${frontendHost}:$frontendPort com proxy para API em 127.0.0.1:$apiPort..."
+                & npm run dev -- --host $frontendHost --port $frontendPort --strictPort
+            }
+            finally {
+                Pop-Location
+            }
+        }
+        finally {
+            if ($frontendProcess -and -not $frontendProcess.HasExited) {
+                Stop-Process -Id $frontendProcess.Id -Force -ErrorAction SilentlyContinue
+            }
+        }
+
+        return
+    }
+
     $uvicornArgs = @("app.main:app", "--host", $AppHost, "--port", "$Port")
     if ($Reload) {
         $uvicornArgs += "--reload"

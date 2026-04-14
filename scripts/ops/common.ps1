@@ -107,6 +107,16 @@ function Stop-ProcessTreeSafe {
         return
     }
 
+    $taskkill = Get-Command taskkill.exe -ErrorAction SilentlyContinue
+    if ($taskkill) {
+        try {
+            & $taskkill.Path /PID $ProcessId /T /F | Out-Null
+            return
+        }
+        catch {
+        }
+    }
+
     try {
         Stop-Process -Id $ProcessId -Force -ErrorAction Stop
     }
