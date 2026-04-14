@@ -1,2 +1,4 @@
 @echo off
-powershell -ExecutionPolicy Bypass -File "%~dp0scripts\start_frota.ps1" -BuildFrontend -SeedDemoData -Port 8000
+cd /d "%~dp0"
+powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\ops\frota.ps1" -Action Start -Port 8000
+pause
