@@ -6,7 +6,7 @@ from app.models.fine import Fine, FineStatus
 from app.models.fuel_supply import FuelSupply
 from app.models.master_data import Allocation, Department, Organization
 from app.models.user import User, UserRole
-from app.models.vehicle import Vehicle, VehicleOwnershipType, VehicleStatus
+from app.models.vehicle import Vehicle, VehicleOwnershipType, VehicleStatus, VehicleType
 from app.models.location_history import LocationHistory
 from app.models.maintenance import MaintenanceRecord
 from app.models.possession import VehiclePossession
@@ -31,6 +31,7 @@ __all__ = [
     "Vehicle",
     "VehicleOwnershipType",
     "VehicleStatus",
+    "VehicleType",
     "LocationHistory",
     "MaintenanceRecord",
     "VehiclePossession",

@@ -84,6 +84,7 @@ class VehicleService:
             chassis_number=chassis_number,
             brand=data.brand.strip(),
             model=data.model.strip(),
+            vehicle_type=data.vehicle_type,
             ownership_type=data.ownership_type,
             status=data.status,
         )
@@ -106,6 +107,7 @@ class VehicleService:
                     "chassis_number": vehicle.chassis_number,
                     "brand": vehicle.brand,
                     "model": vehicle.model,
+                    "vehicle_type": vehicle.vehicle_type.value,
                     "ownership_type": vehicle.ownership_type.value,
                     "status": vehicle.status.value,
                     "location": history.department,
@@ -130,6 +132,7 @@ class VehicleService:
             "chassis_number": vehicle.chassis_number,
             "brand": vehicle.brand,
             "model": vehicle.model,
+            "vehicle_type": vehicle.vehicle_type.value,
             "ownership_type": vehicle.ownership_type.value,
             "status": vehicle.status.value,
             "location": previous_active.display_name if previous_active else None,
@@ -156,6 +159,8 @@ class VehicleService:
                 vehicle.brand = data.brand.strip()
             if data.model is not None:
                 vehicle.model = data.model.strip()
+            if data.vehicle_type is not None:
+                vehicle.vehicle_type = data.vehicle_type
             if data.ownership_type is not None:
                 vehicle.ownership_type = data.ownership_type
             if data.status is not None:
@@ -189,6 +194,7 @@ class VehicleService:
                         "chassis_number": vehicle.chassis_number,
                         "brand": vehicle.brand,
                         "model": vehicle.model,
+                        "vehicle_type": vehicle.vehicle_type.value,
                         "ownership_type": vehicle.ownership_type.value,
                         "status": vehicle.status.value,
                         "location": updated_active.display_name if updated_active else None,
@@ -225,6 +231,7 @@ class VehicleService:
                     "chassis_number": vehicle.chassis_number,
                     "brand": vehicle.brand,
                     "model": vehicle.model,
+                    "vehicle_type": vehicle.vehicle_type.value,
                     "ownership_type": vehicle.ownership_type.value,
                     "status": vehicle.status.value,
                     "location": active.display_name if active else None,
@@ -265,6 +272,7 @@ class VehicleService:
             "chassis_number": vehicle.chassis_number,
             "brand": vehicle.brand,
             "model": vehicle.model,
+            "vehicle_type": vehicle.vehicle_type,
             "ownership_type": vehicle.ownership_type,
             "status": vehicle.status,
             "current_department": current_location["display_name"] if current_location else None,
