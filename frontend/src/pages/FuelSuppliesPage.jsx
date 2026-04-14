@@ -24,6 +24,12 @@ function buildVehicleOption(vehicle) {
   return { value: vehicle.id, label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`, description: locationLabel }
 }
 
+function asArray(payload) {
+  if (Array.isArray(payload)) return payload
+  if (payload && Array.isArray(payload.data)) return payload.data
+  return []
+}
+
 export default function FuelSuppliesPage() {
   const { canWrite } = useAuth()
   const [records, setRecords] = useState([])
@@ -46,9 +52,9 @@ export default function FuelSuppliesPage() {
           api.get('/drivers'),
           masterDataAPI.listOrganizations(),
         ])
-        setVehicles(vehiclesResponse.data)
-        setDrivers(driversResponse.data)
-        setOrganizations(organizationsResponse.data)
+        setVehicles(asArray(vehiclesResponse.data))
+        setDrivers(asArray(driversResponse.data))
+        setOrganizations(asArray(organizationsResponse.data))
       } catch (err) {
         setError(getApiErrorMessage(err, 'Nao foi possivel carregar os cadastros de apoio.'))
       }
