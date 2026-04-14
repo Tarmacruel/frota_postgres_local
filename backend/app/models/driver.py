@@ -43,3 +43,4 @@ class Driver(Base):
     possessions: Mapped[list["VehiclePossession"]] = relationship(back_populates="driver")
     claims: Mapped[list["Claim"]] = relationship(back_populates="driver")
     fines: Mapped[list["Fine"]] = relationship(back_populates="driver")
+    fuel_supplies: Mapped[list["FuelSupply"]] = relationship(back_populates="driver")
