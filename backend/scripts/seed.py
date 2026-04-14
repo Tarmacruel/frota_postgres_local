@@ -1,9 +1,16 @@
 from __future__ import annotations
 
 import asyncio
+import sys
+from pathlib import Path
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from sqlalchemy import select
+
+BACKEND_DIR = Path(__file__).resolve().parents[1]
+if str(BACKEND_DIR) not in sys.path:
+    sys.path.insert(0, str(BACKEND_DIR))
+
 from app.core.database import AsyncSessionFactory
 from app.core.security import get_password_hash
 from app.models.claim import Claim, ClaimStatus, ClaimType
