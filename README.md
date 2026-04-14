@@ -111,6 +111,8 @@ npm install
 npm run dev
 ```
 
+> Se o backend estiver em outra porta (ex.: `80` no publish), crie `frontend/.env.local` com `VITE_API_PROXY_TARGET=http://127.0.0.1:80` antes de rodar `npm run dev`.
+
 Backend isolado:
 
 ```bash
