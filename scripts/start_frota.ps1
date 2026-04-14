@@ -15,6 +15,7 @@ $ErrorActionPreference = "Stop"
 $repoRoot = Convert-Path (Split-Path -Parent $PSScriptRoot)
 $backendDir = Convert-Path (Join-Path $repoRoot "backend")
 $frontendDir = Convert-Path (Join-Path $repoRoot "frontend")
+$frontendIndex = Join-Path $frontendDir "dist\\index.html"
 $postgresBootstrapScript = Convert-Path (Join-Path $repoRoot "scripts\start_local_postgres.ps1")
 $venvDir = Join-Path $backendDir ".venv"
 $pythonExe = Join-Path $venvDir "Scripts\\python.exe"
@@ -44,9 +45,15 @@ if (-not (Test-Path $backendEnv) -and (Test-Path $backendEnvExample)) {
 }
 
 if ($Production) {
+    $isLoopbackHost = $AppHost -eq "127.0.0.1" -or $AppHost -eq "localhost"
     $env:APP_ENV = "production"
-    $env:COOKIE_SECURE = "true"
-    $env:CORS_ORIGINS = "[`"https://frota.sirel.com.br`",`"http://frota.sirel.com.br`"]"
+    $env:COOKIE_SECURE = if ($isLoopbackHost) { "false" } else { "true" }
+    $env:CORS_ORIGINS = if ($isLoopbackHost) {
+        "[`"http://127.0.0.1`",`"http://127.0.0.1:80`",`"http://localhost`",`"http://localhost:80`",`"https://frota.sirel.com.br`",`"http://frota.sirel.com.br`"]"
+    }
+    else {
+        "[`"https://frota.sirel.com.br`",`"http://frota.sirel.com.br`"]"
+    }
 }
 
 if (-not (Test-Path $pythonExe)) {
@@ -95,6 +102,10 @@ if ($BuildFrontend) {
     }
 }
 
+if ($Production -and -not (Test-Path -LiteralPath $frontendIndex)) {
+    throw "Build do frontend não encontrado em '$frontendIndex'. Execute o fluxo de publicação com build habilitado."
+}
+
 if (-not $SkipLocalPostgres) {
     Write-Output "Garantindo PostgreSQL local..."
     Invoke-ExternalStep "Inicializacao do PostgreSQL local" { & $postgresBootstrapScript }
@@ -104,18 +115,7 @@ Push-Location $backendDir
 try {
     if (-not $SkipMigrate) {
         Write-Output "Aplicando migracoes do banco..."
-        try {
-            Invoke-ExternalStep "Migracoes do banco" { & $alembicExe upgrade head }
-        }
-        catch {
-            if ($_.Exception.Message -like "*Multiple head revisions are present*") {
-                Write-Warning "Multiplos heads detectados no Alembic. Aplicando todas as heads automaticamente..."
-                Invoke-ExternalStep "Migracoes do banco (heads)" { & $alembicExe upgrade heads }
-            }
-            else {
-                throw
-            }
-        }
+        Invoke-ExternalStep "Migracoes do banco" { & $alembicExe upgrade heads }
     }
 
     if ($SeedDemoData) {

@@ -36,28 +36,23 @@ Sistema oficial para gestao da frota da Prefeitura Municipal de Teixeira de Frei
 
 ## Fluxo local recomendado
 
-Esse e o modo mais leve e mais proximo do SIREL:
+Esse e o modo mais leve e mais proximo do SIREL (agora centralizado na **Central Operacional**):
 
 ```bat
-Iniciar_Frota_Local.bat
+FROTA_Iniciar.bat
 ```
 
-Esse atalho:
+Esse atalho abre um menu unico para iniciar, parar, resetar, atualizar, aplicar migrations, backup, logs e status, reduzindo manutencao de scripts duplicados.
 
-- cria o `backend\.venv` quando necessario
-- instala dependencias Python
-- sobe um PostgreSQL local em `127.0.0.1:5434`
-- instala dependencias do frontend quando necessario
-- builda o frontend
-- aplica migrations
-- executa seed demo
-- sobe o FastAPI servindo a aplicacao completa em `http://localhost:8000`
+Atalhos diretos principais:
 
-Atalhos adicionais:
-
-- `Parar_Frota_Local.bat`: encerra processos nas portas locais da aplicacao (`8000`, `5173`, `80`)
-- `Backup_Frota_Local.bat`: gera backup SQL em `%LOCALAPPDATA%\\FrotaPMTF\\backups`
-- `Resetar_Frota_Local.bat`: recria `public` no banco local e reaplica migrations
+- `Iniciar_Frota_Local.bat`: inicia ambiente local completo em `http://localhost:8000`
+- `Publicar_Frota_80.bat`: inicia em modo publicacao na porta `80`
+- `Parar_Frota_Local.bat`: encerra a execucao local
+- `FROTA_Atualizar.bat`: executa `git pull --ff-only`, migrations e build frontend
+- `FROTA_Migracoes.bat`: aplica `alembic upgrade heads`
+- `Backup_Frota_Local.bat`: gera backup operacional versionado
+- `Resetar_Frota_Local.bat`: reset completo do banco local e reaplica migrations
 
 > Se a interface continuar com visual antigo, execute novamente `Iniciar_Frota_Local.bat` para forcar novo build do frontend ou rode `npm run dev` em `frontend` para desenvolvimento em tempo real.
 
@@ -74,8 +69,9 @@ Esse fluxo:
 - usa o mesmo PostgreSQL local do host
 - builda o frontend
 - sobe a aplicacao na porta `80`
-- ativa configuracao de producao com `COOKIE_SECURE=true`
-- restringe CORS ao subdominio institucional
+- faz bind em `127.0.0.1` para compatibilidade com tunnel Cloudflare
+- ativa configuracao de producao (em loopback, `COOKIE_SECURE=false` para permitir login via HTTP local)
+- ajusta CORS automaticamente (loopback + domínio institucional quando em `127.0.0.1`)
 
 Arquivos de apoio:
 
@@ -114,6 +110,8 @@ cd frontend
 npm install
 npm run dev
 ```
+
+> Se o backend estiver em outra porta (ex.: `80` no publish), crie `frontend/.env.local` com `VITE_API_PROXY_TARGET=http://127.0.0.1:80` antes de rodar `npm run dev`.
 
 Backend isolado:
 

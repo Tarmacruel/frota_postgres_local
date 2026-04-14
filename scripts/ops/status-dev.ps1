@@ -12,12 +12,17 @@ $paths = Get-FrotaPaths
 $session = Read-FrotaSession
 $pidFromFile = Get-ProcessIdFromFile -Path $paths.AppPidFile
 $pidAlive = $false
+$effectivePort = $Port
 
 if ($pidFromFile) {
-    $pidAlive = Test-ProcessAlive -Pid $pidFromFile
+    $pidAlive = Test-ProcessAlive -ProcessId $pidFromFile
 }
 
-$portOwner = Get-PortOwnerPid -Port $Port
+if ($session -and $session.port) {
+    $effectivePort = [int]$session.port
+}
+
+$portOwner = Get-PortOwnerPid -Port $effectivePort
 
 Write-Host "===========================================" -ForegroundColor Cyan
 Write-Host " FROTA - Status Operacional Local" -ForegroundColor Cyan
@@ -36,7 +41,11 @@ else {
 }
 
 Write-Host "PID em execução     : $pidAlive"
-Write-Host "Dono da porta $Port  : $portOwner"
+Write-Host "Dono da porta $effectivePort  : $portOwner"
 Write-Host "Log principal       : $($paths.AppLogFile)"
 Write-Host "Log de erro         : $($paths.AppErrLogFile)"
 Write-Host "PID file            : $($paths.AppPidFile)"
+
+if ($session -and -not $pidAlive) {
+    Write-Host "Aviso: sessão registrada, mas processo não está ativo. Confira os logs." -ForegroundColor Yellow
+}
