@@ -52,7 +52,7 @@ def parse_create_form(
 @router.get("", response_model=FuelSupplyListResponse, dependencies=[Depends(get_current_user)])
 async def list_fuel_supplies(
     page: int = Query(default=1, ge=1),
-    limit: int = Query(default=10, ge=1, le=100),
+    limit: int = Query(default=10, ge=1, le=200),
     vehicle_id: UUID | None = Query(default=None),
     driver_id: UUID | None = Query(default=None),
     organization_id: UUID | None = Query(default=None),
