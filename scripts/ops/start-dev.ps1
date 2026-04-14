@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [int]$Port = 8000,
+    [string]$AppHost = "0.0.0.0",
     [switch]$Production,
     [switch]$SeedDemoData = $true,
     [switch]$BuildFrontend = $true
@@ -14,7 +15,7 @@ Initialize-FrotaStorage
 $paths = Get-FrotaPaths
 
 $currentPid = Get-ProcessIdFromFile -Path $paths.AppPidFile
-if ($currentPid -and (Test-ProcessAlive -Pid $currentPid)) {
+if ($currentPid -and (Test-ProcessAlive -ProcessId $currentPid)) {
     Write-Host "O Frota já está em execução no PID $currentPid." -ForegroundColor Yellow
     exit 0
 }
@@ -33,6 +34,7 @@ $argumentList = @(
     "-NoProfile"
     "-ExecutionPolicy", "Bypass"
     "-File", "`"$($paths.StartScript)`""
+    "-AppHost", "$AppHost"
     "-Port", "$Port"
 )
 
@@ -58,12 +60,12 @@ $process = Start-Process `
 
 Start-Sleep -Seconds 4
 
-if (-not (Test-ProcessAlive -Pid $process.Id)) {
+if (-not (Test-ProcessAlive -ProcessId $process.Id)) {
     throw "O processo do Frota encerrou logo após iniciar. Verifique os logs em storage\logs."
 }
 
 Write-FrotaSession `
-    -Pid $process.Id `
+    -ProcessId $process.Id `
     -Port $Port `
     -BuildFrontend ([bool]$BuildFrontend) `
     -SeedDemoData ([bool]$SeedDemoData) `

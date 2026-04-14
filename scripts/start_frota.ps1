@@ -44,9 +44,15 @@ if (-not (Test-Path $backendEnv) -and (Test-Path $backendEnvExample)) {
 }
 
 if ($Production) {
+    $isLoopbackHost = $AppHost -eq "127.0.0.1" -or $AppHost -eq "localhost"
     $env:APP_ENV = "production"
-    $env:COOKIE_SECURE = "true"
-    $env:CORS_ORIGINS = "[`"https://frota.sirel.com.br`",`"http://frota.sirel.com.br`"]"
+    $env:COOKIE_SECURE = if ($isLoopbackHost) { "false" } else { "true" }
+    $env:CORS_ORIGINS = if ($isLoopbackHost) {
+        "[`"http://127.0.0.1`",`"http://127.0.0.1:80`",`"http://localhost`",`"http://localhost:80`",`"https://frota.sirel.com.br`",`"http://frota.sirel.com.br`"]"
+    }
+    else {
+        "[`"https://frota.sirel.com.br`",`"http://frota.sirel.com.br`"]"
+    }
 }
 
 if (-not (Test-Path $pythonExe)) {
