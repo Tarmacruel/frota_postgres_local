@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime
+from decimal import Decimal
 from uuid import UUID
 from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
@@ -31,7 +32,7 @@ class FuelSupply(Base):
     supplied_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     odometer_km: Mapped[float] = mapped_column(Float, nullable=False)
     liters: Mapped[float] = mapped_column(Float, nullable=False)
-    total_amount: Mapped[float | None] = mapped_column(Numeric(12, 2), nullable=True)
+    total_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     fuel_station: Mapped[str | None] = mapped_column(String(180), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 

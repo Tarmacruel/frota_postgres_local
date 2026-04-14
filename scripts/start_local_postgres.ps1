@@ -1,6 +1,6 @@
 param(
     [string]$DataDir = "$env:LOCALAPPDATA\FrotaPMTF\postgres-data",
-    [int]$Port = 5434,
+    [int]$Port = 5432,
     [string]$Database = "frota_db",
     [string]$DbUser = "frota_user",
     [string]$DbPassword = "frota_secret"
@@ -8,15 +8,20 @@ param(
 
 $ErrorActionPreference = "Stop"
 
-$pgBin = "C:\Program Files\PostgreSQL\18\bin"
+$pgBinCandidates = @(
+    "C:\Program Files\PostgreSQL\16\bin",
+    "C:\Program Files\PostgreSQL\17\bin",
+    "C:\Program Files\PostgreSQL\18\bin"
+)
+$pgBin = $pgBinCandidates | Where-Object { Test-Path (Join-Path $_ "initdb.exe") } | Select-Object -First 1
 $initdbExe = Join-Path $pgBin "initdb.exe"
 $pgCtlExe = Join-Path $pgBin "pg_ctl.exe"
 $psqlExe = Join-Path $pgBin "psql.exe"
 $configPath = Join-Path $DataDir "postgresql.conf"
 $logPath = Join-Path $DataDir "postgres.log"
 
-if (-not (Test-Path $initdbExe) -or -not (Test-Path $pgCtlExe) -or -not (Test-Path $psqlExe)) {
-    throw "Binarios do PostgreSQL 18 nao encontrados em '$pgBin'."
+if ([string]::IsNullOrWhiteSpace($pgBin) -or -not (Test-Path $initdbExe) -or -not (Test-Path $pgCtlExe) -or -not (Test-Path $psqlExe)) {
+    throw "Binarios do PostgreSQL nao encontrados. Verifique instalacao em 'C:\Program Files\PostgreSQL\<versao>\bin'."
 }
 
 if (-not (Test-Path $DataDir)) {
