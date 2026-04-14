@@ -6,6 +6,7 @@ import { AppIcon, getInitials } from './AppIcon'
 import SearchOverlay from './SearchOverlay'
 import Modal from './Modal'
 import api from '../api/client'
+import { adminNotificationsAPI } from '../api/adminNotifications'
 
 const THEME_STORAGE_KEY = 'frota-theme'
 const SIDEBAR_STORAGE_KEY = 'frota-sidebar-compact'
@@ -27,6 +28,9 @@ export default function Layout() {
   const [passwordModalOpen, setPasswordModalOpen] = useState(false)
   const [passwordForm, setPasswordForm] = useState({ current_password: '', new_password: '', confirm_password: '' })
   const [passwordFeedback, setPasswordFeedback] = useState('')
+  const [notificationsOpen, setNotificationsOpen] = useState(false)
+  const [adminNotifications, setAdminNotifications] = useState([])
+  const [unreadNotifications, setUnreadNotifications] = useState(0)
 
   const navSections = useMemo(() => {
     const sections = [
@@ -46,6 +50,7 @@ export default function Layout() {
           { to: '/manutencoes', label: 'Manutencoes', description: 'Custos, servicos e oficina', icon: 'maintenance' },
           { to: '/sinistros', label: 'Sinistros', description: 'Ocorrencias, BO e prejuizos', icon: 'audit' },
           { to: '/multas', label: 'Multas', description: 'Autos, vencimentos e pagamentos', icon: 'catalog' },
+          { to: '/abastecimentos', label: 'Abastecimentos', description: 'Consumo, comprovantes e alertas', icon: 'maintenance' },
         ],
       },
     ]
@@ -104,6 +109,53 @@ export default function Layout() {
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
   }, [])
+
+
+  useEffect(() => {
+    if (!isAdmin) return
+
+    let mounted = true
+    async function loadUnreadCount() {
+      try {
+        const { data } = await adminNotificationsAPI.unreadCount()
+        if (mounted) {
+          setUnreadNotifications(Number(data.unread || 0))
+        }
+      } catch {
+        if (mounted) setUnreadNotifications(0)
+      }
+    }
+
+    loadUnreadCount()
+    const timer = window.setInterval(loadUnreadCount, 45000)
+    return () => {
+      mounted = false
+      window.clearInterval(timer)
+    }
+  }, [isAdmin])
+
+  async function openNotificationsCenter() {
+    if (!isAdmin) return
+    setNotificationsOpen(true)
+    try {
+      const { data } = await adminNotificationsAPI.list({ limit: 80 })
+      setAdminNotifications(data)
+      const unread = data.filter((item) => !item.read_at).length
+      setUnreadNotifications(unread)
+    } catch {
+      setAdminNotifications([])
+    }
+  }
+
+  async function markNotificationAsRead(notificationId) {
+    try {
+      const { data } = await adminNotificationsAPI.markAsRead(notificationId)
+      setUnreadNotifications(Number(data.unread || 0))
+      setAdminNotifications((current) => current.map((item) => (item.id === notificationId ? { ...item, read_at: new Date().toISOString() } : item)))
+    } catch {
+      return
+    }
+  }
 
   async function handleLogout() {
     await logout()
@@ -221,6 +273,19 @@ export default function Layout() {
               <span className="topbar-search-hint">Ctrl K</span>
             </button>
 
+
+            {isAdmin ? (
+              <button
+                type="button"
+                className="icon-button theme-button"
+                aria-label="Abrir central de notificacoes"
+                title="Central de notificacoes"
+                onClick={openNotificationsCenter}
+              >
+                <AppIcon name="audit" className="app-icon" />
+                {unreadNotifications > 0 ? <span className="badge-counter">{unreadNotifications > 99 ? '99+' : unreadNotifications}</span> : null}
+              </button>
+            ) : null}
             <button type="button" className="icon-button theme-button" aria-label={darkMode ? 'Ativar modo claro' : 'Ativar modo escuro'} title={darkMode ? 'Modo claro' : 'Modo escuro'} onClick={() => setDarkMode((current) => !current)}>
               <AppIcon name={darkMode ? 'sun' : 'moon'} className="app-icon" />
             </button>
@@ -240,6 +305,29 @@ export default function Layout() {
           </NavLink>
         ))}
       </nav>
+
+      <Modal open={notificationsOpen} title="Central de notificacoes" description="Ocorrencias administrativas de divergencia de quilometragem entre posses." onClose={() => setNotificationsOpen(false)}>
+        {!isAdmin ? <div className="alert alert-info">Acesso restrito a administradores.</div> : null}
+        {isAdmin && adminNotifications.length === 0 ? <div className="empty-state">Nenhuma notificacao registrada ate o momento.</div> : null}
+        {isAdmin && adminNotifications.length > 0 ? (
+          <div className="stack" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+            {adminNotifications.map((notification) => (
+              <div key={notification.id} className="surface-panel panel-nested">
+                <div className="stack">
+                  <strong>{notification.title}</strong>
+                  <span>{notification.message}</span>
+                  <span className="muted">{new Date(notification.created_at).toLocaleString('pt-BR')}</span>
+                </div>
+                {!notification.read_at ? (
+                  <div className="actions-inline" style={{ marginTop: 8 }}>
+                    <button className="mini-button" type="button" onClick={() => markNotificationAsRead(notification.id)}>Marcar como lida</button>
+                  </div>
+                ) : <span className="muted">Lida</span>}
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </Modal>
 
       <Modal open={passwordModalOpen} title="Alterar senha" description="Defina uma nova senha para seu acesso." onClose={() => setPasswordModalOpen(false)}>
         <form onSubmit={handlePasswordChange} className="stack">
