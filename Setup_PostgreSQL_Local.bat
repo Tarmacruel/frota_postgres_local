@@ -19,7 +19,11 @@ echo Aplicando migrations ao banco local...
 echo.
 
 echo [0] Garantindo PostgreSQL local em 127.0.0.1:5432...
-powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start_local_postgres.ps1" -Port 5432 -Database frota_db -DbUser frota_user -DbPassword frota_secret
+if "%PG_SUPER_PASSWORD%"=="" (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start_local_postgres.ps1" -Port 5432 -Database frota_db -DbUser postgres -DbPassword postgres -SuperUser postgres -SuperPassword postgres
+) else (
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start_local_postgres.ps1" -Port 5432 -Database frota_db -DbUser postgres -DbPassword postgres -SuperUser postgres -SuperPassword "%PG_SUPER_PASSWORD%"
+)
 if %ERRORLEVEL% neq 0 (
     echo.
     echo [ERRO] Nao foi possivel iniciar/verificar o PostgreSQL local.
@@ -32,7 +36,7 @@ echo.
 cd backend
 
 REM Definir variavel de ambiente para o banco local
-set DATABASE_URL=postgresql+asyncpg://frota_user:frota_secret@127.0.0.1:5432/frota_db
+set DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/frota_db
 
 REM Rodar alembic
 echo [1] Aplicando migrations (alembic upgrade heads)...
