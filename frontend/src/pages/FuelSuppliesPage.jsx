@@ -154,7 +154,7 @@ export default function FuelSuppliesPage() {
             </tbody>
           </table>
         </div>
-        <Pagination page={currentPage} totalPages={totalPages} onChange={setCurrentPage} />
+        <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
       </div>
 
       <Modal open={isModalOpen} onClose={() => setIsModalOpen(false)} title="Novo abastecimento" description="Registre o abastecimento com comprovante obrigatorio.">
