@@ -58,10 +58,30 @@ $process = Start-Process `
     -RedirectStandardError $paths.AppErrLogFile `
     -PassThru
 
-Start-Sleep -Seconds 4
+$timeoutSeconds = if ($BuildFrontend) { 180 } else { 45 }
+$deadline = (Get-Date).AddSeconds($timeoutSeconds)
+$portReady = $false
+
+while ((Get-Date) -lt $deadline) {
+    if (-not (Test-ProcessAlive -ProcessId $process.Id)) {
+        break
+    }
+
+    $portOwner = Get-PortOwnerPid -Port $Port
+    if ($portOwner) {
+        $portReady = $true
+        break
+    }
+
+    Start-Sleep -Seconds 2
+}
 
 if (-not (Test-ProcessAlive -ProcessId $process.Id)) {
     throw "O processo do Frota encerrou logo após iniciar. Verifique os logs em storage\logs."
+}
+
+if (-not $portReady) {
+    throw "O processo iniciou (PID $($process.Id)), mas a porta $Port não ficou disponível em ${timeoutSeconds}s. Verifique os logs em storage\logs."
 }
 
 Write-FrotaSession `
