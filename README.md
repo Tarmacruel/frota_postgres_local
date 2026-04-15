@@ -208,8 +208,7 @@ Arquivos de apoio:
 
 - Ambiente base: [backend/.env.example](/z:/FROTAS/frota_postgres_local/backend/.env.example)
 - Ambiente de producao: [backend/.env.production.example](/z:/FROTAS/frota_postgres_local/backend/.env.production.example)
-- Bootstrap do banco local: [scripts/start_local_postgres.ps1](/z:/FROTAS/frota_postgres_local/scripts/start_local_postgres.ps1)
-- Script principal: [scripts/start_frota.ps1](/z:/FROTAS/frota_postgres_local/scripts/start_frota.ps1)
+- Script principal de execução: [scripts/run-local.ps1](/z:/FROTAS/frota_postgres_local/scripts/run-local.ps1)
 
 ## Banco de dados
 
@@ -224,15 +223,7 @@ O banco padrao roda localmente em:
 - Senha: `frota_secret`
 - URL padrao: `postgresql+asyncpg://frota_user:frota_secret@localhost:5432/frota_db`
 
-> Se sua instalacao usa `postgres` no pgAdmin (como usuario admin), o bootstrap detecta e usa `postgres` automaticamente para criar o banco quando necessario.
-
-O script [scripts/start_local_postgres.ps1](/z:/FROTAS/frota_postgres_local/scripts/start_local_postgres.ps1):
-
-- reutiliza um PostgreSQL ja ativo na porta `5432` (ex.: servico Windows),
-- cria role/banco/permissoes quando necessario,
-- e, quando o banco `frota_db` for criado do zero, restaura automaticamente o backup mais recente de `storage/backups/frota-backup-*.zip` (arquivo `database.sql`).
-
-Se o cluster gerenciado local ainda nao existir (modo `%LOCALAPPDATA%\FrotaPMTF\postgres-data`), o script inicializa automaticamente.
+> Se sua instalacao usa `postgres` no pgAdmin (como usuario admin), execute os comandos SQL do fluxo manual para criar/ajustar `frota_user` e `frota_db`.
 
 ## Acessos
 
@@ -263,11 +254,11 @@ cd backend
 .venv\Scripts\uvicorn.exe app.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
-Bootstrap do PostgreSQL (dentro de `backend`, usando wrapper):
+Banco manual (resumo):
 
 ```powershell
 cd backend
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_local_postgres.ps1 -Port 5432 -Database frota_db -DbUser frota_user -DbPassword frota_secret -SuperUser frota_user
+.venv\Scripts\python.exe -m alembic upgrade heads
 ```
 
 ## Areas da aplicacao
@@ -347,15 +338,12 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 cd Z:\FROTAS\frota_postgres_local
 git checkout main
 git pull origin main
-Setup_PostgreSQL_Local.bat
+cd backend
+.venv\Scripts\python.exe -m alembic upgrade heads
+.venv\Scripts\python.exe scripts/seed.py
 ```
 
-O `Setup_PostgreSQL_Local.bat` agora:
-1. garante o PostgreSQL local em `localhost:5432`,
-2. configura banco/credenciais,
-3. restaura o backup mais recente se o banco for criado do zero,
-4. aplica `alembic upgrade heads`,
-5. executa `scripts/seed.py`.
+Antes das migrations, garanta no pgAdmin/psql que `frota_db` existe e pertence a `frota_user`.
 
 ### 2) Build do frontend para publicacao local (porta 80)
 
@@ -426,7 +414,6 @@ Se nao retornar nada, a porta 80 esta livre.
 - `Publicar_Frota_80.bat`: publica em modo producao na porta 80.
 - `Parar_Frota_Local.bat`: encerra processos locais (8000, 5173 e 80).
 - `Backup_Frota_Local.bat`: gera backup SQL versionado em `storage/backups`.
-- `Setup_PostgreSQL_Local.bat`: garante PostgreSQL local, aplica migrations e seed.
 - `Resetar_Frota_Local.bat`: reseta schema `public` e reaplica migrations.
 
 ## Observacoes
