@@ -12,6 +12,15 @@ const initialOrganizationForm = { id: null, name: '' }
 const initialDepartmentForm = { id: null, organization_id: '', name: '' }
 const initialAllocationForm = { id: null, organization_id: '', department_id: '', name: '' }
 const PAGE_SIZE = 8
+const IMPORT_TEMPLATE_COLUMNS = [
+  { header: 'orgao', value: (row) => row.orgao },
+  { header: 'departamento', value: (row) => row.departamento },
+  { header: 'lotacao', value: (row) => row.lotacao },
+]
+const IMPORT_TEMPLATE_ROWS = [
+  { orgao: 'Secretaria de Saude', departamento: 'Transporte Sanitario', lotacao: 'Garagem Central' },
+  { orgao: 'Secretaria de Educacao', departamento: 'Transporte Escolar', lotacao: 'Garagem Norte' },
+]
 
 export default function CadastrosPage() {
   const { canWrite, canDelete } = useAuth()
@@ -42,26 +51,6 @@ export default function CadastrosPage() {
   const [pendingDelete, setPendingDelete] = useState(null)
   const [bulkDeleting, setBulkDeleting] = useState(false)
   const [selectedOrganizationIds, setSelectedOrganizationIds] = useState([])
-
-  const importTemplateColumns = [
-    { header: 'orgao', value: (row) => row.orgao },
-    { header: 'departamento', value: (row) => row.departamento },
-    { header: 'lotacao', value: (row) => row.lotacao },
-  ]
-  const importTemplateRows = [
-    { orgao: 'Secretaria de Saude', departamento: 'Transporte Sanitario', lotacao: 'Garagem Central' },
-    { orgao: 'Secretaria de Educacao', departamento: 'Transporte Escolar', lotacao: 'Garagem Norte' },
-  ]
-
-  const importTemplateColumns = [
-    { header: 'orgao', value: (row) => row.orgao },
-    { header: 'departamento', value: (row) => row.departamento },
-    { header: 'lotacao', value: (row) => row.lotacao },
-  ]
-  const importTemplateRows = [
-    { orgao: 'Secretaria de Saude', departamento: 'Transporte Sanitario', lotacao: 'Garagem Central' },
-    { orgao: 'Secretaria de Educacao', departamento: 'Transporte Escolar', lotacao: 'Garagem Norte' },
-  ]
 
   const organizationOptions = organizations.map((organization) => ({
     value: organization.id,
@@ -336,7 +325,7 @@ export default function CadastrosPage() {
   async function handleDownloadCsvTemplate() {
     const csvLines = [
       'orgao,departamento,lotacao',
-      ...importTemplateRows.map((row) => [row.orgao, row.departamento, row.lotacao].map((value) => `\"${value}\"`).join(',')),
+      ...IMPORT_TEMPLATE_ROWS.map((row) => [row.orgao, row.departamento, row.lotacao].map((value) => `\"${value}\"`).join(',')),
     ]
     const csvContent = `\uFEFF${csvLines.join('\n')}`
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -353,8 +342,8 @@ export default function CadastrosPage() {
       await exportRowsToXlsx({
         fileName: 'modelo-importacao-cadastros',
         sheetName: 'Modelo de importacao',
-        columns: importTemplateColumns,
-        rows: importTemplateRows,
+        columns: IMPORT_TEMPLATE_COLUMNS,
+        rows: IMPORT_TEMPLATE_ROWS,
         filters: ['Campos obrigatorios: orgao, departamento e lotacao'],
       })
       setFeedback('Modelo XLSX baixado com sucesso.')
