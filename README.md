@@ -36,6 +36,101 @@ Sistema oficial para gestao da frota da Prefeitura Municipal de Teixeira de Frei
 
 ## 🚀 Início rápido
 
+## 🔧 Fluxo manual (sem automações)
+
+Se você preferir não usar os `.bat`/`.ps1`, siga exatamente esta ordem no **Windows PowerShell**.
+
+### 1) Entrar na raiz do projeto
+
+```powershell
+cd Z:\FROTAS\frota_postgres_local
+```
+
+### 2) Garantir que o PostgreSQL 16 está ativo
+
+```powershell
+net start PostgreSQL-x64-16
+```
+
+> Se já estiver iniciado, o Windows retornará mensagem informando que o serviço já está em execução.
+
+### 3) Criar usuário e banco manualmente (psql)
+
+Abra o `psql` como admin (`postgres`) e rode:
+
+```powershell
+"C:\Program Files\PostgreSQL\16\bin\psql.exe" -h localhost -p 5432 -U postgres -d postgres
+```
+
+No prompt do `psql`, execute:
+
+```sql
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM pg_roles WHERE rolname = 'frota_user') THEN
+        CREATE ROLE frota_user LOGIN PASSWORD 'frota_secret';
+    ELSE
+        ALTER ROLE frota_user WITH LOGIN PASSWORD 'frota_secret';
+    END IF;
+END
+$$;
+
+SELECT 'CREATE DATABASE frota_db OWNER frota_user'
+WHERE NOT EXISTS (SELECT FROM pg_database WHERE datname = 'frota_db')\gexec
+
+ALTER DATABASE frota_db OWNER TO frota_user;
+\q
+```
+
+### 4) Configurar ambiente do backend
+
+```powershell
+cd Z:\FROTAS\frota_postgres_local\backend
+copy .env.example .env
+```
+
+Confirme no `.env`:
+
+```env
+DATABASE_URL=postgresql+asyncpg://frota_user:frota_secret@localhost:5432/frota_db
+```
+
+### 5) Instalar dependências e aplicar migrations
+
+```powershell
+cd Z:\FROTAS\frota_postgres_local\backend
+.venv\Scripts\python.exe -m pip install -r requirements.txt
+.venv\Scripts\python.exe -m alembic upgrade heads
+```
+
+### 6) Rodar seed manualmente
+
+```powershell
+cd Z:\FROTAS\frota_postgres_local\backend
+.venv\Scripts\python.exe scripts/seed.py
+```
+
+### 7) Subir backend
+
+```powershell
+cd Z:\FROTAS\frota_postgres_local\backend
+.venv\Scripts\python.exe -m uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+### 8) Subir frontend (novo terminal)
+
+```powershell
+cd Z:\FROTAS\frota_postgres_local\frontend
+npm install
+npm run dev
+```
+
+### 9) Validar acesso
+
+- Backend: `http://localhost:8000`
+- Swagger: `http://localhost:8000/docs`
+- Frontend dev: URL exibida pelo Vite (geralmente `http://localhost:3001` ou `http://localhost:5173`)
+
 ### Primeira execução
 
 ```powershell
@@ -59,7 +154,7 @@ Sistema oficial para gestao da frota da Prefeitura Municipal de Teixeira de Frei
 
 # Ou inicie manualmente PostgreSQL
 .\Iniciar_PostgreSQL.bat
-# → Escolha opção "1" para aplicar migrations
+# → Escolha opção "1" para executar setup completo (DB + migrations + seed)
 ```
 
 ## 📋 Fluxo local recomendado
@@ -104,10 +199,10 @@ Esse fluxo:
 - builda o frontend
 - sobe o **frontend** na porta `80` (Vite com proxy interno)
 - sobe a **API backend** separadamente na porta `8000`
-- faz bind do frontend em `127.0.0.1` para compatibilidade com tunnel Cloudflare
-- configura proxy do frontend para `/api` -> `http://127.0.0.1:8000`
+- faz bind do frontend em `localhost` para compatibilidade com tunnel Cloudflare
+- configura proxy do frontend para `/api` -> `http://localhost:8000`
 - ativa configuracao de producao (em loopback, `COOKIE_SECURE=false` para permitir login via HTTP local)
-- ajusta CORS automaticamente (loopback + domínio institucional quando em `127.0.0.1`)
+- ajusta CORS automaticamente (loopback + domínio institucional quando em `localhost`)
 
 Arquivos de apoio:
 
@@ -122,12 +217,22 @@ O projeto nao depende mais de Docker.
 
 O banco padrao roda localmente em:
 
-- Host: `127.0.0.1`
-- Porta: `5434`
+- Host: `localhost`
+- Porta: `5432`
 - Banco: `frota_db`
 - Usuario: `frota_user`
+- Senha: `frota_secret`
+- URL padrao: `postgresql+asyncpg://frota_user:frota_secret@localhost:5432/frota_db`
 
-Se o cluster ainda nao existir, o script [scripts/start_local_postgres.ps1](/z:/FROTAS/frota_postgres_local/scripts/start_local_postgres.ps1) cria e inicializa tudo automaticamente em `%LOCALAPPDATA%\FrotaPMTF\postgres-data`.
+> Se sua instalacao usa `postgres` no pgAdmin (como usuario admin), o bootstrap detecta e usa `postgres` automaticamente para criar o banco quando necessario.
+
+O script [scripts/start_local_postgres.ps1](/z:/FROTAS/frota_postgres_local/scripts/start_local_postgres.ps1):
+
+- reutiliza um PostgreSQL ja ativo na porta `5432` (ex.: servico Windows),
+- cria role/banco/permissoes quando necessario,
+- e, quando o banco `frota_db` for criado do zero, restaura automaticamente o backup mais recente de `storage/backups/frota-backup-*.zip` (arquivo `database.sql`).
+
+Se o cluster gerenciado local ainda nao existir (modo `%LOCALAPPDATA%\FrotaPMTF\postgres-data`), o script inicializa automaticamente.
 
 ## Acessos
 
@@ -149,13 +254,20 @@ npm install
 npm run dev
 ```
 
-> Se o backend estiver em outra porta (ex.: `80` no publish), crie `frontend/.env.local` com `VITE_API_PROXY_TARGET=http://127.0.0.1:80` antes de rodar `npm run dev`.
+> Se o backend estiver em outra porta (ex.: `80` no publish), crie `frontend/.env.local` com `VITE_API_PROXY_TARGET=http://localhost:80` antes de rodar `npm run dev`.
 
 Backend isolado:
 
 ```bash
 cd backend
 .venv\Scripts\uvicorn.exe app.main:app --host 0.0.0.0 --port 8000 --reload
+```
+
+Bootstrap do PostgreSQL (dentro de `backend`, usando wrapper):
+
+```powershell
+cd backend
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_local_postgres.ps1 -Port 5432 -Database frota_db -DbUser frota_user -DbPassword frota_secret -SuperUser frota_user
 ```
 
 ## Areas da aplicacao
@@ -235,11 +347,15 @@ uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 cd Z:\FROTAS\frota_postgres_local
 git checkout main
 git pull origin main
-cd backend
-alembic upgrade heads
+Setup_PostgreSQL_Local.bat
 ```
 
-> Quando houver mais de um `head` no Alembic, prefira `alembic upgrade heads` (plural).
+O `Setup_PostgreSQL_Local.bat` agora:
+1. garante o PostgreSQL local em `localhost:5432`,
+2. configura banco/credenciais,
+3. restaura o backup mais recente se o banco for criado do zero,
+4. aplica `alembic upgrade heads`,
+5. executa `scripts/seed.py`.
 
 ### 2) Build do frontend para publicacao local (porta 80)
 
@@ -309,7 +425,8 @@ Se nao retornar nada, a porta 80 esta livre.
 - `Iniciar_Frota_Local.bat`: sobe stack local e builda frontend.
 - `Publicar_Frota_80.bat`: publica em modo producao na porta 80.
 - `Parar_Frota_Local.bat`: encerra processos locais (8000, 5173 e 80).
-- `Backup_Frota_Local.bat`: gera backup SQL em `%LOCALAPPDATA%\FrotaPMTF\backups`.
+- `Backup_Frota_Local.bat`: gera backup SQL versionado em `storage/backups`.
+- `Setup_PostgreSQL_Local.bat`: garante PostgreSQL local, aplica migrations e seed.
 - `Resetar_Frota_Local.bat`: reseta schema `public` e reaplica migrations.
 
 ## Observacoes
