@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import SearchableSelect from '../components/SearchableSelect'
 import Pagination from '../components/Pagination'
+import Modal from '../components/Modal'
 import { masterDataAPI } from '../api/masterData'
 import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
@@ -38,6 +39,19 @@ export default function CadastrosPage() {
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [selectedOrganizationIds, setSelectedOrganizationIds] = useState([])
+
+  const importTemplateColumns = [
+    { header: 'orgao', value: (row) => row.orgao },
+    { header: 'departamento', value: (row) => row.departamento },
+    { header: 'lotacao', value: (row) => row.lotacao },
+  ]
+  const importTemplateRows = [
+    { orgao: 'Secretaria de Saude', departamento: 'Transporte Sanitario', lotacao: 'Garagem Central' },
+    { orgao: 'Secretaria de Educacao', departamento: 'Transporte Escolar', lotacao: 'Garagem Norte' },
+  ]
 
   const importTemplateColumns = [
     { header: 'orgao', value: (row) => row.orgao },
@@ -104,6 +118,20 @@ export default function CadastrosPage() {
   const organizationTotalPages = Math.max(1, Math.ceil(filteredOrganizations.length / PAGE_SIZE))
   const departmentTotalPages = Math.max(1, Math.ceil(filteredDepartments.length / PAGE_SIZE))
   const allocationTotalPages = Math.max(1, Math.ceil(filteredAllocations.length / PAGE_SIZE))
+  const allVisibleOrganizationsSelected = paginatedOrganizations.length > 0 && paginatedOrganizations.every((item) => selectedOrganizationIds.includes(item.id))
+
+  const hierarchicalPreview = useMemo(() => organizations.map((organization) => {
+    const organizationDepartments = departments.filter((department) => department.organization_id === organization.id)
+    return {
+      ...organization,
+      departmentCount: organizationDepartments.length,
+      allocationCount: allocations.filter((allocation) => allocation.organization_id === organization.id).length,
+      departments: organizationDepartments.map((department) => ({
+        ...department,
+        allocations: allocations.filter((allocation) => allocation.department_id === department.id),
+      })),
+    }
+  }), [organizations, departments, allocations])
 
   useEffect(() => {
     setOrganizationPage(1)
@@ -128,6 +156,29 @@ export default function CadastrosPage() {
   useEffect(() => {
     if (allocationPage > allocationTotalPages) setAllocationPage(allocationTotalPages)
   }, [allocationPage, allocationTotalPages])
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      const isTypingTarget = ['input', 'textarea'].includes(event.target?.tagName?.toLowerCase())
+      if (isTypingTarget) return
+
+      if (event.ctrlKey && event.key.toLowerCase() === 'n') {
+        event.preventDefault()
+        setActiveTab('organizations')
+        document.getElementById('organization-name')?.focus()
+      }
+
+      if (event.ctrlKey && event.key.toLowerCase() === 'f') {
+        event.preventDefault()
+        if (activeTab === 'organizations') document.getElementById('search-organization-input')?.focus()
+        if (activeTab === 'departments') document.getElementById('search-department-input')?.focus()
+        if (activeTab === 'allocations') document.getElementById('search-allocation-input')?.focus()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [activeTab])
 
   function resetForms() {
     setOrganizationForm(initialOrganizationForm)
@@ -207,8 +258,12 @@ export default function CadastrosPage() {
   }
 
   async function handleDelete(kind, item) {
-    if (!window.confirm(`Excluir ${kind.toLowerCase()} ${item.name}?`)) return
+    setPendingDelete({ kind, item })
+  }
 
+  async function confirmDelete() {
+    if (!pendingDelete) return
+    const { kind, item } = pendingDelete
     try {
       setError('')
       if (kind === 'Orgao') {
@@ -219,10 +274,63 @@ export default function CadastrosPage() {
         await masterDataAPI.removeAllocation(item.id)
       }
       setFeedback(`${kind} removido com sucesso.`)
+      setPendingDelete(null)
       await reload()
     } catch (err) {
       setError(getApiErrorMessage(err, `Nao foi possivel remover ${kind.toLowerCase()}.`))
     }
+  }
+
+  function toggleOrganizationSelection(organizationId) {
+    setSelectedOrganizationIds((current) => (current.includes(organizationId)
+      ? current.filter((id) => id !== organizationId)
+      : [...current, organizationId]))
+  }
+
+  function toggleSelectAllVisibleOrganizations() {
+    setSelectedOrganizationIds((current) => {
+      if (allVisibleOrganizationsSelected) {
+        return current.filter((id) => !paginatedOrganizations.some((organization) => organization.id === id))
+      }
+
+      const merged = new Set(current)
+      paginatedOrganizations.forEach((organization) => merged.add(organization.id))
+      return [...merged]
+    })
+  }
+
+  async function handleBulkDeleteOrganizations() {
+    if (selectedOrganizationIds.length === 0) return
+    setBulkDeleting(true)
+    setError('')
+    try {
+      for (const organizationId of selectedOrganizationIds) {
+        await masterDataAPI.removeOrganization(organizationId)
+      }
+      setSelectedOrganizationIds([])
+      setFeedback('Orgaos selecionados removidos com sucesso.')
+      await reload()
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Nao foi possivel remover todos os orgaos selecionados.'))
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  function handleExportSelectedOrganizations() {
+    if (selectedOrganizationIds.length === 0) return
+    const selectedRows = organizations.filter((organization) => selectedOrganizationIds.includes(organization.id))
+    const csvLines = [
+      'orgao',
+      ...selectedRows.map((row) => `\"${row.name}\"`),
+    ]
+    const blob = new Blob([`\uFEFF${csvLines.join('\n')}`], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = 'orgaos-selecionados.csv'
+    link.click()
+    window.setTimeout(() => URL.revokeObjectURL(link.href), 3000)
+    setFeedback('Exportacao dos orgaos selecionados concluida.')
   }
 
   async function handleDownloadCsvTemplate() {
@@ -284,6 +392,37 @@ export default function CadastrosPage() {
         </div>
       </div>
 
+      <section className="surface-panel panel-nested" style={{ marginBottom: 16 }}>
+        <div className="panel-heading">
+          <div>
+            <h3 className="section-title">Estrutura organizacional (preview)</h3>
+            <p className="section-copy">Visao resumida de relacionamento entre orgaos, departamentos e lotacoes.</p>
+          </div>
+        </div>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Orgao</th>
+                <th>Departamentos</th>
+                <th>Lotacoes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {hierarchicalPreview.length === 0 ? (
+                <tr><td colSpan={3}><div className="empty-state">Sem dados para exibir a hierarquia.</div></td></tr>
+              ) : hierarchicalPreview.map((organization) => (
+                <tr key={`preview-${organization.id}`}>
+                  <td><strong>{organization.name}</strong></td>
+                  <td>{organization.departmentCount}</td>
+                  <td>{organization.allocationCount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {catalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
@@ -323,12 +462,23 @@ export default function CadastrosPage() {
 
           <div className="filter-inline" style={{ marginBottom: 14 }}>
             <input
+              id="search-organization-input"
               className="app-input"
               placeholder="Buscar orgao por nome..."
               value={organizationSearch}
               onChange={(event) => setOrganizationSearch(event.target.value)}
             />
           </div>
+
+          {selectedOrganizationIds.length > 0 ? (
+            <div className="actions-inline" style={{ marginBottom: 12 }}>
+              <span className="section-copy">{selectedOrganizationIds.length} orgao(s) selecionado(s)</span>
+              <button type="button" className="ghost-button" onClick={handleExportSelectedOrganizations}>Exportar selecionados</button>
+              <button type="button" className="mini-button danger" onClick={handleBulkDeleteOrganizations} disabled={bulkDeleting || !canDelete}>
+                {bulkDeleting ? 'Excluindo...' : 'Excluir selecionados'}
+              </button>
+            </div>
+          ) : null}
 
           {canWrite ? (
             <form onSubmit={handleSubmitOrganization} className="form-grid">
@@ -359,6 +509,7 @@ export default function CadastrosPage() {
             <table className="data-table">
               <thead>
                 <tr>
+                  {canWrite ? <th>Selecao</th> : null}
                   <th>Orgao</th>
                   <th>Atualizado em</th>
                   {canWrite ? <th>Acoes</th> : null}
@@ -366,11 +517,23 @@ export default function CadastrosPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={canWrite ? 3 : 2}>Carregando orgaos...</td></tr>
+                  [...Array(4)].map((_, index) => (
+                    <tr key={`org-loading-${index}`}><td colSpan={canWrite ? 4 : 2}>Carregando orgaos...</td></tr>
+                  ))
                 ) : filteredOrganizations.length === 0 ? (
-                  <tr><td colSpan={canWrite ? 3 : 2}><div className="empty-state">Nenhum orgao cadastrado.</div></td></tr>
+                  <tr><td colSpan={canWrite ? 4 : 2}><div className="empty-state">Nenhum orgao cadastrado.</div></td></tr>
                 ) : paginatedOrganizations.map((organization) => (
                   <tr key={organization.id}>
+                    {canWrite ? (
+                      <td data-label="Selecao">
+                        <input
+                          type="checkbox"
+                          checked={selectedOrganizationIds.includes(organization.id)}
+                          onChange={() => toggleOrganizationSelection(organization.id)}
+                          aria-label={`Selecionar orgao ${organization.name}`}
+                        />
+                      </td>
+                    ) : null}
                     <td data-label="Orgao"><strong>{organization.name}</strong></td>
                     <td data-label="Atualizado em">{new Date(organization.updated_at).toLocaleString('pt-BR')}</td>
                     {canWrite ? (
@@ -388,6 +551,18 @@ export default function CadastrosPage() {
               </tbody>
             </table>
           </div>
+          {canWrite ? (
+            <div className="actions-inline" style={{ marginBottom: 8 }}>
+              <label className="section-copy" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={allVisibleOrganizationsSelected}
+                  onChange={toggleSelectAllVisibleOrganizations}
+                />
+                Selecionar todos os orgaos visiveis
+              </label>
+            </div>
+          ) : null}
           <Pagination currentPage={organizationPage} totalPages={organizationTotalPages} onPageChange={setOrganizationPage} />
         </section>
 
@@ -446,6 +621,7 @@ export default function CadastrosPage() {
               searchPlaceholder="Buscar orgao"
             />
             <input
+              id="search-department-input"
               className="app-input"
               placeholder="Buscar departamento..."
               value={departmentSearch}
@@ -573,6 +749,7 @@ export default function CadastrosPage() {
               searchPlaceholder="Buscar departamento"
             />
             <input
+              id="search-allocation-input"
               className="app-input"
               placeholder="Buscar lotacao..."
               value={allocationSearch}
@@ -629,6 +806,18 @@ export default function CadastrosPage() {
           <Pagination currentPage={allocationPage} totalPages={allocationTotalPages} onPageChange={setAllocationPage} />
         </section>
       </div>
+
+      <Modal
+        open={Boolean(pendingDelete)}
+        title="Confirmar exclusao"
+        description={pendingDelete ? `Deseja realmente excluir ${pendingDelete.kind.toLowerCase()} "${pendingDelete.item.name}"?` : ''}
+        onClose={() => setPendingDelete(null)}
+      >
+        <div className="actions-inline">
+          <button type="button" className="ghost-button" onClick={() => setPendingDelete(null)}>Cancelar</button>
+          <button type="button" className="mini-button danger" onClick={confirmDelete}>Sim, excluir</button>
+        </div>
+      </Modal>
     </div>
   )
 }
