@@ -17,7 +17,7 @@ function readStorage(key, fallback) {
 }
 
 export default function Layout() {
-  const { user, logout, isAdmin, roleLabel } = useAuth()
+  const { user, logout, isAdmin, canManageCadastros, roleLabel } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -43,7 +43,6 @@ export default function Layout() {
       {
         title: 'Operacional',
         items: [
-          { to: '/cadastros', label: 'Cadastros', description: 'Orgaos, departamentos e lotacoes', icon: 'catalog' },
           { to: '/vehicles', label: 'Veiculos', description: 'Cadastro, consulta e historico', icon: 'vehicles' },
           { to: '/posses', label: 'Posses', description: 'Posse, alocacao e responsaveis', icon: 'drivers' },
           { to: '/condutores', label: 'Condutores', description: 'Base reutilizavel de motoristas', icon: 'users' },
@@ -55,19 +54,26 @@ export default function Layout() {
       },
     ]
 
-    if (isAdmin) {
-      sections.push({
-        title: 'Gestao',
-        items: [
+    if (isAdmin || canManageCadastros) {
+      const managementItems = []
+      if (canManageCadastros) {
+        managementItems.push({ to: '/cadastros', label: 'Cadastros', description: 'Orgaos, departamentos e lotacoes', icon: 'catalog' })
+      }
+      if (isAdmin) {
+        managementItems.push(
           { to: '/analytics', label: 'Analytics', description: 'BI operacional da frota', icon: 'dashboard' },
           { to: '/users', label: 'Usuarios', description: 'Perfis e niveis de acesso', icon: 'users' },
           { to: '/auditoria', label: 'Auditoria', description: 'Rastreabilidade administrativa', icon: 'audit' },
-        ],
+        )
+      }
+      sections.push({
+        title: 'Gestao',
+        items: managementItems,
       })
     }
 
     return sections
-  }, [isAdmin])
+  }, [isAdmin, canManageCadastros])
 
   const mobileTabs = navSections.flatMap((section) => section.items).filter((item) =>
     ['/', '/vehicles', '/manutencoes', '/condutores'].includes(item.to),
