@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import api from '../api/client'
-import { canDelete, canWrite, getRoleLabel, isAdmin } from '../utils/roles'
+import { canDelete, canManageCadastros, canWrite, getRoleLabel, isAdmin } from '../utils/roles'
 
 const AuthContext = createContext(null)
 
@@ -53,6 +53,7 @@ export function AuthProvider({ children }) {
     isAdmin: isAdmin(user?.role),
     canWrite: canWrite(user?.role),
     canDelete: canDelete(user?.role),
+    canManageCadastros: canManageCadastros(user?.role),
     roleLabel: getRoleLabel(user?.role),
   }), [user, loading])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
