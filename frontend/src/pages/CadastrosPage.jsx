@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import SearchableSelect from '../components/SearchableSelect'
 import Pagination from '../components/Pagination'
+import Modal from '../components/Modal'
 import { masterDataAPI } from '../api/masterData'
 import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
@@ -11,6 +12,15 @@ const initialOrganizationForm = { id: null, name: '' }
 const initialDepartmentForm = { id: null, organization_id: '', name: '' }
 const initialAllocationForm = { id: null, organization_id: '', department_id: '', name: '' }
 const PAGE_SIZE = 8
+const IMPORT_TEMPLATE_COLUMNS = [
+  { header: 'orgao', value: (row) => row.orgao },
+  { header: 'departamento', value: (row) => row.departamento },
+  { header: 'lotacao', value: (row) => row.lotacao },
+]
+const IMPORT_TEMPLATE_ROWS = [
+  { orgao: 'Secretaria de Saude', departamento: 'Transporte Sanitario', lotacao: 'Garagem Central' },
+  { orgao: 'Secretaria de Educacao', departamento: 'Transporte Escolar', lotacao: 'Garagem Norte' },
+]
 
 export default function CadastrosPage() {
   const { canWrite, canDelete } = useAuth()
@@ -32,22 +42,20 @@ export default function CadastrosPage() {
   const [organizationSearch, setOrganizationSearch] = useState('')
   const [departmentSearch, setDepartmentSearch] = useState('')
   const [allocationSearch, setAllocationSearch] = useState('')
+  const [advancedFilterOpen, setAdvancedFilterOpen] = useState(false)
+  const [advancedOrgName, setAdvancedOrgName] = useState('')
+  const [advancedOrgDepartmentMode, setAdvancedOrgDepartmentMode] = useState('any')
   const [organizationPage, setOrganizationPage] = useState(1)
   const [departmentPage, setDepartmentPage] = useState(1)
   const [allocationPage, setAllocationPage] = useState(1)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
-
-  const importTemplateColumns = [
-    { header: 'orgao', value: (row) => row.orgao },
-    { header: 'departamento', value: (row) => row.departamento },
-    { header: 'lotacao', value: (row) => row.lotacao },
-  ]
-  const importTemplateRows = [
-    { orgao: 'Secretaria de Saude', departamento: 'Transporte Sanitario', lotacao: 'Garagem Central' },
-    { orgao: 'Secretaria de Educacao', departamento: 'Transporte Escolar', lotacao: 'Garagem Norte' },
-  ]
+  const [pendingDelete, setPendingDelete] = useState(null)
+  const [bulkDeleting, setBulkDeleting] = useState(false)
+  const [selectedOrganizationIds, setSelectedOrganizationIds] = useState([])
+  const [selectedDepartmentIds, setSelectedDepartmentIds] = useState([])
+  const [selectedAllocationIds, setSelectedAllocationIds] = useState([])
 
   const organizationOptions = organizations.map((organization) => ({
     value: organization.id,
@@ -82,9 +90,17 @@ export default function CadastrosPage() {
 
   const filteredOrganizations = useMemo(() => {
     const normalizedSearch = organizationSearch.trim().toLowerCase()
-    if (!normalizedSearch) return organizations
-    return organizations.filter((organization) => organization.name.toLowerCase().includes(normalizedSearch))
-  }, [organizations, organizationSearch])
+    const normalizedAdvancedSearch = advancedOrgName.trim().toLowerCase()
+    return organizations.filter((organization) => {
+      const bySearch = !normalizedSearch || organization.name.toLowerCase().includes(normalizedSearch)
+      const byAdvancedName = !normalizedAdvancedSearch || organization.name.toLowerCase().includes(normalizedAdvancedSearch)
+      const hasDepartments = organization.departments.length > 0
+      const byDepartmentMode = advancedOrgDepartmentMode === 'any'
+        || (advancedOrgDepartmentMode === 'with' && hasDepartments)
+        || (advancedOrgDepartmentMode === 'without' && !hasDepartments)
+      return bySearch && byAdvancedName && byDepartmentMode
+    })
+  }, [organizations, organizationSearch, advancedOrgName, advancedOrgDepartmentMode])
 
   const paginatedOrganizations = useMemo(() => {
     const startIndex = (organizationPage - 1) * PAGE_SIZE
@@ -104,6 +120,22 @@ export default function CadastrosPage() {
   const organizationTotalPages = Math.max(1, Math.ceil(filteredOrganizations.length / PAGE_SIZE))
   const departmentTotalPages = Math.max(1, Math.ceil(filteredDepartments.length / PAGE_SIZE))
   const allocationTotalPages = Math.max(1, Math.ceil(filteredAllocations.length / PAGE_SIZE))
+  const allVisibleOrganizationsSelected = paginatedOrganizations.length > 0 && paginatedOrganizations.every((item) => selectedOrganizationIds.includes(item.id))
+  const allVisibleDepartmentsSelected = paginatedDepartments.length > 0 && paginatedDepartments.every((item) => selectedDepartmentIds.includes(item.id))
+  const allVisibleAllocationsSelected = paginatedAllocations.length > 0 && paginatedAllocations.every((item) => selectedAllocationIds.includes(item.id))
+
+  const hierarchicalPreview = useMemo(() => organizations.map((organization) => {
+    const organizationDepartments = departments.filter((department) => department.organization_id === organization.id)
+    return {
+      ...organization,
+      departmentCount: organizationDepartments.length,
+      allocationCount: allocations.filter((allocation) => allocation.organization_id === organization.id).length,
+      departments: organizationDepartments.map((department) => ({
+        ...department,
+        allocations: allocations.filter((allocation) => allocation.department_id === department.id),
+      })),
+    }
+  }), [organizations, departments, allocations])
 
   useEffect(() => {
     setOrganizationPage(1)
@@ -128,6 +160,35 @@ export default function CadastrosPage() {
   useEffect(() => {
     if (allocationPage > allocationTotalPages) setAllocationPage(allocationTotalPages)
   }, [allocationPage, allocationTotalPages])
+
+  useEffect(() => {
+    setSelectedOrganizationIds([])
+    setSelectedDepartmentIds([])
+    setSelectedAllocationIds([])
+  }, [activeTab])
+
+  useEffect(() => {
+    const handleKeyDown = (event) => {
+      const isTypingTarget = ['input', 'textarea'].includes(event.target?.tagName?.toLowerCase())
+      if (isTypingTarget) return
+
+      if (event.ctrlKey && event.key.toLowerCase() === 'n') {
+        event.preventDefault()
+        setActiveTab('organizations')
+        document.getElementById('organization-name')?.focus()
+      }
+
+      if (event.ctrlKey && event.key.toLowerCase() === 'f') {
+        event.preventDefault()
+        if (activeTab === 'organizations') document.getElementById('search-organization-input')?.focus()
+        if (activeTab === 'departments') document.getElementById('search-department-input')?.focus()
+        if (activeTab === 'allocations') document.getElementById('search-allocation-input')?.focus()
+      }
+    }
+
+    window.addEventListener('keydown', handleKeyDown)
+    return () => window.removeEventListener('keydown', handleKeyDown)
+  }, [activeTab])
 
   function resetForms() {
     setOrganizationForm(initialOrganizationForm)
@@ -207,8 +268,12 @@ export default function CadastrosPage() {
   }
 
   async function handleDelete(kind, item) {
-    if (!window.confirm(`Excluir ${kind.toLowerCase()} ${item.name}?`)) return
+    setPendingDelete({ kind, item })
+  }
 
+  async function confirmDelete() {
+    if (!pendingDelete) return
+    const { kind, item } = pendingDelete
     try {
       setError('')
       if (kind === 'Orgao') {
@@ -219,16 +284,171 @@ export default function CadastrosPage() {
         await masterDataAPI.removeAllocation(item.id)
       }
       setFeedback(`${kind} removido com sucesso.`)
+      setPendingDelete(null)
       await reload()
     } catch (err) {
       setError(getApiErrorMessage(err, `Nao foi possivel remover ${kind.toLowerCase()}.`))
     }
   }
 
+  function toggleOrganizationSelection(organizationId) {
+    setSelectedOrganizationIds((current) => (current.includes(organizationId)
+      ? current.filter((id) => id !== organizationId)
+      : [...current, organizationId]))
+  }
+
+  function toggleSelectAllVisibleOrganizations() {
+    setSelectedOrganizationIds((current) => {
+      if (allVisibleOrganizationsSelected) {
+        return current.filter((id) => !paginatedOrganizations.some((organization) => organization.id === id))
+      }
+
+      const merged = new Set(current)
+      paginatedOrganizations.forEach((organization) => merged.add(organization.id))
+      return [...merged]
+    })
+  }
+
+  async function handleBulkDeleteOrganizations() {
+    if (selectedOrganizationIds.length === 0) return
+    setBulkDeleting(true)
+    setError('')
+    try {
+      for (const organizationId of selectedOrganizationIds) {
+        await masterDataAPI.removeOrganization(organizationId)
+      }
+      setSelectedOrganizationIds([])
+      setFeedback('Orgaos selecionados removidos com sucesso.')
+      await reload()
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Nao foi possivel remover todos os orgaos selecionados.'))
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  function toggleDepartmentSelection(departmentId) {
+    setSelectedDepartmentIds((current) => (current.includes(departmentId)
+      ? current.filter((id) => id !== departmentId)
+      : [...current, departmentId]))
+  }
+
+  function toggleAllocationSelection(allocationId) {
+    setSelectedAllocationIds((current) => (current.includes(allocationId)
+      ? current.filter((id) => id !== allocationId)
+      : [...current, allocationId]))
+  }
+
+  function toggleSelectAllVisibleDepartments() {
+    setSelectedDepartmentIds((current) => {
+      if (allVisibleDepartmentsSelected) {
+        return current.filter((id) => !paginatedDepartments.some((department) => department.id === id))
+      }
+      const merged = new Set(current)
+      paginatedDepartments.forEach((department) => merged.add(department.id))
+      return [...merged]
+    })
+  }
+
+  function toggleSelectAllVisibleAllocations() {
+    setSelectedAllocationIds((current) => {
+      if (allVisibleAllocationsSelected) {
+        return current.filter((id) => !paginatedAllocations.some((allocation) => allocation.id === id))
+      }
+      const merged = new Set(current)
+      paginatedAllocations.forEach((allocation) => merged.add(allocation.id))
+      return [...merged]
+    })
+  }
+
+  async function handleBulkDeleteDepartments() {
+    if (selectedDepartmentIds.length === 0) return
+    setBulkDeleting(true)
+    setError('')
+    try {
+      for (const departmentId of selectedDepartmentIds) {
+        await masterDataAPI.removeDepartment(departmentId)
+      }
+      setSelectedDepartmentIds([])
+      setFeedback('Departamentos selecionados removidos com sucesso.')
+      await reload()
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Nao foi possivel remover todos os departamentos selecionados.'))
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  async function handleBulkDeleteAllocations() {
+    if (selectedAllocationIds.length === 0) return
+    setBulkDeleting(true)
+    setError('')
+    try {
+      for (const allocationId of selectedAllocationIds) {
+        await masterDataAPI.removeAllocation(allocationId)
+      }
+      setSelectedAllocationIds([])
+      setFeedback('Lotacoes selecionadas removidas com sucesso.')
+      await reload()
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Nao foi possivel remover todas as lotacoes selecionadas.'))
+    } finally {
+      setBulkDeleting(false)
+    }
+  }
+
+  function exportSelectedDepartments() {
+    if (selectedDepartmentIds.length === 0) return
+    const selectedRows = departments.filter((department) => selectedDepartmentIds.includes(department.id))
+    const csvLines = [
+      'departamento,orgao',
+      ...selectedRows.map((row) => `\"${row.name}\",\"${row.organization_name}\"`),
+    ]
+    const blob = new Blob([`\uFEFF${csvLines.join('\n')}`], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = 'departamentos-selecionados.csv'
+    link.click()
+    window.setTimeout(() => URL.revokeObjectURL(link.href), 3000)
+    setFeedback('Exportacao dos departamentos selecionados concluida.')
+  }
+
+  function exportSelectedAllocations() {
+    if (selectedAllocationIds.length === 0) return
+    const selectedRows = allocations.filter((allocation) => selectedAllocationIds.includes(allocation.id))
+    const csvLines = [
+      'lotacao,departamento,orgao',
+      ...selectedRows.map((row) => `\"${row.name}\",\"${row.department_name}\",\"${row.organization_name}\"`),
+    ]
+    const blob = new Blob([`\uFEFF${csvLines.join('\n')}`], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = 'lotacoes-selecionadas.csv'
+    link.click()
+    window.setTimeout(() => URL.revokeObjectURL(link.href), 3000)
+    setFeedback('Exportacao das lotacoes selecionadas concluida.')
+  }
+
+  function handleExportSelectedOrganizations() {
+    if (selectedOrganizationIds.length === 0) return
+    const selectedRows = organizations.filter((organization) => selectedOrganizationIds.includes(organization.id))
+    const csvLines = [
+      'orgao',
+      ...selectedRows.map((row) => `\"${row.name}\"`),
+    ]
+    const blob = new Blob([`\uFEFF${csvLines.join('\n')}`], { type: 'text/csv;charset=utf-8;' })
+    const link = document.createElement('a')
+    link.href = URL.createObjectURL(blob)
+    link.download = 'orgaos-selecionados.csv'
+    link.click()
+    window.setTimeout(() => URL.revokeObjectURL(link.href), 3000)
+    setFeedback('Exportacao dos orgaos selecionados concluida.')
+  }
+
   async function handleDownloadCsvTemplate() {
     const csvLines = [
       'orgao,departamento,lotacao',
-      ...importTemplateRows.map((row) => [row.orgao, row.departamento, row.lotacao].map((value) => `\"${value}\"`).join(',')),
+      ...IMPORT_TEMPLATE_ROWS.map((row) => [row.orgao, row.departamento, row.lotacao].map((value) => `\"${value}\"`).join(',')),
     ]
     const csvContent = `\uFEFF${csvLines.join('\n')}`
     const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' })
@@ -245,8 +465,8 @@ export default function CadastrosPage() {
       await exportRowsToXlsx({
         fileName: 'modelo-importacao-cadastros',
         sheetName: 'Modelo de importacao',
-        columns: importTemplateColumns,
-        rows: importTemplateRows,
+        columns: IMPORT_TEMPLATE_COLUMNS,
+        rows: IMPORT_TEMPLATE_ROWS,
         filters: ['Campos obrigatorios: orgao, departamento e lotacao'],
       })
       setFeedback('Modelo XLSX baixado com sucesso.')
@@ -264,6 +484,7 @@ export default function CadastrosPage() {
         </div>
         <div className="actions-inline">
           <button className="ghost-button" type="button" onClick={resetForms}>Limpar formularios</button>
+          <button className="ghost-button" type="button" onClick={() => setAdvancedFilterOpen(true)}>Filtros avancados</button>
           <button className="ghost-button" type="button" onClick={handleDownloadCsvTemplate}>Baixar modelo CSV</button>
           <button className="ghost-button" type="button" onClick={handleDownloadXlsxTemplate}>Baixar modelo XLSX</button>
         </div>
@@ -283,6 +504,48 @@ export default function CadastrosPage() {
           <span>lotacoes</span>
         </div>
       </div>
+
+      <section className="surface-panel panel-nested" style={{ marginBottom: 16 }}>
+        <div className="panel-heading">
+          <div>
+            <h3 className="section-title">Estrutura organizacional (preview)</h3>
+            <p className="section-copy">Visao resumida de relacionamento entre orgaos, departamentos e lotacoes.</p>
+          </div>
+        </div>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Orgao</th>
+                <th>Departamentos</th>
+                <th>Lotacoes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {hierarchicalPreview.length === 0 ? (
+                <tr><td colSpan={3}><div className="empty-state">Sem dados para exibir a hierarquia.</div></td></tr>
+              ) : hierarchicalPreview.map((organization) => (
+                <tr key={`preview-${organization.id}`}>
+                  <td>
+                    <details>
+                      <summary><strong>{organization.name}</strong></summary>
+                      <ul style={{ marginTop: 8 }}>
+                        {organization.departments.map((department) => (
+                          <li key={`department-preview-${department.id}`}>
+                            {department.name} ({department.allocations.length} lotacao(oes))
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </td>
+                  <td>{organization.departmentCount}</td>
+                  <td>{organization.allocationCount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {catalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError}</div> : null}
@@ -323,12 +586,23 @@ export default function CadastrosPage() {
 
           <div className="filter-inline" style={{ marginBottom: 14 }}>
             <input
+              id="search-organization-input"
               className="app-input"
               placeholder="Buscar orgao por nome..."
               value={organizationSearch}
               onChange={(event) => setOrganizationSearch(event.target.value)}
             />
           </div>
+
+          {selectedOrganizationIds.length > 0 ? (
+            <div className="actions-inline" style={{ marginBottom: 12 }}>
+              <span className="section-copy">{selectedOrganizationIds.length} orgao(s) selecionado(s)</span>
+              <button type="button" className="ghost-button" onClick={handleExportSelectedOrganizations}>Exportar selecionados</button>
+              <button type="button" className="mini-button danger" onClick={handleBulkDeleteOrganizations} disabled={bulkDeleting || !canDelete}>
+                {bulkDeleting ? 'Excluindo...' : 'Excluir selecionados'}
+              </button>
+            </div>
+          ) : null}
 
           {canWrite ? (
             <form onSubmit={handleSubmitOrganization} className="form-grid">
@@ -359,6 +633,7 @@ export default function CadastrosPage() {
             <table className="data-table">
               <thead>
                 <tr>
+                  {canWrite ? <th>Selecao</th> : null}
                   <th>Orgao</th>
                   <th>Atualizado em</th>
                   {canWrite ? <th>Acoes</th> : null}
@@ -366,11 +641,23 @@ export default function CadastrosPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={canWrite ? 3 : 2}>Carregando orgaos...</td></tr>
+                  [...Array(4)].map((_, index) => (
+                    <tr key={`org-loading-${index}`}><td colSpan={canWrite ? 4 : 2}>Carregando orgaos...</td></tr>
+                  ))
                 ) : filteredOrganizations.length === 0 ? (
-                  <tr><td colSpan={canWrite ? 3 : 2}><div className="empty-state">Nenhum orgao cadastrado.</div></td></tr>
+                  <tr><td colSpan={canWrite ? 4 : 2}><div className="empty-state">Nenhum orgao cadastrado.</div></td></tr>
                 ) : paginatedOrganizations.map((organization) => (
                   <tr key={organization.id}>
+                    {canWrite ? (
+                      <td data-label="Selecao">
+                        <input
+                          type="checkbox"
+                          checked={selectedOrganizationIds.includes(organization.id)}
+                          onChange={() => toggleOrganizationSelection(organization.id)}
+                          aria-label={`Selecionar orgao ${organization.name}`}
+                        />
+                      </td>
+                    ) : null}
                     <td data-label="Orgao"><strong>{organization.name}</strong></td>
                     <td data-label="Atualizado em">{new Date(organization.updated_at).toLocaleString('pt-BR')}</td>
                     {canWrite ? (
@@ -388,6 +675,18 @@ export default function CadastrosPage() {
               </tbody>
             </table>
           </div>
+          {canWrite ? (
+            <div className="actions-inline" style={{ marginBottom: 8 }}>
+              <label className="section-copy" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={allVisibleOrganizationsSelected}
+                  onChange={toggleSelectAllVisibleOrganizations}
+                />
+                Selecionar todos os orgaos visiveis
+              </label>
+            </div>
+          ) : null}
           <Pagination currentPage={organizationPage} totalPages={organizationTotalPages} onPageChange={setOrganizationPage} />
         </section>
 
@@ -446,6 +745,7 @@ export default function CadastrosPage() {
               searchPlaceholder="Buscar orgao"
             />
             <input
+              id="search-department-input"
               className="app-input"
               placeholder="Buscar departamento..."
               value={departmentSearch}
@@ -453,10 +753,21 @@ export default function CadastrosPage() {
             />
           </div>
 
+          {selectedDepartmentIds.length > 0 ? (
+            <div className="actions-inline" style={{ marginBottom: 12 }}>
+              <span className="section-copy">{selectedDepartmentIds.length} departamento(s) selecionado(s)</span>
+              <button type="button" className="ghost-button" onClick={exportSelectedDepartments}>Exportar selecionados</button>
+              <button type="button" className="mini-button danger" onClick={handleBulkDeleteDepartments} disabled={bulkDeleting || !canDelete}>
+                {bulkDeleting ? 'Excluindo...' : 'Excluir selecionados'}
+              </button>
+            </div>
+          ) : null}
+
           <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
+                  {canWrite ? <th>Selecao</th> : null}
                   <th>Departamento</th>
                   <th>Orgao</th>
                   {canWrite ? <th>Acoes</th> : null}
@@ -464,11 +775,21 @@ export default function CadastrosPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={canWrite ? 3 : 2}>Carregando departamentos...</td></tr>
+                  <tr><td colSpan={canWrite ? 4 : 2}>Carregando departamentos...</td></tr>
                 ) : filteredDepartments.length === 0 ? (
-                  <tr><td colSpan={canWrite ? 3 : 2}><div className="empty-state">Nenhum departamento encontrado.</div></td></tr>
+                  <tr><td colSpan={canWrite ? 4 : 2}><div className="empty-state">Nenhum departamento encontrado.</div></td></tr>
                 ) : paginatedDepartments.map((department) => (
                   <tr key={department.id}>
+                    {canWrite ? (
+                      <td data-label="Selecao">
+                        <input
+                          type="checkbox"
+                          checked={selectedDepartmentIds.includes(department.id)}
+                          onChange={() => toggleDepartmentSelection(department.id)}
+                          aria-label={`Selecionar departamento ${department.name}`}
+                        />
+                      </td>
+                    ) : null}
                     <td data-label="Departamento"><strong>{department.name}</strong></td>
                     <td data-label="Orgao">{department.organization_name}</td>
                     {canWrite ? (
@@ -486,6 +807,18 @@ export default function CadastrosPage() {
               </tbody>
             </table>
           </div>
+          {canWrite ? (
+            <div className="actions-inline" style={{ marginBottom: 8 }}>
+              <label className="section-copy" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={allVisibleDepartmentsSelected}
+                  onChange={toggleSelectAllVisibleDepartments}
+                />
+                Selecionar todos os departamentos visiveis
+              </label>
+            </div>
+          ) : null}
           <Pagination currentPage={departmentPage} totalPages={departmentTotalPages} onPageChange={setDepartmentPage} />
         </section>
 
@@ -573,6 +906,7 @@ export default function CadastrosPage() {
               searchPlaceholder="Buscar departamento"
             />
             <input
+              id="search-allocation-input"
               className="app-input"
               placeholder="Buscar lotacao..."
               value={allocationSearch}
@@ -580,10 +914,21 @@ export default function CadastrosPage() {
             />
           </div>
 
+          {selectedAllocationIds.length > 0 ? (
+            <div className="actions-inline" style={{ marginBottom: 12 }}>
+              <span className="section-copy">{selectedAllocationIds.length} lotacao(oes) selecionada(s)</span>
+              <button type="button" className="ghost-button" onClick={exportSelectedAllocations}>Exportar selecionados</button>
+              <button type="button" className="mini-button danger" onClick={handleBulkDeleteAllocations} disabled={bulkDeleting || !canDelete}>
+                {bulkDeleting ? 'Excluindo...' : 'Excluir selecionados'}
+              </button>
+            </div>
+          ) : null}
+
           <div className="table-wrap">
             <table className="data-table">
               <thead>
                 <tr>
+                  {canWrite ? <th>Selecao</th> : null}
                   <th>Lotacao</th>
                   <th>Departamento</th>
                   <th>Orgao</th>
@@ -592,11 +937,21 @@ export default function CadastrosPage() {
               </thead>
               <tbody>
                 {loading ? (
-                  <tr><td colSpan={canWrite ? 4 : 3}>Carregando lotacoes...</td></tr>
+                  <tr><td colSpan={canWrite ? 5 : 3}>Carregando lotacoes...</td></tr>
                 ) : filteredAllocations.length === 0 ? (
-                  <tr><td colSpan={canWrite ? 4 : 3}><div className="empty-state">Nenhuma lotacao encontrada.</div></td></tr>
+                  <tr><td colSpan={canWrite ? 5 : 3}><div className="empty-state">Nenhuma lotacao encontrada.</div></td></tr>
                 ) : paginatedAllocations.map((allocation) => (
                   <tr key={allocation.id}>
+                    {canWrite ? (
+                      <td data-label="Selecao">
+                        <input
+                          type="checkbox"
+                          checked={selectedAllocationIds.includes(allocation.id)}
+                          onChange={() => toggleAllocationSelection(allocation.id)}
+                          aria-label={`Selecionar lotacao ${allocation.name}`}
+                        />
+                      </td>
+                    ) : null}
                     <td data-label="Lotacao"><strong>{allocation.name}</strong></td>
                     <td data-label="Departamento">{allocation.department_name}</td>
                     <td data-label="Orgao">{allocation.organization_name}</td>
@@ -626,9 +981,76 @@ export default function CadastrosPage() {
               </tbody>
             </table>
           </div>
+          {canWrite ? (
+            <div className="actions-inline" style={{ marginBottom: 8 }}>
+              <label className="section-copy" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  type="checkbox"
+                  checked={allVisibleAllocationsSelected}
+                  onChange={toggleSelectAllVisibleAllocations}
+                />
+                Selecionar todas as lotacoes visiveis
+              </label>
+            </div>
+          ) : null}
           <Pagination currentPage={allocationPage} totalPages={allocationTotalPages} onPageChange={setAllocationPage} />
         </section>
       </div>
+
+      <Modal
+        open={Boolean(pendingDelete)}
+        title="Confirmar exclusao"
+        description={pendingDelete ? `Deseja realmente excluir ${pendingDelete.kind.toLowerCase()} "${pendingDelete.item.name}"?` : ''}
+        onClose={() => setPendingDelete(null)}
+      >
+        <div className="actions-inline">
+          <button type="button" className="ghost-button" onClick={() => setPendingDelete(null)}>Cancelar</button>
+          <button type="button" className="mini-button danger" onClick={confirmDelete}>Sim, excluir</button>
+        </div>
+      </Modal>
+
+      <Modal
+        open={advancedFilterOpen}
+        title="Filtros avancados de orgaos"
+        description="Refine a listagem de orgaos por nome e vinculacao com departamentos."
+        onClose={() => setAdvancedFilterOpen(false)}
+      >
+        <div className="form-grid">
+          <div className="form-field">
+            <label htmlFor="advanced-org-name">Nome contem</label>
+            <input
+              id="advanced-org-name"
+              className="app-input"
+              placeholder="Ex.: Secretaria"
+              value={advancedOrgName}
+              onChange={(event) => setAdvancedOrgName(event.target.value)}
+            />
+          </div>
+          <div className="form-field">
+            <label htmlFor="advanced-org-mode">Com departamentos</label>
+            <select
+              id="advanced-org-mode"
+              className="app-input"
+              value={advancedOrgDepartmentMode}
+              onChange={(event) => setAdvancedOrgDepartmentMode(event.target.value)}
+            >
+              <option value="any">Qualquer</option>
+              <option value="with">Somente com departamentos</option>
+              <option value="without">Somente sem departamentos</option>
+            </select>
+          </div>
+          <div className="actions-inline">
+            <button type="button" className="ghost-button" onClick={() => {
+              setAdvancedOrgName('')
+              setAdvancedOrgDepartmentMode('any')
+            }}
+            >
+              Limpar filtros
+            </button>
+            <button type="button" className="app-button" onClick={() => setAdvancedFilterOpen(false)}>Aplicar</button>
+          </div>
+        </div>
+      </Modal>
     </div>
   )
 }
