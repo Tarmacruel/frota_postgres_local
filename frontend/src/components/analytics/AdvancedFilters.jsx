@@ -1,4 +1,6 @@
-function buildFilterChips(filters, organizations) {
+import SearchableSelect from '../SearchableSelect'
+
+function buildFilterChips(filters, organizations, vehicleTypeOptions) {
   const chips = []
 
   if (filters.period_days !== 30) {
@@ -6,7 +8,8 @@ function buildFilterChips(filters, organizations) {
   }
 
   if (filters.vehicle_type) {
-    chips.push({ key: 'vehicle_type', label: `Tipo: ${filters.vehicle_type}`, clearTo: '' })
+    const selectedType = vehicleTypeOptions.find((item) => item.value === filters.vehicle_type)
+    chips.push({ key: 'vehicle_type', label: `Tipo: ${selectedType?.label || filters.vehicle_type}`, clearTo: '' })
   }
 
   if (filters.organization) {
@@ -26,7 +29,29 @@ export default function AdvancedFilters({ filters, organizations = [], loading =
     { value: 365, label: 'Últimos 365 dias' },
   ]
 
-  const chips = buildFilterChips(filters, organizations)
+  const vehicleTypeOptions = [
+    { value: '', label: 'Todos os tipos' },
+    { value: 'SEDAN', label: 'Sedan' },
+    { value: 'HATCH', label: 'Hatch' },
+    { value: 'SUV', label: 'SUV' },
+    { value: 'PICAPE', label: 'Picape' },
+    { value: 'VAN', label: 'Van' },
+    { value: 'ONIBUS', label: 'Ônibus' },
+    { value: 'CAMINHAO', label: 'Caminhão' },
+    { value: 'MOTOCICLETA', label: 'Motocicleta' },
+  ]
+
+  const organizationOptions = [
+    { value: '', label: 'Todos os órgãos' },
+    ...organizations.map((org) => ({
+      value: org.id,
+      label: org.name,
+      description: `${org.departments?.length || 0} departamento(s)`,
+      keywords: `${org.name} ${org.departments?.map((department) => department.name).join(' ') || ''}`,
+    })),
+  ]
+
+  const chips = buildFilterChips(filters, organizations, vehicleTypeOptions)
 
   function clearFilters() {
     onChange('period_days', 30)
@@ -40,36 +65,40 @@ export default function AdvancedFilters({ filters, organizations = [], loading =
         <div className="analytics-filters-grid">
           <label className="analytics-filter-field">
             <span>Período</span>
-            <select value={filters.period_days} onChange={(e) => onChange('period_days', Number(e.target.value))}>
-              {periodOptions.map((item) => (
-                <option key={item.value} value={item.value}>{item.label}</option>
-              ))}
-            </select>
+            <SearchableSelect
+              value={filters.period_days}
+              options={periodOptions}
+              onChange={(value) => onChange('period_days', Number(value))}
+              searchPlaceholder="Buscar período"
+              placeholder="Selecione o período"
+              allowClear={false}
+            />
           </label>
 
           <label className="analytics-filter-field">
             <span>Tipo de veículo</span>
-            <select value={filters.vehicle_type} onChange={(e) => onChange('vehicle_type', e.target.value)}>
-              <option value="">Todos os tipos</option>
-              <option value="SEDAN">Sedan</option>
-              <option value="HATCH">Hatch</option>
-              <option value="SUV">SUV</option>
-              <option value="PICAPE">Picape</option>
-              <option value="VAN">Van</option>
-              <option value="ONIBUS">Ônibus</option>
-              <option value="CAMINHAO">Caminhão</option>
-              <option value="MOTOCICLETA">Motocicleta</option>
-            </select>
+            <SearchableSelect
+              value={filters.vehicle_type}
+              options={vehicleTypeOptions}
+              onChange={(value) => onChange('vehicle_type', value)}
+              searchPlaceholder="Buscar tipo de veículo"
+              placeholder="Selecione um tipo"
+              allowClear
+              clearLabel="Limpar tipo"
+            />
           </label>
 
           <label className="analytics-filter-field">
             <span>Órgão</span>
-            <select value={filters.organization} onChange={(e) => onChange('organization', e.target.value)}>
-              <option value="">Todos os órgãos</option>
-              {organizations.map((org) => (
-                <option key={org.id} value={org.id}>{org.name}</option>
-              ))}
-            </select>
+            <SearchableSelect
+              value={filters.organization}
+              options={organizationOptions}
+              onChange={(value) => onChange('organization', value)}
+              searchPlaceholder="Buscar órgão"
+              placeholder="Selecione um órgão"
+              allowClear
+              clearLabel="Limpar órgão"
+            />
           </label>
         </div>
 
