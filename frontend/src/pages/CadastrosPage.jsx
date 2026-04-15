@@ -547,6 +547,48 @@ export default function CadastrosPage() {
         ) : null}
       </section>
 
+      <section className="surface-panel panel-nested" style={{ marginBottom: 16 }}>
+        <div className="panel-heading">
+          <div>
+            <h3 className="section-title">Estrutura organizacional (preview)</h3>
+            <p className="section-copy">Visao resumida de relacionamento entre orgaos, departamentos e lotacoes.</p>
+          </div>
+        </div>
+        <div className="table-wrap">
+          <table className="data-table">
+            <thead>
+              <tr>
+                <th>Orgao</th>
+                <th>Departamentos</th>
+                <th>Lotacoes</th>
+              </tr>
+            </thead>
+            <tbody>
+              {hierarchicalPreview.length === 0 ? (
+                <tr><td colSpan={3}><div className="empty-state">Sem dados para exibir a hierarquia.</div></td></tr>
+              ) : hierarchicalPreview.map((organization) => (
+                <tr key={`preview-${organization.id}`}>
+                  <td>
+                    <details>
+                      <summary><strong>{organization.name}</strong></summary>
+                      <ul style={{ marginTop: 8 }}>
+                        {organization.departments.map((department) => (
+                          <li key={`department-preview-${department.id}`}>
+                            {department.name} ({department.allocations.length} lotacao(oes))
+                          </li>
+                        ))}
+                      </ul>
+                    </details>
+                  </td>
+                  <td>{organization.departmentCount}</td>
+                  <td>{organization.allocationCount}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {catalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
@@ -588,6 +630,26 @@ export default function CadastrosPage() {
           </div>
           {expandedPanels.organizations ? (
             <>
+
+          <div className="filter-inline" style={{ marginBottom: 14 }}>
+            <input
+              id="search-organization-input"
+              className="app-input"
+              placeholder="Buscar orgao por nome..."
+              value={organizationSearch}
+              onChange={(event) => setOrganizationSearch(event.target.value)}
+            />
+          </div>
+
+          {selectedOrganizationIds.length > 0 ? (
+            <div className="actions-inline" style={{ marginBottom: 12 }}>
+              <span className="section-copy">{selectedOrganizationIds.length} orgao(s) selecionado(s)</span>
+              <button type="button" className="ghost-button" onClick={handleExportSelectedOrganizations}>Exportar selecionados</button>
+              <button type="button" className="mini-button danger" onClick={handleBulkDeleteOrganizations} disabled={bulkDeleting || !canDelete}>
+                {bulkDeleting ? 'Excluindo...' : 'Excluir selecionados'}
+              </button>
+            </div>
+          ) : null}
 
           <div className="filter-inline" style={{ marginBottom: 14 }}>
             <input
