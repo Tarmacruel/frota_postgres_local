@@ -2227,7 +2227,24 @@ button {
     grid-template-columns: minmax(0, 1.1fr) minmax(280px, 0.9fr);
     align-items: start;
   }
+
+  .analytics-filters-top-row {
+    flex-direction: row;
+    align-items: end;
+    justify-content: space-between;
+    gap: 16px;
+  }
+
+  .analytics-filters-grid {
+    flex: 1;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .analytics-filter-actions {
+    justify-content: flex-end;
+  }
 }
+
 
 @media (min-width: 1180px) {
   .login-shell {
@@ -2394,6 +2411,109 @@ button {
   line-height: 18px;
   text-align: center;
   padding: 0 5px;
+}
+
+
+.analytics-filters-panel {
+  margin-top: 12px;
+  margin-bottom: 12px;
+  padding: 16px;
+  border: 1px solid var(--line-soft);
+  border-radius: 18px;
+  background: color-mix(in srgb, var(--surface-strong) 94%, transparent);
+}
+
+.analytics-filters-top-row {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.analytics-filters-grid {
+  display: grid;
+  gap: 12px;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+
+.analytics-filter-field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.analytics-filter-field > span {
+  font-weight: 700;
+  color: var(--ink-soft);
+  font-size: 0.86rem;
+}
+
+.analytics-filter-field select {
+  width: 100%;
+  transition: all 0.2s ease;
+}
+
+.analytics-filter-field select:hover {
+  border-color: color-mix(in srgb, var(--ink) 26%, transparent);
+}
+
+.analytics-filter-field select:focus {
+  transform: translateY(-1px);
+  box-shadow: 0 5px 14px color-mix(in srgb, var(--navy) 15%, transparent);
+}
+
+.analytics-filter-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: end;
+}
+
+.analytics-filter-actions .app-button,
+.analytics-filter-actions .secondary-button {
+  min-height: 40px;
+}
+
+.analytics-filter-chips {
+  margin-top: 12px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+
+.analytics-filter-chip-label {
+  font-size: 0.82rem;
+  color: var(--ink-soft);
+  font-weight: 700;
+}
+
+.analytics-filter-chip {
+  border: 1px solid color-mix(in srgb, var(--navy) 18%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--navy) 8%, transparent);
+  color: var(--navy);
+  font-size: 0.8rem;
+  font-weight: 700;
+  padding: 6px 10px;
+}
+
+.analytics-filter-chip:hover {
+  background: color-mix(in srgb, var(--navy) 12%, transparent);
+}
+
+.analytics-filter-clear {
+  border: 0;
+  background: transparent;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+  text-decoration: underline;
+  padding: 6px;
+}
+
+.analytics-filter-clear:hover {
+  color: var(--ink);
 }
 
 :root {

@@ -28,8 +28,12 @@ export default function AdminAnalyticsDashboard() {
   const [exportConfig, setExportConfig] = useState({ format: 'xlsx', includeCharts: true, includeDetails: true })
 
   const query = useMemo(
-    () => ({ period_days: filters.period_days, vehicle_type: filters.vehicle_type || undefined }),
-    [filters.period_days, filters.vehicle_type],
+    () => ({
+      period_days: filters.period_days,
+      vehicle_type: filters.vehicle_type || undefined,
+      organization: filters.organization || undefined,
+    }),
+    [filters.organization, filters.period_days, filters.vehicle_type],
   )
 
   useEffect(() => {
@@ -38,12 +42,16 @@ export default function AdminAnalyticsDashboard() {
       setError('')
 
       const results = await Promise.allSettled([
-        analyticsAPI.overview({ period_days: filters.period_days }),
+        analyticsAPI.overview(query),
         analyticsAPI.efficiency(query),
         analyticsAPI.tco(query),
-        analyticsAPI.driverRisk({ period_days: filters.period_days }),
-        analyticsAPI.insights({ period_days: filters.period_days }),
-        analyticsAPI.costTrend({ months: 12, vehicle_type: filters.vehicle_type || undefined }),
+        analyticsAPI.driverRisk(query),
+        analyticsAPI.insights(query),
+        analyticsAPI.costTrend({
+          months: 12,
+          vehicle_type: filters.vehicle_type || undefined,
+          organization: filters.organization || undefined,
+        }),
       ])
 
       const [overviewResp, efficiencyResp, tcoResp, riskResp, insightsResp, trendResp] = results
@@ -78,7 +86,7 @@ export default function AdminAnalyticsDashboard() {
       setLoading(false)
     }
     load()
-  }, [filters.period_days, query, refreshTick])
+  }, [query, refreshTick])
 
   function updateFilter(name, value) {
     setFilters((current) => ({ ...current, [name]: value }))
@@ -108,13 +116,11 @@ export default function AdminAnalyticsDashboard() {
       <AdvancedFilters
         filters={filters}
         organizations={organizations}
+        loading={loading}
         onChange={updateFilter}
         onRefresh={() => setRefreshTick((value) => value + 1)}
+        onExport={() => setExportModalOpen(true)}
       />
-
-      <div className="actions-inline" style={{ marginBottom: 12 }}>
-        <button className="secondary-button" type="button" onClick={() => setExportModalOpen(true)}>Exportar relatório</button>
-      </div>
 
       {error ? <div className="alert alert-error">{error}</div> : null}
 
