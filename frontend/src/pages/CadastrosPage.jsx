@@ -1,5 +1,6 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import SearchableSelect from '../components/SearchableSelect'
+import Pagination from '../components/Pagination'
 import { masterDataAPI } from '../api/masterData'
 import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
@@ -9,6 +10,7 @@ import { exportRowsToXlsx } from '../utils/exportData'
 const initialOrganizationForm = { id: null, name: '' }
 const initialDepartmentForm = { id: null, organization_id: '', name: '' }
 const initialAllocationForm = { id: null, organization_id: '', department_id: '', name: '' }
+const PAGE_SIZE = 8
 
 export default function CadastrosPage() {
   const { canWrite, canDelete } = useAuth()
@@ -30,6 +32,9 @@ export default function CadastrosPage() {
   const [organizationSearch, setOrganizationSearch] = useState('')
   const [departmentSearch, setDepartmentSearch] = useState('')
   const [allocationSearch, setAllocationSearch] = useState('')
+  const [organizationPage, setOrganizationPage] = useState(1)
+  const [departmentPage, setDepartmentPage] = useState(1)
+  const [allocationPage, setAllocationPage] = useState(1)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
@@ -80,6 +85,49 @@ export default function CadastrosPage() {
     if (!normalizedSearch) return organizations
     return organizations.filter((organization) => organization.name.toLowerCase().includes(normalizedSearch))
   }, [organizations, organizationSearch])
+
+  const paginatedOrganizations = useMemo(() => {
+    const startIndex = (organizationPage - 1) * PAGE_SIZE
+    return filteredOrganizations.slice(startIndex, startIndex + PAGE_SIZE)
+  }, [filteredOrganizations, organizationPage])
+
+  const paginatedDepartments = useMemo(() => {
+    const startIndex = (departmentPage - 1) * PAGE_SIZE
+    return filteredDepartments.slice(startIndex, startIndex + PAGE_SIZE)
+  }, [filteredDepartments, departmentPage])
+
+  const paginatedAllocations = useMemo(() => {
+    const startIndex = (allocationPage - 1) * PAGE_SIZE
+    return filteredAllocations.slice(startIndex, startIndex + PAGE_SIZE)
+  }, [filteredAllocations, allocationPage])
+
+  const organizationTotalPages = Math.max(1, Math.ceil(filteredOrganizations.length / PAGE_SIZE))
+  const departmentTotalPages = Math.max(1, Math.ceil(filteredDepartments.length / PAGE_SIZE))
+  const allocationTotalPages = Math.max(1, Math.ceil(filteredAllocations.length / PAGE_SIZE))
+
+  useEffect(() => {
+    setOrganizationPage(1)
+  }, [organizationSearch])
+
+  useEffect(() => {
+    setDepartmentPage(1)
+  }, [selectedOrganizationFilter, departmentSearch])
+
+  useEffect(() => {
+    setAllocationPage(1)
+  }, [selectedOrganizationFilter, selectedDepartmentFilter, allocationSearch])
+
+  useEffect(() => {
+    if (organizationPage > organizationTotalPages) setOrganizationPage(organizationTotalPages)
+  }, [organizationPage, organizationTotalPages])
+
+  useEffect(() => {
+    if (departmentPage > departmentTotalPages) setDepartmentPage(departmentTotalPages)
+  }, [departmentPage, departmentTotalPages])
+
+  useEffect(() => {
+    if (allocationPage > allocationTotalPages) setAllocationPage(allocationTotalPages)
+  }, [allocationPage, allocationTotalPages])
 
   function resetForms() {
     setOrganizationForm(initialOrganizationForm)
@@ -321,7 +369,7 @@ export default function CadastrosPage() {
                   <tr><td colSpan={canWrite ? 3 : 2}>Carregando orgaos...</td></tr>
                 ) : filteredOrganizations.length === 0 ? (
                   <tr><td colSpan={canWrite ? 3 : 2}><div className="empty-state">Nenhum orgao cadastrado.</div></td></tr>
-                ) : filteredOrganizations.map((organization) => (
+                ) : paginatedOrganizations.map((organization) => (
                   <tr key={organization.id}>
                     <td data-label="Orgao"><strong>{organization.name}</strong></td>
                     <td data-label="Atualizado em">{new Date(organization.updated_at).toLocaleString('pt-BR')}</td>
@@ -340,6 +388,7 @@ export default function CadastrosPage() {
               </tbody>
             </table>
           </div>
+          <Pagination currentPage={organizationPage} totalPages={organizationTotalPages} onPageChange={setOrganizationPage} />
         </section>
 
         <section className="surface-panel panel-nested" style={{ display: activeTab === 'departments' ? 'block' : 'none' }}>
@@ -418,7 +467,7 @@ export default function CadastrosPage() {
                   <tr><td colSpan={canWrite ? 3 : 2}>Carregando departamentos...</td></tr>
                 ) : filteredDepartments.length === 0 ? (
                   <tr><td colSpan={canWrite ? 3 : 2}><div className="empty-state">Nenhum departamento encontrado.</div></td></tr>
-                ) : filteredDepartments.map((department) => (
+                ) : paginatedDepartments.map((department) => (
                   <tr key={department.id}>
                     <td data-label="Departamento"><strong>{department.name}</strong></td>
                     <td data-label="Orgao">{department.organization_name}</td>
@@ -437,6 +486,7 @@ export default function CadastrosPage() {
               </tbody>
             </table>
           </div>
+          <Pagination currentPage={departmentPage} totalPages={departmentTotalPages} onPageChange={setDepartmentPage} />
         </section>
 
         <section className="surface-panel panel-nested" style={{ display: activeTab === 'allocations' ? 'block' : 'none' }}>
@@ -545,7 +595,7 @@ export default function CadastrosPage() {
                   <tr><td colSpan={canWrite ? 4 : 3}>Carregando lotacoes...</td></tr>
                 ) : filteredAllocations.length === 0 ? (
                   <tr><td colSpan={canWrite ? 4 : 3}><div className="empty-state">Nenhuma lotacao encontrada.</div></td></tr>
-                ) : filteredAllocations.map((allocation) => (
+                ) : paginatedAllocations.map((allocation) => (
                   <tr key={allocation.id}>
                     <td data-label="Lotacao"><strong>{allocation.name}</strong></td>
                     <td data-label="Departamento">{allocation.department_name}</td>
@@ -576,6 +626,7 @@ export default function CadastrosPage() {
               </tbody>
             </table>
           </div>
+          <Pagination currentPage={allocationPage} totalPages={allocationTotalPages} onPageChange={setAllocationPage} />
         </section>
       </div>
     </div>
