@@ -26,6 +26,10 @@ export default function CadastrosPage() {
   const [allocationForm, setAllocationForm] = useState(initialAllocationForm)
   const [selectedOrganizationFilter, setSelectedOrganizationFilter] = useState('')
   const [selectedDepartmentFilter, setSelectedDepartmentFilter] = useState('')
+  const [activeTab, setActiveTab] = useState('organizations')
+  const [organizationSearch, setOrganizationSearch] = useState('')
+  const [departmentSearch, setDepartmentSearch] = useState('')
+  const [allocationSearch, setAllocationSearch] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
@@ -46,12 +50,6 @@ export default function CadastrosPage() {
     description: `${organization.departments.length} departamento(s)`,
   }))
 
-  const departmentOptions = (departmentForm.organization_id ? getDepartmentsByOrganization(departmentForm.organization_id) : []).map((department) => ({
-    value: department.id,
-    label: department.name,
-    description: department.organization_name,
-  }))
-
   const allocationDepartmentOptions = (allocationForm.organization_id ? getDepartmentsByOrganization(allocationForm.organization_id) : []).map((department) => ({
     value: department.id,
     label: department.name,
@@ -59,19 +57,29 @@ export default function CadastrosPage() {
   }))
 
   const filteredDepartments = useMemo(() => {
-    if (!selectedOrganizationFilter) return departments
-    return departments.filter((department) => department.organization_id === selectedOrganizationFilter)
-  }, [departments, selectedOrganizationFilter])
+    const normalizedSearch = departmentSearch.trim().toLowerCase()
+    return departments.filter((department) => {
+      const byOrganization = !selectedOrganizationFilter || department.organization_id === selectedOrganizationFilter
+      const bySearch = !normalizedSearch || `${department.name} ${department.organization_name}`.toLowerCase().includes(normalizedSearch)
+      return byOrganization && bySearch
+    })
+  }, [departments, selectedOrganizationFilter, departmentSearch])
 
   const filteredAllocations = useMemo(() => {
-    if (selectedDepartmentFilter) {
-      return allocations.filter((allocation) => allocation.department_id === selectedDepartmentFilter)
-    }
-    if (selectedOrganizationFilter) {
-      return allocations.filter((allocation) => allocation.organization_id === selectedOrganizationFilter)
-    }
-    return allocations
-  }, [allocations, selectedDepartmentFilter, selectedOrganizationFilter])
+    const normalizedSearch = allocationSearch.trim().toLowerCase()
+    return allocations.filter((allocation) => {
+      const byDepartment = !selectedDepartmentFilter || allocation.department_id === selectedDepartmentFilter
+      const byOrganization = selectedDepartmentFilter ? true : (!selectedOrganizationFilter || allocation.organization_id === selectedOrganizationFilter)
+      const bySearch = !normalizedSearch || `${allocation.name} ${allocation.department_name} ${allocation.organization_name}`.toLowerCase().includes(normalizedSearch)
+      return byDepartment && byOrganization && bySearch
+    })
+  }, [allocations, selectedDepartmentFilter, selectedOrganizationFilter, allocationSearch])
+
+  const filteredOrganizations = useMemo(() => {
+    const normalizedSearch = organizationSearch.trim().toLowerCase()
+    if (!normalizedSearch) return organizations
+    return organizations.filter((organization) => organization.name.toLowerCase().includes(normalizedSearch))
+  }, [organizations, organizationSearch])
 
   function resetForms() {
     setOrganizationForm(initialOrganizationForm)
@@ -232,13 +240,46 @@ export default function CadastrosPage() {
       {catalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
+      <div className="actions-inline" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
+        <button
+          className={activeTab === 'organizations' ? 'app-button' : 'ghost-button'}
+          type="button"
+          onClick={() => setActiveTab('organizations')}
+        >
+          Orgaos ({organizations.length})
+        </button>
+        <button
+          className={activeTab === 'departments' ? 'app-button' : 'ghost-button'}
+          type="button"
+          onClick={() => setActiveTab('departments')}
+        >
+          Departamentos ({departments.length})
+        </button>
+        <button
+          className={activeTab === 'allocations' ? 'app-button' : 'ghost-button'}
+          type="button"
+          onClick={() => setActiveTab('allocations')}
+        >
+          Lotacoes ({allocations.length})
+        </button>
+      </div>
+
       <div className="panel-grid cadastros-grid">
-        <section className="surface-panel panel-nested">
+        <section className="surface-panel panel-nested" style={{ display: activeTab === 'organizations' ? 'block' : 'none' }}>
           <div className="panel-heading">
             <div>
               <h3 className="section-title">Orgaos</h3>
               <p className="section-copy">Estrutura superior usada na lotacao.</p>
             </div>
+          </div>
+
+          <div className="filter-inline" style={{ marginBottom: 14 }}>
+            <input
+              className="app-input"
+              placeholder="Buscar orgao por nome..."
+              value={organizationSearch}
+              onChange={(event) => setOrganizationSearch(event.target.value)}
+            />
           </div>
 
           {canWrite ? (
@@ -278,9 +319,9 @@ export default function CadastrosPage() {
               <tbody>
                 {loading ? (
                   <tr><td colSpan={canWrite ? 3 : 2}>Carregando orgaos...</td></tr>
-                ) : organizations.length === 0 ? (
+                ) : filteredOrganizations.length === 0 ? (
                   <tr><td colSpan={canWrite ? 3 : 2}><div className="empty-state">Nenhum orgao cadastrado.</div></td></tr>
-                ) : organizations.map((organization) => (
+                ) : filteredOrganizations.map((organization) => (
                   <tr key={organization.id}>
                     <td data-label="Orgao"><strong>{organization.name}</strong></td>
                     <td data-label="Atualizado em">{new Date(organization.updated_at).toLocaleString('pt-BR')}</td>
@@ -301,7 +342,7 @@ export default function CadastrosPage() {
           </div>
         </section>
 
-        <section className="surface-panel panel-nested">
+        <section className="surface-panel panel-nested" style={{ display: activeTab === 'departments' ? 'block' : 'none' }}>
           <div className="panel-heading">
             <div>
               <h3 className="section-title">Departamentos</h3>
@@ -355,6 +396,12 @@ export default function CadastrosPage() {
               placeholder="Filtrar orgao"
               searchPlaceholder="Buscar orgao"
             />
+            <input
+              className="app-input"
+              placeholder="Buscar departamento..."
+              value={departmentSearch}
+              onChange={(event) => setDepartmentSearch(event.target.value)}
+            />
           </div>
 
           <div className="table-wrap">
@@ -392,7 +439,7 @@ export default function CadastrosPage() {
           </div>
         </section>
 
-        <section className="surface-panel panel-nested">
+        <section className="surface-panel panel-nested" style={{ display: activeTab === 'allocations' ? 'block' : 'none' }}>
           <div className="panel-heading">
             <div>
               <h3 className="section-title">Lotacoes</h3>
@@ -474,6 +521,12 @@ export default function CadastrosPage() {
               ]}
               placeholder="Filtrar departamento"
               searchPlaceholder="Buscar departamento"
+            />
+            <input
+              className="app-input"
+              placeholder="Buscar lotacao..."
+              value={allocationSearch}
+              onChange={(event) => setAllocationSearch(event.target.value)}
             />
           </div>
 
