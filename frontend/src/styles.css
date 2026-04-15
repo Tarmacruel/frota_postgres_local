@@ -2228,21 +2228,6 @@ button {
     align-items: start;
   }
 
-  .analytics-filters-top-row {
-    flex-direction: row;
-    align-items: end;
-    justify-content: space-between;
-    gap: 16px;
-  }
-
-  .analytics-filters-grid {
-    flex: 1;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
-
-  .analytics-filter-actions {
-    justify-content: flex-end;
-  }
 }
 
 
@@ -2471,6 +2456,27 @@ button {
 .analytics-filter-actions .app-button,
 .analytics-filter-actions .secondary-button {
   min-height: 40px;
+}
+
+@media (min-width: 721px) {
+  .analytics-filters-top-row {
+    flex-direction: row;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    gap: 12px;
+  }
+
+  .analytics-filters-grid {
+    flex: 1 1 720px;
+    min-width: min(100%, 320px);
+    grid-template-columns: repeat(3, minmax(170px, 1fr));
+  }
+
+  .analytics-filter-actions {
+    margin-left: auto;
+    flex: 0 0 auto;
+    justify-content: flex-end;
+  }
 }
 
 .analytics-filter-chips {
