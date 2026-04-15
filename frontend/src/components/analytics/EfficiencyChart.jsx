@@ -1,17 +1,20 @@
-function normalizeRows(rows) {
-  return rows
-    .slice(0, 12)
-    .map((item) => ({
-      id: item.vehicle_id || `${item.vehicle_type}-${item.total_km}`,
-      vehicle: item.vehicle_type,
-      consumo: Number(item.consumption_l_100km || 0),
-      media: Number(item.category_average || 0),
-    }))
-}
+import {
+  ResponsiveContainer,
+  BarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Legend,
+} from 'recharts'
 
 export default function EfficiencyChart({ rows = [] }) {
-  const data = normalizeRows(rows)
-  const maxValue = Math.max(1, ...data.map((item) => Math.max(item.consumo, item.media)))
+  const data = rows.slice(0, 12).map((item) => ({
+    vehicle: item.vehicle_type,
+    consumo: Number(item.consumption_l_100km || 0),
+    media: Number(item.category_average || 0),
+  }))
 
   return (
     <section className="surface-panel">
@@ -19,27 +22,18 @@ export default function EfficiencyChart({ rows = [] }) {
       {data.length === 0 ? (
         <div className="empty-state">Sem dados para o período selecionado.</div>
       ) : (
-        <div className="analytics-bars">
-          {data.map((item) => {
-            const consumoWidth = (item.consumo / maxValue) * 100
-            const mediaWidth = (item.media / maxValue) * 100
-            return (
-              <div key={item.id} className="analytics-bar-row">
-                <div className="analytics-bar-meta">
-                  <strong>{item.vehicle}</strong>
-                  <span>{item.consumo.toFixed(2)} vs {item.media.toFixed(2)} L/100km</span>
-                </div>
-                <div className="analytics-bar-track">
-                  <div className="analytics-bar-real" style={{ width: `${consumoWidth}%` }} />
-                  <div className="analytics-bar-target" style={{ width: `${mediaWidth}%` }} />
-                </div>
-              </div>
-            )
-          })}
-          <div className="analytics-bar-legend">
-            <span><i className="legend-real" /> Consumo real</span>
-            <span><i className="legend-target" /> Média da categoria</span>
-          </div>
+        <div style={{ width: '100%', height: 300 }}>
+          <ResponsiveContainer>
+            <BarChart data={data} margin={{ top: 20, right: 24, left: 0, bottom: 5 }}>
+              <CartesianGrid strokeDasharray="3 3" />
+              <XAxis dataKey="vehicle" />
+              <YAxis />
+              <Tooltip formatter={(value) => Number(value).toFixed(2)} />
+              <Legend />
+              <Bar dataKey="consumo" fill="var(--analytics-info)" name="Consumo real" />
+              <Bar dataKey="media" fill="var(--analytics-low)" name="Média categoria" />
+            </BarChart>
+          </ResponsiveContainer>
         </div>
       )}
     </section>

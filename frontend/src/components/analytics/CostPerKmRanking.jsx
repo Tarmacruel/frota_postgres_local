@@ -1,8 +1,18 @@
-function normalizeRows(rows) {
-  return rows.slice(0, 20).map((item, index) => {
+import {
+  ResponsiveContainer,
+  ScatterChart,
+  Scatter,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  Cell,
+} from 'recharts'
+
+export default function CostPerKmRanking({ rows = [] }) {
+  const data = rows.slice(0, 20).map((item) => {
     const variance = Number(item.variance_percentage || 0)
     return {
-      id: item.vehicle_id || `${item.vehicle_type}-${index}`,
       vehicle: item.vehicle_type,
       tco: Number(item.tco_cost_per_km || 0),
       benchmark: Number(item.market_benchmark || 0),
@@ -10,12 +20,6 @@ function normalizeRows(rows) {
       color: variance > 30 ? 'var(--analytics-critical)' : variance < -20 ? 'var(--analytics-low)' : 'var(--analytics-medium)',
     }
   })
-}
-
-export default function CostPerKmRanking({ rows = [] }) {
-  const data = normalizeRows(rows)
-  const maxX = Math.max(1, ...data.map((item) => item.benchmark))
-  const maxY = Math.max(1, ...data.map((item) => item.tco))
 
   return (
     <section className="surface-panel">
@@ -24,20 +28,24 @@ export default function CostPerKmRanking({ rows = [] }) {
         <div className="empty-state">Sem dados para o período selecionado.</div>
       ) : (
         <>
-          <div className="analytics-scatter-area">
-            {data.map((item) => {
-              const left = (item.benchmark / maxX) * 100
-              const bottom = (item.tco / maxY) * 100
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  className="analytics-scatter-dot"
-                  style={{ left: `${left}%`, bottom: `${bottom}%`, backgroundColor: item.color }}
-                  title={`${item.vehicle} | TCO: R$ ${item.tco.toFixed(2)} | Benchmark: R$ ${item.benchmark.toFixed(2)} | Desvio: ${item.variance.toFixed(2)}%`}
+          <div style={{ width: '100%', height: 300 }}>
+            <ResponsiveContainer>
+              <ScatterChart>
+                <CartesianGrid strokeDasharray="3 3" />
+                <XAxis type="number" dataKey="benchmark" name="Benchmark" unit=" R$/km" />
+                <YAxis type="number" dataKey="tco" name="TCO" unit=" R$/km" />
+                <Tooltip
+                  cursor={{ strokeDasharray: '3 3' }}
+                  formatter={(value) => Number(value).toFixed(2)}
+                  labelFormatter={(_, payload) => payload?.[0]?.payload?.vehicle || ''}
                 />
-              )
-            })}
+                <Scatter data={data}>
+                  {data.map((point, index) => (
+                    <Cell key={`${point.vehicle}-${index}`} fill={point.color} />
+                  ))}
+                </Scatter>
+              </ScatterChart>
+            </ResponsiveContainer>
           </div>
           <div className="analytics-scatter-legend">
             <span><i style={{ backgroundColor: 'var(--analytics-critical)' }} /> +30% acima do benchmark</span>

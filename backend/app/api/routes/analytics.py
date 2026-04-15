@@ -11,6 +11,7 @@ from app.schemas.analytics import (
     AnalyticsOverviewResponse,
     AnalyticsTcoItem,
     DriverRiskItem,
+    AnalyticsCostTrendItem,
 )
 from app.services.analytics_service import AnalyticsService
 
@@ -32,6 +33,17 @@ async def analytics_efficiency(
     db: AsyncSession = Depends(get_db_session),
 ):
     return await AnalyticsService(db).efficiency(period_days, vehicle_type)
+
+
+
+
+@router.get("/costs/trend", response_model=list[AnalyticsCostTrendItem])
+async def analytics_costs_trend(
+    months: int = Query(default=12, ge=3, le=24),
+    vehicle_type: str | None = Query(default=None),
+    db: AsyncSession = Depends(get_db_session),
+):
+    return await AnalyticsService(db).costs_trend(months=months, vehicle_type=vehicle_type)
 
 
 @router.get("/costs/tco", response_model=list[AnalyticsTcoItem])

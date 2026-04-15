@@ -62,3 +62,11 @@ class AnalyticsExportResponse(BaseModel):
     export_type: str
     generated_at: datetime
     filename: str
+
+
+class AnalyticsCostTrendItem(BaseModel):
+    month: str
+    fuel_cost: float
+    maintenance_cost: float
+    fines_cost: float
+    total_cost: float

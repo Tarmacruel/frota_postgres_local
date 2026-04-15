@@ -416,6 +416,55 @@ class AnalyticsService:
             [item for item in rows if item.scope == "DRIVER"],
         )
 
+
+    async def costs_trend(self, months: int = 12, vehicle_type: str | None = None) -> list[dict]:
+        now = datetime.now(timezone.utc)
+        month_end = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
+        timeline: list[dict] = []
+
+        for offset in range(months - 1, -1, -1):
+            month_start = (month_end - timedelta(days=offset * 31)).replace(day=1)
+            next_month = (month_start + timedelta(days=32)).replace(day=1)
+
+            vehicle_filter = []
+            if vehicle_type:
+                vehicle_filter = [Vehicle.vehicle_type == vehicle_type]
+
+            fuel_stmt = select(func.sum(func.coalesce(FuelSupply.total_amount, 0))).where(
+                FuelSupply.supplied_at >= month_start,
+                FuelSupply.supplied_at < next_month,
+            )
+            maint_stmt = select(func.sum(func.coalesce(MaintenanceRecord.total_cost, 0))).where(
+                MaintenanceRecord.start_date >= month_start,
+                MaintenanceRecord.start_date < next_month,
+            )
+            fine_stmt = select(func.sum(func.coalesce(Fine.amount, 0))).where(
+                Fine.infraction_date >= month_start.date(),
+                Fine.infraction_date < next_month.date(),
+            )
+
+            if vehicle_filter:
+                fuel_stmt = fuel_stmt.join(Vehicle, Vehicle.id == FuelSupply.vehicle_id).where(*vehicle_filter)
+                maint_stmt = maint_stmt.join(Vehicle, Vehicle.id == MaintenanceRecord.vehicle_id).where(*vehicle_filter)
+                fine_stmt = fine_stmt.join(Vehicle, Vehicle.id == Fine.vehicle_id).where(*vehicle_filter)
+
+            fuel_cost = float((await self.db.execute(fuel_stmt)).scalar_one() or 0)
+            maintenance_cost = float((await self.db.execute(maint_stmt)).scalar_one() or 0)
+            fines_cost = float((await self.db.execute(fine_stmt)).scalar_one() or 0)
+            total_cost = fuel_cost + maintenance_cost + fines_cost
+
+            timeline.append(
+                {
+                    "month": month_start.strftime("%m/%Y"),
+                    "fuel_cost": round(fuel_cost, 2),
+                    "maintenance_cost": round(maintenance_cost, 2),
+                    "fines_cost": round(fines_cost, 2),
+                    "total_cost": round(total_cost, 2),
+                }
+            )
+
+        return timeline
+
     async def export(self, period_days: int, export_format: str) -> Response:
         if export_format not in {"pdf", "xlsx"}:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Formato de exportacao suportado: pdf ou xlsx")
