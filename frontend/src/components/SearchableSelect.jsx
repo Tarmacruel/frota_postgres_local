@@ -16,6 +16,7 @@ export default function SearchableSelect({
   const inputRef = useRef(null)
   const [open, setOpen] = useState(false)
   const [query, setQuery] = useState('')
+  const [openUpward, setOpenUpward] = useState(false)
 
   const selectedOption = useMemo(
     () => options.find((option) => String(option.value) === String(value)) || null,
@@ -37,9 +38,23 @@ export default function SearchableSelect({
   useEffect(() => {
     if (!open) {
       setQuery('')
+      setOpenUpward(false)
       return undefined
     }
 
+    const measureAndPositionPanel = () => {
+      const triggerRect = rootRef.current?.getBoundingClientRect()
+      if (!triggerRect) return
+
+      const viewportHeight = window.innerHeight || document.documentElement.clientHeight || 0
+      const spaceBelow = viewportHeight - triggerRect.bottom
+      const spaceAbove = triggerRect.top
+      const estimatedPanelHeight = Math.min(420, Math.max(220, viewportHeight * 0.42))
+
+      setOpenUpward(spaceBelow < estimatedPanelHeight && spaceAbove > spaceBelow)
+    }
+
+    measureAndPositionPanel()
     window.setTimeout(() => inputRef.current?.focus(), 30)
 
     function handlePointerDown(event) {
@@ -56,9 +71,13 @@ export default function SearchableSelect({
 
     window.addEventListener('mousedown', handlePointerDown)
     window.addEventListener('keydown', handleKeyDown)
+    window.addEventListener('resize', measureAndPositionPanel)
+    window.addEventListener('scroll', measureAndPositionPanel, true)
     return () => {
       window.removeEventListener('mousedown', handlePointerDown)
       window.removeEventListener('keydown', handleKeyDown)
+      window.removeEventListener('resize', measureAndPositionPanel)
+      window.removeEventListener('scroll', measureAndPositionPanel, true)
     }
   }, [open])
 
@@ -73,7 +92,7 @@ export default function SearchableSelect({
   }
 
   return (
-    <div ref={rootRef} className={`searchable-select${open ? ' is-open' : ''}${disabled ? ' is-disabled' : ''}`}>
+    <div ref={rootRef} className={`searchable-select${open ? ' is-open' : ''}${openUpward ? ' opens-upward' : ''}${disabled ? ' is-disabled' : ''}`}>
       <button
         type="button"
         className="searchable-select-trigger"
