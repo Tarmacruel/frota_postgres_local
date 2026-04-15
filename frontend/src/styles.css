@@ -43,6 +43,10 @@
   overflow: hidden;
 }
 
+.modal-body .accordion-section {
+  overflow: visible;
+}
+
 .accordion-summary {
   list-style: none;
   cursor: pointer;
@@ -1705,6 +1709,7 @@ button {
   inset: 0;
   width: 100vw;
   height: 100vh;
+  height: 100dvh;
   display: grid;
   place-items: center;
   padding: 24px;
@@ -1719,6 +1724,7 @@ button {
   position: relative;
   width: min(920px, calc(100vw - 48px));
   max-height: min(88vh, 920px);
+  max-height: min(88dvh, 920px);
   overflow: auto;
   border-radius: 32px;
   padding: 30px clamp(22px, 3vw, 36px);
@@ -2104,17 +2110,15 @@ button {
     box-shadow: none;
   }
 
-  .modal-body .searchable-select-panel {
-    position: absolute;
-  }
-
   .modal-shell {
+    max-height: calc(100dvh - 20px);
     padding-bottom: calc(24px + env(safe-area-inset-bottom, 0px));
   }
 
   .modal-actions {
+    bottom: max(10px, env(safe-area-inset-bottom, 0px));
     margin-top: 8px;
-    padding-bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+    padding-bottom: 8px;
   }
 
   .topbar-search-hint {
