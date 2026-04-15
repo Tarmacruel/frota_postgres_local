@@ -18,8 +18,6 @@ import UsersPage from './pages/UsersPage'
 import VehiclesPage from './pages/VehiclesPage'
 import UnauthorizedPage from './pages/UnauthorizedPage'
 
-const AdminAnalyticsDashboard = lazy(() => import('./pages/AdminAnalyticsDashboard'))
-
 function LazyPageFallback() {
   return (
     <div className="app-loading">
@@ -67,9 +65,7 @@ export default function App() {
               path="analytics"
               element={
                 <ProtectedRoute adminOnly>
-                  <Suspense fallback={<LazyPageFallback />}>
                     <AdminAnalyticsDashboard />
-                  </Suspense>
                 </ProtectedRoute>
               }
             />
