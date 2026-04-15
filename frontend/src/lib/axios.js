@@ -9,16 +9,19 @@ const api = axios.create({
   },
 });
 
-// Interceptor para adicionar token automaticamente
-api.interceptors.request.use((config) => {
-  const token = localStorage.getItem('token');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// Interceptor para adicionar token em TODAS as requisições
+api.interceptors.request.use(
+  (config) => {
+    const token = localStorage.getItem('token');
+    if (token) {
+      config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+  },
+  (error) => Promise.reject(error)
+);
 
-// Interceptor para tratar erros de autenticação
+// Interceptor para tratar erros 401
 api.interceptors.response.use(
   (response) => response,
   (error) => {
