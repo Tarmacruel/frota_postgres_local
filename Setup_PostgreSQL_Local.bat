@@ -36,7 +36,7 @@ echo.
 cd backend
 
 REM Definir variavel de ambiente para o banco local
-set DATABASE_URL=postgresql+asyncpg://frota_user:frota_secret@127.0.0.1:5432/frota_db
+set DATABASE_URL=postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/frota_db
 
 REM Rodar alembic
 echo [1] Aplicando migrations (alembic upgrade heads)...
