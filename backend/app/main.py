@@ -5,6 +5,7 @@ from fastapi import FastAPI, HTTPException
 from fastapi.responses import FileResponse
 from fastapi.middleware.cors import CORSMiddleware
 from app.api.routes.admin_notifications import router as admin_notifications_router
+from app.api.routes.analytics import router as analytics_router
 from app.api.routes.audit import router as audit_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.claims import router as claims_router
@@ -45,6 +46,7 @@ app.include_router(claims_router)
 app.include_router(fines_router)
 app.include_router(fuel_supplies_router)
 app.include_router(search_router)
+app.include_router(analytics_router)
 
 
 @app.get("/api/health")
