@@ -2,10 +2,10 @@ param(
     [string]$DataDir = "$env:LOCALAPPDATA\FrotaPMTF\postgres-data",
     [int]$Port = 5432,
     [string]$Database = "frota_db",
-    [string]$DbUser = "postgres",
-    [string]$DbPassword = "postgres",
-    [string]$SuperUser = "postgres",
-    [string]$SuperPassword = "postgres",
+    [string]$DbUser = "frota_user",
+    [string]$DbPassword = "frota_secret",
+    [string]$SuperUser = "frota_user",
+    [string]$SuperPassword = "",
     [string]$BackupRoot = "",
     [bool]$AutoRestoreLatest = $true
 )
@@ -160,40 +160,55 @@ else {
     Write-Output "Porta $Port ja esta em uso. Usando servidor PostgreSQL ja ativo."
 }
 
-$superCheck = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "SELECT 1" -Password $SuperPassword
-if ($superCheck -ne 0) {
-    throw "Falha ao autenticar no PostgreSQL com usuario administrador '$SuperUser'. Informe -SuperPassword correto ou ajuste credenciais."
+$superPasswordCandidates = @()
+if (-not [string]::IsNullOrWhiteSpace($SuperPassword)) { $superPasswordCandidates += $SuperPassword }
+if ($superPasswordCandidates -notcontains $DbPassword) { $superPasswordCandidates += $DbPassword }
+if ($superPasswordCandidates -notcontains "postgres") { $superPasswordCandidates += "postgres" }
+if ($superPasswordCandidates -notcontains "frota_secret") { $superPasswordCandidates += "frota_secret" }
+$superPasswordCandidates += ""
+
+$authenticatedSuperPassword = $null
+foreach ($candidate in $superPasswordCandidates) {
+    $superCheck = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "SELECT 1" -Password $candidate
+    if ($superCheck -eq 0) {
+        $authenticatedSuperPassword = $candidate
+        break
+    }
+}
+
+if ($null -eq $authenticatedSuperPassword) {
+    throw "Falha ao autenticar no PostgreSQL com usuario administrador '$SuperUser'. Informe -SuperPassword correto (ou defina PG_SUPER_PASSWORD)."
 }
 
 $safeDbPassword = $DbPassword.Replace("'", "''")
 $safeDbUser = $DbUser.Replace("'", "''")
 $safeDatabase = $Database.Replace("'", "''")
 
-$roleExists = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "SELECT 1 FROM pg_roles WHERE rolname = '$safeDbUser'" -Password $SuperPassword -Capture
+$roleExists = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "SELECT 1 FROM pg_roles WHERE rolname = '$safeDbUser'" -Password $authenticatedSuperPassword -Capture
 if ($roleExists -match "1") {
-    $updateRole = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "ALTER ROLE \"$DbUser\" WITH LOGIN PASSWORD '$safeDbPassword';" -Password $SuperPassword
+    $updateRole = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "ALTER ROLE \"$DbUser\" WITH LOGIN PASSWORD '$safeDbPassword';" -Password $authenticatedSuperPassword
     if ($updateRole -ne 0) {
         throw "Falha ao atualizar usuario '$DbUser'."
     }
 }
 else {
-    $createRole = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "CREATE ROLE \"$DbUser\" LOGIN PASSWORD '$safeDbPassword';" -Password $SuperPassword
+    $createRole = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "CREATE ROLE \"$DbUser\" LOGIN PASSWORD '$safeDbPassword';" -Password $authenticatedSuperPassword
     if ($createRole -ne 0) {
         throw "Falha ao criar usuario '$DbUser'."
     }
 }
 
-$dbExists = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "SELECT 1 FROM pg_database WHERE datname = '$safeDatabase'" -Password $SuperPassword -Capture
+$dbExists = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "SELECT 1 FROM pg_database WHERE datname = '$safeDatabase'" -Password $authenticatedSuperPassword -Capture
 $createdDatabase = $false
 if ($dbExists -notmatch "1") {
-    $createDb = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "CREATE DATABASE \"$Database\" OWNER \"$DbUser\";" -Password $SuperPassword
+    $createDb = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "CREATE DATABASE \"$Database\" OWNER \"$DbUser\";" -Password $authenticatedSuperPassword
     if ($createDb -ne 0) {
         throw "Falha ao criar banco '$Database'."
     }
     $createdDatabase = $true
 }
 
-$alterDbOwner = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "ALTER DATABASE \"$Database\" OWNER TO \"$DbUser\";" -Password $SuperPassword
+$alterDbOwner = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "ALTER DATABASE \"$Database\" OWNER TO \"$DbUser\";" -Password $authenticatedSuperPassword
 if ($alterDbOwner -ne 0) {
     throw "Falha ao definir o proprietario do banco '$Database'."
 }
@@ -209,7 +224,7 @@ ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO \"$DbUser\";
 ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO \"$DbUser\";
 "@
 
-$grantResult = Invoke-Psql -User $SuperUser -Db $Database -Sql $ownershipSql -Password $SuperPassword
+$grantResult = Invoke-Psql -User $SuperUser -Db $Database -Sql $ownershipSql -Password $authenticatedSuperPassword
 if ($grantResult -ne 0) {
     throw "Falha ao ajustar permissoes no banco '$Database'."
 }

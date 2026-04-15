@@ -125,9 +125,9 @@ O banco padrao roda localmente em:
 - Host: `127.0.0.1`
 - Porta: `5432`
 - Banco: `frota_db`
-- Usuario: `postgres`
-- Senha: `postgres`
-- URL padrao: `postgresql+asyncpg://postgres:postgres@127.0.0.1:5432/frota_db`
+- Usuario: `frota_user`
+- Senha: `frota_secret`
+- URL padrao: `postgresql+asyncpg://frota_user:frota_secret@127.0.0.1:5432/frota_db`
 
 O script [scripts/start_local_postgres.ps1](/z:/FROTAS/frota_postgres_local/scripts/start_local_postgres.ps1):
 
@@ -170,7 +170,7 @@ Bootstrap do PostgreSQL (dentro de `backend`, usando wrapper):
 
 ```powershell
 cd backend
-powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_local_postgres.ps1 -Port 5432 -Database frota_db -DbUser postgres -DbPassword postgres -SuperUser postgres -SuperPassword postgres
+powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_local_postgres.ps1 -Port 5432 -Database frota_db -DbUser frota_user -DbPassword frota_secret -SuperUser frota_user
 ```
 
 ## Areas da aplicacao

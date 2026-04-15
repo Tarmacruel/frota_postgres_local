@@ -41,7 +41,7 @@ echo.
 echo PostgreSQL running at: localhost:5432
 echo.
 echo Options:
-echo   1. Apply Database Migrations
+echo   1. Run Full DB Setup (DB + Migrations + Seed)
 echo   2. Check Status
 echo   3. Exit
 echo.

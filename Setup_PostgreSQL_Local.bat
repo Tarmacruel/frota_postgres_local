@@ -20,9 +20,9 @@ echo.
 
 echo [0] Garantindo PostgreSQL local em 127.0.0.1:5432...
 if "%PG_SUPER_PASSWORD%"=="" (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start_local_postgres.ps1" -Port 5432 -Database frota_db -DbUser postgres -DbPassword postgres -SuperUser postgres -SuperPassword postgres
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start_local_postgres.ps1" -Port 5432 -Database frota_db -DbUser frota_user -DbPassword frota_secret -SuperUser frota_user
 ) else (
-    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start_local_postgres.ps1" -Port 5432 -Database frota_db -DbUser postgres -DbPassword postgres -SuperUser postgres -SuperPassword "%PG_SUPER_PASSWORD%"
+    powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0scripts\start_local_postgres.ps1" -Port 5432 -Database frota_db -DbUser frota_user -DbPassword frota_secret -SuperUser frota_user -SuperPassword "%PG_SUPER_PASSWORD%"
 )
 if %ERRORLEVEL% neq 0 (
     echo.
