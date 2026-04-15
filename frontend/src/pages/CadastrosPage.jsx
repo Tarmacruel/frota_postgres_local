@@ -53,6 +53,16 @@ export default function CadastrosPage() {
     { orgao: 'Secretaria de Educacao', departamento: 'Transporte Escolar', lotacao: 'Garagem Norte' },
   ]
 
+  const importTemplateColumns = [
+    { header: 'orgao', value: (row) => row.orgao },
+    { header: 'departamento', value: (row) => row.departamento },
+    { header: 'lotacao', value: (row) => row.lotacao },
+  ]
+  const importTemplateRows = [
+    { orgao: 'Secretaria de Saude', departamento: 'Transporte Sanitario', lotacao: 'Garagem Central' },
+    { orgao: 'Secretaria de Educacao', departamento: 'Transporte Escolar', lotacao: 'Garagem Norte' },
+  ]
+
   const organizationOptions = organizations.map((organization) => ({
     value: organization.id,
     label: organization.name,
