@@ -4,6 +4,7 @@ from app.models.claim import Claim, ClaimStatus, ClaimType
 from app.models.driver import Driver, DriverLicenseCategory
 from app.models.fine import Fine, FineStatus
 from app.models.fuel_supply import FuelSupply
+from app.models.fleet_analytics_snapshot import FleetAnalyticsSnapshot
 from app.models.master_data import Allocation, Department, Organization
 from app.models.user import User, UserRole
 from app.models.vehicle import Vehicle, VehicleOwnershipType, VehicleStatus, VehicleType
@@ -23,6 +24,7 @@ __all__ = [
     "Fine",
     "FineStatus",
     "FuelSupply",
+    "FleetAnalyticsSnapshot",
     "Organization",
     "Department",
     "Allocation",
