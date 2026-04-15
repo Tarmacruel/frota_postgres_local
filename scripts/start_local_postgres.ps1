@@ -1,4 +1,5 @@
 param(
+    [string]$Host = "localhost",
     [string]$DataDir = "$env:LOCALAPPDATA\FrotaPMTF\postgres-data",
     [int]$Port = 5432,
     [string]$Database = "frota_db",
@@ -57,7 +58,7 @@ function Invoke-Psql {
 
     $args = @(
         "-w",
-        "-h", "127.0.0.1",
+        "-h", $Host,
         "-p", "$Port",
         "-U", $User,
         "-d", $Db,
@@ -102,7 +103,7 @@ function Invoke-PsqlFile {
 
     $args = @(
         "-w",
-        "-h", "127.0.0.1",
+        "-h", $Host,
         "-p", "$Port",
         "-U", $User,
         "-d", $Db,
@@ -145,7 +146,7 @@ if (-not $portInUse) {
 
     if (Test-Path $configPath) {
         $config = Get-Content $configPath -Raw
-        $config = $config -replace "#?listen_addresses\s*=.*", "listen_addresses = '127.0.0.1'"
+        $config = $config -replace "#?listen_addresses\s*=.*", "listen_addresses = 'localhost'"
         $config = $config -replace "#?port\s*=.*", "port = $Port"
         Set-Content $configPath $config
     }
@@ -197,15 +198,22 @@ $safeDbPassword = $DbPassword.Replace("'", "''")
 $safeDbUser = $DbUser.Replace("'", "''")
 $safeDatabase = $Database.Replace("'", "''")
 
+if ($DbUser -notmatch "^[A-Za-z_][A-Za-z0-9_]*$") {
+    throw "Nome de usuario invalido para SQL: '$DbUser'."
+}
+if ($Database -notmatch "^[A-Za-z_][A-Za-z0-9_]*$") {
+    throw "Nome de banco invalido para SQL: '$Database'."
+}
+
 $roleExists = Invoke-Psql -User $authenticatedSuperUser -Db "postgres" -Sql "SELECT 1 FROM pg_roles WHERE rolname = '$safeDbUser'" -Password $authenticatedSuperPassword -Capture
 if ($roleExists -match "1") {
-    $updateRole = Invoke-Psql -User $authenticatedSuperUser -Db "postgres" -Sql "ALTER ROLE \"$DbUser\" WITH LOGIN PASSWORD '$safeDbPassword';" -Password $authenticatedSuperPassword
+    $updateRole = Invoke-Psql -User $authenticatedSuperUser -Db "postgres" -Sql "ALTER ROLE $DbUser WITH LOGIN PASSWORD '$safeDbPassword';" -Password $authenticatedSuperPassword
     if ($updateRole -ne 0) {
         throw "Falha ao atualizar usuario '$DbUser'."
     }
 }
 else {
-    $createRole = Invoke-Psql -User $authenticatedSuperUser -Db "postgres" -Sql "CREATE ROLE \"$DbUser\" LOGIN PASSWORD '$safeDbPassword';" -Password $authenticatedSuperPassword
+    $createRole = Invoke-Psql -User $authenticatedSuperUser -Db "postgres" -Sql "CREATE ROLE $DbUser LOGIN PASSWORD '$safeDbPassword';" -Password $authenticatedSuperPassword
     if ($createRole -ne 0) {
         throw "Falha ao criar usuario '$DbUser'."
     }
@@ -214,27 +222,27 @@ else {
 $dbExists = Invoke-Psql -User $authenticatedSuperUser -Db "postgres" -Sql "SELECT 1 FROM pg_database WHERE datname = '$safeDatabase'" -Password $authenticatedSuperPassword -Capture
 $createdDatabase = $false
 if ($dbExists -notmatch "1") {
-    $createDb = Invoke-Psql -User $authenticatedSuperUser -Db "postgres" -Sql "CREATE DATABASE \"$Database\" OWNER \"$DbUser\";" -Password $authenticatedSuperPassword
+    $createDb = Invoke-Psql -User $authenticatedSuperUser -Db "postgres" -Sql "CREATE DATABASE $Database OWNER $DbUser;" -Password $authenticatedSuperPassword
     if ($createDb -ne 0) {
         throw "Falha ao criar banco '$Database'."
     }
     $createdDatabase = $true
 }
 
-$alterDbOwner = Invoke-Psql -User $authenticatedSuperUser -Db "postgres" -Sql "ALTER DATABASE \"$Database\" OWNER TO \"$DbUser\";" -Password $authenticatedSuperPassword
+$alterDbOwner = Invoke-Psql -User $authenticatedSuperUser -Db "postgres" -Sql "ALTER DATABASE $Database OWNER TO $DbUser;" -Password $authenticatedSuperPassword
 if ($alterDbOwner -ne 0) {
     throw "Falha ao definir o proprietario do banco '$Database'."
 }
 
 $ownershipSql = @"
-ALTER SCHEMA public OWNER TO \"$DbUser\";
-GRANT ALL ON SCHEMA public TO \"$DbUser\";
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"$DbUser\";
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO \"$DbUser\";
-GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO \"$DbUser\";
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO \"$DbUser\";
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO \"$DbUser\";
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO \"$DbUser\";
+ALTER SCHEMA public OWNER TO $DbUser;
+GRANT ALL ON SCHEMA public TO $DbUser;
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $DbUser;
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $DbUser;
+GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO $DbUser;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $DbUser;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO $DbUser;
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO $DbUser;
 "@
 
 $grantResult = Invoke-Psql -User $authenticatedSuperUser -Db $Database -Sql $ownershipSql -Password $authenticatedSuperPassword
@@ -274,4 +282,4 @@ if ($createdDatabase -and $AutoRestoreLatest) {
     }
 }
 
-Write-Output "PostgreSQL local pronto em 127.0.0.1:$Port/$Database"
+Write-Output "PostgreSQL local pronto em $Host:$Port/$Database"

@@ -1,4 +1,5 @@
 param(
+    [string]$Host = "localhost",
     [int]$Port = 5432,
     [string]$Database = "frota_db",
     [string]$DbUser = "frota_user",
@@ -10,5 +11,5 @@ param(
 $repoRootScript = Join-Path $PSScriptRoot "..\..\scripts\start_local_postgres.ps1"
 $resolvedScript = (Resolve-Path $repoRootScript).Path
 
-& powershell -NoProfile -ExecutionPolicy Bypass -File $resolvedScript -Port $Port -Database $Database -DbUser $DbUser -DbPassword $DbPassword -SuperUser $SuperUser -SuperPassword $SuperPassword
+& powershell -NoProfile -ExecutionPolicy Bypass -File $resolvedScript -Host $Host -Port $Port -Database $Database -DbUser $DbUser -DbPassword $DbPassword -SuperUser $SuperUser -SuperPassword $SuperPassword
 exit $LASTEXITCODE

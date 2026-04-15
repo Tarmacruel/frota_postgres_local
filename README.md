@@ -104,10 +104,10 @@ Esse fluxo:
 - builda o frontend
 - sobe o **frontend** na porta `80` (Vite com proxy interno)
 - sobe a **API backend** separadamente na porta `8000`
-- faz bind do frontend em `127.0.0.1` para compatibilidade com tunnel Cloudflare
-- configura proxy do frontend para `/api` -> `http://127.0.0.1:8000`
+- faz bind do frontend em `localhost` para compatibilidade com tunnel Cloudflare
+- configura proxy do frontend para `/api` -> `http://localhost:8000`
 - ativa configuracao de producao (em loopback, `COOKIE_SECURE=false` para permitir login via HTTP local)
-- ajusta CORS automaticamente (loopback + domínio institucional quando em `127.0.0.1`)
+- ajusta CORS automaticamente (loopback + domínio institucional quando em `localhost`)
 
 Arquivos de apoio:
 
@@ -122,12 +122,12 @@ O projeto nao depende mais de Docker.
 
 O banco padrao roda localmente em:
 
-- Host: `127.0.0.1`
+- Host: `localhost`
 - Porta: `5432`
 - Banco: `frota_db`
 - Usuario: `frota_user`
 - Senha: `frota_secret`
-- URL padrao: `postgresql+asyncpg://frota_user:frota_secret@127.0.0.1:5432/frota_db`
+- URL padrao: `postgresql+asyncpg://frota_user:frota_secret@localhost:5432/frota_db`
 
 > Se sua instalacao usa `postgres` no pgAdmin (como usuario admin), o bootstrap detecta e usa `postgres` automaticamente para criar o banco quando necessario.
 
@@ -159,7 +159,7 @@ npm install
 npm run dev
 ```
 
-> Se o backend estiver em outra porta (ex.: `80` no publish), crie `frontend/.env.local` com `VITE_API_PROXY_TARGET=http://127.0.0.1:80` antes de rodar `npm run dev`.
+> Se o backend estiver em outra porta (ex.: `80` no publish), crie `frontend/.env.local` com `VITE_API_PROXY_TARGET=http://localhost:80` antes de rodar `npm run dev`.
 
 Backend isolado:
 
@@ -256,7 +256,7 @@ Setup_PostgreSQL_Local.bat
 ```
 
 O `Setup_PostgreSQL_Local.bat` agora:
-1. garante o PostgreSQL local em `127.0.0.1:5432`,
+1. garante o PostgreSQL local em `localhost:5432`,
 2. configura banco/credenciais,
 3. restaura o backup mais recente se o banco for criado do zero,
 4. aplica `alembic upgrade heads`,
