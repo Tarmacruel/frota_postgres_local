@@ -6,6 +6,7 @@ import EfficiencyChart from '../components/analytics/EfficiencyChart'
 import CostPerKmRanking from '../components/analytics/CostPerKmRanking'
 import DriverRiskTable from '../components/analytics/DriverRiskTable'
 import SmartInsightsList from '../components/analytics/SmartInsightsList'
+import KPICards from '../components/analytics/KPICards'
 
 export default function AdminAnalyticsDashboard() {
   const [filters, setFilters] = useState({ period_days: 30, vehicle_type: '', organization: '' })
@@ -62,13 +63,6 @@ export default function AdminAnalyticsDashboard() {
     window.URL.revokeObjectURL(url)
   }
 
-  const cards = [
-    { label: 'Consumo médio', value: overview?.average_consumption_l_100km, suffix: ' L/100km' },
-    { label: 'Custo médio / km', value: overview?.average_tco_per_km, suffix: ' R$/km' },
-    { label: 'Alertas ativos', value: overview?.active_alerts, suffix: '' },
-    { label: 'Frota ativa', value: overview?.fleet_active, suffix: '' },
-  ]
-
   return (
     <div className="surface-panel">
       <h2 className="section-title">Analytics Administrativo</h2>
@@ -83,13 +77,8 @@ export default function AdminAnalyticsDashboard() {
 
       {error ? <div className="alert alert-error">{error}</div> : null}
 
-      <div className="metrics-grid" style={{ margin: '16px 0' }}>
-        {cards.map((card) => (
-          <article key={card.label} className="metric-card">
-            <span>{card.label}</span>
-            <div className="metric-value">{loading ? '--' : `${card.value ?? 0}${card.suffix}`}</div>
-          </article>
-        ))}
+      <div style={{ margin: '16px 0' }}>
+        <KPICards overview={overview} loading={loading} />
       </div>
 
       <div className="dashboard-grid">
