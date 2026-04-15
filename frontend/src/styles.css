@@ -2003,8 +2003,45 @@ button {
 }
 
 .cadastros-grid {
-  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  grid-template-columns: 1fr;
   align-items: start;
+  gap: 16px;
+}
+
+.cadastros-toolbar-btn {
+  min-height: 38px;
+  padding: 9px 14px;
+  border-radius: 12px;
+}
+
+.panel-nested .panel-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.panel-nested {
+  border: 1px solid var(--line-soft);
+  border-radius: 20px;
+  background: color-mix(in srgb, var(--surface-strong) 95%, transparent);
+  box-shadow: 0 1px 0 rgba(15, 23, 42, 0.03);
+  padding: 16px;
+}
+
+.panel-nested .table-wrap {
+  border-radius: 16px;
+}
+
+.panel-nested .app-button,
+.panel-nested .ghost-button,
+.panel-nested .mini-button {
+  min-height: 36px;
+}
+
+.panel-nested .actions-inline {
+  gap: 10px;
 }
 
 .helper-text {

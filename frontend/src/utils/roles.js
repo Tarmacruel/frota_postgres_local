@@ -16,6 +16,10 @@ export function canDelete(role) {
   return role === 'ADMIN'
 }
 
+export function canManageCadastros(role) {
+  return role === 'ADMIN' || role === 'PRODUCAO'
+}
+
 export function getRoleLabel(role) {
   return ROLE_LABELS[role] || role || 'Sem perfil'
 }
