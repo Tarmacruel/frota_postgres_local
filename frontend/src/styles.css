@@ -2385,6 +2385,10 @@ button {
     grid-template-columns: minmax(0, 1.2fr) minmax(320px, 0.8fr);
   }
 
+  .cadastros-grid {
+    grid-template-columns: 1fr;
+  }
+
   .app-sidebar.is-compact .brand-copy,
   .app-sidebar.is-compact .nav-section-title,
   .app-sidebar.is-compact .nav-text,
