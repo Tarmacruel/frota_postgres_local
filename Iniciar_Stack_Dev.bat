@@ -39,8 +39,8 @@ start "FROTA Backend" cmd /k "cd /d "%~dp0" && powershell -NoProfile -ExecutionP
 timeout /t 3 /nobreak
 
 REM Abrir Frontend em nova janela
-echo [2/2] Iniciando Frontend em localhost:3001...
-start "FROTA Frontend" cmd /k "cd /d "%~dp0" && powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\run-frontend-dev.ps1" -Port 3001"
+echo [2/2] Iniciando Frontend em localhost:3000...
+start "FROTA Frontend" cmd /k "cd /d "%~dp0" && powershell -NoProfile -ExecutionPolicy Bypass -File ".\scripts\run-frontend-dev.ps1" -Port 3000"
 
 timeout /t 2 /nobreak
 
@@ -53,8 +53,8 @@ echo.
 echo 🚀 Backend:  http://localhost:8000
 echo              http://seu-ip:8000 (rede)
 echo.
-echo ⚛️  Frontend: http://localhost:3001
-echo              http://seu-ip:3001 (rede)
+echo ⚛️  Frontend: http://localhost:3000
+echo              http://seu-ip:3000 (rede)
 echo.
 echo 📊 Swagger:  http://localhost:8000/docs
 echo.

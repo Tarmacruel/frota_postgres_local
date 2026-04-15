@@ -1,92 +1,202 @@
-import { useEffect, useMemo, useState } from 'react'
-import { masterDataAPI } from '../api/masterData'
-import { getApiErrorMessage } from '../utils/apiError'
+// frontend/src/hooks/useMasterDataCatalog.js
+import { useState, useEffect, useContext, useCallback } from 'react';
+import { MasterDataContext } from '../context/MasterDataContext';
+import api from '../lib/axios';
 
-function flattenCatalog(organizations) {
-  const departments = []
-  const allocations = []
+/**
+ * Hook personalizado para gerenciar dados mestres da frota
+ * @returns {Object} Dados de veículos, órgãos, motoristas e funções de refresh
+ */
+export const useMasterDataCatalog = () => {
+  // VALIDAÇÃO CRÍTICA: Verificar se o hook está sendo usado dentro do Provider
+  const context = useContext(MasterDataContext);
+  
+  if (context === undefined) {
+    throw new Error(
+      'useMasterDataCatalog deve ser utilizado dentro de um MasterDataProvider. ' +
+      'Verifique se <MasterDataProvider> envolve sua árvore de componentes em main.jsx.'
+    );
+  }
 
-  organizations.forEach((organization) => {
-    organization.departments.forEach((department) => {
-      departments.push({
-        ...department,
-        organization_id: organization.id,
-        organization_name: organization.name,
-      })
+  // Estados locais para cache e controle
+  const [vehicles, setVehicles] = useState([]);
+  const [organs, setOrgans] = useState([]);
+  const [drivers, setDrivers] = useState([]);
+  const [vehicleTypes, setVehicleTypes] = useState([]);
+  
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState(null);
+  const [lastFetch, setLastFetch] = useState(null);
 
-      department.allocations.forEach((allocation) => {
-        allocations.push({
-          ...allocation,
-          organization_id: organization.id,
-          organization_name: organization.name,
-          department_id: department.id,
-          department_name: department.name,
-          display_name: allocation.display_name || `${organization.name} - ${department.name} - ${allocation.name}`,
-        })
-      })
-    })
-  })
-
-  return { departments, allocations }
-}
-
-export function useMasterDataCatalog() {
-  const [organizations, setOrganizations] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState('')
-
-  async function reload() {
+  // Função para buscar veículos
+  const fetchVehicles = useCallback(async () => {
     try {
-      setLoading(true)
-      setError('')
-      const { data } = await masterDataAPI.getCatalog()
-      setOrganizations(data.organizations || [])
+      const response = await api.get('/api/vehicles', {
+        params: { limit: 1000, status: 'active' }
+      });
+      setVehicles(response.data.items || response.data || []);
+      return true;
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar os cadastros de lotacao.'))
-    } finally {
-      setLoading(false)
+      console.error('Erro ao buscar veículos:', err);
+      setError('Falha ao carregar veículos');
+      return false;
     }
-  }
+  }, []);
 
+  // Função para buscar órgãos
+  const fetchOrgans = useCallback(async () => {
+    try {
+      const response = await api.get('/api/organs', {
+        params: { limit: 500 }
+      });
+      setOrgans(response.data.items || response.data || []);
+      return true;
+    } catch (err) {
+      console.error('Erro ao buscar órgãos:', err);
+      setError('Falha ao carregar órgãos');
+      return false;
+    }
+  }, []);
+
+  // Função para buscar motoristas
+  const fetchDrivers = useCallback(async () => {
+    try {
+      const response = await api.get('/api/drivers', {
+        params: { limit: 1000, status: 'active' }
+      });
+      setDrivers(response.data.items || response.data || []);
+      return true;
+    } catch (err) {
+      console.error('Erro ao buscar motoristas:', err);
+      setError('Falha ao carregar motoristas');
+      return false;
+    }
+  }, []);
+
+  // Função para buscar tipos de veículo
+  const fetchVehicleTypes = useCallback(async () => {
+    try {
+      const response = await api.get('/api/vehicle-types');
+      setVehicleTypes(response.data || []);
+      return true;
+    } catch (err) {
+      console.error('Erro ao buscar tipos de veículo:', err);
+      // Fallback com valores padrão se a API não existir ainda
+      setVehicleTypes([
+        { id: 'SEDAN', name: 'Sedan' },
+        { id: 'HATCH', name: 'Hatch' },
+        { id: 'SUV', name: 'SUV' },
+        { id: 'PICAPE', name: 'Picape' },
+        { id: 'VAN', name: 'Van' },
+        { id: 'ONIBUS', name: 'Ônibus' },
+        { id: 'CAMINHAO', name: 'Caminhão' },
+        { id: 'MOTO', name: 'Motocicleta' },
+      ]);
+      return true;
+    }
+  }, []);
+
+  // Função principal de carregamento
+  const loadAll = useCallback(async (force = false) => {
+    // Evitar refetch muito frequente (cache de 5 minutos)
+    const now = Date.now();
+    if (!force && lastFetch && (now - lastFetch) < 5 * 60 * 1000) {
+      return;
+    }
+
+    setLoading(true);
+    setError(null);
+
+    try {
+      // Executar todas as buscas em paralelo
+      const [vehiclesOk, organsOk, driversOk, typesOk] = await Promise.all([
+        fetchVehicles(),
+        fetchOrgans(),
+        fetchDrivers(),
+        fetchVehicleTypes(),
+      ]);
+
+      if (vehiclesOk && organsOk && driversOk) {
+        setLastFetch(Date.now());
+      }
+    } catch (err) {
+      console.error('Erro crítico ao carregar catálogo:', err);
+      setError('Falha ao carregar dados mestres. Recarregue a página.');
+    } finally {
+      setLoading(false);
+    }
+  }, [fetchVehicles, fetchOrgans, fetchDrivers, fetchVehicleTypes, lastFetch]);
+
+  // Efeito para carregar dados na montagem do hook
   useEffect(() => {
-    reload()
-  }, [])
+    let isMounted = true;
 
-  const { departments, allocations } = useMemo(() => flattenCatalog(organizations), [organizations])
+    const initialize = async () => {
+      if (isMounted) {
+        await loadAll(false);
+      }
+    };
 
-  function getDepartmentsByOrganization(organizationId) {
-    if (!organizationId) return departments
-    return departments.filter((department) => department.organization_id === organizationId)
-  }
+    initialize();
 
-  function getAllocationsByDepartment(departmentId) {
-    if (!departmentId) return allocations
-    return allocations.filter((allocation) => allocation.department_id === departmentId)
-  }
+    return () => {
+      isMounted = false;
+    };
+  }, [loadAll]);
 
-  function findOrganization(organizationId) {
-    return organizations.find((organization) => organization.id === organizationId) || null
-  }
+  // Funções utilitárias de busca
+  const getVehicleById = useCallback((id) => {
+    return vehicles.find(v => v.id === id) || null;
+  }, [vehicles]);
 
-  function findDepartment(departmentId) {
-    return departments.find((department) => department.id === departmentId) || null
-  }
+  const getOrganById = useCallback((id) => {
+    return organs.find(o => o.id === id) || null;
+  }, [organs]);
 
-  function findAllocation(allocationId) {
-    return allocations.find((allocation) => allocation.id === allocationId) || null
-  }
+  const getDriverById = useCallback((id) => {
+    return drivers.find(d => d.id === id) || null;
+  }, [drivers]);
 
+  const getVehicleTypeLabel = useCallback((typeId) => {
+    const type = vehicleTypes.find(t => t.id === typeId);
+    return type?.name || typeId || 'Não especificado';
+  }, [vehicleTypes]);
+
+  // Função de refresh manual
+  const refresh = useCallback(() => {
+    return loadAll(true);
+  }, [loadAll]);
+
+  // Retorno do hook
   return {
-    organizations,
-    departments,
-    allocations,
+    // Dados
+    vehicles,
+    organs,
+    drivers,
+    vehicleTypes,
+    
+    // Estados
     loading,
     error,
-    reload,
-    getDepartmentsByOrganization,
-    getAllocationsByDepartment,
-    findOrganization,
-    findDepartment,
-    findAllocation,
-  }
-}
+    lastFetch,
+    
+    // Ações
+    refresh,
+    loadAll,
+    
+    // Helpers
+    getVehicleById,
+    getOrganById,
+    getDriverById,
+    getVehicleTypeLabel,
+    
+    // Contagens
+    counts: {
+      vehicles: vehicles.length,
+      organs: organs.length,
+      drivers: drivers.length,
+    },
+  };
+};
+
+export default useMasterDataCatalog;
