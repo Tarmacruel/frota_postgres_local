@@ -3,6 +3,7 @@ import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider } from './context/AuthContext'
 import AuditPage from './pages/AuditPage'
+import AdminAnalyticsDashboard from './pages/AdminAnalyticsDashboard'
 import CadastrosPage from './pages/CadastrosPage'
 import ClaimsPage from './pages/ClaimsPage'
 import DashboardPage from './pages/DashboardPage'
@@ -14,6 +15,7 @@ import MaintenancePage from './pages/MaintenancePage'
 import PossessionPage from './pages/PossessionPage'
 import UsersPage from './pages/UsersPage'
 import VehiclesPage from './pages/VehiclesPage'
+import UnauthorizedPage from './pages/UnauthorizedPage'
 
 export default function App() {
   return (
@@ -21,6 +23,7 @@ export default function App() {
       <BrowserRouter>
         <Routes>
           <Route path="/login" element={<LoginPage />} />
+          <Route path="/unauthorized" element={<UnauthorizedPage />} />
           <Route
             path="/"
             element={
@@ -43,6 +46,14 @@ export default function App() {
               element={
                 <ProtectedRoute adminOnly>
                   <UsersPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="analytics"
+              element={
+                <ProtectedRoute adminOnly>
+                  <AdminAnalyticsDashboard />
                 </ProtectedRoute>
               }
             />

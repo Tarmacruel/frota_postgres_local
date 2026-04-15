@@ -2395,3 +2395,85 @@ button {
   text-align: center;
   padding: 0 5px;
 }
+
+:root {
+  --analytics-critical: #dc2626;
+  --analytics-high: #ea580c;
+  --analytics-medium: #ca8a04;
+  --analytics-low: #16a34a;
+  --analytics-info: #2563eb;
+}
+
+.analytics-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 12px;
+}
+
+.analytics-kpi-card {
+  border-left: 4px solid var(--analytics-info);
+  border-radius: 12px;
+  padding: 16px;
+  background: var(--surface);
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.analytics-kpi-label { display: block; font-size: 0.85rem; opacity: .8; }
+.analytics-kpi-value { display: block; font-size: 1.2rem; margin-top: 4px; }
+.analytics-kpi-hint { display: block; margin-top: 4px; font-size: 0.78rem; opacity: .75; }
+.analytics-kpi-icon { font-size: 2rem; opacity: .55; }
+
+.status-critical { border-left-color: var(--analytics-critical); }
+.status-high { border-left-color: var(--analytics-high); }
+.status-medium { border-left-color: var(--analytics-medium); }
+.status-low { border-left-color: var(--analytics-low); }
+.status-info { border-left-color: var(--analytics-info); }
+
+.analytics-bars { display: flex; flex-direction: column; gap: 10px; }
+.analytics-bar-row { display: flex; flex-direction: column; gap: 6px; }
+.analytics-bar-meta { display: flex; justify-content: space-between; font-size: 0.85rem; }
+.analytics-bar-track { height: 12px; border-radius: 999px; background: color-mix(in srgb, var(--ink) 8%, transparent); position: relative; overflow: hidden; }
+.analytics-bar-real { position: absolute; left: 0; top: 0; bottom: 0; background: var(--analytics-info); opacity: .85; }
+.analytics-bar-target { position: absolute; left: 0; top: 2px; bottom: 2px; background: var(--analytics-low); opacity: .8; border-radius: 999px; }
+.analytics-bar-legend { display: flex; gap: 14px; font-size: 0.8rem; margin-top: 6px; }
+.analytics-bar-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
+.analytics-bar-legend .legend-real { background: var(--analytics-info); }
+.analytics-bar-legend .legend-target { background: var(--analytics-low); }
+
+.analytics-scatter-area {
+  position: relative;
+  height: 260px;
+  border: 1px solid color-mix(in srgb, var(--ink) 10%, transparent);
+  border-radius: 10px;
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--ink) 8%, transparent) 1px, transparent 1px),
+    linear-gradient(to top, color-mix(in srgb, var(--ink) 8%, transparent) 1px, transparent 1px);
+  background-size: 28px 28px;
+}
+
+.analytics-scatter-dot {
+  position: absolute;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 0;
+  transform: translate(-50%, -50%);
+  cursor: help;
+}
+
+.analytics-scatter-legend { display: flex; flex-wrap: wrap; gap: 12px; font-size: .8rem; margin-top: 8px; }
+.analytics-scatter-legend i { display: inline-block; width: 10px; height: 10px; border-radius: 50%; margin-right: 4px; }
+
+.analytics-insight-list { display: flex; flex-direction: column; gap: 10px; }
+.analytics-insight { border-left: 4px solid var(--analytics-medium); border-radius: 10px; padding: 12px; }
+.analytics-insight header { display: flex; justify-content: space-between; gap: 8px; align-items: center; }
+.analytics-insight-title { display: flex; align-items: center; gap: 8px; }
+.analytics-insight p { margin: 8px 0; font-size: .9rem; }
+.analytics-insight footer { display: flex; justify-content: space-between; gap: 8px; font-size: .8rem; }
+.insight-critical { background: color-mix(in srgb, var(--analytics-critical) 8%, white); border-left-color: var(--analytics-critical); }
+.insight-high { background: color-mix(in srgb, var(--analytics-high) 8%, white); border-left-color: var(--analytics-high); }
+.insight-medium { background: color-mix(in srgb, var(--analytics-medium) 10%, white); border-left-color: var(--analytics-medium); }
+.insight-up { color: var(--analytics-critical); }
+.insight-down { color: var(--analytics-low); }

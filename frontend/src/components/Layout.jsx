@@ -59,6 +59,7 @@ export default function Layout() {
       sections.push({
         title: 'Gestao',
         items: [
+          { to: '/analytics', label: 'Analytics', description: 'BI operacional da frota', icon: 'dashboard' },
           { to: '/users', label: 'Usuarios', description: 'Perfis e niveis de acesso', icon: 'users' },
           { to: '/auditoria', label: 'Auditoria', description: 'Rastreabilidade administrativa', icon: 'audit' },
         ],
