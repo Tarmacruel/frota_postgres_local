@@ -56,6 +56,12 @@ export default function CadastrosPage() {
   const [selectedOrganizationIds, setSelectedOrganizationIds] = useState([])
   const [selectedDepartmentIds, setSelectedDepartmentIds] = useState([])
   const [selectedAllocationIds, setSelectedAllocationIds] = useState([])
+  const [expandedPanels, setExpandedPanels] = useState({
+    preview: true,
+    organizations: true,
+    departments: true,
+    allocations: true,
+  })
 
   const organizationOptions = organizations.map((organization) => ({
     value: organization.id,
@@ -194,6 +200,10 @@ export default function CadastrosPage() {
     setOrganizationForm(initialOrganizationForm)
     setDepartmentForm(initialDepartmentForm)
     setAllocationForm(initialAllocationForm)
+  }
+
+  function togglePanel(panelName) {
+    setExpandedPanels((current) => ({ ...current, [panelName]: !current[panelName] }))
   }
 
   async function handleSubmitOrganization(event) {
@@ -483,27 +493,59 @@ export default function CadastrosPage() {
           <p className="section-copy">Cadastre previamente orgaos, departamentos e lotacoes para padronizar a lotacao dos veiculos.</p>
         </div>
         <div className="actions-inline">
-          <button className="ghost-button" type="button" onClick={resetForms}>Limpar formularios</button>
-          <button className="ghost-button" type="button" onClick={() => setAdvancedFilterOpen(true)}>Filtros avancados</button>
-          <button className="ghost-button" type="button" onClick={handleDownloadCsvTemplate}>Baixar modelo CSV</button>
-          <button className="ghost-button" type="button" onClick={handleDownloadXlsxTemplate}>Baixar modelo XLSX</button>
+          <button className="ghost-button cadastros-toolbar-btn" type="button" onClick={resetForms}>Limpar formularios</button>
+          <button className="ghost-button cadastros-toolbar-btn" type="button" onClick={() => setAdvancedFilterOpen(true)}>Filtros avancados</button>
+          <button className="ghost-button cadastros-toolbar-btn" type="button" onClick={handleDownloadCsvTemplate}>Baixar modelo CSV</button>
+          <button className="ghost-button cadastros-toolbar-btn" type="button" onClick={handleDownloadXlsxTemplate}>Baixar modelo XLSX</button>
         </div>
       </div>
 
-      <div className="panel-metrics">
-        <div className="metric-inline">
-          <strong>{organizations.length}</strong>
-          <span>orgaos</span>
+      <section className="surface-panel panel-nested" style={{ marginBottom: 16 }}>
+        <div className="panel-heading">
+          <div>
+            <h3 className="section-title">Estrutura organizacional (preview)</h3>
+            <p className="section-copy">Visao resumida de relacionamento entre orgaos, departamentos e lotacoes.</p>
+          </div>
+          <button type="button" className="ghost-button cadastros-toolbar-btn" onClick={() => togglePanel('preview')}>
+            {expandedPanels.preview ? 'Recolher' : 'Expandir'}
+          </button>
         </div>
-        <div className="metric-inline">
-          <strong>{departments.length}</strong>
-          <span>departamentos</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{allocations.length}</strong>
-          <span>lotacoes</span>
-        </div>
-      </div>
+        {expandedPanels.preview ? (
+          <div className="table-wrap">
+            <table className="data-table">
+              <thead>
+                <tr>
+                  <th>Orgao</th>
+                  <th>Departamentos</th>
+                  <th>Lotacoes</th>
+                </tr>
+              </thead>
+              <tbody>
+                {hierarchicalPreview.length === 0 ? (
+                  <tr><td colSpan={3}><div className="empty-state">Sem dados para exibir a hierarquia.</div></td></tr>
+                ) : hierarchicalPreview.map((organization) => (
+                  <tr key={`preview-${organization.id}`}>
+                    <td>
+                      <details>
+                        <summary><strong>{organization.name}</strong></summary>
+                        <ul style={{ marginTop: 8 }}>
+                          {organization.departments.map((department) => (
+                            <li key={`department-preview-${department.id}`}>
+                              {department.name} ({department.allocations.length} lotacao(oes))
+                            </li>
+                          ))}
+                        </ul>
+                      </details>
+                    </td>
+                    <td>{organization.departmentCount}</td>
+                    <td>{organization.allocationCount}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        ) : null}
+      </section>
 
       <section className="surface-panel panel-nested" style={{ marginBottom: 16 }}>
         <div className="panel-heading">
@@ -582,7 +624,32 @@ export default function CadastrosPage() {
               <h3 className="section-title">Orgaos</h3>
               <p className="section-copy">Estrutura superior usada na lotacao.</p>
             </div>
+            <button type="button" className="ghost-button cadastros-toolbar-btn" onClick={() => togglePanel('organizations')}>
+              {expandedPanels.organizations ? 'Recolher' : 'Expandir'}
+            </button>
           </div>
+          {expandedPanels.organizations ? (
+            <>
+
+          <div className="filter-inline" style={{ marginBottom: 14 }}>
+            <input
+              id="search-organization-input"
+              className="app-input"
+              placeholder="Buscar orgao por nome..."
+              value={organizationSearch}
+              onChange={(event) => setOrganizationSearch(event.target.value)}
+            />
+          </div>
+
+          {selectedOrganizationIds.length > 0 ? (
+            <div className="actions-inline" style={{ marginBottom: 12 }}>
+              <span className="section-copy">{selectedOrganizationIds.length} orgao(s) selecionado(s)</span>
+              <button type="button" className="ghost-button" onClick={handleExportSelectedOrganizations}>Exportar selecionados</button>
+              <button type="button" className="mini-button danger" onClick={handleBulkDeleteOrganizations} disabled={bulkDeleting || !canDelete}>
+                {bulkDeleting ? 'Excluindo...' : 'Excluir selecionados'}
+              </button>
+            </div>
+          ) : null}
 
           <div className="filter-inline" style={{ marginBottom: 14 }}>
             <input
@@ -688,6 +755,8 @@ export default function CadastrosPage() {
             </div>
           ) : null}
           <Pagination currentPage={organizationPage} totalPages={organizationTotalPages} onPageChange={setOrganizationPage} />
+            </>
+          ) : null}
         </section>
 
         <section className="surface-panel panel-nested" style={{ display: activeTab === 'departments' ? 'block' : 'none' }}>
@@ -696,7 +765,12 @@ export default function CadastrosPage() {
               <h3 className="section-title">Departamentos</h3>
               <p className="section-copy">Vincule o departamento ao orgao correspondente.</p>
             </div>
+            <button type="button" className="ghost-button cadastros-toolbar-btn" onClick={() => togglePanel('departments')}>
+              {expandedPanels.departments ? 'Recolher' : 'Expandir'}
+            </button>
           </div>
+          {expandedPanels.departments ? (
+            <>
 
           {canWrite ? (
             <form onSubmit={handleSubmitDepartment} className="form-grid">
@@ -820,6 +894,8 @@ export default function CadastrosPage() {
             </div>
           ) : null}
           <Pagination currentPage={departmentPage} totalPages={departmentTotalPages} onPageChange={setDepartmentPage} />
+            </>
+          ) : null}
         </section>
 
         <section className="surface-panel panel-nested" style={{ display: activeTab === 'allocations' ? 'block' : 'none' }}>
@@ -828,7 +904,12 @@ export default function CadastrosPage() {
               <h3 className="section-title">Lotacoes</h3>
               <p className="section-copy">Defina o ponto final de lotacao usado no cadastro de veiculos.</p>
             </div>
+            <button type="button" className="ghost-button cadastros-toolbar-btn" onClick={() => togglePanel('allocations')}>
+              {expandedPanels.allocations ? 'Recolher' : 'Expandir'}
+            </button>
           </div>
+          {expandedPanels.allocations ? (
+            <>
 
           {canWrite ? (
             <form onSubmit={handleSubmitAllocation} className="form-grid">
@@ -994,6 +1075,8 @@ export default function CadastrosPage() {
             </div>
           ) : null}
           <Pagination currentPage={allocationPage} totalPages={allocationTotalPages} onPageChange={setAllocationPage} />
+            </>
+          ) : null}
         </section>
       </div>
 
