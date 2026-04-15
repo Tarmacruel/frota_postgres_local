@@ -1,3 +1,4 @@
+import { Suspense, lazy } from 'react'
 import { BrowserRouter, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
@@ -16,6 +17,19 @@ import PossessionPage from './pages/PossessionPage'
 import UsersPage from './pages/UsersPage'
 import VehiclesPage from './pages/VehiclesPage'
 import UnauthorizedPage from './pages/UnauthorizedPage'
+
+const AdminAnalyticsDashboard = lazy(() => import('./pages/AdminAnalyticsDashboard'))
+
+function LazyPageFallback() {
+  return (
+    <div className="app-loading">
+      <div className="loading-card">
+        <strong>Carregando módulo de analytics</strong>
+        <p className="muted">Preparando gráficos e indicadores administrativos.</p>
+      </div>
+    </div>
+  )
+}
 
 export default function App() {
   return (
@@ -53,7 +67,9 @@ export default function App() {
               path="analytics"
               element={
                 <ProtectedRoute adminOnly>
-                  <AdminAnalyticsDashboard />
+                  <Suspense fallback={<LazyPageFallback />}>
+                    <AdminAnalyticsDashboard />
+                  </Suspense>
                 </ProtectedRoute>
               }
             />

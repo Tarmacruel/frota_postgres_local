@@ -2,12 +2,28 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 
 const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:8000'
+
 export default defineConfig({
   plugins: [react()],
+  resolve: {
+    dedupe: ['react', 'react-dom'],
+  },
+  build: {
+    chunkSizeWarningLimit: 650,
+    rollupOptions: {
+      output: {
+        manualChunks(id) {
+          if (id.includes('node_modules/recharts')) return 'analytics-charts'
+          if (id.includes('node_modules/jspdf') || id.includes('node_modules/jspdf-autotable')) return 'export-pdf'
+          return undefined
+        },
+      },
+    },
+  },
   server: {
     host: '0.0.0.0',
     port: 3000,
-    allowedHosts: true,    
+    allowedHosts: true,
     proxy: {
       '/api': {
         target: apiProxyTarget,
@@ -31,8 +47,8 @@ export default defineConfig({
       },
     },
     cors: {
-      origin: "*",
-      credentials: true
-    }
+      origin: '*',
+      credentials: true,
+    },
   },
 })

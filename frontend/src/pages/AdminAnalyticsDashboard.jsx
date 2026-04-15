@@ -34,28 +34,48 @@ export default function AdminAnalyticsDashboard() {
 
   useEffect(() => {
     async function load() {
-      try {
-        setLoading(true)
-        setError('')
-        const [overviewResp, efficiencyResp, tcoResp, riskResp, insightsResp, trendResp] = await Promise.all([
-          analyticsAPI.overview({ period_days: filters.period_days }),
-          analyticsAPI.efficiency(query),
-          analyticsAPI.tco(query),
-          analyticsAPI.driverRisk({ period_days: filters.period_days }),
-          analyticsAPI.insights({ period_days: filters.period_days }),
-          analyticsAPI.costTrend({ months: 12, vehicle_type: filters.vehicle_type || undefined }),
-        ])
-        setOverview(overviewResp.data)
-        setEfficiency(efficiencyResp.data)
-        setTco(tcoResp.data)
-        setDriverRisk(riskResp.data)
-        setInsights(insightsResp.data)
-        setTrend(trendResp.data)
-      } catch (err) {
-        setError(getApiErrorMessage(err, 'Não foi possível carregar o módulo de analytics.'))
-      } finally {
-        setLoading(false)
+      setLoading(true)
+      setError('')
+
+      const results = await Promise.allSettled([
+        analyticsAPI.overview({ period_days: filters.period_days }),
+        analyticsAPI.efficiency(query),
+        analyticsAPI.tco(query),
+        analyticsAPI.driverRisk({ period_days: filters.period_days }),
+        analyticsAPI.insights({ period_days: filters.period_days }),
+        analyticsAPI.costTrend({ months: 12, vehicle_type: filters.vehicle_type || undefined }),
+      ])
+
+      const [overviewResp, efficiencyResp, tcoResp, riskResp, insightsResp, trendResp] = results
+
+      if (overviewResp.status === 'fulfilled') setOverview(overviewResp.value.data)
+      else setOverview(null)
+
+      if (efficiencyResp.status === 'fulfilled') setEfficiency(efficiencyResp.value.data)
+      else setEfficiency([])
+
+      if (tcoResp.status === 'fulfilled') setTco(tcoResp.value.data)
+      else setTco([])
+
+      if (riskResp.status === 'fulfilled') setDriverRisk(riskResp.value.data)
+      else setDriverRisk([])
+
+      if (insightsResp.status === 'fulfilled') setInsights(insightsResp.value.data)
+      else setInsights([])
+
+      if (trendResp.status === 'fulfilled') setTrend(trendResp.value.data)
+      else setTrend([])
+
+      const failed = results.filter((item) => item.status === 'rejected')
+      if (failed.length > 0) {
+        const firstError = failed[0]
+        const message = firstError.status === 'rejected'
+          ? getApiErrorMessage(firstError.reason, 'Parte dos dados de analytics não pôde ser carregada.')
+          : 'Parte dos dados de analytics não pôde ser carregada.'
+        setError(message)
       }
+
+      setLoading(false)
     }
     load()
   }, [filters.period_days, query, refreshTick])
