@@ -41,28 +41,23 @@ echo.
 echo PostgreSQL running at: localhost:5432
 echo.
 echo Options:
-echo   1. Apply Database Migrations (manual)
+echo   1. Run Full DB Setup (DB + Migrations + Seed)
 echo   2. Check Status
 echo   3. Exit
 echo.
 set /p choice="Choose an option: "
 
 if "%choice%"=="1" (
-    cd /d "%~dp0backend"
+    cd /d "%~dp0"
     echo.
-    echo [*] Applying migrations manually...
-    set DATABASE_URL=postgresql+asyncpg://frota_user:frota_secret@localhost:5432/frota_db
-    .venv\Scripts\python.exe -m alembic upgrade heads
+    echo [*] Running full local database setup (create DB/role + migrations + seed)...
+    call Setup_PostgreSQL_Local.bat
     if %ERRORLEVEL% equ 0 (
         echo.
-        echo [OK] Migrations applied successfully!
+        echo [OK] Setup completed successfully!
     ) else (
         echo.
-        echo [ERR] Failed to apply migrations
-        echo.
-        echo Execute manual SQL for DB/role creation in pgAdmin if needed:
-        echo   CREATE ROLE frota_user LOGIN PASSWORD 'frota_secret';
-        echo   CREATE DATABASE frota_db OWNER frota_user;
+        echo [ERR] Failed to run local database setup
     )
     echo.
     pause

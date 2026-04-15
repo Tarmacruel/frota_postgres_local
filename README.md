@@ -155,6 +155,7 @@ npm run dev
 # Ou inicie manualmente PostgreSQL
 .\Iniciar_PostgreSQL.bat
 # → Escolha opção "1" para executar setup completo (DB + migrations + seed)
+# → Escolha opção "1" para executar setup completo (DB + migrations + seed)
 ```
 
 ## 📋 Fluxo local recomendado
@@ -201,7 +202,10 @@ Esse fluxo:
 - sobe a **API backend** separadamente na porta `8000`
 - faz bind do frontend em `localhost` para compatibilidade com tunnel Cloudflare
 - configura proxy do frontend para `/api` -> `http://localhost:8000`
+- faz bind do frontend em `localhost` para compatibilidade com tunnel Cloudflare
+- configura proxy do frontend para `/api` -> `http://localhost:8000`
 - ativa configuracao de producao (em loopback, `COOKIE_SECURE=false` para permitir login via HTTP local)
+- ajusta CORS automaticamente (loopback + domínio institucional quando em `localhost`)
 - ajusta CORS automaticamente (loopback + domínio institucional quando em `localhost`)
 
 Arquivos de apoio:
@@ -216,6 +220,8 @@ O projeto nao depende mais de Docker.
 
 O banco padrao roda localmente em:
 
+- Host: `localhost`
+- Porta: `5432`
 - Host: `localhost`
 - Porta: `5432`
 - Banco: `frota_db`
@@ -245,6 +251,7 @@ npm install
 npm run dev
 ```
 
+> Se o backend estiver em outra porta (ex.: `80` no publish), crie `frontend/.env.local` com `VITE_API_PROXY_TARGET=http://localhost:80` antes de rodar `npm run dev`.
 > Se o backend estiver em outra porta (ex.: `80` no publish), crie `frontend/.env.local` com `VITE_API_PROXY_TARGET=http://localhost:80` antes de rodar `npm run dev`.
 
 Backend isolado:
