@@ -1,174 +1,263 @@
 param(
     [string]$DataDir = "$env:LOCALAPPDATA\FrotaPMTF\postgres-data",
-    [int]$Port = 5434,
+    [int]$Port = 5432,
     [string]$Database = "frota_db",
     [string]$DbUser = "frota_user",
-    [string]$DbPassword = "frota_secret"
+    [string]$DbPassword = "frota_secret",
+    [string]$SuperUser = "frota_user",
+    [string]$SuperPassword = "",
+    [string]$BackupRoot = "",
+    [bool]$AutoRestoreLatest = $true
 )
 
 $ErrorActionPreference = "Stop"
 
-$pgBin = "C:\Program Files\PostgreSQL\18\bin"
+function Test-PortInUse {
+    param([int]$PortToCheck)
+    $result = netstat -ano | Select-String ":$PortToCheck\\s"
+    return ($null -ne $result)
+}
+
+$pgBinCandidates = @(
+    "C:\Program Files\PostgreSQL\16\bin",
+    "C:\Program Files\PostgreSQL\17\bin",
+    "C:\Program Files\PostgreSQL\18\bin"
+)
+$pgBin = $pgBinCandidates | Where-Object { Test-Path (Join-Path $_ "psql.exe") } | Select-Object -First 1
+
+if ([string]::IsNullOrWhiteSpace($pgBin)) {
+    throw "Binarios do PostgreSQL nao encontrados. Verifique instalacao em 'C:\Program Files\PostgreSQL\<versao>\bin'."
+}
+
 $initdbExe = Join-Path $pgBin "initdb.exe"
 $pgCtlExe = Join-Path $pgBin "pg_ctl.exe"
 $psqlExe = Join-Path $pgBin "psql.exe"
 $configPath = Join-Path $DataDir "postgresql.conf"
 $logPath = Join-Path $DataDir "postgres.log"
-
-if (-not (Test-Path $initdbExe) -or -not (Test-Path $pgCtlExe) -or -not (Test-Path $psqlExe)) {
-    throw "Binarios do PostgreSQL 18 nao encontrados em '$pgBin'."
+if ([string]::IsNullOrWhiteSpace($BackupRoot)) {
+    $BackupRoot = Join-Path (Join-Path $PSScriptRoot "..") "storage\backups"
 }
 
-if (-not (Test-Path $DataDir)) {
-    New-Item -ItemType Directory -Path $DataDir -Force | Out-Null
-}
+function Invoke-Psql {
+    param(
+        [string]$User,
+        [string]$Db,
+        [string]$Sql,
+        [string]$Password = "",
+        [switch]$Capture
+    )
 
-if (-not (Test-Path (Join-Path $DataDir "PG_VERSION"))) {
-    & $initdbExe -D $DataDir -U postgres --auth=trust --encoding=UTF8
-    if ($LASTEXITCODE -ne 0) {
-        throw "Falha ao inicializar o cluster PostgreSQL local."
+    $oldPassword = $env:PGPASSWORD
+    if ([string]::IsNullOrEmpty($Password)) {
+        Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:PGPASSWORD = $Password
+    }
+
+    $args = @(
+        "-w",
+        "-h", "127.0.0.1",
+        "-p", "$Port",
+        "-U", $User,
+        "-d", $Db,
+        "-v", "ON_ERROR_STOP=1",
+        "-tA",
+        "-c", $Sql
+    )
+
+    try {
+        if ($Capture) {
+            return (& $psqlExe @args)
+        }
+
+        & $psqlExe @args | Out-Null
+        return $LASTEXITCODE
+    }
+    finally {
+        if ([string]::IsNullOrEmpty($oldPassword)) {
+            Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:PGPASSWORD = $oldPassword
+        }
     }
 }
 
-$config = Get-Content $configPath -Raw
-$config = $config -replace "#?listen_addresses\s*=.*", "listen_addresses = '127.0.0.1'"
-$config = $config -replace "#?port\s*=.*", "port = $Port"
-Set-Content $configPath $config
+function Invoke-PsqlFile {
+    param(
+        [string]$User,
+        [string]$Db,
+        [string]$FilePath,
+        [string]$Password = ""
+    )
 
-& $pgCtlExe -D $DataDir status | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    & $pgCtlExe -D $DataDir -l $logPath -o "-p $Port" start | Out-Null
-    Start-Sleep -Seconds 3
+    $oldPassword = $env:PGPASSWORD
+    if ([string]::IsNullOrEmpty($Password)) {
+        Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+    }
+    else {
+        $env:PGPASSWORD = $Password
+    }
+
+    $args = @(
+        "-w",
+        "-h", "127.0.0.1",
+        "-p", "$Port",
+        "-U", $User,
+        "-d", $Db,
+        "-v", "ON_ERROR_STOP=1",
+        "-f", $FilePath
+    )
+
+    try {
+        & $psqlExe @args | Out-Null
+        return $LASTEXITCODE
+    }
+    finally {
+        if ([string]::IsNullOrEmpty($oldPassword)) {
+            Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+        }
+        else {
+            $env:PGPASSWORD = $oldPassword
+        }
+    }
 }
 
-& $psqlExe -h 127.0.0.1 -p $Port -U postgres -d postgres -c "SELECT 1;" | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    throw "Cluster PostgreSQL local nao respondeu em 127.0.0.1:$Port."
-}
+$portInUse = Test-PortInUse -PortToCheck $Port
+$hasManagedCluster = Test-Path (Join-Path $DataDir "PG_VERSION")
 
-$roleExists = & $psqlExe -h 127.0.0.1 -p $Port -U postgres -d postgres -tAc "SELECT 1 FROM pg_roles WHERE rolname = '$DbUser'"
-if ($roleExists -match "1") {
-    & $psqlExe -h 127.0.0.1 -p $Port -U postgres -d postgres -c "ALTER ROLE $DbUser WITH LOGIN PASSWORD '$DbPassword';" | Out-Null
+if (-not $portInUse) {
+    if (-not $hasManagedCluster) {
+        if (-not (Test-Path $DataDir)) {
+            New-Item -ItemType Directory -Path $DataDir -Force | Out-Null
+        }
+
+        if (-not (Test-Path $initdbExe) -or -not (Test-Path $pgCtlExe)) {
+            throw "initdb/pg_ctl nao encontrados em '$pgBin'."
+        }
+
+        & $initdbExe -D $DataDir -U postgres --auth=trust --encoding=UTF8
+        if ($LASTEXITCODE -ne 0) {
+            throw "Falha ao inicializar o cluster PostgreSQL local."
+        }
+    }
+
+    if (Test-Path $configPath) {
+        $config = Get-Content $configPath -Raw
+        $config = $config -replace "#?listen_addresses\s*=.*", "listen_addresses = '127.0.0.1'"
+        $config = $config -replace "#?port\s*=.*", "port = $Port"
+        Set-Content $configPath $config
+    }
+
+    & $pgCtlExe -D $DataDir status | Out-Null
+    if ($LASTEXITCODE -ne 0) {
+        & $pgCtlExe -D $DataDir -l $logPath -o "-p $Port" start | Out-Null
+        Start-Sleep -Seconds 3
+    }
 }
 else {
-    & $psqlExe -h 127.0.0.1 -p $Port -U postgres -d postgres -c "CREATE ROLE $DbUser LOGIN PASSWORD '$DbPassword';" | Out-Null
+    Write-Output "Porta $Port ja esta em uso. Usando servidor PostgreSQL ja ativo."
 }
 
-if ($LASTEXITCODE -ne 0) {
-    throw "Falha ao preparar o usuario '$DbUser'."
-}
+$superPasswordCandidates = @()
+if (-not [string]::IsNullOrWhiteSpace($SuperPassword)) { $superPasswordCandidates += $SuperPassword }
+if ($superPasswordCandidates -notcontains $DbPassword) { $superPasswordCandidates += $DbPassword }
+if ($superPasswordCandidates -notcontains "postgres") { $superPasswordCandidates += "postgres" }
+if ($superPasswordCandidates -notcontains "frota_secret") { $superPasswordCandidates += "frota_secret" }
+$superPasswordCandidates += ""
 
-$dbExists = & $psqlExe -h 127.0.0.1 -p $Port -U postgres -d postgres -tAc "SELECT 1 FROM pg_database WHERE datname = '$Database'"
-if ($dbExists -notmatch "1") {
-    & $psqlExe -h 127.0.0.1 -p $Port -U postgres -d postgres -c "CREATE DATABASE $Database OWNER $DbUser;" | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "Falha ao criar o banco '$Database'."
+$authenticatedSuperPassword = $null
+foreach ($candidate in $superPasswordCandidates) {
+    $superCheck = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "SELECT 1" -Password $candidate
+    if ($superCheck -eq 0) {
+        $authenticatedSuperPassword = $candidate
+        break
     }
 }
 
-& $psqlExe -h 127.0.0.1 -p $Port -U postgres -d postgres -c "ALTER DATABASE $Database OWNER TO $DbUser;" | Out-Null
-if ($LASTEXITCODE -ne 0) {
+if ($null -eq $authenticatedSuperPassword) {
+    throw "Falha ao autenticar no PostgreSQL com usuario administrador '$SuperUser'. Informe -SuperPassword correto (ou defina PG_SUPER_PASSWORD)."
+}
+
+$safeDbPassword = $DbPassword.Replace("'", "''")
+$safeDbUser = $DbUser.Replace("'", "''")
+$safeDatabase = $Database.Replace("'", "''")
+
+$roleExists = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "SELECT 1 FROM pg_roles WHERE rolname = '$safeDbUser'" -Password $authenticatedSuperPassword -Capture
+if ($roleExists -match "1") {
+    $updateRole = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "ALTER ROLE \"$DbUser\" WITH LOGIN PASSWORD '$safeDbPassword';" -Password $authenticatedSuperPassword
+    if ($updateRole -ne 0) {
+        throw "Falha ao atualizar usuario '$DbUser'."
+    }
+}
+else {
+    $createRole = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "CREATE ROLE \"$DbUser\" LOGIN PASSWORD '$safeDbPassword';" -Password $authenticatedSuperPassword
+    if ($createRole -ne 0) {
+        throw "Falha ao criar usuario '$DbUser'."
+    }
+}
+
+$dbExists = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "SELECT 1 FROM pg_database WHERE datname = '$safeDatabase'" -Password $authenticatedSuperPassword -Capture
+$createdDatabase = $false
+if ($dbExists -notmatch "1") {
+    $createDb = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "CREATE DATABASE \"$Database\" OWNER \"$DbUser\";" -Password $authenticatedSuperPassword
+    if ($createDb -ne 0) {
+        throw "Falha ao criar banco '$Database'."
+    }
+    $createdDatabase = $true
+}
+
+$alterDbOwner = Invoke-Psql -User $SuperUser -Db "postgres" -Sql "ALTER DATABASE \"$Database\" OWNER TO \"$DbUser\";" -Password $authenticatedSuperPassword
+if ($alterDbOwner -ne 0) {
     throw "Falha ao definir o proprietario do banco '$Database'."
 }
 
 $ownershipSql = @"
-ALTER SCHEMA public OWNER TO $DbUser;
-GRANT ALL ON SCHEMA public TO $DbUser;
-GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO $DbUser;
-GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO $DbUser;
-GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO $DbUser;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO $DbUser;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO $DbUser;
-ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO $DbUser;
+ALTER SCHEMA public OWNER TO \"$DbUser\";
+GRANT ALL ON SCHEMA public TO \"$DbUser\";
+GRANT ALL PRIVILEGES ON ALL TABLES IN SCHEMA public TO \"$DbUser\";
+GRANT ALL PRIVILEGES ON ALL SEQUENCES IN SCHEMA public TO \"$DbUser\";
+GRANT ALL PRIVILEGES ON ALL FUNCTIONS IN SCHEMA public TO \"$DbUser\";
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON TABLES TO \"$DbUser\";
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON SEQUENCES TO \"$DbUser\";
+ALTER DEFAULT PRIVILEGES IN SCHEMA public GRANT ALL ON FUNCTIONS TO \"$DbUser\";
 "@
 
-& $psqlExe -h 127.0.0.1 -p $Port -U postgres -d $Database -c $ownershipSql | Out-Null
-if ($LASTEXITCODE -ne 0) {
-    throw "Falha ao ajustar as permissoes do banco '$Database'."
+$grantResult = Invoke-Psql -User $SuperUser -Db $Database -Sql $ownershipSql -Password $authenticatedSuperPassword
+if ($grantResult -ne 0) {
+    throw "Falha ao ajustar permissoes no banco '$Database'."
 }
 
-$relationOwnerSql = @"
-SELECT format(
-    'ALTER %s %I.%I OWNER TO %I;',
-    CASE c.relkind
-        WHEN 'S' THEN 'SEQUENCE'
-        WHEN 'v' THEN 'VIEW'
-        WHEN 'm' THEN 'MATERIALIZED VIEW'
-        WHEN 'f' THEN 'FOREIGN TABLE'
-        ELSE 'TABLE'
-    END,
-    n.nspname,
-    c.relname,
-    '$DbUser'
-)
-FROM pg_class c
-JOIN pg_namespace n ON n.oid = c.relnamespace
-WHERE n.nspname = 'public'
-  AND c.relkind IN ('r', 'p', 'S', 'v', 'm', 'f')
-  AND pg_get_userbyid(c.relowner) <> '$DbUser';
-"@
+if ($createdDatabase -and $AutoRestoreLatest) {
+    $latestBackup = Get-ChildItem -Path $BackupRoot -Filter "frota-backup-*.zip" -File -ErrorAction SilentlyContinue |
+        Sort-Object LastWriteTime -Descending |
+        Select-Object -First 1
 
-$relationStatements = & $psqlExe -h 127.0.0.1 -p $Port -U postgres -d $Database -tA -c $relationOwnerSql
-foreach ($statement in $relationStatements) {
-    if ([string]::IsNullOrWhiteSpace($statement)) {
-        continue
+    if ($latestBackup) {
+        $tempDir = Join-Path ([System.IO.Path]::GetTempPath()) ("frota-restore-" + [guid]::NewGuid().ToString("N"))
+        New-Item -Path $tempDir -ItemType Directory -Force | Out-Null
+
+        try {
+            Expand-Archive -LiteralPath $latestBackup.FullName -DestinationPath $tempDir -Force
+            $sqlFile = Join-Path $tempDir "database.sql"
+            if (-not (Test-Path $sqlFile)) {
+                throw "Backup '$($latestBackup.FullName)' nao contem database.sql."
+            }
+
+            $restore = Invoke-PsqlFile -User $DbUser -Db $Database -FilePath $sqlFile -Password $DbPassword
+            if ($restore -ne 0) {
+                throw "Falha ao restaurar o backup '$($latestBackup.Name)' no banco '$Database'."
+            }
+
+            Write-Output "Backup restaurado com sucesso: $($latestBackup.Name)"
+        }
+        finally {
+            Remove-Item -LiteralPath $tempDir -Recurse -Force -ErrorAction SilentlyContinue
+        }
     }
-
-    & $psqlExe -h 127.0.0.1 -p $Port -U postgres -d $Database -c $statement | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "Falha ao ajustar o proprietario de um objeto relacional em '$Database'."
-    }
-}
-
-$functionOwnerSql = @"
-SELECT format(
-    'ALTER FUNCTION %I.%I(%s) OWNER TO %I;',
-    n.nspname,
-    p.proname,
-    pg_get_function_identity_arguments(p.oid),
-    '$DbUser'
-)
-FROM pg_proc p
-JOIN pg_namespace n ON n.oid = p.pronamespace
-WHERE n.nspname = 'public'
-  AND pg_get_userbyid(p.proowner) <> '$DbUser';
-"@
-
-$functionStatements = & $psqlExe -h 127.0.0.1 -p $Port -U postgres -d $Database -tA -c $functionOwnerSql
-foreach ($statement in $functionStatements) {
-    if ([string]::IsNullOrWhiteSpace($statement)) {
-        continue
-    }
-
-    & $psqlExe -h 127.0.0.1 -p $Port -U postgres -d $Database -c $statement | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "Falha ao ajustar o proprietario de uma funcao em '$Database'."
-    }
-}
-
-$typeOwnerSql = @"
-SELECT format(
-    'ALTER TYPE %I.%I OWNER TO %I;',
-    n.nspname,
-    t.typname,
-    '$DbUser'
-)
-FROM pg_type t
-JOIN pg_namespace n ON n.oid = t.typnamespace
-WHERE n.nspname = 'public'
-  AND t.typname IN ('user_role', 'vehicle_status')
-  AND pg_get_userbyid(t.typowner) <> '$DbUser';
-"@
-
-$typeStatements = & $psqlExe -h 127.0.0.1 -p $Port -U postgres -d $Database -tA -c $typeOwnerSql
-foreach ($statement in $typeStatements) {
-    if ([string]::IsNullOrWhiteSpace($statement)) {
-        continue
-    }
-
-    & $psqlExe -h 127.0.0.1 -p $Port -U postgres -d $Database -c $statement | Out-Null
-    if ($LASTEXITCODE -ne 0) {
-        throw "Falha ao ajustar o proprietario de um tipo em '$Database'."
+    else {
+        Write-Output "Nenhum backup encontrado em '$BackupRoot'. Banco criado sem restauracao."
     }
 }
 
