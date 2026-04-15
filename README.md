@@ -59,7 +59,7 @@ Sistema oficial para gestao da frota da Prefeitura Municipal de Teixeira de Frei
 
 # Ou inicie manualmente PostgreSQL
 .\Iniciar_PostgreSQL.bat
-# → Escolha opção "1" para aplicar migrations
+# → Escolha opção "1" para executar setup completo (DB + migrations + seed)
 ```
 
 ## 📋 Fluxo local recomendado
