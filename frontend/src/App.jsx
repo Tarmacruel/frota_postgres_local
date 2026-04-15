@@ -45,7 +45,14 @@ export default function App() {
             }
           >
             <Route index element={<DashboardPage />} />
-            <Route path="cadastros" element={<CadastrosPage />} />
+            <Route
+              path="cadastros"
+              element={(
+                <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO']}>
+                  <CadastrosPage />
+                </ProtectedRoute>
+              )}
+            />
             <Route path="vehicles" element={<VehiclesPage />} />
             <Route path="posses" element={<PossessionPage />} />
             <Route path="condutores" element={<DriversPage />} />
