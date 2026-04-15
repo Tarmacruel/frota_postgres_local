@@ -129,6 +129,8 @@ O banco padrao roda localmente em:
 - Senha: `frota_secret`
 - URL padrao: `postgresql+asyncpg://frota_user:frota_secret@127.0.0.1:5432/frota_db`
 
+> Se sua instalacao usa `postgres` no pgAdmin (como usuario admin), o bootstrap detecta e usa `postgres` automaticamente para criar o banco quando necessario.
+
 O script [scripts/start_local_postgres.ps1](/z:/FROTAS/frota_postgres_local/scripts/start_local_postgres.ps1):
 
 - reutiliza um PostgreSQL ja ativo na porta `5432` (ex.: servico Windows),
