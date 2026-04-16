@@ -104,7 +104,7 @@ class PossessionService:
             fallback_document=data.driver_document,
             fallback_contact=data.driver_contact,
         )
-        photo_payloads = await self._read_and_validate_captured_photos(photos, photo_metadata, require_at_least_one=True)
+        photo_payloads = await self._read_and_validate_captured_photos(photos, photo_metadata, require_at_least_one=False)
         document_payload = await self._read_and_validate_document(signed_document)
 
         effective_start = data.start_date or datetime.now(timezone.utc)

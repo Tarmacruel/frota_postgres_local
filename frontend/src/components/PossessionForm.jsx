@@ -28,7 +28,7 @@ function isSecureCaptureContext() {
 }
 
 function getEvidenceErrorMessage(error) {
-  if (!error) return 'Nao foi possivel capturar a evidencia obrigatoria.'
+  if (!error) return 'Nao foi possivel capturar a evidencia.'
 
   if (error.code === 1 || error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
     return 'Permita camera e localizacao para registrar a posse.'
@@ -218,7 +218,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
 
   async function startEvidenceCapture() {
     if (!secureCaptureContext) {
-      setCaptureError('A captura obrigatoria exige acesso em https ou localhost.')
+      setCaptureError('A captura exige acesso em https ou localhost.')
       return
     }
 
@@ -347,11 +347,6 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       return
     }
 
-    if (capturedPhotos.length === 0) {
-      setCaptureError('Foto e localizacao sao obrigatorias para registrar a posse.')
-      return
-    }
-
     try {
       setSubmitting(true)
       setError('')
@@ -366,20 +361,22 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       if (form.start_date) payload.append('start_date', new Date(form.start_date).toISOString())
       if (form.start_odometer_km !== '') payload.append('start_odometer_km', String(Number(form.start_odometer_km)))
       if (form.observation) payload.append('observation', form.observation)
-      payload.append(
-        'photo_metadata_json',
-        JSON.stringify(
-          capturedPhotos.map((photo) => ({
-            photo_captured_at: photo.capturedAt,
-            capture_latitude: photo.captureLocation.latitude,
-            capture_longitude: photo.captureLocation.longitude,
-            capture_accuracy_meters: photo.captureLocation.accuracy_meters,
-          })),
-        ),
-      )
-      capturedPhotos.forEach((photo, index) => {
-        payload.append('photos', photo.blob, `posse-${form.vehicle_id}-${index + 1}.jpg`)
-      })
+      if (capturedPhotos.length > 0) {
+        payload.append(
+          'photo_metadata_json',
+          JSON.stringify(
+            capturedPhotos.map((photo) => ({
+              photo_captured_at: photo.capturedAt,
+              capture_latitude: photo.captureLocation.latitude,
+              capture_longitude: photo.captureLocation.longitude,
+              capture_accuracy_meters: photo.captureLocation.accuracy_meters,
+            })),
+          ),
+        )
+        capturedPhotos.forEach((photo, index) => {
+          payload.append('photos', photo.blob, `posse-${form.vehicle_id}-${index + 1}.jpg`)
+        })
+      }
       if (signedDocument) {
         payload.append('signed_document', signedDocument, signedDocument.name)
       }
@@ -491,11 +488,11 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       </div>
 
       <div className="form-field modal-field-span">
-        <label>Evidencia obrigatoria</label>
+        <label>Evidencia (opcional)</label>
         <div className="evidence-shell">
           <div className="evidence-copy">
-            <strong>Foto e localizacao sao obrigatorias para registrar a posse.</strong>
-            <span>Use a camera do dispositivo para registrar quantas fotos forem necessarias das partes do veiculo.</span>
+            <strong>Foto e localizacao sao opcionais no registro de posse.</strong>
+            <span>Se desejar, use a camera do dispositivo para registrar evidencias das partes do veiculo.</span>
           </div>
 
           {!draftPreviewUrl && captureState !== 'preview' ? (
@@ -610,7 +607,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       </div>
 
       <div className="actions-inline modal-actions">
-        <button className="app-button" type="submit" disabled={submitting || vehicles.length === 0 || capturedPhotos.length === 0 || !form.driver_id}>
+        <button className="app-button" type="submit" disabled={submitting || vehicles.length === 0 || !form.driver_id}>
           {submitting ? 'Salvando...' : 'Registrar posse'}
         </button>
         <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>
