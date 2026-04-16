@@ -2,16 +2,10 @@ import { useMemo, useRef, useState } from 'react'
 import SearchableSelect from './SearchableSelect'
 import { fuelSuppliesAPI } from '../api/fuelSupplies'
 import { getApiErrorMessage } from '../utils/apiError'
+import { toDateTimeLocalValue } from '../utils/datetime'
 
 const MAX_RECEIPT_SIZE_BYTES = 8 * 1024 * 1024
 const ALLOWED_RECEIPT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
-
-function toDateTimeInput(value) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().slice(0, 16)
-}
 
 function buildVehicleOption(vehicle) {
   const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
@@ -37,7 +31,7 @@ export default function FuelSupplyForm({ vehicles, drivers, organizations, onClo
     vehicle_id: '',
     driver_id: '',
     organization_id: '',
-    supplied_at: toDateTimeInput(new Date().toISOString()),
+    supplied_at: toDateTimeLocalValue(new Date().toISOString()),
     odometer_km: '',
     liters: '',
     total_amount: '',
