@@ -697,7 +697,7 @@ export default function PossessionPage() {
       <Modal
         open={isCreateModalOpen}
         title="Nova posse"
-        description="Ao registrar um novo condutor, qualquer posse ativa do mesmo veiculo sera encerrada automaticamente. Foto e localizacao sao obrigatorias, voce pode capturar varias fotos, e o termo assinado pode ser anexado no mesmo fluxo."
+        description="Ao registrar um novo condutor, qualquer posse ativa do mesmo veiculo sera encerrada automaticamente. Foto e localizacao sao opcionais, voce pode capturar varias fotos, e o termo assinado pode ser anexado no mesmo fluxo."
         onClose={() => setIsCreateModalOpen(false)}
       >
         <PossessionForm
