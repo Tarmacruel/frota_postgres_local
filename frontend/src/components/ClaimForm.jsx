@@ -3,6 +3,7 @@ import { claimsAPI } from '../api/claims'
 import DriverSelect from './DriverSelect'
 import SearchableSelect from './SearchableSelect'
 import { getApiErrorMessage } from '../utils/apiError'
+import { toDateTimeLocalValue } from '../utils/datetime'
 
 const typeOptions = ['COLISAO', 'ROUBO', 'FURTO', 'AVARIA', 'OUTRO']
 const statusOptions = ['ABERTO', 'EM_ANALISE', 'ENCERRADO']
@@ -21,7 +22,7 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
   const [form, setForm] = useState({
     vehicle_id: initialData?.vehicle_id || '',
     driver_id: initialData?.driver_id || '',
-    data_ocorrencia: initialData?.data_ocorrencia ? new Date(initialData.data_ocorrencia).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
+    data_ocorrencia: initialData?.data_ocorrencia ? toDateTimeLocalValue(initialData.data_ocorrencia) : toDateTimeLocalValue(new Date()),
     tipo: initialData?.tipo || 'COLISAO',
     descricao: initialData?.descricao || '',
     local: initialData?.local || '',

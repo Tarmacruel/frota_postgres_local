@@ -2,20 +2,14 @@ import { useMemo, useState } from 'react'
 import { maintenanceAPI } from '../api/maintenance'
 import SearchableSelect from './SearchableSelect'
 import { getApiErrorMessage } from '../utils/apiError'
-
-function toDateTimeInput(value) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().slice(0, 16)
-}
+import { toDateTimeLocalValue } from '../utils/datetime'
 
 function buildInitialState(initialData, vehicles) {
   if (initialData) {
     return {
       vehicle_id: initialData.vehicle_id,
-      start_date: toDateTimeInput(initialData.start_date),
-      end_date: toDateTimeInput(initialData.end_date),
+      start_date: toDateTimeLocalValue(initialData.start_date),
+      end_date: toDateTimeLocalValue(initialData.end_date),
       service_description: initialData.service_description || '',
       parts_replaced: initialData.parts_replaced || '',
       total_cost: initialData.total_cost ?? '',
@@ -24,7 +18,7 @@ function buildInitialState(initialData, vehicles) {
 
   return {
     vehicle_id: '',
-    start_date: toDateTimeInput(new Date().toISOString()),
+    start_date: toDateTimeLocalValue(new Date().toISOString()),
     end_date: '',
     service_description: '',
     parts_replaced: '',

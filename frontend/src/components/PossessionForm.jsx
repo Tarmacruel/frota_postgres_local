@@ -3,6 +3,7 @@ import { possessionAPI } from '../api/possession'
 import DriverSelect from './DriverSelect'
 import SearchableSelect from './SearchableSelect'
 import { getApiErrorMessage } from '../utils/apiError'
+import { toDateTimeLocalValue } from '../utils/datetime'
 
 const MAX_DOCUMENT_SIZE_BYTES = 12 * 1024 * 1024
 const ALLOWED_DOCUMENT_TYPES = [
@@ -13,13 +14,6 @@ const ALLOWED_DOCUMENT_TYPES = [
   'application/msword',
   'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
 ]
-
-function toDateTimeInput(value) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().slice(0, 16)
-}
 
 function formatDateTime(value) {
   if (!value) return '-'
@@ -102,7 +96,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
     driver_name: '',
     driver_document: '',
     driver_contact: '',
-    start_date: toDateTimeInput(new Date().toISOString()),
+    start_date: toDateTimeLocalValue(new Date().toISOString()),
     start_odometer_km: '',
     observation: '',
   })
