@@ -5,10 +5,25 @@ export default function VehicleDetailsTable({ efficiencyRows = [], tcoRows = [] 
 
   const rows = useMemo(() => {
     const tcoByVehicle = new Map(tcoRows.map((row) => [row.vehicle_id, row]))
-    return efficiencyRows.map((row) => ({
-      ...row,
-      tco: tcoByVehicle.get(row.vehicle_id) || null,
-    }))
+    const keyOccurrences = new Map()
+
+    return efficiencyRows.map((row) => {
+      const baseKey = [
+        row.vehicle_id || row.plate || row.vehicle_type || 'unknown-vehicle',
+        row.total_km || 0,
+        row.consumption_l_100km || 0,
+        row.variance_percentage || 0,
+      ].join('-')
+
+      const nextOccurrence = (keyOccurrences.get(baseKey) || 0) + 1
+      keyOccurrences.set(baseKey, nextOccurrence)
+
+      return {
+        ...row,
+        rowKey: `${baseKey}-${nextOccurrence}`,
+        tco: tcoByVehicle.get(row.vehicle_id) || null,
+      }
+    })
   }, [efficiencyRows, tcoRows])
 
   return (
@@ -26,9 +41,8 @@ export default function VehicleDetailsTable({ efficiencyRows = [], tcoRows = [] 
             </tr>
           </thead>
           <tbody>
-            {rows.map((row, index) => {
-              const baseKey = row.vehicle_id || row.plate || row.vehicle_type || 'unknown-vehicle'
-              const rowKey = `${baseKey}-${index}`
+            {rows.map((row) => {
+              const rowKey = row.rowKey
               return (
                 <Fragment key={rowKey}>
                   <tr>
