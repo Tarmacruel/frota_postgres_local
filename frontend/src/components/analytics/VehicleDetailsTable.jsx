@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from 'react'
 
 export default function VehicleDetailsTable({ efficiencyRows = [], tcoRows = [] }) {
-  const [expandedRow, setExpandedRow] = useState(null)
+  const [expandedRowKey, setExpandedRowKey] = useState(null)
 
   const rows = useMemo(() => {
     const tcoByVehicle = new Map(tcoRows.map((row) => [row.vehicle_id, row]))
@@ -26,8 +26,9 @@ export default function VehicleDetailsTable({ efficiencyRows = [], tcoRows = [] 
             </tr>
           </thead>
           <tbody>
-            {rows.map((row) => {
-              const rowKey = row.vehicle_id || `${row.vehicle_type}-${row.total_km}`
+            {rows.map((row, index) => {
+              const baseKey = row.vehicle_id || row.plate || row.vehicle_type || 'unknown-vehicle'
+              const rowKey = `${baseKey}-${index}`
               return (
                 <Fragment key={rowKey}>
                   <tr>
@@ -39,13 +40,13 @@ export default function VehicleDetailsTable({ efficiencyRows = [], tcoRows = [] 
                       <button
                         type="button"
                         className="ghost-button"
-                        onClick={() => setExpandedRow(expandedRow === row.vehicle_id ? null : row.vehicle_id)}
+                        onClick={() => setExpandedRowKey(expandedRowKey === rowKey ? null : rowKey)}
                       >
-                        {expandedRow === row.vehicle_id ? 'Ocultar' : 'Detalhes'}
+                        {expandedRowKey === rowKey ? 'Ocultar' : 'Detalhes'}
                       </button>
                     </td>
                   </tr>
-                  {expandedRow === row.vehicle_id ? (
+                  {expandedRowKey === rowKey ? (
                     <tr>
                       <td colSpan={5}>
                         Média categoria consumo: {Number(row.category_average || 0).toFixed(2)} L/100km •
