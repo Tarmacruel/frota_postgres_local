@@ -3,6 +3,7 @@ from app.models.audit_log import AuditLog
 from app.models.claim import Claim, ClaimStatus, ClaimType
 from app.models.driver import Driver, DriverLicenseCategory
 from app.models.fine import Fine, FineStatus
+from app.models.fuel_station import FuelStation, FuelStationUser
 from app.models.fuel_supply import FuelSupply
 from app.models.fleet_analytics_snapshot import FleetAnalyticsSnapshot
 from app.models.master_data import Allocation, Department, Organization
@@ -23,6 +24,8 @@ __all__ = [
     "DriverLicenseCategory",
     "Fine",
     "FineStatus",
+    "FuelStation",
+    "FuelStationUser",
     "FuelSupply",
     "FleetAnalyticsSnapshot",
     "Organization",

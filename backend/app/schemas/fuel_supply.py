@@ -10,6 +10,7 @@ class FuelSupplyCreate(BaseModel):
     vehicle_id: UUID
     driver_id: UUID | None = None
     organization_id: UUID | None = None
+    fuel_station_id: UUID | None = None
     supplied_at: datetime | None = None
     odometer_km: float = Field(gt=0)
     liters: float = Field(gt=0)
@@ -30,6 +31,7 @@ class FuelSupplyFilter(BaseModel):
     vehicle_id: UUID | None = None
     driver_id: UUID | None = None
     organization_id: UUID | None = None
+    fuel_station_id: UUID | None = None
     start_date: datetime | None = None
     end_date: datetime | None = None
     only_anomalies: bool | None = None
@@ -49,6 +51,8 @@ class FuelSupplyOut(BaseModel):
     odometer_km: float
     liters: float
     total_amount: float | None
+    fuel_station_id: UUID | None
+    fuel_station_name: str | None
     fuel_station: str | None
     notes: str | None
     consumption_km_l: float | None

@@ -26,7 +26,7 @@ function buildDriverOption(driver) {
   }
 }
 
-export default function FuelSupplyForm({ vehicles, drivers, organizations, onClose, onSuccess }) {
+export default function FuelSupplyForm({ vehicles, drivers, organizations, fuelStations, onClose, onSuccess }) {
   const [form, setForm] = useState({
     vehicle_id: '',
     driver_id: '',
@@ -35,7 +35,7 @@ export default function FuelSupplyForm({ vehicles, drivers, organizations, onClo
     odometer_km: '',
     liters: '',
     total_amount: '',
-    fuel_station: '',
+    fuel_station_id: '',
     notes: '',
   })
   const [receiptFile, setReceiptFile] = useState(null)
@@ -94,7 +94,7 @@ export default function FuelSupplyForm({ vehicles, drivers, organizations, onClo
       payload.append('odometer_km', String(Number(form.odometer_km)))
       payload.append('liters', String(Number(form.liters)))
       if (form.total_amount) payload.append('total_amount', String(Number(form.total_amount)))
-      if (form.fuel_station) payload.append('fuel_station', form.fuel_station)
+      if (form.fuel_station_id) payload.append('fuel_station_id', form.fuel_station_id)
       if (form.notes) payload.append('notes', form.notes)
       payload.append('receipt', receiptFile, receiptFile.name)
 
@@ -142,7 +142,7 @@ export default function FuelSupplyForm({ vehicles, drivers, organizations, onClo
       </div>
       <div className="form-field">
         <label>Posto</label>
-        <input type="text" className="app-input" value={form.fuel_station} onChange={(event) => setForm({ ...form, fuel_station: event.target.value })} />
+        <SearchableSelect value={form.fuel_station_id} onChange={(value) => setForm({ ...form, fuel_station_id: value })} options={[{ value: '', label: 'Nao informado' }, ...fuelStations.map((station) => ({ value: station.id, label: station.name, description: station.address }))]} placeholder="Selecione o posto" searchPlaceholder="Buscar posto" />
       </div>
 
       <div className="form-field modal-field-span">
