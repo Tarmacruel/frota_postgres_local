@@ -50,6 +50,15 @@ class FuelSupplyService:
         return self._serialize(supply)
 
     async def create(self, data: FuelSupplyCreate, receipt: UploadFile, current_user: User) -> dict:
+        if not settings.ENABLE_LEGACY_FUEL_SUPPLY_CREATE:
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE,
+                detail=(
+                    "Criacao direta em /api/fuel-supplies foi descontinuada. "
+                    "Use /api/fuel-supply-orders e confirme a ordem com comprovante."
+                ),
+            )
+
         vehicle = await self.vehicles.get_by_id(data.vehicle_id)
         if not vehicle:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")

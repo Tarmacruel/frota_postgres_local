@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from app.models.fuel_supply_order import FuelSupplyOrderStatus
 from app.schemas.common import PaginatedResponse
 
 
@@ -83,3 +84,80 @@ class FuelAnomalyReportItem(BaseModel):
     supplied_at: datetime
     consumption_km_l: float | None
     anomaly_details: str | None
+
+
+class FuelSupplyOrderCreate(BaseModel):
+    vehicle_id: UUID
+    driver_id: UUID | None = None
+    organization_id: UUID | None = None
+    fuel_station_id: UUID | None = None
+    expires_at: datetime
+    requested_liters: float | None = Field(default=None, gt=0)
+    max_amount: float | None = Field(default=None, ge=0)
+    notes: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("notes")
+    @classmethod
+    def normalize_notes(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+
+class FuelSupplyOrderConfirm(BaseModel):
+    driver_id: UUID | None = None
+    supplied_at: datetime | None = None
+    odometer_km: float = Field(gt=0)
+    liters: float = Field(gt=0)
+    total_amount: float | None = Field(default=None, ge=0)
+    fuel_station: str | None = Field(default=None, max_length=180)
+    notes: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("fuel_station", "notes")
+    @classmethod
+    def normalize_confirm_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+
+class FuelSupplyOrderCancel(BaseModel):
+    reason: str | None = Field(default=None, max_length=500)
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_reason(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+
+class FuelSupplyOrderOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    status: FuelSupplyOrderStatus
+    vehicle_id: UUID
+    vehicle_plate: str
+    driver_id: UUID | None
+    organization_id: UUID | None
+    organization_name: str | None
+    fuel_station_id: UUID | None
+    created_by_user_id: UUID
+    created_by_name: str | None
+    confirmed_by_user_id: UUID | None
+    confirmed_by_name: str | None
+    expires_at: datetime
+    requested_liters: float | None
+    max_amount: float | None
+    notes: str | None
+    confirmed_at: datetime | None
+    created_at: datetime
+    updated_at: datetime
+
+
+class FuelSupplyOrderListResponse(PaginatedResponse[FuelSupplyOrderOut]):
+    pass
