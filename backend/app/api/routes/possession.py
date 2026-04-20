@@ -89,9 +89,9 @@ def parse_possession_form(
 
 
 def parse_possession_photo_metadata(
-    photo_metadata_json: str = Form(...),
+    photo_metadata_json: str | None = Form(default=None),
 ) -> list[PossessionPhotoCreate]:
-    return _parse_photo_metadata(photo_metadata_json, required=True)
+    return _parse_photo_metadata(photo_metadata_json, required=False)
 
 
 def parse_admin_update_form(

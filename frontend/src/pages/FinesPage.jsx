@@ -74,9 +74,25 @@ export default function FinesPage() {
   ]
 
   async function loadAux() {
-    const [vehicleResponse, driverResponse] = await Promise.all([vehiclesAPI.list(), driversAPI.list({ page: 1, limit: 200, active: true })])
-    setVehicles(vehicleResponse.data)
-    setDrivers(driverResponse.data.data)
+    const [vehicleResponse, driverResponse] = await Promise.all([
+      vehiclesAPI.list({ limit: 200 }),
+      driversAPI.listActive({ limit: 200 }),
+    ])
+    setVehicles(Array.isArray(vehicleResponse.data) ? vehicleResponse.data : [])
+    setDrivers(Array.isArray(driverResponse.data) ? driverResponse.data : [])
+  }
+
+  async function handleVehicleChange(value) {
+    setForm((prev) => ({ ...prev, vehicle_id: value }))
+    if (!value || editingRecord) return
+
+    try {
+      const { data } = await vehiclesAPI.currentDriver(value)
+      const nextDriverId = data?.driver_id || ''
+      setForm((prev) => ({ ...prev, driver_id: nextDriverId }))
+    } catch {
+      setForm((prev) => ({ ...prev, driver_id: '' }))
+    }
   }
 
   async function loadFines(page = pagination.page) {
@@ -235,7 +251,7 @@ export default function FinesPage() {
             <label>Veiculo</label>
             <SearchableSelect
               value={form.vehicle_id}
-              onChange={(value) => setForm({ ...form, vehicle_id: value })}
+              onChange={handleVehicleChange}
               options={vehicles.map(vehicleOption)}
               placeholder="Selecionar veiculo"
               searchPlaceholder="Buscar veiculo por placa, marca ou modelo"

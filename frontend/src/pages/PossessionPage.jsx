@@ -11,6 +11,7 @@ import { possessionAPI } from '../api/possession'
 import { useAuth } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
+import { toDateTimeLocalValue } from '../utils/datetime'
 
 const viewOptions = [
   { value: 'ATIVAS', label: 'Ativas' },
@@ -33,13 +34,6 @@ const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 function formatDate(value) {
   if (!value) return 'Atual'
   return new Date(value).toLocaleString('pt-BR')
-}
-
-function toDateTimeInput(value) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().slice(0, 16)
 }
 
 function formatTimestamp(value) {
@@ -82,7 +76,7 @@ function buildMapEmbedUrl(location) {
 
 function buildEndState(record) {
   return {
-    end_date: new Date().toISOString().slice(0, 16),
+    end_date: toDateTimeLocalValue(new Date()),
     end_odometer_km: record?.end_odometer_km ?? '',
     observation: record?.observation || '',
   }
@@ -266,8 +260,8 @@ export default function PossessionPage() {
       driver_name: record.driver_name || '',
       driver_document: record.driver_document || '',
       driver_contact: record.driver_contact || '',
-      start_date: toDateTimeInput(record.start_date),
-      end_date: toDateTimeInput(record.end_date),
+      start_date: toDateTimeLocalValue(record.start_date),
+      end_date: toDateTimeLocalValue(record.end_date),
       observation: record.observation || '',
       start_odometer_km: record.start_odometer_km ?? '',
       end_odometer_km: record.end_odometer_km ?? '',
@@ -697,7 +691,7 @@ export default function PossessionPage() {
       <Modal
         open={isCreateModalOpen}
         title="Nova posse"
-        description="Ao registrar um novo condutor, qualquer posse ativa do mesmo veiculo sera encerrada automaticamente. Foto e localizacao sao obrigatorias, voce pode capturar varias fotos, e o termo assinado pode ser anexado no mesmo fluxo."
+        description="Ao registrar um novo condutor, qualquer posse ativa do mesmo veiculo sera encerrada automaticamente. Foto e localizacao sao opcionais, voce pode capturar varias fotos, e o termo assinado pode ser anexado no mesmo fluxo."
         onClose={() => setIsCreateModalOpen(false)}
       >
         <PossessionForm

@@ -1,14 +1,29 @@
 import { Fragment, useMemo, useState } from 'react'
 
 export default function VehicleDetailsTable({ efficiencyRows = [], tcoRows = [] }) {
-  const [expandedRow, setExpandedRow] = useState(null)
+  const [expandedRowKey, setExpandedRowKey] = useState(null)
 
   const rows = useMemo(() => {
     const tcoByVehicle = new Map(tcoRows.map((row) => [row.vehicle_id, row]))
-    return efficiencyRows.map((row) => ({
-      ...row,
-      tco: tcoByVehicle.get(row.vehicle_id) || null,
-    }))
+    const keyOccurrences = new Map()
+
+    return efficiencyRows.map((row) => {
+      const baseKey = [
+        row.vehicle_id || row.plate || row.vehicle_type || 'unknown-vehicle',
+        row.total_km || 0,
+        row.consumption_l_100km || 0,
+        row.variance_percentage || 0,
+      ].join('-')
+
+      const nextOccurrence = (keyOccurrences.get(baseKey) || 0) + 1
+      keyOccurrences.set(baseKey, nextOccurrence)
+
+      return {
+        ...row,
+        rowKey: `${baseKey}-${nextOccurrence}`,
+        tco: tcoByVehicle.get(row.vehicle_id) || null,
+      }
+    })
   }, [efficiencyRows, tcoRows])
 
   return (
@@ -27,7 +42,7 @@ export default function VehicleDetailsTable({ efficiencyRows = [], tcoRows = [] 
           </thead>
           <tbody>
             {rows.map((row) => {
-              const rowKey = row.vehicle_id || `${row.vehicle_type}-${row.total_km}`
+              const rowKey = row.rowKey
               return (
                 <Fragment key={rowKey}>
                   <tr>
@@ -39,13 +54,13 @@ export default function VehicleDetailsTable({ efficiencyRows = [], tcoRows = [] 
                       <button
                         type="button"
                         className="ghost-button"
-                        onClick={() => setExpandedRow(expandedRow === row.vehicle_id ? null : row.vehicle_id)}
+                        onClick={() => setExpandedRowKey(expandedRowKey === rowKey ? null : rowKey)}
                       >
-                        {expandedRow === row.vehicle_id ? 'Ocultar' : 'Detalhes'}
+                        {expandedRowKey === rowKey ? 'Ocultar' : 'Detalhes'}
                       </button>
                     </td>
                   </tr>
-                  {expandedRow === row.vehicle_id ? (
+                  {expandedRowKey === rowKey ? (
                     <tr>
                       <td colSpan={5}>
                         Média categoria consumo: {Number(row.category_average || 0).toFixed(2)} L/100km •
