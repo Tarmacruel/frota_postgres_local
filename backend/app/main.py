@@ -12,6 +12,7 @@ from app.api.routes.claims import router as claims_router
 from app.api.routes.drivers import router as drivers_router
 from app.api.routes.fines import router as fines_router
 from app.api.routes.fuel_supplies import router as fuel_supplies_router
+from app.api.routes.fuel_supply_orders import router as fuel_supply_orders_router
 from app.api.routes.maintenance import router as maintenance_router
 from app.api.routes.master_data import router as master_data_router
 from app.api.routes.possession import router as possession_router
@@ -45,6 +46,7 @@ app.include_router(possession_router)
 app.include_router(claims_router)
 app.include_router(fines_router)
 app.include_router(fuel_supplies_router)
+app.include_router(fuel_supply_orders_router)
 app.include_router(search_router)
 app.include_router(analytics_router)
 
