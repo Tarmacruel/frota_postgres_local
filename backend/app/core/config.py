@@ -39,6 +39,7 @@ class Settings(BaseSettings):
     COOKIE_NAME: str = "access_token"
     COOKIE_SECURE: bool = False
     APP_ENV: str = "development"
+    ENABLE_LEGACY_FUEL_SUPPLY_CREATE: bool = True
 
     model_config = SettingsConfigDict(env_file=str(BASE_DIR / ".env"), extra="ignore")
 
