@@ -5,7 +5,7 @@ from datetime import datetime
 from uuid import UUID
 from sqlalchemy import DateTime, Enum, String, text
 from sqlalchemy.dialects.postgresql import CITEXT, UUID as PGUUID
-from sqlalchemy.orm import Mapped, mapped_column
+from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
 
 
@@ -25,3 +25,5 @@ class User(Base):
     role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"), nullable=False, default=UserRole.PADRAO)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
+    fuel_station_links: Mapped[list["FuelStationUser"]] = relationship(back_populates="user", cascade="all, delete-orphan")
+

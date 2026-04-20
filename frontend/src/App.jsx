@@ -11,6 +11,7 @@ import DashboardPage from './pages/DashboardPage'
 import DriversPage from './pages/DriversPage'
 import FinesPage from './pages/FinesPage'
 import FuelSuppliesPage from './pages/FuelSuppliesPage'
+import FuelStationsPage from './pages/FuelStationsPage'
 import LoginPage from './pages/LoginPage'
 import MaintenancePage from './pages/MaintenancePage'
 import PossessionPage from './pages/PossessionPage'
@@ -60,6 +61,14 @@ export default function App() {
             <Route path="sinistros" element={<ClaimsPage />} />
             <Route path="multas" element={<FinesPage />} />
             <Route path="abastecimentos" element={<FuelSuppliesPage />} />
+            <Route
+              path="postos"
+              element={(
+                <ProtectedRoute adminOnly>
+                  <FuelStationsPage />
+                </ProtectedRoute>
+              )}
+            />
             <Route
               path="users"
               element={
