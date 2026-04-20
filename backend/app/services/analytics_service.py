@@ -80,11 +80,26 @@ class AnalyticsService:
         start = end - timedelta(days=period_days)
         return start, end
 
+    @staticmethod
+    def _unique_vehicle_snapshots(rows: list[FleetAnalyticsSnapshot]) -> list[FleetAnalyticsSnapshot]:
+        unique: dict[UUID, FleetAnalyticsSnapshot] = {}
+        for row in rows:
+            if row.scope != "VEHICLE" or row.vehicle_id is None:
+                continue
+            unique.setdefault(row.vehicle_id, row)
+        return list(unique.values())
+
+    @staticmethod
+    def _unique_driver_snapshots(rows: list[FleetAnalyticsSnapshot]) -> list[FleetAnalyticsSnapshot]:
+        unique: dict[UUID, FleetAnalyticsSnapshot] = {}
+        for row in rows:
+            if row.scope != "DRIVER" or row.driver_id is None:
+                continue
+            unique.setdefault(row.driver_id, row)
+        return list(unique.values())
+
     async def _ensure_snapshots(self, period_days: int) -> list[FleetAnalyticsSnapshot]:
         period_start, period_end = self._period_bounds(period_days)
-        existing = await self.analytics_repo.list_period_snapshots(period_start=period_start, period_end=period_end)
-        if existing:
-            return existing
 
         vehicle_rows = (
             await self.db.execute(
@@ -264,8 +279,8 @@ class AnalyticsService:
 
     async def overview(self, period_days: int) -> dict:
         snapshots = await self._ensure_snapshots(period_days)
-        vehicle_rows = [item for item in snapshots if item.scope == "VEHICLE"]
-        insights = self._build_insights(vehicle_rows, [item for item in snapshots if item.scope == "DRIVER"])
+        vehicle_rows = self._unique_vehicle_snapshots(snapshots)
+        insights = self._build_insights(vehicle_rows, self._unique_driver_snapshots(snapshots))
         consumptions = [item.consumption_l_100km for item in vehicle_rows if item.consumption_l_100km is not None]
         tcos = [item.tco_cost_per_km for item in vehicle_rows if item.tco_cost_per_km is not None]
 
@@ -279,7 +294,7 @@ class AnalyticsService:
         }
 
     async def efficiency(self, period_days: int, vehicle_type: str | None = None) -> list[dict]:
-        rows = [item for item in await self._ensure_snapshots(period_days) if item.scope == "VEHICLE"]
+        rows = self._unique_vehicle_snapshots(await self._ensure_snapshots(period_days))
         if vehicle_type:
             rows = [row for row in rows if row.vehicle_type == vehicle_type]
         payload = []
@@ -299,7 +314,7 @@ class AnalyticsService:
         return sorted(payload, key=lambda item: (item["variance_percentage"] or 0), reverse=True)
 
     async def tco(self, period_days: int, vehicle_type: str | None = None) -> list[dict]:
-        rows = [item for item in await self._ensure_snapshots(period_days) if item.scope == "VEHICLE"]
+        rows = self._unique_vehicle_snapshots(await self._ensure_snapshots(period_days))
         if vehicle_type:
             rows = [row for row in rows if row.vehicle_type == vehicle_type]
 
@@ -320,7 +335,7 @@ class AnalyticsService:
         return sorted(payload, key=lambda item: (item["tco_cost_per_km"] or 0), reverse=True)
 
     async def driver_risk(self, period_days: int) -> list[dict]:
-        rows = [item for item in await self._ensure_snapshots(period_days) if item.scope == "DRIVER"]
+        rows = self._unique_driver_snapshots(await self._ensure_snapshots(period_days))
         payload = []
         for row in rows:
             extra = row.extra_payload or {}
@@ -412,8 +427,8 @@ class AnalyticsService:
     async def insights(self, period_days: int) -> list[dict]:
         rows = await self._ensure_snapshots(period_days)
         return self._build_insights(
-            [item for item in rows if item.scope == "VEHICLE"],
-            [item for item in rows if item.scope == "DRIVER"],
+            self._unique_vehicle_snapshots(rows),
+            self._unique_driver_snapshots(rows),
         )
 
 
