@@ -38,6 +38,7 @@ class FuelSupplyOrderRepository:
         status_filter: FuelSupplyOrderStatus | None = None,
         organization_id: UUID | None = None,
         vehicle_id: UUID | None = None,
+        fuel_station_id: UUID | None = None,
         due_until: datetime | None = None,
     ) -> tuple[list[FuelSupplyOrder], int]:
         stmt = select(FuelSupplyOrder).options(
@@ -55,6 +56,8 @@ class FuelSupplyOrderRepository:
             filters.append(FuelSupplyOrder.organization_id == organization_id)
         if vehicle_id:
             filters.append(FuelSupplyOrder.vehicle_id == vehicle_id)
+        if fuel_station_id:
+            filters.append(FuelSupplyOrder.fuel_station_id == fuel_station_id)
         if due_until:
             filters.append(FuelSupplyOrder.expires_at <= due_until)
 

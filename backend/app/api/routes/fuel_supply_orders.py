@@ -61,6 +61,7 @@ async def list_fuel_supply_orders(
     status_filter: FuelSupplyOrderStatus | None = Query(default=None, alias="status"),
     organization_id: UUID | None = Query(default=None, alias="posto_id"),
     vehicle_id: UUID | None = Query(default=None),
+    fuel_station_id: UUID | None = Query(default=None),
     due_until: datetime | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
 ):
@@ -70,6 +71,7 @@ async def list_fuel_supply_orders(
         status_filter=status_filter,
         organization_id=organization_id,
         vehicle_id=vehicle_id,
+        fuel_station_id=fuel_station_id,
         due_until=due_until,
     )
 
