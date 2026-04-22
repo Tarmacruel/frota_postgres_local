@@ -38,6 +38,7 @@ class FuelSupplyRepository:
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         only_anomalies: bool | None = None,
+        fuel_station: str | None = None,
     ) -> tuple[list[FuelSupply], int]:
         stmt = select(FuelSupply).options(joinedload(FuelSupply.vehicle), joinedload(FuelSupply.driver), joinedload(FuelSupply.organization), joinedload(FuelSupply.fuel_station_ref))
         count_stmt = select(func.count(FuelSupply.id))
@@ -57,6 +58,8 @@ class FuelSupplyRepository:
             filters.append(FuelSupply.supplied_at <= end_date)
         if only_anomalies is not None:
             filters.append(FuelSupply.is_consumption_anomaly.is_(only_anomalies))
+        if fuel_station:
+            filters.append(func.lower(FuelSupply.fuel_station) == fuel_station.lower())
 
         if filters:
             clause = and_(*filters)

@@ -17,7 +17,7 @@ function readStorage(key, fallback) {
 }
 
 export default function Layout() {
-  const { user, logout, isAdmin, canManageCadastros, roleLabel } = useAuth()
+  const { user, logout, isAdmin, canManageCadastros, canAccessFuelSupplies, isFuelStation, roleLabel } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -33,6 +33,17 @@ export default function Layout() {
   const [unreadNotifications, setUnreadNotifications] = useState(0)
 
   const navSections = useMemo(() => {
+    if (isFuelStation) {
+      return [
+        {
+          title: 'Operacional',
+          items: [
+            { to: '/abastecimentos', label: 'Ordens em aberto', description: 'Consulta e confirmacao de ordens do posto', icon: 'maintenance' },
+          ],
+        },
+      ]
+    }
+
     const sections = [
       {
         title: 'Visao geral',
@@ -49,7 +60,7 @@ export default function Layout() {
           { to: '/manutencoes', label: 'Manutencoes', description: 'Custos, servicos e oficina', icon: 'maintenance' },
           { to: '/sinistros', label: 'Sinistros', description: 'Ocorrencias, BO e prejuizos', icon: 'audit' },
           { to: '/multas', label: 'Multas', description: 'Autos, vencimentos e pagamentos', icon: 'catalog' },
-          { to: '/abastecimentos', label: 'Abastecimentos', description: 'Consumo, comprovantes e alertas', icon: 'maintenance' },
+          ...(canAccessFuelSupplies ? [{ to: '/abastecimentos', label: 'Abastecimentos', description: 'Consumo, comprovantes e alertas', icon: 'maintenance' }] : []),
         ],
       },
     ]
@@ -74,10 +85,10 @@ export default function Layout() {
     }
 
     return sections
-  }, [isAdmin, canManageCadastros])
+  }, [isAdmin, canManageCadastros, canAccessFuelSupplies, isFuelStation])
 
   const mobileTabs = navSections.flatMap((section) => section.items).filter((item) =>
-    ['/', '/vehicles', '/manutencoes', '/condutores'].includes(item.to),
+    isFuelStation ? ['/abastecimentos'].includes(item.to) : ['/', '/vehicles', '/manutencoes', '/condutores'].includes(item.to),
   )
 
   const currentItem =

@@ -51,6 +51,17 @@ class FuelSupplyService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abastecimento nao encontrado")
         return self._serialize(supply)
 
+    async def get_for_station(self, *, supply_id: UUID, fuel_station: str) -> dict:
+        supply = await self.supplies.get_by_id(supply_id)
+        if not supply:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abastecimento nao encontrado")
+
+        record_station = (supply.fuel_station or "").strip().lower()
+        expected_station = fuel_station.strip().lower()
+        if not expected_station or record_station != expected_station:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abastecimento nao encontrado para o posto informado")
+        return self._serialize(supply)
+
     async def create(self, data: FuelSupplyCreate, receipt: UploadFile, current_user: User) -> dict:
         if not settings.ENABLE_LEGACY_FUEL_SUPPLY_CREATE:
             raise HTTPException(

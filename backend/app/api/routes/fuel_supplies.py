@@ -2,14 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime
 from uuid import UUID
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, UploadFile, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user, require_writer
+from app.api.deps import get_current_user, require_fuel_supply_confirmer
 from app.db.session import get_db_session
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.fuel_supply import (
     FuelAnomalyReportItem,
     FuelConsumptionReportItem,
@@ -51,7 +51,7 @@ def parse_create_form(
         raise RequestValidationError(exc.errors()) from exc
 
 
-@router.get("", response_model=FuelSupplyListResponse, dependencies=[Depends(get_current_user)])
+@router.get("", response_model=FuelSupplyListResponse)
 async def list_fuel_supplies(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),
@@ -63,7 +63,12 @@ async def list_fuel_supplies(
     end_date: datetime | None = Query(default=None),
     only_anomalies: bool | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
 ):
+    fuel_station_filter = None
+    if current_user.role == UserRole.POSTO:
+        fuel_station_filter = current_user.name.strip()
+
     return await FuelSupplyService(db).list(
         page=page,
         limit=limit,
@@ -74,6 +79,7 @@ async def list_fuel_supplies(
         start_date=start_date,
         end_date=end_date,
         only_anomalies=only_anomalies,
+        fuel_station=fuel_station_filter,
     )
 
 
@@ -82,34 +88,55 @@ async def create_fuel_supply(
     data: FuelSupplyCreate = Depends(parse_create_form),
     receipt: UploadFile = File(...),
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_writer),
+    current_user: User = Depends(require_fuel_supply_confirmer),
 ):
+    if current_user.role == UserRole.POSTO:
+        data = data.model_copy(update={"fuel_station": current_user.name.strip()})
     return await FuelSupplyService(db).create(data, receipt, current_user)
 
 
-@router.get("/{supply_id}", response_model=FuelSupplyOut, dependencies=[Depends(get_current_user)])
-async def get_fuel_supply(supply_id: UUID, db: AsyncSession = Depends(get_db_session)):
-    return await FuelSupplyService(db).get(supply_id)
-
-
-@router.get("/{supply_id}/receipt", dependencies=[Depends(get_current_user)])
-async def get_fuel_supply_receipt(supply_id: UUID, db: AsyncSession = Depends(get_db_session)) -> FileResponse:
-    return await FuelSupplyService(db).get_receipt_file(supply_id)
-
-
-@router.get("/reports/consumption", response_model=list[FuelConsumptionReportItem], dependencies=[Depends(get_current_user)])
+@router.get("/reports/consumption", response_model=list[FuelConsumptionReportItem])
 async def consumption_report(
     start_date: datetime | None = Query(default=None),
     end_date: datetime | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
 ):
+    if current_user.role == UserRole.POSTO:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Perfil POSTO nao possui acesso a relatorios")
     return await FuelSupplyService(db).consumption_report(start_date=start_date, end_date=end_date)
 
 
-@router.get("/reports/anomalies", response_model=list[FuelAnomalyReportItem], dependencies=[Depends(get_current_user)])
+@router.get("/reports/anomalies", response_model=list[FuelAnomalyReportItem])
 async def anomalies_report(
     start_date: datetime | None = Query(default=None),
     end_date: datetime | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
 ):
+    if current_user.role == UserRole.POSTO:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Perfil POSTO nao possui acesso a relatorios")
     return await FuelSupplyService(db).anomalies_report(start_date=start_date, end_date=end_date)
+
+
+@router.get("/{supply_id}", response_model=FuelSupplyOut)
+async def get_fuel_supply(
+    supply_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+):
+    if current_user.role == UserRole.POSTO:
+        return await FuelSupplyService(db).get_for_station(supply_id=supply_id, fuel_station=current_user.name.strip())
+    return await FuelSupplyService(db).get(supply_id)
+
+
+@router.get("/{supply_id}/receipt")
+async def get_fuel_supply_receipt(
+    supply_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user),
+) -> FileResponse:
+    if current_user.role == UserRole.POSTO:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Perfil POSTO nao possui acesso a comprovantes")
+    return await FuelSupplyService(db).get_receipt_file(supply_id)
+
