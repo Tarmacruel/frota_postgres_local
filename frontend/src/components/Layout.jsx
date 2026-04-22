@@ -72,6 +72,7 @@ export default function Layout() {
       }
       if (isAdmin) {
         managementItems.push(
+          { to: '/postos', label: 'Postos', description: 'Cadastro de postos e vinculos', icon: 'catalog' },
           { to: '/analytics', label: 'Analytics', description: 'BI operacional da frota', icon: 'dashboard' },
           { to: '/users', label: 'Usuarios', description: 'Perfis e niveis de acesso', icon: 'users' },
           { to: '/auditoria', label: 'Auditoria', description: 'Rastreabilidade administrativa', icon: 'audit' },

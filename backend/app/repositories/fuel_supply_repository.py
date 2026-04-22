@@ -21,7 +21,7 @@ class FuelSupplyRepository:
     async def get_by_id(self, supply_id: UUID) -> FuelSupply | None:
         result = await self.db.execute(
             select(FuelSupply)
-            .options(joinedload(FuelSupply.vehicle), joinedload(FuelSupply.driver), joinedload(FuelSupply.organization))
+            .options(joinedload(FuelSupply.vehicle), joinedload(FuelSupply.driver), joinedload(FuelSupply.organization), joinedload(FuelSupply.fuel_station_ref))
             .where(FuelSupply.id == supply_id)
         )
         return result.scalar_one_or_none()
@@ -34,12 +34,13 @@ class FuelSupplyRepository:
         vehicle_id: UUID | None = None,
         driver_id: UUID | None = None,
         organization_id: UUID | None = None,
+        fuel_station_id: UUID | None = None,
         start_date: datetime | None = None,
         end_date: datetime | None = None,
         only_anomalies: bool | None = None,
         fuel_station: str | None = None,
     ) -> tuple[list[FuelSupply], int]:
-        stmt = select(FuelSupply).options(joinedload(FuelSupply.vehicle), joinedload(FuelSupply.driver), joinedload(FuelSupply.organization))
+        stmt = select(FuelSupply).options(joinedload(FuelSupply.vehicle), joinedload(FuelSupply.driver), joinedload(FuelSupply.organization), joinedload(FuelSupply.fuel_station_ref))
         count_stmt = select(func.count(FuelSupply.id))
 
         filters = []
@@ -49,6 +50,8 @@ class FuelSupplyRepository:
             filters.append(FuelSupply.driver_id == driver_id)
         if organization_id:
             filters.append(FuelSupply.organization_id == organization_id)
+        if fuel_station_id:
+            filters.append(FuelSupply.fuel_station_id == fuel_station_id)
         if start_date:
             filters.append(FuelSupply.supplied_at >= start_date)
         if end_date:

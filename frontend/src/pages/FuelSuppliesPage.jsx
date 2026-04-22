@@ -4,6 +4,7 @@ import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
 import FuelSupplyForm from '../components/FuelSupplyForm'
 import api from '../api/client'
+import { fuelStationsAPI } from '../api/fuelStations'
 import { masterDataAPI } from '../api/masterData'
 import { fuelSuppliesAPI } from '../api/fuelSupplies'
 import { useAuth } from '../context/AuthContext'
@@ -36,7 +37,8 @@ export default function FuelSuppliesPage() {
   const [vehicles, setVehicles] = useState([])
   const [drivers, setDrivers] = useState([])
   const [organizations, setOrganizations] = useState([])
-  const [filters, setFilters] = useState({ vehicle_id: '', driver_id: '', organization_id: '', only_anomalies: '' })
+  const [fuelStations, setFuelStations] = useState([])
+  const [filters, setFilters] = useState({ vehicle_id: '', driver_id: '', organization_id: '', fuel_station_id: '', only_anomalies: '' })
   const [search, setSearch] = useState('')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -47,14 +49,16 @@ export default function FuelSuppliesPage() {
   useEffect(() => {
     async function loadDependencies() {
       try {
-        const [vehiclesResponse, driversResponse, organizationsResponse] = await Promise.all([
+        const [vehiclesResponse, driversResponse, organizationsResponse, stationsResponse] = await Promise.all([
           api.get('/vehicles'),
           api.get('/drivers'),
           masterDataAPI.listOrganizations(),
+          fuelStationsAPI.list({ active_only: true }),
         ])
         setVehicles(asArray(vehiclesResponse.data))
         setDrivers(asArray(driversResponse.data))
         setOrganizations(asArray(organizationsResponse.data))
+        setFuelStations(asArray(stationsResponse.data))
       } catch (err) {
         setError(getApiErrorMessage(err, 'Nao foi possivel carregar os cadastros de apoio.'))
       }
@@ -70,6 +74,7 @@ export default function FuelSuppliesPage() {
       if (filters.vehicle_id) params.vehicle_id = filters.vehicle_id
       if (filters.driver_id) params.driver_id = filters.driver_id
       if (filters.organization_id) params.organization_id = filters.organization_id
+      if (filters.fuel_station_id) params.fuel_station_id = filters.fuel_station_id
       if (filters.only_anomalies === 'true') params.only_anomalies = true
       const { data } = await fuelSuppliesAPI.list(params)
       setRecords(data.data || [])
@@ -88,7 +93,7 @@ export default function FuelSuppliesPage() {
     const term = search.trim().toLowerCase()
     return records.filter((record) => {
       if (!term) return true
-      return [record.vehicle_plate, record.driver_name, record.organization_name, record.fuel_station, record.notes]
+      return [record.vehicle_plate, record.driver_name, record.organization_name, record.fuel_station_name, record.fuel_station, record.notes]
         .filter(Boolean)
         .some((value) => value.toLowerCase().includes(term))
     })
@@ -140,6 +145,7 @@ export default function FuelSuppliesPage() {
                 <th>Data</th>
                 <th>Condutor</th>
                 <th>Orgao</th>
+                <th>Posto</th>
                 <th>Litros</th>
                 <th>Km/l</th>
                 <th>Alerta</th>
@@ -147,14 +153,15 @@ export default function FuelSuppliesPage() {
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan={8} className="muted">Carregando abastecimentos...</td></tr> : null}
-              {!loading && paginatedRecords.length === 0 ? <tr><td colSpan={8}><div className="empty-state">Nenhum abastecimento encontrado.</div></td></tr> : null}
+              {loading ? <tr><td colSpan={9} className="muted">Carregando abastecimentos...</td></tr> : null}
+              {!loading && paginatedRecords.length === 0 ? <tr><td colSpan={9}><div className="empty-state">Nenhum abastecimento encontrado.</div></td></tr> : null}
               {!loading && paginatedRecords.map((record) => (
                 <tr key={record.id}>
                   <td>{record.vehicle_plate}</td>
                   <td>{formatDate(record.supplied_at)}</td>
                   <td>{record.driver_name || '-'}</td>
                   <td>{record.organization_name || '-'}</td>
+                  <td>{record.fuel_station_name || record.fuel_station || '-'}</td>
                   <td>{formatNumber(record.liters)}</td>
                   <td>{formatNumber(record.consumption_km_l)}</td>
                   <td>{record.is_consumption_anomaly ? <span className="status-chip warning">Alerta</span> : '-'}</td>
@@ -172,6 +179,7 @@ export default function FuelSuppliesPage() {
           vehicles={vehicles}
           drivers={drivers}
           organizations={organizations}
+          fuelStations={fuelStations}
           onClose={() => setIsModalOpen(false)}
           onSuccess={(message) => {
             setFeedback(message)

@@ -10,6 +10,7 @@ import DashboardPage from './pages/DashboardPage'
 import DriversPage from './pages/DriversPage'
 import FinesPage from './pages/FinesPage'
 import FuelSuppliesPage from './pages/FuelSuppliesPage'
+import FuelStationsPage from './pages/FuelStationsPage'
 import LoginPage from './pages/LoginPage'
 import MaintenancePage from './pages/MaintenancePage'
 import PossessionPage from './pages/PossessionPage'
@@ -100,6 +101,14 @@ export default function App() {
               element={(
                 <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO', 'POSTO']}>
                   <FuelSuppliesPage />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="postos"
+              element={(
+                <ProtectedRoute adminOnly>
+                  <FuelStationsPage />
                 </ProtectedRoute>
               )}
             />

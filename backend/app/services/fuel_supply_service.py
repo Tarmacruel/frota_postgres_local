@@ -11,6 +11,7 @@ from app.core.config import settings
 from app.models.fuel_supply import FuelSupply
 from app.models.user import User
 from app.repositories.driver_repository import DriverRepository
+from app.repositories.fuel_station_repository import FuelStationRepository
 from app.repositories.fuel_supply_repository import FuelSupplyRepository
 from app.repositories.master_data_repository import MasterDataRepository
 from app.repositories.vehicle_repository import VehicleRepository
@@ -31,6 +32,7 @@ class FuelSupplyService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.supplies = FuelSupplyRepository(db)
+        self.fuel_stations = FuelStationRepository(db)
         self.vehicles = VehicleRepository(db)
         self.drivers = DriverRepository(db)
         self.master_data = MasterDataRepository(db)
@@ -61,6 +63,15 @@ class FuelSupplyService:
         return self._serialize(supply)
 
     async def create(self, data: FuelSupplyCreate, receipt: UploadFile, current_user: User) -> dict:
+        if not settings.ENABLE_LEGACY_FUEL_SUPPLY_CREATE:
+            raise HTTPException(
+                status_code=status.HTTP_410_GONE,
+                detail=(
+                    "Criacao direta em /api/fuel-supplies foi descontinuada. "
+                    "Use /api/fuel-supply-orders e confirme a ordem com comprovante."
+                ),
+            )
+
         vehicle = await self.vehicles.get_by_id(data.vehicle_id)
         if not vehicle:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
@@ -74,6 +85,14 @@ class FuelSupplyService:
             organization = await self.master_data.get_organization(data.organization_id)
             if not organization:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Orgao nao encontrado")
+
+        station = None
+        if data.fuel_station_id:
+            station = await self.fuel_stations.get(data.fuel_station_id)
+            if not station:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posto nao encontrado")
+            if not station.active:
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Posto selecionado esta inativo")
 
         receipt_payload = await self._read_and_validate_receipt(receipt)
         supplied_at = data.supplied_at or datetime.now(timezone.utc)
@@ -101,7 +120,8 @@ class FuelSupplyService:
             odometer_km=data.odometer_km,
             liters=data.liters,
             total_amount=data.total_amount,
-            fuel_station=data.fuel_station,
+            fuel_station_id=data.fuel_station_id,
+            fuel_station=station.name if station else data.fuel_station,
             notes=data.notes,
             consumption_km_l=consumption_km_l,
             is_consumption_anomaly=is_anomaly,
@@ -129,6 +149,7 @@ class FuelSupplyService:
                     "vehicle_id": str(supply.vehicle_id),
                     "driver_id": str(supply.driver_id) if supply.driver_id else None,
                     "organization_id": str(supply.organization_id) if supply.organization_id else None,
+                    "fuel_station_id": str(supply.fuel_station_id) if supply.fuel_station_id else None,
                     "consumption_km_l": supply.consumption_km_l,
                     "is_consumption_anomaly": supply.is_consumption_anomaly,
                     "anomaly_details": supply.anomaly_details,
@@ -264,6 +285,8 @@ class FuelSupplyService:
             "odometer_km": item.odometer_km,
             "liters": item.liters,
             "total_amount": float(item.total_amount) if item.total_amount is not None else None,
+            "fuel_station_id": item.fuel_station_id,
+            "fuel_station_name": item.fuel_station_ref.name if item.fuel_station_ref else None,
             "fuel_station": item.fuel_station,
             "notes": item.notes,
             "consumption_km_l": item.consumption_km_l,
