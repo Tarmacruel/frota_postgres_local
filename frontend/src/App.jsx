@@ -1,8 +1,7 @@
-import { Suspense, lazy } from 'react'
-import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import ProtectedRoute from './components/ProtectedRoute'
-import { AuthProvider } from './context/AuthContext'
+import { AuthProvider, useAuth } from './context/AuthContext'
 import AuditPage from './pages/AuditPage'
 import AdminAnalyticsDashboard from './pages/AdminAnalyticsDashboard'
 import CadastrosPage from './pages/CadastrosPage'
@@ -18,15 +17,10 @@ import UsersPage from './pages/UsersPage'
 import VehiclesPage from './pages/VehiclesPage'
 import UnauthorizedPage from './pages/UnauthorizedPage'
 
-function LazyPageFallback() {
-  return (
-    <div className="app-loading">
-      <div className="loading-card">
-        <strong>Carregando módulo de analytics</strong>
-        <p className="muted">Preparando gráficos e indicadores administrativos.</p>
-      </div>
-    </div>
-  )
+function HomeRoute() {
+  const { isFuelStation } = useAuth()
+  if (isFuelStation) return <Navigate to="/abastecimentos" replace />
+  return <DashboardPage />
 }
 
 export default function App() {
@@ -44,7 +38,7 @@ export default function App() {
               </ProtectedRoute>
             }
           >
-            <Route index element={<DashboardPage />} />
+            <Route index element={<HomeRoute />} />
             <Route
               path="cadastros"
               element={(
@@ -53,13 +47,62 @@ export default function App() {
                 </ProtectedRoute>
               )}
             />
-            <Route path="vehicles" element={<VehiclesPage />} />
-            <Route path="posses" element={<PossessionPage />} />
-            <Route path="condutores" element={<DriversPage />} />
-            <Route path="manutencoes" element={<MaintenancePage />} />
-            <Route path="sinistros" element={<ClaimsPage />} />
-            <Route path="multas" element={<FinesPage />} />
-            <Route path="abastecimentos" element={<FuelSuppliesPage />} />
+            <Route
+              path="vehicles"
+              element={(
+                <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO']}>
+                  <VehiclesPage />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="posses"
+              element={(
+                <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO']}>
+                  <PossessionPage />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="condutores"
+              element={(
+                <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO']}>
+                  <DriversPage />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="manutencoes"
+              element={(
+                <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO']}>
+                  <MaintenancePage />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="sinistros"
+              element={(
+                <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO']}>
+                  <ClaimsPage />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="multas"
+              element={(
+                <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO']}>
+                  <FinesPage />
+                </ProtectedRoute>
+              )}
+            />
+            <Route
+              path="abastecimentos"
+              element={(
+                <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO', 'POSTO']}>
+                  <FuelSuppliesPage />
+                </ProtectedRoute>
+              )}
+            />
             <Route
               path="users"
               element={

@@ -12,7 +12,7 @@ const initialForm = {
   role: 'PADRAO',
 }
 
-const roleOptions = ['ADMIN', 'PRODUCAO', 'PADRAO']
+const roleOptions = ['ADMIN', 'PRODUCAO', 'PADRAO', 'POSTO']
 
 function formatDate(value) {
   if (!value) return '-'
@@ -145,7 +145,7 @@ export default function UsersPage() {
       await previewRowsToPdf({
         title: 'Frota PMTF - Usuarios',
         fileName: 'frota-pmtf-usuarios',
-        subtitle: 'Relatorio dos perfis administrativos, de producao e consulta.',
+        subtitle: 'Relatorio dos perfis administrativos, de producao, posto e consulta.',
         columns: exportColumns,
         rows: filteredUsers,
         filters: [

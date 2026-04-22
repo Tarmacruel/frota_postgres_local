@@ -31,7 +31,7 @@ function asArray(payload) {
 }
 
 export default function FuelSuppliesPage() {
-  const { canWrite } = useAuth()
+  const { canConfirmFuelOrders, isFuelStation } = useAuth()
   const [records, setRecords] = useState([])
   const [vehicles, setVehicles] = useState([])
   const [drivers, setDrivers] = useState([])
@@ -108,19 +108,23 @@ export default function FuelSuppliesPage() {
           <h2 className="section-title">Abastecimentos</h2>
           <p className="section-copy">Gestao de abastecimento com comprovante obrigatorio e alertas automaticos de consumo.</p>
         </div>
-        {canWrite ? <button className="app-button" type="button" onClick={() => setIsModalOpen(true)}>Novo abastecimento</button> : null}
+        {canConfirmFuelOrders ? <button className="app-button" type="button" onClick={() => setIsModalOpen(true)}>Confirmar ordem</button> : null}
       </div>
 
       <div className="toolbar-card">
         <div className="filter-inline">
           <input className="app-input" placeholder="Buscar por placa, condutor, orgao ou posto" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veiculos' }, ...vehicles.map(buildVehicleOption)]} placeholder="Filtrar veiculo" />
-          <SearchableSelect value={filters.driver_id} onChange={(value) => setFilters((prev) => ({ ...prev, driver_id: value }))} options={[{ value: '', label: 'Todos os condutores' }, ...drivers.map((driver) => ({ value: driver.id, label: driver.nome_completo }))]} placeholder="Filtrar condutor" />
-          <SearchableSelect value={filters.organization_id} onChange={(value) => setFilters((prev) => ({ ...prev, organization_id: value }))} options={[{ value: '', label: 'Todos os orgaos' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))]} placeholder="Filtrar orgao" />
-          <select className="app-input" value={filters.only_anomalies} onChange={(event) => setFilters((prev) => ({ ...prev, only_anomalies: event.target.value }))}>
-            <option value="">Todos</option>
-            <option value="true">Somente alertas</option>
-          </select>
+          {!isFuelStation ? (
+            <>
+              <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veiculos' }, ...vehicles.map(buildVehicleOption)]} placeholder="Filtrar veiculo" />
+              <SearchableSelect value={filters.driver_id} onChange={(value) => setFilters((prev) => ({ ...prev, driver_id: value }))} options={[{ value: '', label: 'Todos os condutores' }, ...drivers.map((driver) => ({ value: driver.id, label: driver.nome_completo }))]} placeholder="Filtrar condutor" />
+              <SearchableSelect value={filters.organization_id} onChange={(value) => setFilters((prev) => ({ ...prev, organization_id: value }))} options={[{ value: '', label: 'Todos os orgaos' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))]} placeholder="Filtrar orgao" />
+              <select className="app-input" value={filters.only_anomalies} onChange={(event) => setFilters((prev) => ({ ...prev, only_anomalies: event.target.value }))}>
+                <option value="">Todos</option>
+                <option value="true">Somente alertas</option>
+              </select>
+            </>
+          ) : null}
         </div>
       </div>
 
@@ -163,7 +167,7 @@ export default function FuelSuppliesPage() {
         <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
       </div>
 
-      <Modal open={isModalOpen} onClose={() => setIsModalOpen(false)} title="Novo abastecimento" description="Registre o abastecimento com comprovante obrigatorio.">
+      <Modal open={isModalOpen} onClose={() => setIsModalOpen(false)} title="Confirmar ordem de abastecimento" description="Confirme o abastecimento com comprovante obrigatorio.">
         <FuelSupplyForm
           vehicles={vehicles}
           drivers={drivers}
