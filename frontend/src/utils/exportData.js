@@ -113,7 +113,7 @@ async function loadImageDataUrlFromBlob(blob) {
     const image = await new Promise((resolve, reject) => {
       const element = new Image()
       element.onload = () => resolve(element)
-      element.onerror = () => reject(new Error('Nao foi possivel carregar o brasao oficial.'))
+      element.onerror = () => reject(new Error('Não foi possível carregar o brasao oficial.'))
       element.src = objectUrl
     })
 
@@ -139,7 +139,7 @@ async function loadOptimizedLogo() {
     optimizedLogoPromise = (async () => {
       const response = await fetch(officialBrand.logoPath)
       if (!response.ok) {
-        throw new Error('Nao foi possivel carregar o brasao oficial.')
+        throw new Error('Não foi possível carregar o brasao oficial.')
       }
 
       const blob = await response.blob()

@@ -40,14 +40,14 @@ export default function FuelStationsPage() {
         setError('')
         await Promise.all([loadStations(), loadUsers()])
       } catch (err) {
-        setError(getApiErrorMessage(err, 'Nao foi possivel carregar postos e usuarios.'))
+        setError(getApiErrorMessage(err, 'Não foi possível carregar postos e usuários.'))
       }
     }
     bootstrap()
   }, [])
 
   useEffect(() => {
-    loadLinks(selectedStationId).catch((err) => setError(getApiErrorMessage(err, 'Nao foi possivel carregar vinculos do posto.')))
+    loadLinks(selectedStationId).catch((err) => setError(getApiErrorMessage(err, 'Não foi possível carregar vinculos do posto.')))
   }, [selectedStationId])
 
   async function saveStation(event) {
@@ -70,7 +70,7 @@ export default function FuelStationsPage() {
       setStationForm(initialStationForm)
       await loadStations()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o posto.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar o posto.'))
     }
   }
 
@@ -82,7 +82,7 @@ export default function FuelStationsPage() {
       if (selectedStationId === stationId) setSelectedStationId('')
       await loadStations()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel remover o posto.'))
+      setError(getApiErrorMessage(err, 'Não foi possível remover o posto.'))
     }
   }
 
@@ -91,11 +91,11 @@ export default function FuelStationsPage() {
     try {
       setError('')
       await fuelStationsAPI.createUser(selectedStationId, { user_id: userId, active: true })
-      setFeedback('Usuario vinculado ao posto.')
+      setFeedback('Usuário vinculado ao posto.')
       setUserId('')
       await loadLinks(selectedStationId)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel vincular usuario ao posto.'))
+      setError(getApiErrorMessage(err, 'Não foi possível vincular usuário ao posto.'))
     }
   }
 
@@ -105,7 +105,7 @@ export default function FuelStationsPage() {
       await fuelStationsAPI.updateUser(selectedStationId, link.id, { active: !link.active })
       await loadLinks(selectedStationId)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel atualizar vinculo.'))
+      setError(getApiErrorMessage(err, 'Não foi possível atualizar vinculo.'))
     }
   }
 
@@ -115,7 +115,7 @@ export default function FuelStationsPage() {
       await fuelStationsAPI.removeUser(selectedStationId, linkId)
       await loadLinks(selectedStationId)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel remover vinculo.'))
+      setError(getApiErrorMessage(err, 'Não foi possível remover vinculo.'))
     }
   }
 

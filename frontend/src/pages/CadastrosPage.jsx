@@ -13,7 +13,7 @@ const initialDepartmentForm = { id: null, organization_id: '', name: '' }
 const initialAllocationForm = { id: null, organization_id: '', department_id: '', name: '' }
 const PAGE_SIZE = 8
 const IMPORT_TEMPLATE_COLUMNS = [
-  { header: 'orgao', value: (row) => row.orgao },
+  { header: 'órgão', value: (row) => row.orgao },
   { header: 'departamento', value: (row) => row.departamento },
   { header: 'lotacao', value: (row) => row.lotacao },
 ]
@@ -213,15 +213,15 @@ export default function CadastrosPage() {
       setError('')
       if (organizationForm.id) {
         await masterDataAPI.updateOrganization(organizationForm.id, { name: organizationForm.name })
-        setFeedback('Orgao atualizado com sucesso.')
+        setFeedback('Órgão atualizado com sucesso.')
       } else {
         await masterDataAPI.createOrganization({ name: organizationForm.name })
-        setFeedback('Orgao cadastrado com sucesso.')
+        setFeedback('Órgão cadastrado com sucesso.')
       }
       setOrganizationForm(initialOrganizationForm)
       await reload()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o orgao.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar o órgão.'))
     } finally {
       setSubmitting(false)
     }
@@ -246,7 +246,7 @@ export default function CadastrosPage() {
       setDepartmentForm(initialDepartmentForm)
       await reload()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o departamento.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar o departamento.'))
     } finally {
       setSubmitting(false)
     }
@@ -271,7 +271,7 @@ export default function CadastrosPage() {
       setAllocationForm(initialAllocationForm)
       await reload()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar a lotacao.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar a lotacao.'))
     } finally {
       setSubmitting(false)
     }
@@ -286,7 +286,7 @@ export default function CadastrosPage() {
     const { kind, item } = pendingDelete
     try {
       setError('')
-      if (kind === 'Orgao') {
+      if (kind === 'Órgão') {
         await masterDataAPI.removeOrganization(item.id)
       } else if (kind === 'Departamento') {
         await masterDataAPI.removeDepartment(item.id)
@@ -297,7 +297,7 @@ export default function CadastrosPage() {
       setPendingDelete(null)
       await reload()
     } catch (err) {
-      setError(getApiErrorMessage(err, `Nao foi possivel remover ${kind.toLowerCase()}.`))
+      setError(getApiErrorMessage(err, `Não foi possível remover ${kind.toLowerCase()}.`))
     }
   }
 
@@ -328,10 +328,10 @@ export default function CadastrosPage() {
         await masterDataAPI.removeOrganization(organizationId)
       }
       setSelectedOrganizationIds([])
-      setFeedback('Orgaos selecionados removidos com sucesso.')
+      setFeedback('Órgãos selecionados removidos com sucesso.')
       await reload()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel remover todos os orgaos selecionados.'))
+      setError(getApiErrorMessage(err, 'Não foi possível remover todos os órgãos selecionados.'))
     } finally {
       setBulkDeleting(false)
     }
@@ -383,7 +383,7 @@ export default function CadastrosPage() {
       setFeedback('Departamentos selecionados removidos com sucesso.')
       await reload()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel remover todos os departamentos selecionados.'))
+      setError(getApiErrorMessage(err, 'Não foi possível remover todos os departamentos selecionados.'))
     } finally {
       setBulkDeleting(false)
     }
@@ -401,7 +401,7 @@ export default function CadastrosPage() {
       setFeedback('Lotacoes selecionadas removidas com sucesso.')
       await reload()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel remover todas as lotacoes selecionadas.'))
+      setError(getApiErrorMessage(err, 'Não foi possível remover todas as lotacoes selecionadas.'))
     } finally {
       setBulkDeleting(false)
     }
@@ -411,7 +411,7 @@ export default function CadastrosPage() {
     if (selectedDepartmentIds.length === 0) return
     const selectedRows = departments.filter((department) => selectedDepartmentIds.includes(department.id))
     const csvLines = [
-      'departamento,orgao',
+      'departamento,órgão',
       ...selectedRows.map((row) => `\"${row.name}\",\"${row.organization_name}\"`),
     ]
     const blob = new Blob([`\uFEFF${csvLines.join('\n')}`], { type: 'text/csv;charset=utf-8;' })
@@ -427,7 +427,7 @@ export default function CadastrosPage() {
     if (selectedAllocationIds.length === 0) return
     const selectedRows = allocations.filter((allocation) => selectedAllocationIds.includes(allocation.id))
     const csvLines = [
-      'lotacao,departamento,orgao',
+      'lotacao,departamento,órgão',
       ...selectedRows.map((row) => `\"${row.name}\",\"${row.department_name}\",\"${row.organization_name}\"`),
     ]
     const blob = new Blob([`\uFEFF${csvLines.join('\n')}`], { type: 'text/csv;charset=utf-8;' })
@@ -443,21 +443,21 @@ export default function CadastrosPage() {
     if (selectedOrganizationIds.length === 0) return
     const selectedRows = organizations.filter((organization) => selectedOrganizationIds.includes(organization.id))
     const csvLines = [
-      'orgao',
+      'órgão',
       ...selectedRows.map((row) => `\"${row.name}\"`),
     ]
     const blob = new Blob([`\uFEFF${csvLines.join('\n')}`], { type: 'text/csv;charset=utf-8;' })
     const link = document.createElement('a')
     link.href = URL.createObjectURL(blob)
-    link.download = 'orgaos-selecionados.csv'
+    link.download = 'órgãos-selecionados.csv'
     link.click()
     window.setTimeout(() => URL.revokeObjectURL(link.href), 3000)
-    setFeedback('Exportacao dos orgaos selecionados concluida.')
+    setFeedback('Exportacao dos órgãos selecionados concluida.')
   }
 
   async function handleDownloadCsvTemplate() {
     const csvLines = [
-      'orgao,departamento,lotacao',
+      'órgão,departamento,lotacao',
       ...IMPORT_TEMPLATE_ROWS.map((row) => [row.orgao, row.departamento, row.lotacao].map((value) => `\"${value}\"`).join(',')),
     ]
     const csvContent = `\uFEFF${csvLines.join('\n')}`
@@ -477,11 +477,11 @@ export default function CadastrosPage() {
         sheetName: 'Modelo de importacao',
         columns: IMPORT_TEMPLATE_COLUMNS,
         rows: IMPORT_TEMPLATE_ROWS,
-        filters: ['Campos obrigatorios: orgao, departamento e lotacao'],
+        filters: ['Campos obrigatorios: órgão, departamento e lotacao'],
       })
       setFeedback('Modelo XLSX baixado com sucesso.')
     } catch {
-      setError('Nao foi possivel baixar o modelo XLSX.')
+      setError('Não foi possível baixar o modelo XLSX.')
     }
   }
 
@@ -593,7 +593,7 @@ export default function CadastrosPage() {
             <input
               id="search-organization-input"
               className="app-input"
-              placeholder="Buscar orgao por nome..."
+              placeholder="Buscar órgão por nome..."
               value={organizationSearch}
               onChange={(event) => setOrganizationSearch(event.target.value)}
             />
@@ -623,7 +623,7 @@ export default function CadastrosPage() {
               </div>
               <div className="actions-inline">
                 <button className="app-button" type="submit" disabled={submitting || !organizationForm.name.trim()}>
-                  {submitting ? 'Salvando...' : organizationForm.id ? 'Atualizar orgao' : 'Cadastrar orgao'}
+                  {submitting ? 'Salvando...' : organizationForm.id ? 'Atualizar órgão' : 'Cadastrar órgão'}
                 </button>
                 {organizationForm.id ? (
                   <button className="ghost-button" type="button" onClick={() => setOrganizationForm(initialOrganizationForm)}>
@@ -659,18 +659,18 @@ export default function CadastrosPage() {
                           type="checkbox"
                           checked={selectedOrganizationIds.includes(organization.id)}
                           onChange={() => toggleOrganizationSelection(organization.id)}
-                          aria-label={`Selecionar orgao ${organization.name}`}
+                          aria-label={`Selecionar órgão ${organization.name}`}
                         />
                       </td>
                     ) : null}
-                    <td data-label="Orgao"><strong>{organization.name}</strong></td>
+                    <td data-label="Órgão"><strong>{organization.name}</strong></td>
                     <td data-label="Atualizado em">{new Date(organization.updated_at).toLocaleString('pt-BR')}</td>
                     {canWrite ? (
                       <td data-label="Acoes">
                         <div className="actions-inline">
                           <button type="button" className="mini-button" onClick={() => setOrganizationForm({ id: organization.id, name: organization.name })}>Editar</button>
                           {canDelete ? (
-                            <button type="button" className="mini-button danger" onClick={() => handleDelete('Orgao', organization)}>Excluir</button>
+                            <button type="button" className="mini-button danger" onClick={() => handleDelete('Órgão', organization)}>Excluir</button>
                           ) : null}
                         </div>
                       </td>
@@ -718,8 +718,8 @@ export default function CadastrosPage() {
                   value={departmentForm.organization_id}
                   onChange={(value) => setDepartmentForm({ ...departmentForm, organization_id: value })}
                   options={organizationOptions}
-                  placeholder="Selecione o orgao"
-                  searchPlaceholder="Buscar orgao"
+                  placeholder="Selecione o órgão"
+                  searchPlaceholder="Buscar órgão"
                 />
               </div>
               <div className="form-field">
@@ -752,9 +752,9 @@ export default function CadastrosPage() {
                 setSelectedOrganizationFilter(value)
                 setSelectedDepartmentFilter('')
               }}
-              options={[{ value: '', label: 'Todos os orgaos' }, ...organizationOptions]}
-              placeholder="Filtrar orgao"
-              searchPlaceholder="Buscar orgao"
+              options={[{ value: '', label: 'Todos os órgãos' }, ...organizationOptions]}
+              placeholder="Filtrar órgão"
+              searchPlaceholder="Buscar órgão"
             />
             <input
               id="search-department-input"
@@ -803,7 +803,7 @@ export default function CadastrosPage() {
                       </td>
                     ) : null}
                     <td data-label="Departamento"><strong>{department.name}</strong></td>
-                    <td data-label="Orgao">{department.organization_name}</td>
+                    <td data-label="Órgão">{department.organization_name}</td>
                     {canWrite ? (
                       <td data-label="Acoes">
                         <div className="actions-inline">
@@ -857,8 +857,8 @@ export default function CadastrosPage() {
                   value={allocationForm.organization_id}
                   onChange={(value) => setAllocationForm({ ...allocationForm, organization_id: value, department_id: '' })}
                   options={organizationOptions}
-                  placeholder="Selecione o orgao"
-                  searchPlaceholder="Buscar orgao"
+                  placeholder="Selecione o órgão"
+                  searchPlaceholder="Buscar órgão"
                 />
               </div>
               <div className="form-field">
@@ -867,7 +867,7 @@ export default function CadastrosPage() {
                   value={allocationForm.department_id}
                   onChange={(value) => setAllocationForm({ ...allocationForm, department_id: value })}
                   options={allocationDepartmentOptions}
-                  placeholder={!allocationForm.organization_id ? 'Selecione primeiro o orgao' : 'Selecione o departamento'}
+                  placeholder={!allocationForm.organization_id ? 'Selecione primeiro o órgão' : 'Selecione o departamento'}
                   searchPlaceholder="Buscar departamento"
                   disabled={!allocationForm.organization_id}
                 />
@@ -906,9 +906,9 @@ export default function CadastrosPage() {
                 setSelectedOrganizationFilter(value)
                 setSelectedDepartmentFilter('')
               }}
-              options={[{ value: '', label: 'Todos os orgaos' }, ...organizationOptions]}
-              placeholder="Filtrar orgao"
-              searchPlaceholder="Buscar orgao"
+              options={[{ value: '', label: 'Todos os órgãos' }, ...organizationOptions]}
+              placeholder="Filtrar órgão"
+              searchPlaceholder="Buscar órgão"
             />
             <SearchableSelect
               value={selectedDepartmentFilter}
@@ -973,7 +973,7 @@ export default function CadastrosPage() {
                     ) : null}
                     <td data-label="Lotacao"><strong>{allocation.name}</strong></td>
                     <td data-label="Departamento">{allocation.department_name}</td>
-                    <td data-label="Orgao">{allocation.organization_name}</td>
+                    <td data-label="Órgão">{allocation.organization_name}</td>
                     {canWrite ? (
                       <td data-label="Acoes">
                         <div className="actions-inline">
@@ -1032,8 +1032,8 @@ export default function CadastrosPage() {
 
       <Modal
         open={advancedFilterOpen}
-        title="Filtros avancados de orgaos"
-        description="Refine a listagem de orgaos por nome e vinculacao com departamentos."
+        title="Filtros avancados de órgãos"
+        description="Refine a listagem de órgãos por nome e vinculacao com departamentos."
         onClose={() => setAdvancedFilterOpen(false)}
       >
         <div className="form-grid">

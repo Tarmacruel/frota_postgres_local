@@ -60,7 +60,7 @@ export default function SearchOverlay({ open, onClose, onSelect }) {
         setResults(data)
         setActiveIndex(0)
       } catch (err) {
-        setError(getApiErrorMessage(err, 'Nao foi possivel executar a busca global.'))
+        setError(getApiErrorMessage(err, 'Não foi possível executar a busca global.'))
       } finally {
         setLoading(false)
       }
@@ -109,7 +109,7 @@ export default function SearchOverlay({ open, onClose, onSelect }) {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={handleInputKeyDown}
-              placeholder="Buscar veiculo, chassi, condutor, lotacao ou manutencao"
+              placeholder="Buscar veículo, chassi, condutor, lotacao ou manutencao"
             />
           </div>
           <button type="button" className="icon-button" onClick={onClose} aria-label="Fechar busca">

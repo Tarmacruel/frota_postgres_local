@@ -1,35 +1,35 @@
 # Sistema de Frota - PMTF
 
-Sistema oficial para gestao da frota da Prefeitura Municipal de Teixeira de Freitas, com backend FastAPI, frontend React e PostgreSQL rodando de forma nativa no Windows, sem Docker e em processo unico para publicacao no estilo do SIREL.
+Sistema oficial para gestão da frota da Prefeitura Municipal de Teixeira de Freitas, com backend FastAPI, frontend React e PostgreSQL rodando de forma nativa no Windows, sem Docker e em processo único para publicação no estilo do SIREL.
 
 ## Stack
 
 - Backend: FastAPI + SQLAlchemy Async + Alembic
 - Frontend: React + Vite + Axios + React Router
 - Banco: PostgreSQL 16 local
-- Execucao: processo Python unico servindo API e frontend buildado
-- Identidade visual: brasao oficial da PMTF, tema azul royal e relatorios institucionais em PDF e XLSX
+- Execução: processo Python único servindo API e frontend buildado
+- Identidade visual: brasão oficial da PMTF, tema azul royal e relatórios institucionais em PDF e XLSX
 
 ## O que o sistema faz
 
-- Autenticacao com cookie HttpOnly
-- Gestao de usuarios com perfis `ADMIN` e `PADRAO`
-- Cadastro de veiculos com historico de lotacao
-- Registro de manutencoes com custo, descricao e periodo
-- Registro de posse de veiculos por condutor
-- Encerramento automatico da posse ativa anterior ao iniciar uma nova posse
-- Exportacao oficial em PDF e XLSX para veiculos, usuarios, manutencoes e condutores
-- Layout mobile first com navegacao recolhivel e leitura facilitada no celular
+- Autenticação com cookie HttpOnly
+- Gestão de usuários com perfis `ADMIN` e `PADRAO`
+- Cadastro de veículos com histórico de lotação
+- Registro de manutenções com custo, descrição e período
+- Registro de posse de veículos por condutor
+- Encerramento automático da posse ativa anterior ao iniciar uma nova posse
+- Exportação oficial em PDF e XLSX para veículos, usuários, manutenções e condutores
+- Layout mobile first com navegação recolhível e leitura facilitada no celular
 
 ## Identidade institucional
 
-- Logotipo e favicon: `brasao-pmtf.png`
-- Endereco institucional usado na interface e nos relatorios:
+- Logotipo e favicon: `brasão-pmtf.png`
+- Endereco institucional usado na interface e nos relatórios:
   `Avenida Marechal Castelo Branco, 145 - Centro, Teixeira de Freitas - BA, CEP 45995-041`
-- CNPJ institucional usado nos relatorios:
+- CNPJ institucional usado nos relatórios:
   `13.650.403/0001-28`
 
-## Usuarios seed
+## Usuários seed
 
 - Admin: `admin@frota.local` / `Admin@1234`
 - Padrao: `padrao@frota.local` / `User@1234`
@@ -64,13 +64,13 @@ Sistema oficial para gestao da frota da Prefeitura Municipal de Teixeira de Frei
 
 ## 📋 Fluxo local recomendado
 
-Esse e o modo mais leve e mais proximo do SIREL (agora centralizado na **Central Operacional**):
+Esse é o modo mais leve e mais próximo do SIREL (agora centralizado na **Central Operacional**):
 
 ```bat
 FROTA_Iniciar.bat
 ```
 
-Esse atalho abre um menu unico para iniciar, parar, resetar, atualizar, aplicar migrations, backup, logs e status, reduzindo manutencao de scripts duplicados.
+Esse atalho abre um menu único para iniciar, parar, resetar, atualizar, aplicar migrations, backup, logs e status, reduzindo manutenção de scripts duplicados.
 
 ### Atalhos diretos principais:
 
@@ -106,38 +106,38 @@ Esse fluxo:
 - sobe a **API backend** separadamente na porta `8000`
 - faz bind do frontend em `localhost` para compatibilidade com tunnel Cloudflare
 - configura proxy do frontend para `/api` -> `http://localhost:8000`
-- ativa configuracao de producao (em loopback, `COOKIE_SECURE=false` para permitir login via HTTP local)
+- ativa configuração de produção (em loopback, `COOKIE_SECURE=false` para permitir login via HTTP local)
 - ajusta CORS automaticamente (loopback + domínio institucional quando em `localhost`)
 
 Arquivos de apoio:
 
 - Ambiente base: [backend/.env.example](/z:/FROTAS/frota_postgres_local/backend/.env.example)
-- Ambiente de producao: [backend/.env.production.example](/z:/FROTAS/frota_postgres_local/backend/.env.production.example)
+- Ambiente de produção: [backend/.env.production.example](/z:/FROTAS/frota_postgres_local/backend/.env.production.example)
 - Bootstrap do banco local: [scripts/start_local_postgres.ps1](/z:/FROTAS/frota_postgres_local/scripts/start_local_postgres.ps1)
 - Script principal: [scripts/start_frota.ps1](/z:/FROTAS/frota_postgres_local/scripts/start_frota.ps1)
 
 ## Banco de dados
 
-O projeto nao depende mais de Docker.
+O projeto não depende mais de Docker.
 
 O banco padrao roda localmente em:
 
 - Host: `localhost`
 - Porta: `5432`
 - Banco: `frota_db`
-- Usuario: `frota_user`
+- Usuário: `frota_user`
 - Senha: `frota_secret`
 - URL padrao: `postgresql+asyncpg://frota_user:frota_secret@localhost:5432/frota_db`
 
-> Se sua instalacao usa `postgres` no pgAdmin (como usuario admin), o bootstrap detecta e usa `postgres` automaticamente para criar o banco quando necessario.
+> Se sua instalação usa `postgres` no pgAdmin (como usuário admin), o bootstrap detecta e usa `postgres` automaticamente para criar o banco quando necessário.
 
 O script [scripts/start_local_postgres.ps1](/z:/FROTAS/frota_postgres_local/scripts/start_local_postgres.ps1):
 
 - reutiliza um PostgreSQL ja ativo na porta `5432` (ex.: servico Windows),
-- cria role/banco/permissoes quando necessario,
+- cria role/banco/permissoes quando necessário,
 - e, quando o banco `frota_db` for criado do zero, restaura automaticamente o backup mais recente de `storage/backups/frota-backup-*.zip` (arquivo `database.sql`).
 
-Se o cluster gerenciado local ainda nao existir (modo `%LOCALAPPDATA%\FrotaPMTF\postgres-data`), o script inicializa automaticamente.
+Se o cluster gerenciado local ainda não existir (modo `%LOCALAPPDATA%\FrotaPMTF\postgres-data`), o script inicializa automaticamente.
 
 ## Acessos
 
@@ -178,20 +178,20 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_local_postgr
 ## Areas da aplicacao
 
 - `/` painel operacional
-- `/vehicles` cadastro de veiculos, lotacao e condutor atual
-- `/manutencoes` historico, cadastro e exportacao de manutencoes
-- `/condutores` posse de veiculos, encerramento e exportacao
-- `/users` administracao de usuarios
+- `/vehicles` cadastro de veículos, lotação e condutor atual
+- `/manutencoes` histórico, cadastro e exportação de manutenções
+- `/condutores` posse de veículos, encerramento e exportação
+- `/users` administração de usuários
 
 ## Endpoints principais
 
-### Autenticacao
+### Autenticação
 
 - `POST /api/auth/login`
 - `POST /api/auth/logout`
 - `GET /api/auth/me`
 
-### Veiculos
+### Veículos
 
 - `GET /api/vehicles`
 - `POST /api/vehicles`
@@ -208,7 +208,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_local_postgr
 - `PUT /api/maintenance/{record_id}`
 - `DELETE /api/maintenance/{record_id}`
 
-### Posse de veiculos
+### Posse de veículos
 
 - `GET /api/possession`
 - `GET /api/possession/active`
@@ -219,13 +219,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\start_local_postgr
 
 O seed cria:
 
-- 2 usuarios de acesso
-- 3 veiculos de exemplo
-- historico inicial de lotacao
-- manutencoes de exemplo
+- 2 usuários de acesso
+- 3 veículos de exemplo
+- histórico inicial de lotação
+- manutenções de exemplo
 - posses de exemplo
 
-## Validacao
+## Validação
 
 Build do frontend:
 
@@ -244,9 +244,9 @@ $env:PYTHONPATH = (Get-Location).Path
 uvicorn main:app --host 0.0.0.0 --port 8000 --reload
 
 
-## Operacao local (passo a passo)
+## Operação local (passo a passo)
 
-### 1) Atualizar codigo e aplicar banco
+### 1) Atualizar código e aplicar banco
 
 ```powershell
 cd Z:\FROTAS\frota_postgres_local
@@ -262,7 +262,7 @@ O `Setup_PostgreSQL_Local.bat` agora:
 4. aplica `alembic upgrade heads`,
 5. executa `scripts/seed.py`.
 
-### 2) Build do frontend para publicacao local (porta 80)
+### 2) Build do frontend para publicação local (porta 80)
 
 ```powershell
 cd Z:\FROTAS\frota_postgres_local\frontend
@@ -270,7 +270,7 @@ npm install
 npm run build
 ```
 
-### 3) Subir ambiente completo para publicacao local
+### 3) Subir ambiente completo para publicação local
 
 ```powershell
 cd Z:\FROTAS\frota_postgres_local
@@ -309,26 +309,26 @@ Get-Process -Id $pid80
 Stop-Process -Id $pid80 -Force
 ```
 
-Validacao:
+Validação:
 
 ```powershell
 Get-NetTCPConnection -LocalPort 80 -State Listen
 ```
 
-Se nao retornar nada, a porta 80 esta livre.
+Se não retornar nada, a porta 80 está livre.
 
-## Rotina recomendada quando frontend nao atualiza
+## Rotina recomendada quando frontend não atualiza
 
 1. Parar o processo antigo (`Parar_Frota_Local.bat` ou `Stop-Process` da porta 80).
 2. Rodar novo build do frontend (`npm run build` em `frontend`).
 3. Subir novamente com `Publicar_Frota_80.bat`.
-4. Fazer `Ctrl+F5` no navegador e testar em aba anonima.
-5. Se usar Cloudflare Tunnel, limpar cache do Cloudflare e reiniciar o tunnel se necessario.
+4. Fazer `Ctrl+F5` no navegador e testar em aba anônima.
+5. Se usar Cloudflare Tunnel, limpar cache do Cloudflare e reiniciar o tunnel se necessário.
 
 ## Scripts utilitarios
 
 - `Iniciar_Frota_Local.bat`: sobe stack local e builda frontend.
-- `Publicar_Frota_80.bat`: publica em modo producao na porta 80.
+- `Publicar_Frota_80.bat`: publica em modo produção na porta 80.
 - `Parar_Frota_Local.bat`: encerra processos locais (8000, 5173 e 80).
 - `Backup_Frota_Local.bat`: gera backup SQL versionado em `storage/backups`.
 - `Setup_PostgreSQL_Local.bat`: garante PostgreSQL local, aplica migrations e seed.
@@ -336,10 +336,10 @@ Se nao retornar nada, a porta 80 esta livre.
 
 ## Observacoes
 
-- O frontend nao grava token em `localStorage`
+- O frontend não grava token em `localStorage`
 - A raiz `/` entrega o frontend buildado quando `frontend/dist` existe
 - A API continua disponivel em `/api/*`
-- A posse ativa e encerrada automaticamente ao iniciar uma nova para o mesmo veiculo
-- A exclusao de veiculo remove historico, manutencoes e posse vinculados por `ON DELETE CASCADE`
+- A posse ativa é encerrada automaticamente ao iniciar uma nova para o mesmo veículo
+- A exclusão de veículo remove histórico, manutenções e posse vinculados por `ON DELETE CASCADE`
 - O Cloudflare aceita proxy HTTP nas portas `80`, `8080`, `8880`, `2052`, `2082`, `2086` e `2095`
 - O Cloudflare aceita proxy HTTPS nas portas `443`, `2053`, `2083`, `2087`, `2096` e `8443`

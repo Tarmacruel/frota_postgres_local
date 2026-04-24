@@ -80,7 +80,7 @@ export default function DriversPage() {
       setRecords(data.data)
       setPagination(data.pagination)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar os condutores.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar os condutores.'))
     } finally {
       setLoading(false)
     }
@@ -136,7 +136,7 @@ export default function DriversPage() {
       closeModal()
       await loadDrivers(editingRecord ? pagination.page : 1)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o condutor.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar o condutor.'))
     } finally {
       setSubmitting(false)
     }
@@ -149,7 +149,7 @@ export default function DriversPage() {
       setFeedback('Condutor inativado com sucesso.')
       await loadDrivers(pagination.page)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel inativar o condutor.'))
+      setError(getApiErrorMessage(err, 'Não foi possível inativar o condutor.'))
     }
   }
 

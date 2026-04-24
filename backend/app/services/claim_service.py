@@ -48,7 +48,7 @@ class ClaimService:
     async def get(self, claim_id: UUID) -> dict:
         claim = await self.claims.get_by_id(claim_id)
         if not claim:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sinistro nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sinistro não encontrado")
         return self._serialize(claim)
 
     async def create(self, data: ClaimCreate, current_user: User) -> dict:
@@ -84,13 +84,13 @@ class ClaimService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel registrar o sinistro") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível registrar o sinistro") from exc
         return await self.get(claim.id)
 
     async def update(self, claim_id: UUID, data: ClaimUpdate, current_user: User) -> dict:
         claim = await self.claims.get_by_id(claim_id)
         if not claim:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sinistro nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sinistro não encontrado")
 
         payload = data.model_dump(exclude_unset=True)
         next_vehicle_id = claim.vehicle_id
@@ -122,17 +122,17 @@ class ClaimService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar o sinistro") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar o sinistro") from exc
         return await self.get(claim.id)
 
     async def _require_vehicle_for_claim(self, vehicle_id: UUID):
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
         if vehicle.status not in {VehicleStatus.ATIVO, VehicleStatus.MANUTENCAO}:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Sinistros so podem ser registrados para veiculos ativos ou em manutencao",
+                detail="Sinistros so podem ser registrados para veículos ativos ou em manutencao",
             )
         return vehicle
 
@@ -141,11 +141,11 @@ class ClaimService:
             return None
         driver = await self.drivers.get_by_id(driver_id)
         if not driver:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
         if not await self.possessions.driver_had_vehicle_at(vehicle_id=vehicle_id, driver_id=driver_id, occurred_at=occurred_at):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Condutor informado nao possuia posse ativa deste veiculo na data do sinistro",
+                detail="Condutor informado não possuia posse ativa deste veículo na data do sinistro",
             )
         return driver
 

@@ -51,7 +51,7 @@ export default function MaintenanceForm({ vehicles, initialData = null, onClose,
     event.preventDefault()
 
     if (!form.vehicle_id) {
-      setError('Selecione um veiculo para continuar.')
+      setError('Selecione um veículo para continuar.')
       return
     }
 
@@ -81,7 +81,7 @@ export default function MaintenanceForm({ vehicles, initialData = null, onClose,
 
       onClose?.()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar a manutencao.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar a manutencao.'))
     } finally {
       setSubmitting(false)
     }
@@ -97,10 +97,10 @@ export default function MaintenanceForm({ vehicles, initialData = null, onClose,
           value={form.vehicle_id}
           onChange={(value) => setForm({ ...form, vehicle_id: value })}
           options={vehicles.map(buildVehicleOption)}
-          placeholder="Selecione o veiculo"
-          searchPlaceholder="Buscar veiculo por placa, modelo ou chassi"
+          placeholder="Selecione o veículo"
+          searchPlaceholder="Buscar veículo por placa, modelo ou chassi"
           disabled={isEdit}
-          emptyLabel="Nenhum veiculo disponivel."
+          emptyLabel="Nenhum veículo disponivel."
         />
       </div>
 

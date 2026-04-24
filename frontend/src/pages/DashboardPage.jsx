@@ -32,7 +32,7 @@ export default function DashboardPage() {
         setMaintenance(maintenanceResponse.data)
         setActivePossessions(possessionResponse.data)
       } catch (err) {
-        setError(getApiErrorMessage(err, 'Nao foi possivel carregar os indicadores da frota.'))
+        setError(getApiErrorMessage(err, 'Não foi possível carregar os indicadores da frota.'))
       } finally {
         setLoading(false)
       }
@@ -61,7 +61,7 @@ export default function DashboardPage() {
   }, [vehicles, maintenance, activePossessions])
 
   const metricCards = [
-    { label: 'Veiculos ativos', value: stats.ativos, note: 'Disponiveis para uso imediato.' },
+    { label: 'Veículos ativos', value: stats.ativos, note: 'Disponiveis para uso imediato.' },
     { label: 'Em manutencao', value: stats.manutencao, note: 'Demandam retorno operacional.' },
     { label: 'Sem condutor', value: stats.semCondutor, note: 'Precisam de responsavel definido.' },
     { label: 'Pendencias abertas', value: stats.manutencoesAbertas, note: 'Chamados de oficina em andamento.' },
@@ -69,7 +69,7 @@ export default function DashboardPage() {
 
   const primaryActions = [
     {
-      title: 'Abrir veiculos ativos',
+      title: 'Abrir veículos ativos',
       description: 'Vá direto para a frota pronta para operação e filtre apenas o que está liberado.',
       to: '/vehicles?status=ATIVO',
       cta: 'Consultar ativos',
@@ -81,13 +81,13 @@ export default function DashboardPage() {
       cta: 'Abrir manutencoes',
     },
     {
-      title: 'Ver veiculos sem condutor',
+      title: 'Ver veículos sem condutor',
       description: 'Encontre rapidamente os ativos sem posse vigente para redistribuição.',
       to: '/posses',
       cta: 'Abrir posses',
     },
     {
-      title: canWrite ? 'Cadastrar novo veiculo' : 'Consultar base completa',
+      title: canWrite ? 'Cadastrar novo veículo' : 'Consultar base completa',
       description: canWrite
         ? 'Acesse o módulo principal da frota para cadastrar, editar e abrir históricos.'
         : 'Acesse a base consolidada para pesquisa, filtros e emissão de relatórios.',
@@ -99,10 +99,10 @@ export default function DashboardPage() {
   const adminActions = isAdmin
     ? [
         {
-          title: 'Gestao de usuarios',
+          title: 'Gestao de usuários',
           description: 'Ajuste perfis administrativos, produção e leitura conforme a secretaria.',
           to: '/users',
-          cta: 'Abrir usuarios',
+          cta: 'Abrir usuários',
         },
         {
           title: 'Auditoria administrativa',

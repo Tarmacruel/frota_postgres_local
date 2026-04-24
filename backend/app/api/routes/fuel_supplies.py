@@ -103,7 +103,7 @@ async def consumption_report(
     current_user: User = Depends(get_current_user),
 ):
     if current_user.role == UserRole.POSTO:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Perfil POSTO nao possui acesso a relatorios")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Perfil POSTO não possui acesso a relatorios")
     return await FuelSupplyService(db).consumption_report(start_date=start_date, end_date=end_date)
 
 
@@ -115,7 +115,7 @@ async def anomalies_report(
     current_user: User = Depends(get_current_user),
 ):
     if current_user.role == UserRole.POSTO:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Perfil POSTO nao possui acesso a relatorios")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Perfil POSTO não possui acesso a relatorios")
     return await FuelSupplyService(db).anomalies_report(start_date=start_date, end_date=end_date)
 
 
@@ -137,6 +137,6 @@ async def get_fuel_supply_receipt(
     current_user: User = Depends(get_current_user),
 ) -> FileResponse:
     if current_user.role == UserRole.POSTO:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Perfil POSTO nao possui acesso a comprovantes")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Perfil POSTO não possui acesso a comprovantes")
     return await FuelSupplyService(db).get_receipt_file(supply_id)
 

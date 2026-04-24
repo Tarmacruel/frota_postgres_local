@@ -56,7 +56,7 @@ export default function UsersPage() {
       const { data } = await api.get('/users')
       setUsers(data)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar os usuarios.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar os usuários.'))
     } finally {
       setLoading(false)
     }
@@ -104,38 +104,38 @@ export default function UsersPage() {
         }
         if (form.password.trim()) payload.password = form.password
         await api.put(`/users/${editingUser.id}`, payload)
-        setFeedback('Usuario atualizado com sucesso.')
+        setFeedback('Usuário atualizado com sucesso.')
       } else {
         await api.post('/users', form)
-        setFeedback('Usuario criado com sucesso.')
+        setFeedback('Usuário criado com sucesso.')
       }
 
       closeModal()
       await loadUsers()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o usuario.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar o usuário.'))
     } finally {
       setSubmitting(false)
     }
   }
 
   async function handleDelete(user) {
-    if (!window.confirm(`Excluir o usuario ${user.email}?`)) return
+    if (!window.confirm(`Excluir o usuário ${user.email}?`)) return
 
     try {
       setError('')
       setFeedback('')
       await api.delete(`/users/${user.id}`)
-      setFeedback('Usuario removido com sucesso.')
+      setFeedback('Usuário removido com sucesso.')
       await loadUsers()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel excluir o usuario.'))
+      setError(getApiErrorMessage(err, 'Não foi possível excluir o usuário.'))
     }
   }
 
   async function handleExportPdf() {
     if (filteredUsers.length === 0) {
-      setFeedback('Nao ha usuarios filtrados para previsualizar.')
+      setFeedback('Não ha usuários filtrados para previsualizar.')
       return
     }
 
@@ -143,8 +143,8 @@ export default function UsersPage() {
       setError('')
       setFeedback('')
       await previewRowsToPdf({
-        title: 'Frota PMTF - Usuarios',
-        fileName: 'frota-pmtf-usuarios',
+        title: 'Frota PMTF - Usuários',
+        fileName: 'frota-pmtf-usuários',
         subtitle: 'Relatorio dos perfis administrativos, de producao, posto e consulta.',
         columns: exportColumns,
         rows: filteredUsers,
@@ -153,15 +153,15 @@ export default function UsersPage() {
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
-      setFeedback('Pre-visualizacao do PDF de usuarios aberta em nova guia.')
+      setFeedback('Pre-visualizacao do PDF de usuários aberta em nova guia.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o PDF dos usuarios.'))
+      setError(getApiErrorMessage(err, 'Não foi possível gerar o PDF dos usuários.'))
     }
   }
 
   async function handleExportXlsx() {
     if (filteredUsers.length === 0) {
-      setFeedback('Nao ha usuarios filtrados para exportar.')
+      setFeedback('Não ha usuários filtrados para exportar.')
       return
     }
 
@@ -169,8 +169,8 @@ export default function UsersPage() {
       setError('')
       setFeedback('')
       await exportRowsToXlsx({
-        fileName: 'frota-pmtf-usuarios',
-        sheetName: 'Usuarios',
+        fileName: 'frota-pmtf-usuários',
+        sheetName: 'Usuários',
         columns: exportColumns,
         rows: filteredUsers,
         filters: [
@@ -178,9 +178,9 @@ export default function UsersPage() {
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
-      setFeedback('Exportacao de usuarios em XLSX iniciada com sucesso.')
+      setFeedback('Exportacao de usuários em XLSX iniciada com sucesso.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar os usuarios em XLSX.'))
+      setError(getApiErrorMessage(err, 'Não foi possível exportar os usuários em XLSX.'))
     }
   }
 
@@ -296,7 +296,7 @@ export default function UsersPage() {
 
       <Modal
         open={isModalOpen}
-        title={editingUser ? 'Editar usuario' : 'Novo usuario'}
+        title={editingUser ? 'Editar usuário' : 'Novo usuário'}
         description="Defina o perfil correto para cada pessoa: administracao total, operacao de producao ou consulta."
         onClose={closeModal}
       >
@@ -316,7 +316,7 @@ export default function UsersPage() {
             <input
               id="user-email"
               className="app-input"
-              placeholder="usuario@frota.local"
+              placeholder="usuário@frota.local"
               value={form.email}
               onChange={(event) => setForm({ ...form, email: event.target.value })}
             />
@@ -342,7 +342,7 @@ export default function UsersPage() {
           </div>
           <div className="actions-inline modal-actions">
             <button className="app-button" type="submit" disabled={submitting}>
-              {submitting ? 'Salvando...' : editingUser ? 'Atualizar usuario' : 'Criar usuario'}
+              {submitting ? 'Salvando...' : editingUser ? 'Atualizar usuário' : 'Criar usuário'}
             </button>
             <button className="ghost-button" type="button" onClick={closeModal}>Cancelar</button>
           </div>

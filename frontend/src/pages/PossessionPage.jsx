@@ -138,7 +138,7 @@ export default function PossessionPage() {
   const focusRecordId = searchParams.get('focus')
 
   const exportColumns = [
-    { header: 'Veiculo', value: (record) => record.vehicle_plate },
+    { header: 'Veículo', value: (record) => record.vehicle_plate },
     { header: 'Condutor', value: (record) => record.driver_name },
     { header: 'Documento', value: (record) => record.driver_document || '-' },
     { header: 'Contato', value: (record) => record.driver_contact || '-' },
@@ -179,7 +179,7 @@ export default function PossessionPage() {
 
       setRecords(data)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar as posses.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar as posses.'))
     } finally {
       setLoading(false)
     }
@@ -190,7 +190,7 @@ export default function PossessionPage() {
       try {
         await loadVehicles()
       } catch (err) {
-        setError(getApiErrorMessage(err, 'Nao foi possivel carregar os veiculos.'))
+        setError(getApiErrorMessage(err, 'Não foi possível carregar os veículos.'))
       }
     }
     loadPage()
@@ -412,7 +412,7 @@ export default function PossessionPage() {
       closeEndModal()
       await loadPossessions()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel encerrar a posse.'))
+      setError(getApiErrorMessage(err, 'Não foi possível encerrar a posse.'))
     } finally {
       setEnding(false)
     }
@@ -448,7 +448,7 @@ export default function PossessionPage() {
       closeEditModal()
       await loadPossessions()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel atualizar a posse.'))
+      setError(getApiErrorMessage(err, 'Não foi possível atualizar a posse.'))
     } finally {
       setSavingEdit(false)
     }
@@ -456,7 +456,7 @@ export default function PossessionPage() {
 
   async function handlePreviewPdf() {
     if (filteredRecords.length === 0) {
-      setFeedback('Nao ha registros de posse filtrados para previsualizar.')
+      setFeedback('Não ha registros de posse filtrados para previsualizar.')
       return
     }
 
@@ -464,26 +464,26 @@ export default function PossessionPage() {
       setError('')
       setFeedback('')
       await previewRowsToPdf({
-        title: 'Frota PMTF - Posses de veiculos',
+        title: 'Frota PMTF - Posses de veículos',
         fileName: 'frota-pmtf-posses',
         subtitle: 'Relatorio das posses filtradas no painel operacional.',
         columns: exportColumns,
         rows: filteredRecords,
         filters: [
           { label: 'Status', value: viewOptions.find((option) => option.value === viewFilter)?.label || 'Todas' },
-          ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+          ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
       setFeedback('Pre-visualizacao do PDF de posses aberta em nova guia.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o PDF dos condutores.'))
+      setError(getApiErrorMessage(err, 'Não foi possível gerar o PDF dos condutores.'))
     }
   }
 
   async function handleExportXlsx() {
     if (filteredRecords.length === 0) {
-      setFeedback('Nao ha registros de posse filtrados para exportar.')
+      setFeedback('Não ha registros de posse filtrados para exportar.')
       return
     }
 
@@ -497,13 +497,13 @@ export default function PossessionPage() {
         rows: filteredRecords,
         filters: [
           { label: 'Status', value: viewOptions.find((option) => option.value === viewFilter)?.label || 'Todas' },
-          ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+          ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
       setFeedback('Exportacao de posses em XLSX iniciada com sucesso.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar os condutores em XLSX.'))
+      setError(getApiErrorMessage(err, 'Não foi possível exportar os condutores em XLSX.'))
     }
   }
 
@@ -551,9 +551,9 @@ export default function PossessionPage() {
             <SearchableSelect
               value={vehicleFilter}
               onChange={setVehicleFilter}
-              options={[{ value: '', label: 'Todos os veiculos' }, ...vehicles.map(buildVehicleOption)]}
-              placeholder="Filtrar veiculo"
-              searchPlaceholder="Buscar veiculo por placa, modelo, chassi ou lotacao"
+              options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(buildVehicleOption)]}
+              placeholder="Filtrar veículo"
+              searchPlaceholder="Buscar veículo por placa, modelo, chassi ou lotacao"
             />
           </div>
         </div>
@@ -614,7 +614,7 @@ export default function PossessionPage() {
               ) : (
                 paginatedRecords.map((record) => (
                   <tr key={record.id} className={focusedRecord?.id === record.id ? 'is-focused-row' : ''}>
-                    <td data-label="Veiculo"><strong>{record.vehicle_plate}</strong></td>
+                    <td data-label="Veículo"><strong>{record.vehicle_plate}</strong></td>
                     <td data-label="Condutor">
                       <DriverBadge
                         name={record.driver_name}
@@ -691,7 +691,7 @@ export default function PossessionPage() {
       <Modal
         open={isCreateModalOpen}
         title="Nova posse"
-        description="Ao registrar um novo condutor, qualquer posse ativa do mesmo veiculo sera encerrada automaticamente. Foto e localizacao sao opcionais, voce pode capturar varias fotos, e o termo assinado pode ser anexado no mesmo fluxo."
+        description="Ao registrar um novo condutor, qualquer posse ativa do mesmo veículo sera encerrada automaticamente. Foto e localizacao sao opcionais, voce pode capturar varias fotos, e o termo assinado pode ser anexado no mesmo fluxo."
         onClose={() => setIsCreateModalOpen(false)}
       >
         <PossessionForm
@@ -707,7 +707,7 @@ export default function PossessionPage() {
       <Modal
         open={Boolean(editingRecord)}
         title="Editar posse"
-        description={editingRecord ? `Edicao administrativa de ${editingRecord.driver_name} no veiculo ${editingRecord.vehicle_plate}. A justificativa e obrigatoria, entra na auditoria e agora tambem pode incluir documento e fotos complementares.` : ''}
+        description={editingRecord ? `Edicao administrativa de ${editingRecord.driver_name} no veículo ${editingRecord.vehicle_plate}. A justificativa e obrigatoria, entra na auditoria e agora tambem pode incluir documento e fotos complementares.` : ''}
         onClose={closeEditModal}
       >
         <form onSubmit={handleEditPossession} className="form-grid modal-form-grid">
@@ -815,7 +815,7 @@ export default function PossessionPage() {
             <div className="evidence-shell">
               <div className="evidence-copy">
                 <strong>Anexe ou substitua o documento da posse, se necessario.</strong>
-                <span>{editingRecord?.document_available ? `Documento atual: ${editingRecord.document_name || 'Documento anexado'}.` : 'Ainda nao ha documento anexado neste registro.'}</span>
+                <span>{editingRecord?.document_available ? `Documento atual: ${editingRecord.document_name || 'Documento anexado'}.` : 'Ainda não ha documento anexado neste registro.'}</span>
               </div>
               <input
                 ref={editDocumentInputRef}
@@ -880,7 +880,7 @@ export default function PossessionPage() {
       <Modal
         open={Boolean(endingRecord)}
         title="Encerrar posse"
-        description={endingRecord ? `Finalize a posse ativa de ${endingRecord.driver_name} no veiculo ${endingRecord.vehicle_plate}.` : ''}
+        description={endingRecord ? `Finalize a posse ativa de ${endingRecord.driver_name} no veículo ${endingRecord.vehicle_plate}.` : ''}
         onClose={closeEndModal}
       >
         <form onSubmit={handleEndPossession} className="form-grid modal-form-grid">
@@ -929,14 +929,14 @@ export default function PossessionPage() {
       <Modal
         open={Boolean(photoRecord)}
         title="Fotos da posse"
-        description={photoRecord ? `Evidencias registradas para ${photoRecord.driver_name} no veiculo ${photoRecord.vehicle_plate}.` : ''}
+        description={photoRecord ? `Evidencias registradas para ${photoRecord.driver_name} no veículo ${photoRecord.vehicle_plate}.` : ''}
         onClose={closePhotoModal}
       >
         {photoRecord ? (
           <div className="evidence-gallery-grid">
             {(photoRecord.photos || []).map((photo, index) => (
               <article key={photo.id || `legacy-${index}`} className="evidence-thumb-card evidence-thumb-card-large">
-                <img src={photo.url} alt={`Foto ${index + 1} da posse do veiculo ${photoRecord.vehicle_plate}`} className="evidence-thumb-image" />
+                <img src={photo.url} alt={`Foto ${index + 1} da posse do veículo ${photoRecord.vehicle_plate}`} className="evidence-thumb-image" />
                 <div className="stack">
                   <strong>Foto {index + 1}</strong>
                   <span className="muted">Condutor: {photoRecord.driver_name}</span>

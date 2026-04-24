@@ -60,7 +60,7 @@ export default function FuelSuppliesPage() {
         setOrganizations(asArray(organizationsResponse.data))
         setFuelStations(asArray(stationsResponse.data))
       } catch (err) {
-        setError(getApiErrorMessage(err, 'Nao foi possivel carregar os cadastros de apoio.'))
+        setError(getApiErrorMessage(err, 'Não foi possível carregar os cadastros de apoio.'))
       }
     }
     loadDependencies()
@@ -79,7 +79,7 @@ export default function FuelSuppliesPage() {
       const { data } = await fuelSuppliesAPI.list(params)
       setRecords(data.data || [])
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar os abastecimentos.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar os abastecimentos.'))
     } finally {
       setLoading(false)
     }
@@ -118,12 +118,12 @@ export default function FuelSuppliesPage() {
 
       <div className="toolbar-card">
         <div className="filter-inline">
-          <input className="app-input" placeholder="Buscar por placa, condutor, orgao ou posto" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <input className="app-input" placeholder="Buscar por placa, condutor, órgão ou posto" value={search} onChange={(event) => setSearch(event.target.value)} />
           {!isFuelStation ? (
             <>
-              <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veiculos' }, ...vehicles.map(buildVehicleOption)]} placeholder="Filtrar veiculo" />
+              <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(buildVehicleOption)]} placeholder="Filtrar veículo" />
               <SearchableSelect value={filters.driver_id} onChange={(value) => setFilters((prev) => ({ ...prev, driver_id: value }))} options={[{ value: '', label: 'Todos os condutores' }, ...drivers.map((driver) => ({ value: driver.id, label: driver.nome_completo }))]} placeholder="Filtrar condutor" />
-              <SearchableSelect value={filters.organization_id} onChange={(value) => setFilters((prev) => ({ ...prev, organization_id: value }))} options={[{ value: '', label: 'Todos os orgaos' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))]} placeholder="Filtrar orgao" />
+              <SearchableSelect value={filters.organization_id} onChange={(value) => setFilters((prev) => ({ ...prev, organization_id: value }))} options={[{ value: '', label: 'Todos os órgãos' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))]} placeholder="Filtrar órgão" />
               <select className="app-input" value={filters.only_anomalies} onChange={(event) => setFilters((prev) => ({ ...prev, only_anomalies: event.target.value }))}>
                 <option value="">Todos</option>
                 <option value="true">Somente alertas</option>

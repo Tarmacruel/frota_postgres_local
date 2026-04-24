@@ -94,7 +94,7 @@ export default function LoginPage() {
                     className="app-input login-app-input"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="usuario@frota.local"
+                    placeholder="usuário@frota.local"
                   />
                 </div>
               </div>

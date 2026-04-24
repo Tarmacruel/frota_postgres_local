@@ -74,7 +74,7 @@ export default function AuditPage() {
         const { data } = await api.get('/audit', { params: { limit: 200 } })
         setLogs(data)
       } catch (err) {
-        setError(getApiErrorMessage(err, 'Nao foi possivel carregar a trilha de auditoria.'))
+        setError(getApiErrorMessage(err, 'Não foi possível carregar a trilha de auditoria.'))
       } finally {
         setLoading(false)
       }
@@ -85,7 +85,7 @@ export default function AuditPage() {
 
   async function handleExportPdf() {
     if (filteredLogs.length === 0) {
-      setFeedback('Nao ha eventos de auditoria filtrados para previsualizar.')
+      setFeedback('Não ha eventos de auditoria filtrados para previsualizar.')
       return
     }
 
@@ -106,13 +106,13 @@ export default function AuditPage() {
       })
       setFeedback('Pre-visualizacao do PDF de auditoria aberta em nova guia.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o PDF da auditoria.'))
+      setError(getApiErrorMessage(err, 'Não foi possível gerar o PDF da auditoria.'))
     }
   }
 
   async function handleExportXlsx() {
     if (filteredLogs.length === 0) {
-      setFeedback('Nao ha eventos de auditoria filtrados para exportar.')
+      setFeedback('Não ha eventos de auditoria filtrados para exportar.')
       return
     }
 
@@ -132,7 +132,7 @@ export default function AuditPage() {
       })
       setFeedback('Exportacao de auditoria em XLSX iniciada com sucesso.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar a auditoria em XLSX.'))
+      setError(getApiErrorMessage(err, 'Não foi possível exportar a auditoria em XLSX.'))
     }
   }
 

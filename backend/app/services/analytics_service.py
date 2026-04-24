@@ -370,7 +370,7 @@ class AnalyticsService:
                         "variance_percentage": round(variance, 2),
                         "severity": severity,
                         "message": (
-                            f"Veiculo tipo {row.vehicle_type} apresenta consumo {abs(variance):.1f}% "
+                            f"Veículo tipo {row.vehicle_type} apresenta consumo {abs(variance):.1f}% "
                             f"{'superior' if variance > 0 else 'inferior'} a media da categoria "
                             f"({(row.category_average_consumption or 0):.1f} L/100km)."
                         ),

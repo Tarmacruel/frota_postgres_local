@@ -1,4 +1,4 @@
-export function getApiErrorMessage(error, fallback = 'Nao foi possivel concluir a operacao.') {
+export function getApiErrorMessage(error, fallback = 'Não foi possível concluir a operacao.') {
   const detail = error?.response?.data?.detail
 
   if (typeof detail === 'string' && detail.trim()) {
