@@ -94,7 +94,7 @@ class FuelSupplyOrderCreate(BaseModel):
     vehicle_id: UUID
     driver_id: UUID | None = None
     organization_id: UUID | None = None
-    fuel_station_id: UUID | None = None
+    fuel_station_id: UUID
     expires_at: datetime
     requested_liters: float | None = Field(default=None, gt=0)
     max_amount: float | None = Field(default=None, ge=0)
@@ -143,13 +143,21 @@ class FuelSupplyOrderOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    request_number: str
+    validation_code: str
+    public_validation_path: str
     status: FuelSupplyOrderStatus
     vehicle_id: UUID
     vehicle_plate: str
+    vehicle_description: str | None
     driver_id: UUID | None
+    driver_name: str | None
     organization_id: UUID | None
     organization_name: str | None
     fuel_station_id: UUID | None
+    fuel_station_name: str | None
+    fuel_station_cnpj: str | None
+    fuel_station_address: str | None
     created_by_user_id: UUID
     created_by_name: str | None
     confirmed_by_user_id: UUID | None
@@ -165,3 +173,25 @@ class FuelSupplyOrderOut(BaseModel):
 
 class FuelSupplyOrderListResponse(PaginatedResponse[FuelSupplyOrderOut]):
     pass
+
+
+class FuelSupplyOrderPublicOut(BaseModel):
+    request_number: str
+    validation_code: str
+    public_validation_path: str
+    status: FuelSupplyOrderStatus
+    vehicle_plate: str
+    vehicle_description: str | None
+    driver_name: str | None
+    organization_name: str | None
+    fuel_station_name: str | None
+    fuel_station_cnpj: str | None
+    fuel_station_address: str | None
+    created_by_name: str | None
+    confirmed_by_name: str | None
+    requested_liters: float | None
+    max_amount: float | None
+    notes: str | None
+    created_at: datetime
+    expires_at: datetime
+    confirmed_at: datetime | None

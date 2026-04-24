@@ -17,7 +17,7 @@ function readStorage(key, fallback) {
 }
 
 export default function Layout() {
-  const { user, logout, isAdmin, canManageCadastros, canAccessFuelSupplies, isFuelStation, roleLabel } = useAuth()
+  const { user, logout, isAdmin, canManageCadastros, canAccessFuelSupplies, isPosto, roleLabel } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
 
@@ -33,12 +33,12 @@ export default function Layout() {
   const [unreadNotifications, setUnreadNotifications] = useState(0)
 
   const navSections = useMemo(() => {
-    if (isFuelStation) {
+    if (isPosto) {
       return [
         {
-          title: 'Operacional',
+          title: 'Abastecimento',
           items: [
-            { to: '/abastecimentos', label: 'Ordens em aberto', description: 'Consulta e confirmacao de ordens do posto', icon: 'maintenance' },
+            { to: '/ordens-abastecimento', label: 'Ordens abertas', description: 'Confirmacao das ordens pendentes', icon: 'maintenance' },
           ],
         },
       ]
@@ -60,7 +60,7 @@ export default function Layout() {
           { to: '/manutencoes', label: 'Manutencoes', description: 'Custos, servicos e oficina', icon: 'maintenance' },
           { to: '/sinistros', label: 'Sinistros', description: 'Ocorrencias, BO e prejuizos', icon: 'audit' },
           { to: '/multas', label: 'Multas', description: 'Autos, vencimentos e pagamentos', icon: 'catalog' },
-          ...(canAccessFuelSupplies ? [{ to: '/abastecimentos', label: 'Abastecimentos', description: 'Consumo, comprovantes e alertas', icon: 'maintenance' }] : []),
+          ...(canAccessFuelSupplies ? [{ to: '/abastecimentos', label: 'Abastecimentos', description: 'Ordens, historico e alertas de consumo', icon: 'maintenance' }] : []),
         ],
       },
     ]
@@ -85,10 +85,10 @@ export default function Layout() {
     }
 
     return sections
-  }, [isAdmin, canManageCadastros, canAccessFuelSupplies, isFuelStation])
+  }, [isAdmin, canManageCadastros, canAccessFuelSupplies, isPosto])
 
   const mobileTabs = navSections.flatMap((section) => section.items).filter((item) =>
-    isFuelStation ? ['/abastecimentos'].includes(item.to) : ['/', '/vehicles', '/manutencoes', '/condutores'].includes(item.to),
+    isPosto ? ['/ordens-abastecimento'].includes(item.to) : ['/', '/vehicles', '/manutencoes', '/condutores'].includes(item.to),
   )
 
   const currentItem =

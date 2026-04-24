@@ -12,7 +12,7 @@ const initialForm = {
   role: 'PADRAO',
 }
 
-const roleOptions = ['ADMIN', 'PRODUCAO', 'PADRAO', 'POSTO']
+const roleOptions = ['ADMIN', 'PRODUCAO', 'POSTO', 'PADRAO']
 
 function formatDate(value) {
   if (!value) return '-'
@@ -194,7 +194,7 @@ export default function UsersPage() {
       <div className="panel-heading">
         <div>
           <h2 className="section-title">Gestao de usuarios</h2>
-          <p className="section-copy">Gerencie perfis administrativos, operadores de producao e usuarios apenas de consulta.</p>
+          <p className="section-copy">Gerencie perfis administrativos, operadores de producao, postos credenciados e usuarios apenas de consulta.</p>
         </div>
         <div className="actions-inline">
           <button className="app-button" type="button" onClick={openCreateModal}>Novo usuario</button>
@@ -229,6 +229,10 @@ export default function UsersPage() {
         <div className="metric-inline">
           <strong>{users.filter((user) => user.role === 'PRODUCAO').length}</strong>
           <span>perfil producao</span>
+        </div>
+        <div className="metric-inline">
+          <strong>{users.filter((user) => user.role === 'POSTO').length}</strong>
+          <span>perfil posto</span>
         </div>
         <div className="metric-inline">
           <strong>{users.filter((user) => user.role === 'ADMIN').length}</strong>
@@ -274,7 +278,7 @@ export default function UsersPage() {
                     </td>
                     <td data-label="E-mail">{user.email}</td>
                     <td data-label="Perfil">
-                      <span className={`status-badge ${user.role === 'ADMIN' ? 'status-ATIVO' : user.role === 'PRODUCAO' ? 'status-PRODUCAO' : 'status-INATIVO'}`}>
+                      <span className={`status-badge ${user.role === 'ADMIN' ? 'status-ATIVO' : user.role === 'PRODUCAO' ? 'status-PRODUCAO' : user.role === 'POSTO' ? 'status-POSTO' : 'status-INATIVO'}`}>
                         {getRoleLabel(user.role)}
                       </span>
                     </td>
@@ -297,7 +301,7 @@ export default function UsersPage() {
       <Modal
         open={isModalOpen}
         title={editingUser ? 'Editar usuario' : 'Novo usuario'}
-        description="Defina o perfil correto para cada pessoa: administracao total, operacao de producao ou consulta."
+        description="Defina o perfil correto para cada pessoa: administracao total, operacao de producao, posto credenciado ou consulta."
         onClose={closeModal}
       >
         <form onSubmit={handleSubmit} className="form-grid modal-form-grid">

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from uuid import UUID
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.models.fuel_supply_order import FuelSupplyOrder, FuelSupplyOrderStatus
@@ -22,11 +22,28 @@ class FuelSupplyOrderRepository:
             select(FuelSupplyOrder)
             .options(
                 joinedload(FuelSupplyOrder.vehicle),
+                joinedload(FuelSupplyOrder.driver),
                 joinedload(FuelSupplyOrder.organization),
+                joinedload(FuelSupplyOrder.fuel_station_ref),
                 joinedload(FuelSupplyOrder.creator),
                 joinedload(FuelSupplyOrder.confirmer),
             )
             .where(FuelSupplyOrder.id == order_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_validation_code(self, validation_code: str) -> FuelSupplyOrder | None:
+        result = await self.db.execute(
+            select(FuelSupplyOrder)
+            .options(
+                joinedload(FuelSupplyOrder.vehicle),
+                joinedload(FuelSupplyOrder.driver),
+                joinedload(FuelSupplyOrder.organization),
+                joinedload(FuelSupplyOrder.fuel_station_ref),
+                joinedload(FuelSupplyOrder.creator),
+                joinedload(FuelSupplyOrder.confirmer),
+            )
+            .where(FuelSupplyOrder.validation_code == validation_code)
         )
         return result.scalar_one_or_none()
 
@@ -39,11 +56,14 @@ class FuelSupplyOrderRepository:
         organization_id: UUID | None = None,
         vehicle_id: UUID | None = None,
         fuel_station_id: UUID | None = None,
+        fuel_station_ids: list[UUID] | None = None,
         due_until: datetime | None = None,
     ) -> tuple[list[FuelSupplyOrder], int]:
         stmt = select(FuelSupplyOrder).options(
             joinedload(FuelSupplyOrder.vehicle),
+            joinedload(FuelSupplyOrder.driver),
             joinedload(FuelSupplyOrder.organization),
+            joinedload(FuelSupplyOrder.fuel_station_ref),
             joinedload(FuelSupplyOrder.creator),
             joinedload(FuelSupplyOrder.confirmer),
         )
@@ -58,6 +78,8 @@ class FuelSupplyOrderRepository:
             filters.append(FuelSupplyOrder.vehicle_id == vehicle_id)
         if fuel_station_id:
             filters.append(FuelSupplyOrder.fuel_station_id == fuel_station_id)
+        if fuel_station_ids:
+            filters.append(FuelSupplyOrder.fuel_station_id.in_(fuel_station_ids))
         if due_until:
             filters.append(FuelSupplyOrder.expires_at <= due_until)
 
@@ -70,3 +92,14 @@ class FuelSupplyOrderRepository:
         total = int((await self.db.execute(count_stmt)).scalar_one())
         records = list((await self.db.execute(stmt)).scalars().unique().all())
         return records, total
+
+    async def expire_overdue(self, *, reference_time: datetime) -> int:
+        result = await self.db.execute(
+            update(FuelSupplyOrder)
+            .where(
+                FuelSupplyOrder.status == FuelSupplyOrderStatus.OPEN,
+                FuelSupplyOrder.expires_at < reference_time,
+            )
+            .values(status=FuelSupplyOrderStatus.EXPIRED)
+        )
+        return int(result.rowcount or 0)

@@ -30,6 +30,37 @@ class FuelStationRepository:
         await self.db.refresh(station)
         return station
 
+    async def list_active_stations_for_user(self, user_id: UUID) -> list[FuelStation]:
+        stmt = (
+            select(FuelStation)
+            .join(FuelStationUser, FuelStationUser.fuel_station_id == FuelStation.id)
+            .where(
+                FuelStationUser.user_id == user_id,
+                FuelStationUser.active.is_(True),
+                FuelStation.active.is_(True),
+            )
+            .order_by(FuelStation.name.asc())
+        )
+        result = await self.db.execute(stmt)
+        return list(result.scalars().unique().all())
+
+    async def list_active_station_ids_for_user(self, user_id: UUID) -> list[UUID]:
+        return [station.id for station in await self.list_active_stations_for_user(user_id)]
+
+    async def has_active_user_link(self, *, user_id: UUID, fuel_station_id: UUID) -> bool:
+        stmt = (
+            select(FuelStationUser.id)
+            .join(FuelStation, FuelStation.id == FuelStationUser.fuel_station_id)
+            .where(
+                FuelStationUser.user_id == user_id,
+                FuelStationUser.fuel_station_id == fuel_station_id,
+                FuelStationUser.active.is_(True),
+                FuelStation.active.is_(True),
+            )
+            .limit(1)
+        )
+        return (await self.db.execute(stmt)).scalar_one_or_none() is not None
+
     async def list_users(self, fuel_station_id: UUID, active_only: bool | None = None) -> list[FuelStationUser]:
         stmt = (
             select(FuelStationUser)

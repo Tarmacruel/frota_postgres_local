@@ -46,7 +46,7 @@ function normalizeSummaryMetrics(metrics = []) {
     .filter(Boolean)
 }
 
-function formatDateTimeLabel(value) {
+export function formatDateTimeLabel(value) {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) return '-'
 
@@ -134,7 +134,7 @@ async function loadImageDataUrlFromBlob(blob) {
   }
 }
 
-async function loadOptimizedLogo() {
+export async function loadOptimizedLogo() {
   if (!optimizedLogoPromise) {
     optimizedLogoPromise = (async () => {
       const response = await fetch(officialBrand.logoPath)

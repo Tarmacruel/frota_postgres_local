@@ -4,8 +4,8 @@ import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 import { getRoleLabel } from '../utils/roles'
 
-const actionOptions = ['TODAS', 'CREATE', 'UPDATE', 'DELETE']
-const entityOptions = ['TODOS', 'USER', 'VEHICLE', 'MAINTENANCE', 'POSSESSION']
+const actionOptions = ['TODAS', 'CREATE', 'UPDATE', 'DELETE', 'ORDER_CREATED', 'ORDER_CONFIRMED', 'ORDER_CANCELLED', 'ORDER_EXPIRED']
+const entityOptions = ['TODOS', 'USER', 'VEHICLE', 'MAINTENANCE', 'POSSESSION', 'FUEL_STATION', 'FUEL_STATION_USER', 'FUEL_SUPPLY', 'FUEL_SUPPLY_ORDER']
 
 function formatDate(value) {
   if (!value) return '-'
@@ -16,6 +16,12 @@ function summarizeDetails(details) {
   if (!details) return 'Sem detalhes adicionais'
   if (details.event === 'END_POSSESSION') {
     return `Encerramento registrado para ${details.end_date ? formatDate(details.end_date) : 'agora'}`
+  }
+  if (details.reason) {
+    return `Justificativa: ${details.reason}`
+  }
+  if (details.supply_id) {
+    return `Abastecimento confirmado: ${details.supply_id}`
   }
   if (details.after?.role) {
     return `Perfil final ${getRoleLabel(details.after.role)}`

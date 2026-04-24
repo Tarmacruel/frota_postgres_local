@@ -2,15 +2,16 @@ from __future__ import annotations
 
 from datetime import datetime, timezone
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.models.fuel_supply import FuelSupply
 from app.models.fuel_supply_order import FuelSupplyOrder, FuelSupplyOrderStatus
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.repositories.driver_repository import DriverRepository
+from app.repositories.fuel_station_repository import FuelStationRepository
 from app.repositories.fuel_supply_order_repository import FuelSupplyOrderRepository
 from app.repositories.fuel_supply_repository import FuelSupplyRepository
 from app.repositories.master_data_repository import MasterDataRepository
@@ -26,6 +27,7 @@ RECEIPT_EXTENSIONS = {
     "image/png": ".png",
     "image/webp": ".webp",
 }
+PUBLIC_VALIDATION_PATH_PREFIX = "/validar/ordem-abastecimento"
 
 
 class FuelSupplyOrderService:
@@ -33,13 +35,28 @@ class FuelSupplyOrderService:
         self.db = db
         self.orders = FuelSupplyOrderRepository(db)
         self.supplies = FuelSupplyRepository(db)
+        self.fuel_stations = FuelStationRepository(db)
         self.vehicles = VehicleRepository(db)
         self.drivers = DriverRepository(db)
         self.master_data = MasterDataRepository(db)
         self.audit = AuditService(db)
 
-    async def list(self, *, page: int, limit: int, **filters) -> PaginatedResponse[dict]:
-        records, total = await self.orders.list_paginated(page=page, limit=limit, **filters)
+    async def list(self, *, page: int, limit: int, current_user: User, **filters) -> PaginatedResponse[dict]:
+        await self._expire_overdue_orders()
+
+        scoped_filters = dict(filters)
+        if current_user.role == UserRole.POSTO:
+            station_ids = await self.fuel_stations.list_active_station_ids_for_user(current_user.id)
+            if not station_ids:
+                return PaginatedResponse[dict](data=[], pagination=build_pagination(page, limit, 0))
+
+            requested_station_id = scoped_filters.get("fuel_station_id")
+            if requested_station_id and requested_station_id not in station_ids:
+                return PaginatedResponse[dict](data=[], pagination=build_pagination(page, limit, 0))
+
+            scoped_filters["fuel_station_ids"] = station_ids
+
+        records, total = await self.orders.list_paginated(page=page, limit=limit, **scoped_filters)
         return PaginatedResponse[dict](
             data=[self._serialize_order(item) for item in records],
             pagination=build_pagination(page, limit, total),
@@ -64,11 +81,18 @@ class FuelSupplyOrderService:
             if not organization:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Orgao/posto nao encontrado")
 
+        station = await self.fuel_stations.get(data.fuel_station_id)
+        if not station:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posto nao encontrado")
+        if not station.active:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Posto selecionado esta inativo")
+
         order = FuelSupplyOrder(
             vehicle_id=data.vehicle_id,
             driver_id=data.driver_id,
             organization_id=data.organization_id,
             fuel_station_id=data.fuel_station_id,
+            validation_code=await self._generate_validation_code(),
             created_by_user_id=current_user.id,
             expires_at=data.expires_at,
             requested_liters=data.requested_liters,
@@ -94,11 +118,25 @@ class FuelSupplyOrderService:
 
         return await self.get_order(order.id)
 
-    async def get_order(self, order_id: UUID) -> dict:
+    async def get_order(self, order_id: UUID, *, current_user: User | None = None) -> dict:
+        await self._expire_overdue_orders()
         order = await self.orders.get_by_id(order_id)
         if not order:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento nao encontrada")
+        if current_user and current_user.role == UserRole.POSTO:
+            await self._ensure_station_access(current_user=current_user, order=order)
         return self._serialize_order(order)
+
+    async def get_public_order(self, validation_code: str) -> dict:
+        await self._expire_overdue_orders()
+        normalized_code = (validation_code or "").strip().upper()
+        if not normalized_code:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comprovante publico nao encontrado")
+
+        order = await self.orders.get_by_validation_code(normalized_code)
+        if not order:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comprovante publico nao encontrado")
+        return self._serialize_public_order(order)
 
     async def confirm_order(self, order_id: UUID, data: FuelSupplyOrderConfirm, receipt: UploadFile, current_user: User) -> dict:
         order = await self.orders.get_by_id(order_id)
@@ -128,9 +166,17 @@ class FuelSupplyOrderService:
             await self.db.commit()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem expirada")
 
-        user_station_id = getattr(current_user, "organization_id", None)
-        if order.organization_id and user_station_id and user_station_id != order.organization_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuario nao pertence ao posto da ordem")
+        if not order.fuel_station_id:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem sem posto vinculado")
+
+        station = await self.fuel_stations.get(order.fuel_station_id)
+        if not station:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posto nao encontrado para a ordem")
+        if not station.active:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Posto vinculado a ordem esta inativo")
+
+        if current_user.role == UserRole.POSTO:
+            await self._ensure_station_access(current_user=current_user, order=order)
 
         if data.driver_id:
             driver = await self.drivers.get_by_id(data.driver_id)
@@ -163,7 +209,8 @@ class FuelSupplyOrderService:
             odometer_km=data.odometer_km,
             liters=data.liters,
             total_amount=data.total_amount,
-            fuel_station=data.fuel_station,
+            fuel_station_id=station.id,
+            fuel_station=station.name,
             notes=data.notes,
             consumption_km_l=consumption_km_l,
             is_consumption_anomaly=is_anomaly,
@@ -223,6 +270,10 @@ class FuelSupplyOrderService:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem ja cancelada")
         if order.status == FuelSupplyOrderStatus.EXPIRED:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem expirada")
+        if datetime.now(timezone.utc) > order.expires_at:
+            order.status = FuelSupplyOrderStatus.EXPIRED
+            await self.db.commit()
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem expirada")
 
         order.status = FuelSupplyOrderStatus.CANCELLED
 
@@ -236,6 +287,32 @@ class FuelSupplyOrderService:
         )
         await self.db.commit()
         return await self.get_order(order.id)
+
+    async def _expire_overdue_orders(self) -> None:
+        expired = await self.orders.expire_overdue(reference_time=datetime.now(timezone.utc))
+        if expired:
+            await self.db.commit()
+
+    async def _ensure_station_access(self, *, current_user: User, order: FuelSupplyOrder) -> None:
+        if not order.fuel_station_id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Ordem sem posto vinculado")
+
+        has_access = await self.fuel_stations.has_active_user_link(
+            user_id=current_user.id,
+            fuel_station_id=order.fuel_station_id,
+        )
+        if not has_access:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuario nao possui vinculo ativo com o posto da ordem")
+
+    async def _generate_validation_code(self) -> str:
+        for _ in range(8):
+            candidate = f"OA-{uuid4().hex[:12].upper()}"
+            if not await self.orders.get_by_validation_code(candidate):
+                return candidate
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Nao foi possivel gerar o codigo publico da ordem",
+        )
 
     async def _read_and_validate_receipt(self, receipt: UploadFile | None) -> dict:
         if receipt is None:
@@ -297,16 +374,38 @@ class FuelSupplyOrderService:
             )
         return False, None
 
+    def _build_public_validation_path(self, validation_code: str) -> str:
+        return f"{PUBLIC_VALIDATION_PATH_PREFIX}/{validation_code}"
+
+    def _build_vehicle_description(self, item: FuelSupplyOrder) -> str | None:
+        if not item.vehicle:
+            return None
+
+        description_parts = [item.vehicle.plate]
+        vehicle_name = " ".join(filter(None, [item.vehicle.brand, item.vehicle.model])).strip()
+        if vehicle_name:
+            description_parts.append(vehicle_name)
+
+        return " - ".join(description_parts)
+
     def _serialize_order(self, item: FuelSupplyOrder) -> dict:
         return {
             "id": item.id,
+            "request_number": f"AB-{str(item.id).split('-')[0].upper()}",
+            "validation_code": item.validation_code,
+            "public_validation_path": self._build_public_validation_path(item.validation_code),
             "status": item.status,
             "vehicle_id": item.vehicle_id,
             "vehicle_plate": item.vehicle.plate if item.vehicle else "",
+            "vehicle_description": self._build_vehicle_description(item),
             "driver_id": item.driver_id,
+            "driver_name": item.driver.nome_completo if item.driver else None,
             "organization_id": item.organization_id,
             "organization_name": item.organization.name if item.organization else None,
             "fuel_station_id": item.fuel_station_id,
+            "fuel_station_name": item.fuel_station_ref.name if item.fuel_station_ref else None,
+            "fuel_station_cnpj": item.fuel_station_ref.cnpj if item.fuel_station_ref else None,
+            "fuel_station_address": item.fuel_station_ref.address if item.fuel_station_ref else None,
             "created_by_user_id": item.created_by_user_id,
             "created_by_name": item.creator.name if item.creator else None,
             "confirmed_by_user_id": item.confirmed_by_user_id,
@@ -318,4 +417,28 @@ class FuelSupplyOrderService:
             "confirmed_at": item.confirmed_at,
             "created_at": item.created_at,
             "updated_at": item.updated_at,
+        }
+
+    def _serialize_public_order(self, item: FuelSupplyOrder) -> dict:
+        serialized = self._serialize_order(item)
+        return {
+            "request_number": serialized["request_number"],
+            "validation_code": serialized["validation_code"],
+            "public_validation_path": serialized["public_validation_path"],
+            "status": serialized["status"],
+            "vehicle_plate": serialized["vehicle_plate"],
+            "vehicle_description": serialized["vehicle_description"],
+            "driver_name": serialized["driver_name"],
+            "organization_name": serialized["organization_name"],
+            "fuel_station_name": serialized["fuel_station_name"],
+            "fuel_station_cnpj": serialized["fuel_station_cnpj"],
+            "fuel_station_address": serialized["fuel_station_address"],
+            "created_by_name": serialized["created_by_name"],
+            "confirmed_by_name": serialized["confirmed_by_name"],
+            "requested_liters": serialized["requested_liters"],
+            "max_amount": serialized["max_amount"],
+            "notes": serialized["notes"],
+            "created_at": serialized["created_at"],
+            "expires_at": serialized["expires_at"],
+            "confirmed_at": serialized["confirmed_at"],
         }

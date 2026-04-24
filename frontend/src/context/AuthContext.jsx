@@ -1,6 +1,17 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import api from '../api/client'
-import { canAccessFuelSupplies, canConfirmFuelOrders, canDelete, canManageCadastros, canWrite, getRoleLabel, isAdmin, isFuelStation } from '../utils/roles'
+import {
+  canAccessFuelSupplies,
+  canConfirmFuelOrders,
+  canDelete,
+  canManageCadastros,
+  canManageFuelSupplyOrders,
+  canWrite,
+  getRoleLabel,
+  isAdmin,
+  isFuelStation,
+  isPosto,
+} from '../utils/roles'
 
 const AuthContext = createContext(null)
 
@@ -51,10 +62,12 @@ export function AuthProvider({ children }) {
     logout,
     reload: loadMe,
     isAdmin: isAdmin(user?.role),
+    isPosto: isPosto(user?.role),
     canWrite: canWrite(user?.role),
     canDelete: canDelete(user?.role),
     canManageCadastros: canManageCadastros(user?.role),
     canAccessFuelSupplies: canAccessFuelSupplies(user?.role),
+    canManageFuelSupplyOrders: canManageFuelSupplyOrders(user?.role),
     canConfirmFuelOrders: canConfirmFuelOrders(user?.role),
     isFuelStation: isFuelStation(user?.role),
     roleLabel: getRoleLabel(user?.role),

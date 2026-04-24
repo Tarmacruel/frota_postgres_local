@@ -23,6 +23,7 @@ const initialForm = {
   organization_id: '',
   department_id: '',
   allocation_id: '',
+  edit_reason: '',
 }
 
 const statusOptions = [
@@ -154,6 +155,65 @@ function buildFilterSummary(statusFilter, ownershipFilter, locationFilter, searc
   }
 
   return filters
+}
+
+const vehicleHistoryFieldLabels = {
+  plate: 'Placa',
+  chassis_number: 'Chassi',
+  brand: 'Marca',
+  model: 'Modelo',
+  vehicle_type: 'Tipo de veiculo',
+  ownership_type: 'Propriedade',
+  status: 'Status',
+  location: 'Lotacao',
+}
+
+function getVehicleHistoryTypeLabel(value) {
+  if (value === 'MOVEMENT') return 'Movimentacao'
+  if (value === 'CREATE') return 'Cadastro'
+  return 'Edicao'
+}
+
+function formatVehicleHistoryFieldValue(field, value) {
+  if (value === null || value === undefined || value === '') return 'Nao informado'
+  if (field === 'status') return getStatusLabel(value)
+  if (field === 'ownership_type') return getOwnershipLabel(value)
+  if (field === 'vehicle_type') return getVehicleTypeLabel(value)
+  return String(value)
+}
+
+function buildVehicleHistoryChangeLines(item) {
+  if (item.event_type === 'MOVEMENT') {
+    return [
+      `Lotacao: ${item.display_name || item.department || 'Nao informada'}`,
+      `Orgao: ${item.organization_name || 'Legado'}`,
+      `Departamento: ${item.department_name || item.department || 'Sem departamento'}`,
+      `Periodo: ${formatDate(item.start_date)} ate ${item.end_date ? formatDate(item.end_date) : 'Atual'}`,
+    ]
+  }
+
+  const after = item.after || {}
+  if (item.event_type === 'CREATE') {
+    return [
+      `Status inicial: ${formatVehicleHistoryFieldValue('status', after.status)}`,
+      `Tipo: ${formatVehicleHistoryFieldValue('vehicle_type', after.vehicle_type)}`,
+      `Propriedade: ${formatVehicleHistoryFieldValue('ownership_type', after.ownership_type)}`,
+      `Lotacao inicial: ${formatVehicleHistoryFieldValue('location', after.location)}`,
+    ].filter((line) => !line.endsWith('Nao informado'))
+  }
+
+  const before = item.before || {}
+  const changedKeys = Object.keys(vehicleHistoryFieldLabels).filter((key) => (before[key] ?? null) !== (after[key] ?? null))
+
+  if (changedKeys.length === 0) {
+    return ['Edicao registrada sem diferencas adicionais nos campos auditados.']
+  }
+
+  return changedKeys.map((key) => `${vehicleHistoryFieldLabels[key]}: ${formatVehicleHistoryFieldValue(key, before[key])} -> ${formatVehicleHistoryFieldValue(key, after[key])}`)
+}
+
+function buildVehicleHistorySummary(item) {
+  return buildVehicleHistoryChangeLines(item).join(' | ')
 }
 
 export default function VehiclesPage() {
@@ -385,6 +445,7 @@ export default function VehiclesPage() {
       organization_id: vehicle.current_location?.organization_id || '',
       department_id: vehicle.current_location?.department_id || '',
       allocation_id: vehicle.current_location?.allocation_id || '',
+      edit_reason: '',
     })
     setIsModalOpen(true)
   }
@@ -422,6 +483,11 @@ export default function VehiclesPage() {
       return
     }
 
+    if (editingId && !form.edit_reason.trim()) {
+      setError('Informe a justificativa obrigatoria desta edicao.')
+      return
+    }
+
     try {
       setSubmitting(true)
       setError('')
@@ -446,8 +512,9 @@ export default function VehiclesPage() {
       }
 
       if (editingId) {
+        payload.edit_reason = form.edit_reason
         await api.put(`/vehicles/${editingId}`, payload)
-        setFeedback('Veiculo atualizado com sucesso.')
+        setFeedback('Veiculo atualizado com justificativa e historico.')
       } else {
         await api.post('/vehicles', payload)
         setFeedback('Veiculo cadastrado com sucesso.')
@@ -543,13 +610,15 @@ export default function VehiclesPage() {
 
     const historyColumns = [
       { header: 'Veiculo', value: () => selectedVehicle.plate },
-      { header: 'Orgao', value: (item) => item.organization_name || 'Legado' },
-      { header: 'Departamento', value: (item) => item.department_name || item.department || 'Sem departamento' },
-      { header: 'Lotacao', value: (item) => item.allocation_name || item.display_name || 'Sem lotacao' },
-      { header: 'Local completo', value: (item) => item.display_name || item.department },
-      { header: 'Inicio', value: (item) => formatDate(item.start_date) },
-      { header: 'Fim', value: (item) => (item.end_date ? formatDate(item.end_date) : 'Atual') },
+      { header: 'Data', value: (item) => formatDate(item.occurred_at) },
+      { header: 'Evento', value: (item) => getVehicleHistoryTypeLabel(item.event_type) },
+      { header: 'Resumo', value: (item) => buildVehicleHistorySummary(item) },
+      { header: 'Justificativa', value: (item) => item.justification || 'Sem justificativa registrada' },
+      { header: 'Ator', value: (item) => item.actor_name || 'Sistema' },
     ]
+
+    const historyEditCount = selectedHistory.filter((item) => item.event_type === 'EDIT').length
+    const historyMovementCount = selectedHistory.filter((item) => item.event_type === 'MOVEMENT').length
 
     try {
       setError('')
@@ -557,12 +626,14 @@ export default function VehiclesPage() {
       await previewRowsToPdf({
         title: `Frota PMTF - Historico ${selectedVehicle.plate}`,
         fileName: `frota-pmtf-historico-${selectedVehicle.plate.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-        subtitle: `Historico de lotacao do veiculo ${selectedVehicle.plate} | ${selectedVehicle.brand} ${selectedVehicle.model}.`,
+        subtitle: `Historico de edicoes e movimentacoes do veiculo ${selectedVehicle.plate} | ${selectedVehicle.brand} ${selectedVehicle.model}.`,
         columns: historyColumns,
         rows: selectedHistory,
         summaryMetrics: [
           { label: 'Veiculo', value: selectedVehicle.plate, tone: 'blue' },
-          { label: 'Movimentacoes', value: selectedHistory.length, tone: 'blue' },
+          { label: 'Eventos', value: selectedHistory.length, tone: 'blue' },
+          { label: 'Edicoes', value: historyEditCount, tone: 'amber' },
+          { label: 'Movimentacoes', value: historyMovementCount, tone: 'blue' },
           { label: 'Tipo', value: getOwnershipLabel(selectedVehicle.ownership_type), tone: 'blue' },
           { label: 'Status', value: getStatusLabel(selectedVehicle.status), tone: selectedVehicle.status === 'ATIVO' ? 'green' : selectedVehicle.status === 'MANUTENCAO' ? 'amber' : 'red' },
         ],
@@ -755,9 +826,9 @@ export default function VehiclesPage() {
       <section className="surface-panel history-panel">
         <div className="panel-heading">
           <div>
-            <h3 className="section-title">Historico de lotacao</h3>
+            <h3 className="section-title">Historico do veiculo</h3>
             <p className="section-copy">
-              {selectedVehicle ? `Linha do tempo de ${selectedVehicle.plate}` : 'Selecione um veiculo na tabela para visualizar a cronologia de lotacao.'}
+              {selectedVehicle ? `Linha do tempo de ${selectedVehicle.plate} com edicoes cadastrais e movimentacoes de lotacao.` : 'Selecione um veiculo na tabela para visualizar o historico consolidado de edicoes e movimentacoes.'}
             </p>
             {selectedVehicle ? (
               <p className="section-copy" style={{ marginTop: 10 }}>
@@ -785,13 +856,22 @@ export default function VehiclesPage() {
         {selectedHistory.length > 0 ? (
           <ul className="history-list history-grid">
             {selectedHistory.map((item) => (
-              <li className="history-item" key={item.id}>
-                <strong>{item.display_name || item.department}</strong>
-                <div className="muted">Orgao: {item.organization_name || 'Legado'}</div>
-                <div className="muted">Departamento: {item.department_name || item.department || 'Sem departamento'}</div>
-                <div className="muted">Lotacao: {item.allocation_name || 'Nao estruturada'}</div>
-                <div className="muted">Inicio: {formatDate(item.start_date)}</div>
-                <div className="muted">Fim: {item.end_date ? formatDate(item.end_date) : 'Atual'}</div>
+              <li className="history-item" key={`${item.event_type}-${item.id}`}>
+                <div className="history-item-topline">
+                  <span className={`status-badge history-event-${item.event_type}`}>{getVehicleHistoryTypeLabel(item.event_type)}</span>
+                  <span className="muted">{formatDate(item.occurred_at)}</span>
+                </div>
+                <strong>{item.title}</strong>
+                {item.actor_name ? <div className="muted">Registrado por: {item.actor_name}</div> : null}
+                <div className="history-item-lines">
+                  {buildVehicleHistoryChangeLines(item).map((line) => (
+                    <div className="muted" key={`${item.id}-${line}`}>{line}</div>
+                  ))}
+                </div>
+                <div className="history-item-justification">
+                  <span>Justificativa</span>
+                  <strong>{item.justification || 'Sem justificativa registrada'}</strong>
+                </div>
               </li>
             ))}
           </ul>
@@ -803,7 +883,7 @@ export default function VehiclesPage() {
       <Modal
         open={isModalOpen}
         title={editingId ? 'Editar veiculo' : 'Novo veiculo'}
-        description="Preencha os dados do veiculo e vincule a lotacao por orgao, departamento e lotacao cadastrados."
+        description={editingId ? 'Toda alteracao exige uma nova justificativa. Ela sera registrada no historico de edicoes e movimentacoes do veiculo.' : 'Preencha os dados do veiculo e vincule a lotacao por orgao, departamento e lotacao cadastrados.'}
         onClose={closeVehicleModal}
       >
         <form onSubmit={handleSubmit} className="stack">
@@ -870,8 +950,27 @@ export default function VehiclesPage() {
             </div>
           </AccordionSection>
 
+          {editingId ? (
+            <AccordionSection title="Justificativa" subtitle="Observacao obrigatoria da edicao" open>
+              <div className="form-grid modal-form-grid">
+                <div className="form-field modal-field-span">
+                  <label htmlFor="edit_reason">Justificativa da edicao</label>
+                  <textarea
+                    id="edit_reason"
+                    className="app-textarea"
+                    rows="4"
+                    placeholder="Explique por que este cadastro do veiculo esta sendo alterado."
+                    value={form.edit_reason}
+                    onChange={(event) => setForm({ ...form, edit_reason: event.target.value })}
+                  />
+                  <span className="helper-text">Uma nova justificativa fica registrada em cada edicao e em qualquer nova movimentacao de lotacao gerada pela alteracao.</span>
+                </div>
+              </div>
+            </AccordionSection>
+          ) : null}
+
           <div className="actions-inline modal-actions">
-            <button className="app-button" type="submit" disabled={submitting || catalogLoading}>
+            <button className="app-button" type="submit" disabled={submitting || catalogLoading || Boolean(editingId && !form.edit_reason.trim())}>
               {submitting ? 'Salvando...' : editingId ? 'Atualizar veiculo' : 'Cadastrar veiculo'}
             </button>
             <button className="ghost-button" type="button" onClick={closeVehicleModal}>Cancelar</button>

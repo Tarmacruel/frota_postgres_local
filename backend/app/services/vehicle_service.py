@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.models.audit_log import AuditLog
 from app.models.location_history import LocationHistory
 from app.models.master_data import Allocation
 from app.models.user import User
@@ -65,7 +66,10 @@ class VehicleService:
         if not vehicle:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
         history = await self.vehicles.list_history(vehicle_id)
-        return [self._serialize_history(item) for item in history]
+        audit_logs = await self._list_vehicle_audit_logs(vehicle_id)
+        events = [self._serialize_history(item) for item in history]
+        events.extend(self._serialize_audit_event(item) for item in audit_logs)
+        return sorted(events, key=lambda item: item["occurred_at"], reverse=True)
 
     async def create(self, data: VehicleCreate, current_user: User) -> dict:
         existing = await self.vehicles.get_by_plate(data.plate.upper())
@@ -177,6 +181,7 @@ class VehicleService:
                         vehicle_id=vehicle.id,
                         allocation_id=allocation.id,
                         department=allocation.display_name,
+                        justification=data.edit_reason,
                     )
                     await self.vehicles.create_history(new_history)
 
@@ -188,6 +193,7 @@ class VehicleService:
                 entity_id=vehicle.id,
                 entity_label=vehicle.plate,
                 details={
+                    "reason": data.edit_reason,
                     "before": previous_values,
                     "after": {
                         "plate": vehicle.plate,
@@ -258,6 +264,18 @@ class VehicleService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lotacao nao encontrada")
         return allocation
 
+    async def _list_vehicle_audit_logs(self, vehicle_id: UUID) -> list[AuditLog]:
+        result = await self.db.execute(
+            select(AuditLog)
+            .where(
+                AuditLog.entity_type == "VEHICLE",
+                AuditLog.entity_id == vehicle_id,
+                AuditLog.action.in_(("CREATE", "UPDATE")),
+            )
+            .order_by(AuditLog.created_at.desc())
+        )
+        return list(result.scalars().all())
+
     def _normalize_chassis(self, chassis_number: str | None) -> str | None:
         if chassis_number is None:
             return None
@@ -298,7 +316,12 @@ class VehicleService:
     def _serialize_history(self, history: LocationHistory) -> dict:
         return {
             "id": history.id,
-            "vehicle_id": history.vehicle_id,
+            "event_type": "MOVEMENT",
+            "action": None,
+            "occurred_at": history.start_date,
+            "title": "Movimentacao de lotacao",
+            "actor_name": None,
+            "justification": history.justification,
             "allocation_id": history.allocation_id,
             "department": history.department,
             "display_name": history.display_name,
@@ -308,4 +331,37 @@ class VehicleService:
             "start_date": history.start_date,
             "end_date": history.end_date,
             "created_at": history.created_at,
+            "before": None,
+            "after": None,
+        }
+
+    def _serialize_audit_event(self, log: AuditLog) -> dict:
+        details = log.details or {}
+        before = details.get("before") if isinstance(details.get("before"), dict) else None
+        if isinstance(details.get("after"), dict):
+            after = details["after"]
+        elif log.action == "CREATE" and isinstance(details, dict):
+            after = details
+        else:
+            after = None
+
+        return {
+            "id": log.id,
+            "event_type": "CREATE" if log.action == "CREATE" else "EDIT",
+            "action": log.action,
+            "occurred_at": log.created_at,
+            "title": "Cadastro do veiculo" if log.action == "CREATE" else "Edicao cadastral",
+            "actor_name": log.actor_name,
+            "justification": details.get("reason"),
+            "allocation_id": None,
+            "department": None,
+            "display_name": None,
+            "organization_name": None,
+            "department_name": None,
+            "allocation_name": None,
+            "start_date": None,
+            "end_date": None,
+            "created_at": log.created_at,
+            "before": before,
+            "after": after,
         }

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models.vehicle import VehicleOwnershipType, VehicleStatus, VehicleType
 from app.schemas.common import PaginatedResponse
 
@@ -37,6 +37,15 @@ class VehicleUpdate(BaseModel):
     ownership_type: VehicleOwnershipType | None = None
     status: VehicleStatus | None = None
     allocation_id: UUID | None = None
+    edit_reason: str = Field(min_length=8, max_length=500)
+
+    @field_validator("edit_reason")
+    @classmethod
+    def validate_edit_reason(cls, value: str) -> str:
+        normalized = value.strip()
+        if len(normalized) < 8:
+            raise ValueError("Justificativa da edicao deve ter ao menos 8 caracteres")
+        return normalized
 
 
 class VehicleOut(BaseModel):

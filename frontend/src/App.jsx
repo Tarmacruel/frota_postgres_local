@@ -11,16 +11,18 @@ import DriversPage from './pages/DriversPage'
 import FinesPage from './pages/FinesPage'
 import FuelSuppliesPage from './pages/FuelSuppliesPage'
 import FuelStationsPage from './pages/FuelStationsPage'
+import FuelSupplyOrdersPage from './pages/FuelSupplyOrdersPage'
 import LoginPage from './pages/LoginPage'
 import MaintenancePage from './pages/MaintenancePage'
 import PossessionPage from './pages/PossessionPage'
+import PublicFuelSupplyOrderPage from './pages/PublicFuelSupplyOrderPage'
 import UsersPage from './pages/UsersPage'
 import VehiclesPage from './pages/VehiclesPage'
 import UnauthorizedPage from './pages/UnauthorizedPage'
 
 function HomeRoute() {
-  const { isFuelStation } = useAuth()
-  if (isFuelStation) return <Navigate to="/abastecimentos" replace />
+  const { isPosto } = useAuth()
+  if (isPosto) return <Navigate to="/ordens-abastecimento" replace />
   return <DashboardPage />
 }
 
@@ -31,6 +33,7 @@ export default function App() {
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
+          <Route path="/validar/ordem-abastecimento/:validationCode" element={<PublicFuelSupplyOrderPage />} />
           <Route
             path="/"
             element={
@@ -99,7 +102,7 @@ export default function App() {
             <Route
               path="abastecimentos"
               element={(
-                <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO', 'POSTO']}>
+                <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO']}>
                   <FuelSuppliesPage />
                 </ProtectedRoute>
               )}
@@ -111,6 +114,14 @@ export default function App() {
                   <FuelStationsPage />
                 </ProtectedRoute>
               )}
+            />
+            <Route
+              path="ordens-abastecimento"
+              element={
+                <ProtectedRoute allowedRoles={['POSTO']}>
+                  <FuelSupplyOrdersPage />
+                </ProtectedRoute>
+              }
             />
             <Route
               path="users"

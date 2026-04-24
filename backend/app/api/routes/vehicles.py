@@ -10,7 +10,7 @@ from app.models.user import User
 from app.models.vehicle import VehicleOwnershipType, VehicleStatus
 from app.schemas.auth import MessageOut
 from app.schemas.claim import ClaimListResponse
-from app.schemas.history import LocationHistoryOut
+from app.schemas.history import VehicleHistoryEventOut
 from app.schemas.possession import PossessionOut
 from app.schemas.vehicle import VehicleCreate, VehicleListResponse, VehicleOut, VehicleUpdate
 from app.services.claim_service import ClaimService
@@ -105,7 +105,7 @@ async def current_driver(
     return await PossessionService(db).get_current_driver(vehicle_id, current_user=current_user)
 
 
-@router.get("/{vehicle_id}/historico", response_model=list[LocationHistoryOut], dependencies=[Depends(get_current_user)])
+@router.get("/{vehicle_id}/historico", response_model=list[VehicleHistoryEventOut], dependencies=[Depends(get_current_user)])
 async def history_vehicle(vehicle_id: UUID, db: AsyncSession = Depends(get_db_session)):
     return await VehicleService(db).get_history(vehicle_id)
 
