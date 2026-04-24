@@ -37,7 +37,7 @@ class AdminNotificationService:
     async def mark_as_read(self, notification_id: UUID) -> None:
         updated = await self.notifications.mark_as_read(notification_id, datetime.now(timezone.utc))
         if not updated:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notificacao nao encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Notificacao não encontrada")
 
     async def unread_count(self) -> int:
         return await self.notifications.count_unread()

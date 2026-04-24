@@ -85,7 +85,7 @@ class PossessionService:
         await self._ensure_vehicle_exists(vehicle_id)
         record = await self.possessions.get_active_by_vehicle(vehicle_id)
         if not record:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nenhum condutor ativo encontrado para este veiculo")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nenhum condutor ativo encontrado para este veículo")
         return self._serialize(record, can_view_location=self._can_view_location(current_user))
 
     async def start(
@@ -112,7 +112,7 @@ class PossessionService:
         if current_active and effective_start < current_active.start_date:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Nova posse nao pode iniciar antes da posse ativa atual",
+                detail="Nova posse não pode iniciar antes da posse ativa atual",
             )
 
         auto_close_end_odometer = data.start_odometer_km
@@ -194,7 +194,7 @@ class PossessionService:
                 await self.admin_notifications.notify(
                     title="Divergencia de quilometragem entre posses",
                     message=(
-                        f"Veiculo {vehicle.plate}: nova posse iniciou em {data.start_odometer_km:.1f} km "
+                        f"Veículo {vehicle.plate}: nova posse iniciou em {data.start_odometer_km:.1f} km "
                         f"e a posse anterior encerrada tinha {current_active.end_odometer_km:.1f} km."
                     ),
                     event_type="POSSESSION_ODOMETER_GAP",
@@ -207,14 +207,14 @@ class PossessionService:
             await self.db.rollback()
             self._cleanup_file(stored_document_path)
             self._cleanup_files(stored_photo_paths)
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel iniciar a posse") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível iniciar a posse") from exc
         except OSError as exc:
             await self.db.rollback()
             self._cleanup_file(stored_document_path)
             self._cleanup_files(stored_photo_paths)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Nao foi possivel armazenar os arquivos da posse",
+                detail="Não foi possível armazenar os arquivos da posse",
             ) from exc
         except Exception:
             await self.db.rollback()
@@ -227,14 +227,14 @@ class PossessionService:
     async def end(self, possession_id: UUID, data: PossessionUpdate, current_user: User) -> dict:
         possession = await self.possessions.get_by_id(possession_id)
         if not possession:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
         if possession.end_date is not None:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Registro de posse ja encerrado")
 
         payload = data.model_dump(exclude_unset=True)
         effective_end = payload.get("end_date") or datetime.now(timezone.utc)
         if effective_end < possession.start_date:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data final nao pode ser anterior ao inicio da posse")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data final não pode ser anterior ao inicio da posse")
 
         possession.end_date = effective_end
         if "observation" in payload:
@@ -261,7 +261,7 @@ class PossessionService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel encerrar a posse") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível encerrar a posse") from exc
 
         return await self._get_by_id(possession.id, current_user)
 
@@ -277,10 +277,10 @@ class PossessionService:
     ) -> dict:
         possession = await self.possessions.get_by_id(possession_id)
         if not possession:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
 
         if data.end_date is not None and data.end_date < data.start_date:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data final nao pode ser anterior ao inicio da posse")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data final não pode ser anterior ao inicio da posse")
 
         selected_driver = await self._resolve_driver_snapshot(
             driver_id=data.driver_id,
@@ -379,14 +379,14 @@ class PossessionService:
             await self.db.rollback()
             self._cleanup_file(stored_document_path)
             self._cleanup_files(stored_photo_paths)
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar a posse") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar a posse") from exc
         except OSError as exc:
             await self.db.rollback()
             self._cleanup_file(stored_document_path)
             self._cleanup_files(stored_photo_paths)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Nao foi possivel armazenar os anexos da posse",
+                detail="Não foi possível armazenar os anexos da posse",
             ) from exc
         except Exception:
             await self.db.rollback()
@@ -402,7 +402,7 @@ class PossessionService:
     async def get_photo_file(self, possession_id: UUID, *, photo_id: UUID | None = None) -> FileResponse:
         record = await self.possessions.get_by_id(possession_id)
         if not record:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
 
         if photo_id is None:
             if record.photo_path:
@@ -417,12 +417,12 @@ class PossessionService:
         else:
             selected_photo = next((photo for photo in record.photos if photo.id == photo_id), None)
             if not selected_photo:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foto da posse nao encontrada")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foto da posse não encontrada")
             absolute_photo_path = self._resolve_photo_path(selected_photo.photo_path)
             photo_mime_type = selected_photo.photo_mime_type or "application/octet-stream"
 
         if not absolute_photo_path.is_file():
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Arquivo da foto nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Arquivo da foto não encontrado")
 
         return FileResponse(
             absolute_photo_path,
@@ -436,13 +436,13 @@ class PossessionService:
     async def get_document_file(self, possession_id: UUID) -> FileResponse:
         record = await self.possessions.get_by_id(possession_id)
         if not record:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
         if not record.document_path:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nenhum documento encontrado para esta posse")
 
         absolute_document_path = self._resolve_document_path(record.document_path)
         if not absolute_document_path.is_file():
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Arquivo do documento nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Arquivo do documento não encontrado")
 
         disposition_type = "inline" if (record.document_mime_type or "") in INLINE_DOCUMENT_MIME_TYPES else "attachment"
         filename = record.document_name or absolute_document_path.name
@@ -459,14 +459,14 @@ class PossessionService:
     async def _get_by_id(self, possession_id: UUID, current_user: User | None = None) -> dict:
         record = await self.possessions.get_by_id(possession_id)
         if not record:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
         await self.db.refresh(record, attribute_names=["vehicle", "photos"])
         return self._serialize(record, can_view_location=self._can_view_location(current_user))
 
     async def _ensure_vehicle_exists(self, vehicle_id: UUID) -> Vehicle:
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
         return vehicle
 
     async def _resolve_driver_snapshot(
@@ -487,7 +487,7 @@ class PossessionService:
 
         driver = await self.drivers.get_by_id(driver_id)
         if not driver:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor selecionado nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor selecionado não encontrado")
         if not driver.ativo:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Condutor selecionado esta inativo")
 
@@ -513,7 +513,7 @@ class PossessionService:
             if self._periods_overlap(start_date, end_date, record.start_date, record.end_date):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail="Periodo informado se sobrepoe a outro registro de posse deste veiculo",
+                    detail="Periodo informado se sobrepoe a outro registro de posse deste veículo",
                 )
 
     async def _read_and_validate_captured_photos(
@@ -556,7 +556,7 @@ class PossessionService:
             if photo_metadata:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Os metadados enviados para novas fotos nao possuem arquivos correspondentes",
+                    detail="Os metadados enviados para novas fotos não possuem arquivos correspondentes",
                 )
             return []
 

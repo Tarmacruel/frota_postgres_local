@@ -1,5 +1,5 @@
 export const SEARCH_TYPE_LABELS = {
-  vehicle: 'Veiculos',
+  vehicle: 'Veículos',
   possession: 'Posses',
   maintenance: 'Manutencoes',
 }

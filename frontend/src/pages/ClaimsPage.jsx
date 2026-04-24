@@ -48,7 +48,7 @@ export default function ClaimsPage() {
   const [editingRecord, setEditingRecord] = useState(null)
 
   const exportColumns = [
-    { header: 'Veiculo', value: (item) => item.vehicle_plate },
+    { header: 'Veículo', value: (item) => item.vehicle_plate },
     { header: 'Condutor', value: (item) => item.driver_name || '-' },
     { header: 'Data', value: (item) => formatDate(item.data_ocorrencia) },
     { header: 'Tipo', value: (item) => item.tipo },
@@ -77,7 +77,7 @@ export default function ClaimsPage() {
       setRecords(data.data)
       setPagination(data.pagination)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar os sinistros.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar os sinistros.'))
     } finally {
       setLoading(false)
     }
@@ -102,7 +102,7 @@ export default function ClaimsPage() {
       filters: [
         { label: 'Status', value: statusFilter },
         { label: 'Tipo', value: typeFilter },
-        ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+        ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
         ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
       ],
     })
@@ -118,7 +118,7 @@ export default function ClaimsPage() {
       filters: [
         { label: 'Status', value: statusFilter },
         { label: 'Tipo', value: typeFilter },
-        ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+        ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
       ],
     })
   }
@@ -144,9 +144,9 @@ export default function ClaimsPage() {
             <SearchableSelect
               value={vehicleFilter}
               onChange={setVehicleFilter}
-              options={[{ value: '', label: 'Todos os veiculos' }, ...vehicles.map(vehicleOption)]}
-              placeholder="Filtrar veiculo"
-              searchPlaceholder="Buscar veiculo"
+              options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(vehicleOption)]}
+              placeholder="Filtrar veículo"
+              searchPlaceholder="Buscar veículo"
             />
             <select className="app-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               {statusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
@@ -191,7 +191,7 @@ export default function ClaimsPage() {
               ) : (
                 records.map((record) => (
                   <tr key={record.id}>
-                    <td data-label="Veiculo"><strong>{record.vehicle_plate}</strong></td>
+                    <td data-label="Veículo"><strong>{record.vehicle_plate}</strong></td>
                     <td data-label="Condutor">{record.driver_name || '-'}</td>
                     <td data-label="Data">{formatDate(record.data_ocorrencia)}</td>
                     <td data-label="Tipo">{record.tipo}</td>
@@ -216,7 +216,7 @@ export default function ClaimsPage() {
       <Modal
         open={isModalOpen}
         title={editingRecord ? 'Editar sinistro' : 'Novo sinistro'}
-        description="Relacione o veiculo, o condutor quando conhecido e os dados operacionais da ocorrencia."
+        description="Relacione o veículo, o condutor quando conhecido e os dados operacionais da ocorrencia."
         onClose={() => setIsModalOpen(false)}
       >
         <ClaimForm

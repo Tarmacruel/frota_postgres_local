@@ -78,7 +78,7 @@ function formatPlate(value) {
 
 function formatChassis(value) {
   const normalized = String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
-  if (!normalized) return 'Nao informado'
+  if (!normalized) return 'Não informado'
   const segments = [normalized.slice(0, 4), normalized.slice(4, 8), normalized.slice(8, 12), normalized.slice(12)]
   return segments.filter(Boolean).join('-')
 }
@@ -96,7 +96,7 @@ function getOwnershipLabel(value) {
 }
 
 function getVehicleTypeLabel(value) {
-  return vehicleTypeOptions.find((option) => option.value === value)?.label || value || 'Nao informado'
+  return vehicleTypeOptions.find((option) => option.value === value)?.label || value || 'Não informado'
 }
 
 function getStatusBadgeColors(value) {
@@ -230,7 +230,7 @@ export default function VehiclesPage() {
     { header: 'Placa', value: (vehicle) => formatPlate(vehicle.plate), align: 'center', width: 66 },
     { header: 'Chassi', value: (vehicle) => formatChassis(vehicle.chassis_number), align: 'center', width: 118 },
     { header: 'Marca / Modelo', value: (vehicle) => `${vehicle.brand}\n${vehicle.model}` },
-    { header: 'Tipo veiculo', value: (vehicle) => getVehicleTypeLabel(vehicle.vehicle_type), align: 'center', width: 82 },
+    { header: 'Tipo veículo', value: (vehicle) => getVehicleTypeLabel(vehicle.vehicle_type), align: 'center', width: 82 },
     { header: 'Tipo propriedade', value: (vehicle) => getOwnershipLabel(vehicle.ownership_type), align: 'center', width: 74, badgeColors: getOwnershipBadgeColors },
     { header: 'Status', value: (vehicle) => getStatusLabel(vehicle.status), align: 'center', width: 88, badgeColors: getStatusBadgeColors },
     { header: 'Lotacao atual', value: (vehicle) => buildVehicleLocationLabel(vehicle) },
@@ -254,7 +254,7 @@ export default function VehiclesPage() {
         }
       }
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar os veiculos.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar os veículos.'))
     } finally {
       setLoading(false)
     }
@@ -342,7 +342,7 @@ export default function VehiclesPage() {
         patchSearchParams({ focus: id })
       }
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar o historico.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar o historico.'))
     }
   }
 
@@ -413,7 +413,7 @@ export default function VehiclesPage() {
     const touchedLocationSelection = Boolean(form.organization_id || form.department_id || form.allocation_id)
 
     if (!editingId && !form.allocation_id) {
-      setError('Selecione a lotacao completa para cadastrar o veiculo.')
+      setError('Selecione a lotacao completa para cadastrar o veículo.')
       return
     }
 
@@ -447,16 +447,16 @@ export default function VehiclesPage() {
 
       if (editingId) {
         await api.put(`/vehicles/${editingId}`, payload)
-        setFeedback('Veiculo atualizado com sucesso.')
+        setFeedback('Veículo atualizado com sucesso.')
       } else {
         await api.post('/vehicles', payload)
-        setFeedback('Veiculo cadastrado com sucesso.')
+        setFeedback('Veículo cadastrado com sucesso.')
       }
 
       closeVehicleModal()
       await loadVehicles()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o veiculo.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar o veículo.'))
     } finally {
       setSubmitting(false)
     }
@@ -473,16 +473,16 @@ export default function VehiclesPage() {
       if (selectedVehicle?.id === id) {
         clearHistoryFocus(false)
       }
-      setFeedback('Veiculo removido com sucesso.')
+      setFeedback('Veículo removido com sucesso.')
       await loadVehicles()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel excluir o veiculo.'))
+      setError(getApiErrorMessage(err, 'Não foi possível excluir o veículo.'))
     }
   }
 
   async function handlePreviewPdf() {
     if (filteredVehicles.length === 0) {
-      setFeedback('Nao ha veiculos filtrados para previsualizar em PDF.')
+      setFeedback('Não ha veículos filtrados para previsualizar em PDF.')
       return
     }
 
@@ -490,9 +490,9 @@ export default function VehiclesPage() {
       setError('')
       setFeedback('')
       await previewRowsToPdf({
-        title: 'Frota PMTF - Veiculos',
-        fileName: 'frota-pmtf-veiculos',
-        subtitle: 'Relatorio dos veiculos filtrados no painel operacional.',
+        title: 'Frota PMTF - Veículos',
+        fileName: 'frota-pmtf-veículos',
+        subtitle: 'Relatorio dos veículos filtrados no painel operacional.',
         columns: exportColumns,
         rows: filteredVehicles,
         filters: buildFilterSummary(statusFilter, ownershipFilter, locationFilter, search, locationOptions),
@@ -505,17 +505,17 @@ export default function VehiclesPage() {
         ],
         referenceLabel: latestUpdate ? `Referencia dos dados: atualizado ate ${formatDate(latestUpdate)}` : 'Referencia dos dados: painel operacional atual',
         responsibleSector: 'Secretaria Municipal de Administracao | Departamento de Gestao da Frota',
-        generatedBy: user?.name || user?.email || 'Usuario autenticado',
+        generatedBy: user?.name || user?.email || 'Usuário autenticado',
       })
       setFeedback('Pre-visualizacao do PDF aberta em nova guia.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel gerar a pre-visualizacao em PDF.'))
+      setError(getApiErrorMessage(err, 'Não foi possível gerar a pre-visualizacao em PDF.'))
     }
   }
 
   async function handleExportXlsx() {
     if (filteredVehicles.length === 0) {
-      setFeedback('Nao ha veiculos filtrados para exportar.')
+      setFeedback('Não ha veículos filtrados para exportar.')
       return
     }
 
@@ -523,27 +523,27 @@ export default function VehiclesPage() {
       setError('')
       setFeedback('')
       await exportRowsToXlsx({
-        fileName: 'frota-pmtf-veiculos',
-        sheetName: 'Veiculos',
+        fileName: 'frota-pmtf-veículos',
+        sheetName: 'Veículos',
         columns: exportColumns,
         rows: filteredVehicles,
         filters: buildFilterSummary(statusFilter, ownershipFilter, locationFilter, search, locationOptions),
       })
       setFeedback('Exportacao em XLSX iniciada com sucesso.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar os veiculos em XLSX.'))
+      setError(getApiErrorMessage(err, 'Não foi possível exportar os veículos em XLSX.'))
     }
   }
 
   async function handlePreviewHistoryPdf() {
     if (!selectedVehicle || selectedHistory.length === 0) {
-      setFeedback('Selecione um veiculo com historico carregado para previsualizar o PDF.')
+      setFeedback('Selecione um veículo com historico carregado para previsualizar o PDF.')
       return
     }
 
     const historyColumns = [
-      { header: 'Veiculo', value: () => selectedVehicle.plate },
-      { header: 'Orgao', value: (item) => item.organization_name || 'Legado' },
+      { header: 'Veículo', value: () => selectedVehicle.plate },
+      { header: 'Órgão', value: (item) => item.organization_name || 'Legado' },
       { header: 'Departamento', value: (item) => item.department_name || item.department || 'Sem departamento' },
       { header: 'Lotacao', value: (item) => item.allocation_name || item.display_name || 'Sem lotacao' },
       { header: 'Local completo', value: (item) => item.display_name || item.department },
@@ -557,27 +557,27 @@ export default function VehiclesPage() {
       await previewRowsToPdf({
         title: `Frota PMTF - Historico ${selectedVehicle.plate}`,
         fileName: `frota-pmtf-historico-${selectedVehicle.plate.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-        subtitle: `Historico de lotacao do veiculo ${selectedVehicle.plate} | ${selectedVehicle.brand} ${selectedVehicle.model}.`,
+        subtitle: `Historico de lotacao do veículo ${selectedVehicle.plate} | ${selectedVehicle.brand} ${selectedVehicle.model}.`,
         columns: historyColumns,
         rows: selectedHistory,
         summaryMetrics: [
-          { label: 'Veiculo', value: selectedVehicle.plate, tone: 'blue' },
+          { label: 'Veículo', value: selectedVehicle.plate, tone: 'blue' },
           { label: 'Movimentacoes', value: selectedHistory.length, tone: 'blue' },
           { label: 'Tipo', value: getOwnershipLabel(selectedVehicle.ownership_type), tone: 'blue' },
           { label: 'Status', value: getStatusLabel(selectedVehicle.status), tone: selectedVehicle.status === 'ATIVO' ? 'green' : selectedVehicle.status === 'MANUTENCAO' ? 'amber' : 'red' },
         ],
         filters: [
-          { label: 'Veiculo', value: selectedVehicle.plate },
+          { label: 'Veículo', value: selectedVehicle.plate },
           { label: 'Tipo', value: getOwnershipLabel(selectedVehicle.ownership_type) },
           { label: 'Status', value: getStatusLabel(selectedVehicle.status) },
         ],
         referenceLabel: selectedVehicle.updated_at ? `Referencia dos dados: atualizado ate ${formatDate(selectedVehicle.updated_at)}` : 'Historico consolidado da frota municipal',
         responsibleSector: 'Secretaria Municipal de Administracao | Departamento de Gestao da Frota',
-        generatedBy: user?.name || user?.email || 'Usuario autenticado',
+        generatedBy: user?.name || user?.email || 'Usuário autenticado',
       })
       setFeedback(`Pre-visualizacao do historico de ${selectedVehicle.plate} aberta em nova guia.`)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o PDF do historico do veiculo.'))
+      setError(getApiErrorMessage(err, 'Não foi possível gerar o PDF do historico do veículo.'))
     }
   }
 
@@ -593,7 +593,7 @@ export default function VehiclesPage() {
     .filter(Boolean)
     .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0]
   const vehicleReportMetrics = [
-    { label: 'Total de veiculos', value: filteredVehicles.length, tone: 'blue' },
+    { label: 'Total de veículos', value: filteredVehicles.length, tone: 'blue' },
     { label: 'Ativos', value: visibleActiveVehicles, tone: 'green' },
     { label: 'Em manutencao', value: visibleMaintenanceVehicles, tone: 'amber' },
     { label: 'Inativos', value: visibleInactiveVehicles, tone: 'red' },
@@ -723,10 +723,10 @@ export default function VehiclesPage() {
                 paginatedVehicles.map((vehicle) => (
                   <tr key={vehicle.id} className={selectedVehicle?.id === vehicle.id ? 'is-focused-row' : ''}>
                     <td data-label="Placa"><strong>{vehicle.plate}</strong></td>
-                    <td data-label="Chassi">{vehicle.chassis_number || 'Nao informado'}</td>
+                    <td data-label="Chassi">{vehicle.chassis_number || 'Não informado'}</td>
                     <td data-label="Marca">{vehicle.brand}</td>
                     <td data-label="Modelo">{vehicle.model}</td>
-                    <td data-label="Tipo veiculo">{getVehicleTypeLabel(vehicle.vehicle_type)}</td>
+                    <td data-label="Tipo veículo">{getVehicleTypeLabel(vehicle.vehicle_type)}</td>
                     <td data-label="Propriedade"><BadgeOwnership value={vehicle.ownership_type} /></td>
                     <td data-label="Status"><span className={`status-badge status-${vehicle.status}`}>{vehicle.status}</span></td>
                     <td data-label="Lotacao atual">{buildVehicleLocationLabel(vehicle)}</td>
@@ -757,11 +757,11 @@ export default function VehiclesPage() {
           <div>
             <h3 className="section-title">Historico de lotacao</h3>
             <p className="section-copy">
-              {selectedVehicle ? `Linha do tempo de ${selectedVehicle.plate}` : 'Selecione um veiculo na tabela para visualizar a cronologia de lotacao.'}
+              {selectedVehicle ? `Linha do tempo de ${selectedVehicle.plate}` : 'Selecione um veículo na tabela para visualizar a cronologia de lotacao.'}
             </p>
             {selectedVehicle ? (
               <p className="section-copy" style={{ marginTop: 10 }}>
-                Chassi: {selectedVehicle.chassis_number || 'Nao informado'} | Condutor atual: {selectedVehicle.current_driver_name || 'Sem condutor ativo'}
+                Chassi: {selectedVehicle.chassis_number || 'Não informado'} | Condutor atual: {selectedVehicle.current_driver_name || 'Sem condutor ativo'}
               </p>
             ) : null}
           </div>
@@ -789,7 +789,7 @@ export default function VehiclesPage() {
                 <strong>{item.display_name || item.department}</strong>
                 <div className="muted">Orgao: {item.organization_name || 'Legado'}</div>
                 <div className="muted">Departamento: {item.department_name || item.department || 'Sem departamento'}</div>
-                <div className="muted">Lotacao: {item.allocation_name || 'Nao estruturada'}</div>
+                <div className="muted">Lotacao: {item.allocation_name || 'Não estruturada'}</div>
                 <div className="muted">Inicio: {formatDate(item.start_date)}</div>
                 <div className="muted">Fim: {item.end_date ? formatDate(item.end_date) : 'Atual'}</div>
               </li>
@@ -802,8 +802,8 @@ export default function VehiclesPage() {
 
       <Modal
         open={isModalOpen}
-        title={editingId ? 'Editar veiculo' : 'Novo veiculo'}
-        description="Preencha os dados do veiculo e vincule a lotacao por orgao, departamento e lotacao cadastrados."
+        title={editingId ? 'Editar veículo' : 'Novo veículo'}
+        description="Preencha os dados do veículo e vincule a lotacao por órgão, departamento e lotacao cadastrados."
         onClose={closeVehicleModal}
       >
         <form onSubmit={handleSubmit} className="stack">
@@ -852,15 +852,15 @@ export default function VehiclesPage() {
             </div>
           </AccordionSection>
 
-          <AccordionSection title="Lotacao" subtitle="Orgao, departamento e lotacao">
+          <AccordionSection title="Lotacao" subtitle="Órgão, departamento e lotacao">
             <div className="form-grid modal-form-grid">
               <div className="form-field">
                 <label>Orgao</label>
-                <SearchableSelect value={form.organization_id} onChange={(value) => setForm({ ...form, organization_id: value, department_id: '', allocation_id: '' })} options={organizationOptions} placeholder={catalogLoading ? 'Carregando orgaos...' : 'Selecione o orgao'} searchPlaceholder="Buscar orgao" disabled={catalogLoading || organizationOptions.length === 0} />
+                <SearchableSelect value={form.organization_id} onChange={(value) => setForm({ ...form, organization_id: value, department_id: '', allocation_id: '' })} options={organizationOptions} placeholder={catalogLoading ? 'Carregando órgãos...' : 'Selecione o órgão'} searchPlaceholder="Buscar órgão" disabled={catalogLoading || organizationOptions.length === 0} />
               </div>
               <div className="form-field">
                 <label>Departamento</label>
-                <SearchableSelect value={form.department_id} onChange={(value) => setForm({ ...form, department_id: value, allocation_id: '' })} options={departmentOptions} placeholder={!form.organization_id ? 'Selecione primeiro o orgao' : 'Selecione o departamento'} searchPlaceholder="Buscar departamento" disabled={!form.organization_id || departmentOptions.length === 0} />
+                <SearchableSelect value={form.department_id} onChange={(value) => setForm({ ...form, department_id: value, allocation_id: '' })} options={departmentOptions} placeholder={!form.organization_id ? 'Selecione primeiro o órgão' : 'Selecione o departamento'} searchPlaceholder="Buscar departamento" disabled={!form.organization_id || departmentOptions.length === 0} />
               </div>
               <div className="form-field modal-field-span">
                 <label>Lotacao</label>
@@ -872,7 +872,7 @@ export default function VehiclesPage() {
 
           <div className="actions-inline modal-actions">
             <button className="app-button" type="submit" disabled={submitting || catalogLoading}>
-              {submitting ? 'Salvando...' : editingId ? 'Atualizar veiculo' : 'Cadastrar veiculo'}
+              {submitting ? 'Salvando...' : editingId ? 'Atualizar veículo' : 'Cadastrar veículo'}
             </button>
             <button className="ghost-button" type="button" onClick={closeVehicleModal}>Cancelar</button>
           </div>

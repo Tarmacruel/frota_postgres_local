@@ -54,7 +54,7 @@ export default function MaintenancePage() {
   const focusRecordId = searchParams.get('focus')
 
   const exportColumns = [
-    { header: 'Veiculo', value: (record) => record.vehicle_plate },
+    { header: 'Veículo', value: (record) => record.vehicle_plate },
     { header: 'Inicio', value: (record) => formatDate(record.start_date) },
     { header: 'Conclusao', value: (record) => formatDate(record.end_date) },
     { header: 'Servico', value: (record) => record.service_description },
@@ -82,7 +82,7 @@ export default function MaintenancePage() {
       const { data } = await maintenanceAPI.list(params)
       setRecords(data)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar as manutencoes.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar as manutencoes.'))
     } finally {
       setLoading(false)
     }
@@ -93,7 +93,7 @@ export default function MaintenancePage() {
       try {
         await loadVehicles()
       } catch (err) {
-        setError(getApiErrorMessage(err, 'Nao foi possivel carregar a frota para o formulario.'))
+        setError(getApiErrorMessage(err, 'Não foi possível carregar a frota para o formulario.'))
       }
     }
     loadPage()
@@ -166,7 +166,7 @@ export default function MaintenancePage() {
       setFeedback('Manutencao removida com sucesso.')
       await loadRecords()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel remover a manutencao.'))
+      setError(getApiErrorMessage(err, 'Não foi possível remover a manutencao.'))
     }
   }
 
@@ -177,7 +177,7 @@ export default function MaintenancePage() {
 
   async function handleExportPdf() {
     if (filteredRecords.length === 0) {
-      setFeedback('Nao ha manutencoes filtradas para previsualizar.')
+      setFeedback('Não ha manutencoes filtradas para previsualizar.')
       return
     }
 
@@ -192,7 +192,7 @@ export default function MaintenancePage() {
         rows: filteredRecords,
         filters: [
           { label: 'Status', value: statusOptions.find((option) => option.value === statusFilter)?.label || 'Todas' },
-          ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+          ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
           ...(startFilter ? [{ label: 'Inicio a partir de', value: formatDate(new Date(startFilter).toISOString()) }] : []),
           ...(endFilter ? [{ label: 'Fim ate', value: formatDate(new Date(endFilter).toISOString()) }] : []),
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
@@ -200,13 +200,13 @@ export default function MaintenancePage() {
       })
       setFeedback('Pre-visualizacao do PDF de manutencoes aberta em nova guia.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o PDF de manutencoes.'))
+      setError(getApiErrorMessage(err, 'Não foi possível gerar o PDF de manutencoes.'))
     }
   }
 
   async function handleExportXlsx() {
     if (filteredRecords.length === 0) {
-      setFeedback('Nao ha manutencoes filtradas para exportar.')
+      setFeedback('Não ha manutencoes filtradas para exportar.')
       return
     }
 
@@ -220,13 +220,13 @@ export default function MaintenancePage() {
         rows: filteredRecords,
         filters: [
           { label: 'Status', value: statusOptions.find((option) => option.value === statusFilter)?.label || 'Todas' },
-          ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+          ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
       setFeedback('Exportacao de manutencoes em XLSX iniciada com sucesso.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar as manutencoes em XLSX.'))
+      setError(getApiErrorMessage(err, 'Não foi possível exportar as manutencoes em XLSX.'))
     }
   }
 
@@ -275,9 +275,9 @@ export default function MaintenancePage() {
             <SearchableSelect
               value={vehicleFilter}
               onChange={setVehicleFilter}
-              options={[{ value: '', label: 'Todos os veiculos' }, ...vehicles.map(buildVehicleOption)]}
-              placeholder="Filtrar veiculo"
-              searchPlaceholder="Buscar veiculo por placa, modelo ou chassi"
+              options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(buildVehicleOption)]}
+              placeholder="Filtrar veículo"
+              searchPlaceholder="Buscar veículo por placa, modelo ou chassi"
             />
             <input type="datetime-local" className="app-input" value={startFilter} onChange={(event) => setStartFilter(event.target.value)} />
             <input type="datetime-local" className="app-input" value={endFilter} onChange={(event) => setEndFilter(event.target.value)} />
@@ -342,7 +342,7 @@ export default function MaintenancePage() {
               ) : (
                 paginatedRecords.map((record) => (
                   <tr key={record.id} className={focusedRecord?.id === record.id ? 'is-focused-row' : ''}>
-                    <td data-label="Veiculo"><strong>{record.vehicle_plate}</strong></td>
+                    <td data-label="Veículo"><strong>{record.vehicle_plate}</strong></td>
                     <td data-label="Inicio">{formatDate(record.start_date)}</td>
                     <td data-label="Conclusao">{formatDate(record.end_date)}</td>
                     <td data-label="Servico">

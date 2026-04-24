@@ -20,7 +20,7 @@ class MaintenanceCreate(BaseModel):
     def validate_description(cls, value: str) -> str:
         normalized = value.strip()
         if not normalized:
-            raise ValueError("Descricao nao pode ser vazia")
+            raise ValueError("Descricao não pode ser vazia")
         return normalized
 
     @field_validator("parts_replaced")
@@ -34,7 +34,7 @@ class MaintenanceCreate(BaseModel):
     @model_validator(mode="after")
     def validate_dates(self) -> "MaintenanceCreate":
         if self.end_date and self.end_date < self.start_date:
-            raise ValueError("Data final nao pode ser anterior a data inicial")
+            raise ValueError("Data final não pode ser anterior a data inicial")
         return self
 
 
@@ -51,7 +51,7 @@ class MaintenanceUpdate(BaseModel):
             return None
         normalized = value.strip()
         if not normalized:
-            raise ValueError("Descricao nao pode ser vazia")
+            raise ValueError("Descricao não pode ser vazia")
         return normalized
 
     @field_validator("parts_replaced")

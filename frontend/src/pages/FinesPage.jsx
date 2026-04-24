@@ -64,7 +64,7 @@ export default function FinesPage() {
   const [form, setForm] = useState(initialForm)
   const [submitting, setSubmitting] = useState(false)
   const exportColumns = [
-    { header: 'Veiculo', value: (item) => item.vehicle_plate },
+    { header: 'Veículo', value: (item) => item.vehicle_plate },
     { header: 'Auto', value: (item) => item.ticket_number },
     { header: 'Condutor', value: (item) => item.driver_name || '-' },
     { header: 'Data infracao', value: (item) => formatDate(item.infraction_date) },
@@ -103,7 +103,7 @@ export default function FinesPage() {
       setRecords(data.data)
       setPagination(data.pagination)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar as multas.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar as multas.'))
     } finally {
       setLoading(false)
     }
@@ -139,7 +139,7 @@ export default function FinesPage() {
     try {
       setSubmitting(true)
       if (!form.vehicle_id) {
-        setError('Selecione um veiculo para registrar a multa.')
+        setError('Selecione um veículo para registrar a multa.')
         return
       }
       const payload = { ...form, driver_id: form.driver_id || null, due_date: form.due_date || null, location: form.location || null, amount: Number(form.amount) }
@@ -154,7 +154,7 @@ export default function FinesPage() {
       setForm(initialForm)
       await loadFines(editingRecord ? pagination.page : 1)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar a multa.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar a multa.'))
     } finally {
       setSubmitting(false)
     }
@@ -170,7 +170,7 @@ export default function FinesPage() {
       rows: records,
       filters: [
         { label: 'Status', value: statusFilter },
-        ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+        ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
         ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
       ],
     })
@@ -185,7 +185,7 @@ export default function FinesPage() {
       rows: records,
       filters: [
         { label: 'Status', value: statusFilter },
-        ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+        ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
       ],
     })
   }
@@ -210,9 +210,9 @@ export default function FinesPage() {
           <SearchableSelect
             value={vehicleFilter}
             onChange={setVehicleFilter}
-            options={[{ value: '', label: 'Todos os veiculos' }, ...vehicles.map(vehicleOption)]}
-            placeholder="Filtrar veiculo"
-            searchPlaceholder="Buscar veiculo"
+            options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(vehicleOption)]}
+            placeholder="Filtrar veículo"
+            searchPlaceholder="Buscar veículo"
           />
           <select className="app-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>{statusOptions.map((o) => <option key={o} value={o}>{o}</option>)}</select>
         </div>
@@ -253,8 +253,8 @@ export default function FinesPage() {
               value={form.vehicle_id}
               onChange={handleVehicleChange}
               options={vehicles.map(vehicleOption)}
-              placeholder="Selecionar veiculo"
-              searchPlaceholder="Buscar veiculo por placa, marca ou modelo"
+              placeholder="Selecionar veículo"
+              searchPlaceholder="Buscar veículo por placa, marca ou modelo"
             />
           </div>
           <div className="form-field">
@@ -262,7 +262,7 @@ export default function FinesPage() {
             <SearchableSelect
               value={form.driver_id}
               onChange={(value) => setForm({ ...form, driver_id: value })}
-              options={[{ value: '', label: 'Nao informado' }, ...drivers.map(driverOption)]}
+              options={[{ value: '', label: 'Não informado' }, ...drivers.map(driverOption)]}
               placeholder="Selecionar condutor"
               searchPlaceholder="Buscar condutor por nome ou documento"
             />

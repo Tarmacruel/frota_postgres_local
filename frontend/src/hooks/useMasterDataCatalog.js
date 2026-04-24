@@ -42,7 +42,7 @@ export function useMasterDataCatalog() {
       const { data } = await masterDataAPI.getCatalog()
       setOrganizations(data.organizations || [])
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar os cadastros de lotacao.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar os cadastros de lotacao.'))
     } finally {
       setLoading(false)
     }

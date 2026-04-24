@@ -33,7 +33,7 @@ class MaintenanceService:
     async def get(self, record_id: UUID) -> dict:
         record = await self.records.get_by_id(record_id)
         if not record:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de manutencao nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de manutencao não encontrado")
         return self._serialize(record)
 
     async def list_paginated(
@@ -91,14 +91,14 @@ class MaintenanceService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel registrar a manutencao") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível registrar a manutencao") from exc
 
         return await self.get(record.id)
 
     async def update(self, record_id: UUID, data: MaintenanceUpdate, current_user: User) -> dict:
         record = await self.records.get_by_id(record_id)
         if not record:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de manutencao nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de manutencao não encontrado")
 
         payload = data.model_dump(exclude_unset=True)
         previous_values = {
@@ -109,7 +109,7 @@ class MaintenanceService:
         }
         next_end_date = payload["end_date"] if "end_date" in payload else record.end_date
         if next_end_date and next_end_date < record.start_date:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data final nao pode ser anterior a data inicial")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data final não pode ser anterior a data inicial")
 
         for field, value in payload.items():
             setattr(record, field, value)
@@ -135,14 +135,14 @@ class MaintenanceService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar a manutencao") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar a manutencao") from exc
 
         return await self.get(record.id)
 
     async def delete(self, record_id: UUID, current_user: User) -> None:
         record = await self.records.get_by_id(record_id)
         if not record:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de manutencao nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de manutencao não encontrado")
 
         try:
             await self.audit.record(
@@ -162,12 +162,12 @@ class MaintenanceService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel remover a manutencao") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível remover a manutencao") from exc
 
     async def _ensure_vehicle_exists(self, vehicle_id: UUID) -> None:
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
     def _serialize(self, record: MaintenanceRecord) -> dict:
         return {

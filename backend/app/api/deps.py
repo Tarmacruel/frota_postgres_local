@@ -52,7 +52,7 @@ async def require_fuel_station_user(current_user: User = Depends(get_current_use
     if current_user.role not in {UserRole.ADMIN, UserRole.POSTO}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso restrito a administradores e usuarios de posto",
+            detail="Acesso restrito a administradores e usuários de posto",
         )
     return current_user
 

@@ -66,7 +66,7 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
       }
       onClose?.()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o sinistro.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar o sinistro.'))
     } finally {
       setSubmitting(false)
     }
@@ -82,7 +82,7 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
           value={form.vehicle_id}
           onChange={(value) => setForm({ ...form, vehicle_id: value })}
           options={vehicles.map(vehicleOption)}
-          placeholder="Selecione o veiculo envolvido"
+          placeholder="Selecione o veículo envolvido"
           searchPlaceholder="Buscar por placa, modelo ou chassi"
         />
       </div>

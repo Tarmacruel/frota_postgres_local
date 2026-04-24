@@ -52,17 +52,17 @@ class FuelSupplyOrderService:
 
         vehicle = await self.vehicles.get_by_id(data.vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
         if data.driver_id:
             driver = await self.drivers.get_by_id(data.driver_id)
             if not driver:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
 
         if data.organization_id:
             organization = await self.master_data.get_organization(data.organization_id)
             if not organization:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Orgao/posto nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Órgão/posto não encontrado")
 
         order = FuelSupplyOrder(
             vehicle_id=data.vehicle_id,
@@ -90,20 +90,20 @@ class FuelSupplyOrderService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel criar a ordem de abastecimento") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível criar a ordem de abastecimento") from exc
 
         return await self.get_order(order.id)
 
     async def get_order(self, order_id: UUID) -> dict:
         order = await self.orders.get_by_id(order_id)
         if not order:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento nao encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento não encontrada")
         return self._serialize_order(order)
 
     async def confirm_order(self, order_id: UUID, data: FuelSupplyOrderConfirm, receipt: UploadFile, current_user: User) -> dict:
         order = await self.orders.get_by_id(order_id)
         if not order:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento nao encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento não encontrada")
 
         if order.status == FuelSupplyOrderStatus.COMPLETED:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem ja confirmada")
@@ -130,12 +130,12 @@ class FuelSupplyOrderService:
 
         user_station_id = getattr(current_user, "organization_id", None)
         if order.organization_id and user_station_id and user_station_id != order.organization_id:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuario nao pertence ao posto da ordem")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuário não pertence ao posto da ordem")
 
         if data.driver_id:
             driver = await self.drivers.get_by_id(data.driver_id)
             if not driver:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
 
         receipt_payload = await self._read_and_validate_receipt(receipt)
         supplied_at = data.supplied_at or now
@@ -146,7 +146,7 @@ class FuelSupplyOrderService:
         if previous_supply:
             km_delta = data.odometer_km - previous_supply.odometer_km
             if km_delta <= 0:
-                alerts.append("Odometro menor ou igual ao ultimo abastecimento. Consumo nao pode ser calculado de forma confiavel.")
+                alerts.append("Odometro menor ou igual ao ultimo abastecimento. Consumo não pode ser calculado de forma confiavel.")
             else:
                 consumption_km_l = km_delta / data.liters
 
@@ -205,18 +205,18 @@ class FuelSupplyOrderService:
         except IntegrityError as exc:
             await self.db.rollback()
             self._cleanup_file(stored_receipt_path)
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel confirmar a ordem") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível confirmar a ordem") from exc
         except OSError as exc:
             await self.db.rollback()
             self._cleanup_file(stored_receipt_path)
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Nao foi possivel armazenar o comprovante") from exc
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Não foi possível armazenar o comprovante") from exc
 
         return await self.get_order(order.id)
 
     async def cancel_order(self, order_id: UUID, payload: FuelSupplyOrderCancel, current_user: User) -> dict:
         order = await self.orders.get_by_id(order_id)
         if not order:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento nao encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento não encontrada")
         if order.status == FuelSupplyOrderStatus.COMPLETED:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem ja confirmada")
         if order.status == FuelSupplyOrderStatus.CANCELLED:

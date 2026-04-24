@@ -25,7 +25,7 @@ class FuelStationService:
     async def get(self, fuel_station_id: UUID) -> FuelStation:
         station = await self.repo.get(fuel_station_id)
         if not station:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posto nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posto não encontrado")
         return station
 
     async def create(self, data: FuelStationCreate, actor: User) -> FuelStation:
@@ -68,7 +68,7 @@ class FuelStationService:
             return station
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar o posto") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar o posto") from exc
 
     async def delete(self, fuel_station_id: UUID, actor: User) -> None:
         station = await self.get(fuel_station_id)
@@ -85,7 +85,7 @@ class FuelStationService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel remover o posto") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível remover o posto") from exc
 
     async def list_user_links(self, fuel_station_id: UUID, active_only: bool | None = None) -> list[dict]:
         await self.get(fuel_station_id)
@@ -96,7 +96,7 @@ class FuelStationService:
         station = await self.get(fuel_station_id)
         user = await self.users.get_by_id(data.user_id)
         if not user:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuario nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
 
         link = FuelStationUser(user_id=data.user_id, fuel_station_id=fuel_station_id, active=data.active)
         try:
@@ -118,7 +118,7 @@ class FuelStationService:
     async def update_user_link(self, fuel_station_id: UUID, link_id: UUID, data: FuelStationUserUpdate, actor: User) -> dict:
         link = await self.repo.get_user_link(fuel_station_id, link_id)
         if not link:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vinculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vinculo não encontrado")
         before = {"active": link.active}
         link.active = data.active
         await self.audit.record(
@@ -137,7 +137,7 @@ class FuelStationService:
     async def delete_user_link(self, fuel_station_id: UUID, link_id: UUID, actor: User) -> None:
         link = await self.repo.get_user_link(fuel_station_id, link_id)
         if not link:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vinculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Vinculo não encontrado")
         await self.audit.record(
             actor=actor,
             action="DELETE",

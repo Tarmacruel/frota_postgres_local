@@ -54,7 +54,7 @@ export default function Layout() {
       {
         title: 'Operacional',
         items: [
-          { to: '/vehicles', label: 'Veiculos', description: 'Cadastro, consulta e historico', icon: 'vehicles' },
+          { to: '/vehicles', label: 'Veículos', description: 'Cadastro, consulta e historico', icon: 'vehicles' },
           { to: '/posses', label: 'Posses', description: 'Posse, alocacao e responsaveis', icon: 'drivers' },
           { to: '/condutores', label: 'Condutores', description: 'Base reutilizavel de motoristas', icon: 'users' },
           { to: '/manutencoes', label: 'Manutencoes', description: 'Custos, servicos e oficina', icon: 'maintenance' },
@@ -68,13 +68,13 @@ export default function Layout() {
     if (isAdmin || canManageCadastros) {
       const managementItems = []
       if (canManageCadastros) {
-        managementItems.push({ to: '/cadastros', label: 'Cadastros', description: 'Orgaos, departamentos e lotacoes', icon: 'catalog' })
+        managementItems.push({ to: '/cadastros', label: 'Cadastros', description: 'Órgãos, departamentos e lotacoes', icon: 'catalog' })
       }
       if (isAdmin) {
         managementItems.push(
           { to: '/postos', label: 'Postos', description: 'Cadastro de postos e vinculos', icon: 'catalog' },
           { to: '/analytics', label: 'Analytics', description: 'BI operacional da frota', icon: 'dashboard' },
-          { to: '/users', label: 'Usuarios', description: 'Perfis e niveis de acesso', icon: 'users' },
+          { to: '/users', label: 'Usuários', description: 'Perfis e niveis de acesso', icon: 'users' },
           { to: '/auditoria', label: 'Auditoria', description: 'Rastreabilidade administrativa', icon: 'audit' },
         )
       }
@@ -186,7 +186,7 @@ export default function Layout() {
     setPasswordFeedback('')
     try {
       if (passwordForm.new_password !== passwordForm.confirm_password) {
-        setPasswordFeedback('A confirmacao da nova senha nao confere.')
+        setPasswordFeedback('A confirmacao da nova senha não confere.')
         return
       }
       await api.post('/auth/change-password', {
@@ -196,7 +196,7 @@ export default function Layout() {
       setPasswordFeedback('Senha alterada com sucesso.')
       setPasswordForm({ current_password: '', new_password: '', confirm_password: '' })
     } catch {
-      setPasswordFeedback('Nao foi possivel alterar a senha. Confira a senha atual.')
+      setPasswordFeedback('Não foi possível alterar a senha. Confira a senha atual.')
     }
   }
 

@@ -28,14 +28,14 @@ function isSecureCaptureContext() {
 }
 
 function getEvidenceErrorMessage(error) {
-  if (!error) return 'Nao foi possivel capturar a evidencia.'
+  if (!error) return 'Não foi possível capturar a evidencia.'
 
   if (error.code === 1 || error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
     return 'Permita camera e localizacao para registrar a posse.'
   }
 
   if (error.code === 2 || error.name === 'PositionUnavailableError') {
-    return 'Nao foi possivel obter a localizacao atual do dispositivo.'
+    return 'Não foi possível obter a localizacao atual do dispositivo.'
   }
 
   if (error.code === 3 || error.name === 'TimeoutError') {
@@ -50,7 +50,7 @@ function getEvidenceErrorMessage(error) {
     return 'A camera esta ocupada por outro aplicativo. Feche-o e tente novamente.'
   }
 
-  return 'Nao foi possivel capturar foto e localizacao da posse.'
+  return 'Não foi possível capturar foto e localizacao da posse.'
 }
 
 function getCurrentPosition(options) {
@@ -67,7 +67,7 @@ function canvasToJpegBlob(canvas) {
           resolve(blob)
           return
         }
-        reject(new Error('Nao foi possivel gerar a foto da posse.'))
+        reject(new Error('Não foi possível gerar a foto da posse.'))
       },
       'image/jpeg',
       0.82,
@@ -223,7 +223,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
     }
 
     if (!navigator.geolocation || !navigator.mediaDevices?.getUserMedia) {
-      setCaptureError('Este dispositivo nao oferece suporte completo a camera e localizacao.')
+      setCaptureError('Este dispositivo não oferece suporte completo a camera e localizacao.')
       return
     }
 
@@ -281,7 +281,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       const context = canvas.getContext('2d')
 
       if (!context) {
-        throw new Error('Nao foi possivel preparar a foto capturada.')
+        throw new Error('Não foi possível preparar a foto capturada.')
       }
 
       context.drawImage(video, 0, 0, canvas.width, canvas.height)
@@ -338,7 +338,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
     event.preventDefault()
 
     if (!form.vehicle_id) {
-      setError('Selecione um veiculo para continuar.')
+      setError('Selecione um veículo para continuar.')
       return
     }
 
@@ -385,7 +385,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       onSuccess?.('Posse registrada com sucesso. Se havia posse ativa, ela foi encerrada automaticamente.')
       onClose?.()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel registrar a posse.'))
+      setError(getApiErrorMessage(err, 'Não foi possível registrar a posse.'))
     } finally {
       setSubmitting(false)
     }
@@ -408,9 +408,9 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
           value={form.vehicle_id}
           onChange={(value) => setForm({ ...form, vehicle_id: value })}
           options={vehicles.map(buildVehicleOption)}
-          placeholder="Selecione o veiculo"
-          searchPlaceholder="Buscar veiculo por placa, modelo, chassi ou lotacao"
-          emptyLabel="Nenhum veiculo disponivel."
+          placeholder="Selecione o veículo"
+          searchPlaceholder="Buscar veículo por placa, modelo, chassi ou lotacao"
+          emptyLabel="Nenhum veículo disponivel."
         />
       </div>
 
@@ -528,7 +528,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
           {draftPreviewUrl ? (
             <div className="evidence-review-grid">
               <div className="evidence-image-card">
-                <img src={draftPreviewUrl} alt="Foto capturada do veiculo" className="evidence-image" />
+                <img src={draftPreviewUrl} alt="Foto capturada do veículo" className="evidence-image" />
               </div>
               <div className="evidence-meta-card">
                 <strong>Revise a evidencia capturada</strong>

@@ -29,7 +29,7 @@ class DriverService:
     async def get(self, driver_id: UUID) -> dict:
         driver = await self.drivers.get_by_id(driver_id)
         if not driver:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
         return self._serialize(driver)
 
     async def create(self, data: DriverCreate, current_user: User) -> dict:
@@ -55,13 +55,13 @@ class DriverService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel cadastrar o condutor") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível cadastrar o condutor") from exc
         return self._serialize(driver)
 
     async def update(self, driver_id: UUID, data: DriverUpdate, current_user: User) -> dict:
         driver = await self.drivers.get_by_id(driver_id)
         if not driver:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
 
         payload = data.model_dump(exclude_unset=True)
         if "documento" in payload and payload["documento"] != driver.documento:
@@ -84,13 +84,13 @@ class DriverService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar o condutor") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar o condutor") from exc
         return self._serialize(driver)
 
     async def deactivate(self, driver_id: UUID, current_user: User) -> None:
         driver = await self.drivers.get_by_id(driver_id)
         if not driver:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
         if not driver.ativo:
             return
 
@@ -113,7 +113,7 @@ class DriverService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel inativar o condutor") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível inativar o condutor") from exc
 
     async def _ensure_unique_document(self, documento: str, *, exclude_id: UUID | None = None) -> None:
         existing = await self.drivers.get_active_by_document(documento, exclude_id=exclude_id)

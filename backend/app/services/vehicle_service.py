@@ -63,7 +63,7 @@ class VehicleService:
     async def get_history(self, vehicle_id: UUID):
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
         history = await self.vehicles.list_history(vehicle_id)
         return [self._serialize_history(item) for item in history]
 
@@ -116,7 +116,7 @@ class VehicleService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel criar o veiculo") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível criar o veículo") from exc
 
         active = await self.vehicles.get_active_history(vehicle.id)
         return self._serialize_vehicle(vehicle, active, None)
@@ -124,7 +124,7 @@ class VehicleService:
     async def update(self, vehicle_id: UUID, data: VehicleUpdate, current_user: User) -> dict:
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
         previous_active = await self.vehicles.get_active_history(vehicle.id)
         previous_values = {
@@ -206,7 +206,7 @@ class VehicleService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar o veiculo") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar o veículo") from exc
 
         active = await self.vehicles.get_active_history(vehicle.id)
         possession = await self.vehicles.get_active_possession(vehicle.id)
@@ -215,7 +215,7 @@ class VehicleService:
     async def delete(self, vehicle_id: UUID, current_user: User) -> None:
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
         active = await self.vehicles.get_active_history(vehicle.id)
         possession = await self.vehicles.get_active_possession(vehicle.id)
@@ -242,7 +242,7 @@ class VehicleService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel remover o veiculo") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível remover o veículo") from exc
 
     async def _get_by_chassis(self, chassis_number: str | None) -> Vehicle | None:
         if not chassis_number:
@@ -255,7 +255,7 @@ class VehicleService:
     async def _require_allocation(self, allocation_id: UUID) -> Allocation:
         allocation = await self.master_data.get_allocation(allocation_id)
         if not allocation:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lotacao nao encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lotacao não encontrada")
         return allocation
 
     def _normalize_chassis(self, chassis_number: str | None) -> str | None:

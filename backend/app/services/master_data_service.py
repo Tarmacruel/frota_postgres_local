@@ -53,12 +53,12 @@ class MasterDataService:
             return organization
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Orgao ja cadastrado") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Órgão ja cadastrado") from exc
 
     async def update_organization(self, organization_id: UUID, data: OrganizationUpdate, current_user: User) -> Organization:
         organization = await self.repo.get_organization(organization_id)
         if not organization:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Orgao nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Órgão não encontrado")
 
         previous = organization.name
         organization.name = data.name.strip()
@@ -78,12 +78,12 @@ class MasterDataService:
             return organization
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar o orgao") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar o órgão") from exc
 
     async def delete_organization(self, organization_id: UUID, current_user: User) -> None:
         organization = await self.repo.get_organization(organization_id)
         if not organization:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Orgao nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Órgão não encontrado")
         try:
             await self.audit.record(
                 actor=current_user,
@@ -97,12 +97,12 @@ class MasterDataService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel remover o orgao") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível remover o órgão") from exc
 
     async def create_department(self, data: DepartmentCreate, current_user: User) -> Department:
         parent = await self.repo.get_organization(data.organization_id)
         if not parent:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Orgao nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Órgão não encontrado")
 
         department = Department(organization_id=data.organization_id, name=data.name.strip())
         try:
@@ -119,16 +119,16 @@ class MasterDataService:
             return department
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Departamento ja cadastrado para este orgao") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Departamento ja cadastrado para este órgão") from exc
 
     async def update_department(self, department_id: UUID, data: DepartmentUpdate, current_user: User) -> Department:
         department = await self.repo.get_department(department_id)
         if not department:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Departamento nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Departamento não encontrado")
 
         parent = await self.repo.get_organization(data.organization_id)
         if not parent:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Orgao nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Órgão não encontrado")
 
         before = {"name": department.name, "organization": department.organization_name}
         department.organization_id = data.organization_id
@@ -152,12 +152,12 @@ class MasterDataService:
             return department
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar o departamento") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar o departamento") from exc
 
     async def delete_department(self, department_id: UUID, current_user: User) -> None:
         department = await self.repo.get_department(department_id)
         if not department:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Departamento nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Departamento não encontrado")
         try:
             await self.audit.record(
                 actor=current_user,
@@ -171,12 +171,12 @@ class MasterDataService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel remover o departamento") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível remover o departamento") from exc
 
     async def create_allocation(self, data: AllocationCreate, current_user: User) -> Allocation:
         parent = await self.repo.get_department(data.department_id)
         if not parent:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Departamento nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Departamento não encontrado")
 
         allocation = Allocation(department_id=data.department_id, name=data.name.strip())
         try:
@@ -202,11 +202,11 @@ class MasterDataService:
     async def update_allocation(self, allocation_id: UUID, data: AllocationUpdate, current_user: User) -> Allocation:
         allocation = await self.repo.get_allocation(allocation_id)
         if not allocation:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lotacao nao encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lotacao não encontrada")
 
         parent = await self.repo.get_department(data.department_id)
         if not parent:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Departamento nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Departamento não encontrado")
 
         before = {
             "organization": allocation.organization_name,
@@ -238,12 +238,12 @@ class MasterDataService:
             return allocation
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar a lotacao") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar a lotacao") from exc
 
     async def delete_allocation(self, allocation_id: UUID, current_user: User) -> None:
         allocation = await self.repo.get_allocation(allocation_id)
         if not allocation:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lotacao nao encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lotacao não encontrada")
         try:
             await self.audit.record(
                 actor=current_user,
@@ -263,5 +263,5 @@ class MasterDataService:
             await self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail="Nao foi possivel remover a lotacao porque ela ja esta vinculada a historicos",
+                detail="Não foi possível remover a lotacao porque ela ja esta vinculada a historicos",
             ) from exc

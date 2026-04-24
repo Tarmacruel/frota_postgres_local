@@ -313,7 +313,7 @@ python -m venv .venv
 cd backend
 
 # Criar schema
-alembic revision --autogenerate -m "descricao da mudanca"
+alembic revision --autogenerate -m "descrição da mudança"
 
 # Aplicar
 alembic upgrade heads

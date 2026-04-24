@@ -7,12 +7,12 @@ export default function CategoryFilterBar({ filters, onChange }) {
         <option value={365}>Ultimos 365 dias</option>
       </select>
       <input
-        placeholder="Tipo de veiculo (ex: SEDAN)"
+        placeholder="Tipo de veículo (ex: SEDAN)"
         value={filters.vehicle_type}
         onChange={(e) => onChange('vehicle_type', e.target.value.toUpperCase())}
       />
       <input
-        placeholder="Orgao (informativo)"
+        placeholder="Órgão (informativo)"
         value={filters.organization}
         onChange={(e) => onChange('organization', e.target.value)}
       />
