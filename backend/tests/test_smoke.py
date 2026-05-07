@@ -82,3 +82,11 @@ async def test_openapi_contains_new_routes(client):
     assert "return_term_available" in possession["properties"]
     assert "return_term_url" in possession["properties"]
     assert "document_available" in possession["properties"]
+
+    current_user = schemas["CurrentUserOut"]
+    assert "must_change_password" in current_user["properties"]
+
+    user_out = schemas["UserOut"]
+    assert "must_change_password" in user_out["properties"]
+
+    assert "/api/auth/change-password" in paths

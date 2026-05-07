@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user
+from app.api.deps import get_current_user_ready
 from app.db.session import get_db_session
 from app.schemas.search import SearchResultOut
 from app.services.search_service import SearchService
@@ -10,7 +10,7 @@ from app.services.search_service import SearchService
 router = APIRouter(prefix="/api/search", tags=["Search"])
 
 
-@router.get("", response_model=list[SearchResultOut], dependencies=[Depends(get_current_user)])
+@router.get("", response_model=list[SearchResultOut], dependencies=[Depends(get_current_user_ready)])
 async def global_search(
     q: str = Query(min_length=1, max_length=120),
     limit: int = Query(default=12, ge=1, le=20),

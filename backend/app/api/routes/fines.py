@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user, require_writer
+from app.api.deps import get_current_user_ready, require_writer
 from app.db.session import get_db_session
 from app.models.fine import FineStatus
 from app.schemas.fine import FineCreate, FineListResponse, FineOut, FineUpdate
@@ -12,7 +12,7 @@ from app.services.fine_service import FineService
 router = APIRouter(prefix="/api/fines", tags=["Fines"])
 
 
-@router.get("", response_model=FineListResponse, dependencies=[Depends(get_current_user)])
+@router.get("", response_model=FineListResponse, dependencies=[Depends(get_current_user_ready)])
 async def list_fines(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),
@@ -24,7 +24,7 @@ async def list_fines(
     return await FineService(db).list(page=page, limit=limit, vehicle_id=vehicle_id, status_filter=status_filter, search=search)
 
 
-@router.get("/{fine_id}", response_model=FineOut, dependencies=[Depends(get_current_user)])
+@router.get("/{fine_id}", response_model=FineOut, dependencies=[Depends(get_current_user_ready)])
 async def get_fine(fine_id: UUID, db: AsyncSession = Depends(get_db_session)):
     return await FineService(db).get(fine_id)
 

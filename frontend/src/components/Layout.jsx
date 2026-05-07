@@ -5,7 +5,6 @@ import { useAuth } from '../context/AuthContext'
 import { AppIcon, getInitials } from './AppIcon'
 import SearchOverlay from './SearchOverlay'
 import Modal from './Modal'
-import api from '../api/client'
 import { adminNotificationsAPI } from '../api/adminNotifications'
 
 const THEME_STORAGE_KEY = 'frota-theme'
@@ -17,9 +16,10 @@ function readStorage(key, fallback) {
 }
 
 export default function Layout() {
-  const { user, logout, isAdmin, canManageCadastros, canAccessFuelSupplies, isPosto, roleLabel } = useAuth()
+  const { user, logout, changePassword, mustChangePassword, isAdmin, canManageCadastros, canAccessFuelSupplies, isPosto, roleLabel } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
+  const passwordChangeRequired = Boolean(mustChangePassword)
 
   const [navOpen, setNavOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -113,6 +113,7 @@ export default function Layout() {
 
   useEffect(() => {
     const handleKeyDown = (event) => {
+      if (passwordChangeRequired) return
       const target = event.target
       const tagName = target?.tagName?.toLowerCase()
       const isTypingTarget = tagName === 'input' || tagName === 'textarea' || target?.isContentEditable
@@ -127,11 +128,17 @@ export default function Layout() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [])
+  }, [passwordChangeRequired])
+
+  useEffect(() => {
+    if (!passwordChangeRequired) return
+    setSearchOpen(false)
+    setPasswordModalOpen(true)
+  }, [passwordChangeRequired])
 
 
   useEffect(() => {
-    if (!isAdmin) return
+    if (!isAdmin || passwordChangeRequired) return
 
     let mounted = true
     async function loadUnreadCount() {
@@ -151,10 +158,10 @@ export default function Layout() {
       mounted = false
       window.clearInterval(timer)
     }
-  }, [isAdmin])
+  }, [isAdmin, passwordChangeRequired])
 
   async function openNotificationsCenter() {
-    if (!isAdmin) return
+    if (!isAdmin || passwordChangeRequired) return
     setNotificationsOpen(true)
     try {
       const { data } = await adminNotificationsAPI.list({ limit: 80 })
@@ -189,12 +196,13 @@ export default function Layout() {
         setPasswordFeedback('A confirmação da nova senha não confere.')
         return
       }
-      await api.post('/auth/change-password', {
+      await changePassword({
         current_password: passwordForm.current_password,
         new_password: passwordForm.new_password,
       })
       setPasswordFeedback('Senha alterada com sucesso.')
       setPasswordForm({ current_password: '', new_password: '', confirm_password: '' })
+      setPasswordModalOpen(false)
     } catch {
       setPasswordFeedback('Não foi possível alterar a senha. Confira a senha atual.')
     }
@@ -222,7 +230,7 @@ export default function Layout() {
 
   return (
     <div className={`app-shell${sidebarCompact ? ' sidebar-compact' : ''}`}>
-      <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} onSelect={(result) => navigate(result.route)} />
+      <SearchOverlay open={!passwordChangeRequired && searchOpen} onClose={() => setSearchOpen(false)} onSelect={(result) => navigate(result.route)} />
 
       <button type="button" className={`sidebar-scrim${navOpen ? ' is-visible' : ''}`} aria-label="Fechar navegação" onClick={() => setNavOpen(false)} />
 
@@ -284,7 +292,18 @@ export default function Layout() {
           </div>
 
           <div className="topbar-actions">
-            <button type="button" className="topbar-search-trigger" aria-label="Abrir busca global" onClick={() => setSearchOpen(true)} onFocus={() => setSearchOpen(true)}>
+            <button
+              type="button"
+              className="topbar-search-trigger"
+              aria-label="Abrir busca global"
+              onClick={() => {
+                if (!passwordChangeRequired) setSearchOpen(true)
+              }}
+              onFocus={() => {
+                if (!passwordChangeRequired) setSearchOpen(true)
+              }}
+              disabled={passwordChangeRequired}
+            >
               <span className="topbar-search-copy">
                 <AppIcon name="search" className="app-icon" />
                 <span>Buscar veículo, posse ou manutenção</span>
@@ -293,7 +312,7 @@ export default function Layout() {
             </button>
 
 
-            {isAdmin ? (
+            {isAdmin && !passwordChangeRequired ? (
               <button
                 type="button"
                 className="icon-button theme-button"
@@ -312,7 +331,13 @@ export default function Layout() {
         </header>
 
         <main className="app-main">
-          <Outlet />
+          {passwordChangeRequired ? (
+            <div className="surface-panel">
+              <div className="empty-state">Altere sua senha provisória para continuar usando o sistema.</div>
+            </div>
+          ) : (
+            <Outlet />
+          )}
         </main>
       </div>
 
@@ -348,7 +373,15 @@ export default function Layout() {
         ) : null}
       </Modal>
 
-      <Modal open={passwordModalOpen} title="Alterar senha" description="Defina uma nova senha para seu acesso." onClose={() => setPasswordModalOpen(false)}>
+      <Modal
+        open={passwordModalOpen || passwordChangeRequired}
+        title={passwordChangeRequired ? 'Troca de senha obrigatória' : 'Alterar senha'}
+        description={passwordChangeRequired ? 'Sua senha atual é provisória. Defina uma nova senha para liberar o acesso aos módulos.' : 'Defina uma nova senha para seu acesso.'}
+        onClose={() => {
+          if (!passwordChangeRequired) setPasswordModalOpen(false)
+        }}
+        canClose={!passwordChangeRequired}
+      >
         <form onSubmit={handlePasswordChange} className="stack">
           <input className="app-input" type="password" placeholder="Senha atual" value={passwordForm.current_password} onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })} required />
           <input className="app-input" type="password" placeholder="Nova senha (mínimo 8 caracteres)" value={passwordForm.new_password} onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })} required />
@@ -356,6 +389,7 @@ export default function Layout() {
           {passwordFeedback ? <div className="alert alert-info">{passwordFeedback}</div> : null}
           <div className="actions-inline modal-actions">
             <button className="app-button" type="submit">Salvar senha</button>
+            {passwordChangeRequired ? <button className="ghost-button" type="button" onClick={handleLogout}>Sair</button> : null}
           </div>
         </form>
       </Modal>

@@ -8,7 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user, require_admin, require_writer
+from app.api.deps import get_current_user_ready, require_admin, require_writer
 from app.db.session import get_db_session
 from app.models.user import User
 from app.schemas.possession import (
@@ -176,7 +176,7 @@ async def list_possession(
     vehicle_id: UUID | None = Query(default=None),
     active: bool | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_ready),
 ):
     return await PossessionService(db).list(vehicle_id=vehicle_id, active=active, current_user=current_user)
 
@@ -190,7 +190,7 @@ async def list_possession_paginated(
     active: bool | None = Query(default=None),
     search: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_ready),
 ):
     return await PossessionService(db).list_paginated(
         page=page,
@@ -206,7 +206,7 @@ async def list_possession_paginated(
 @router.get("/active", response_model=list[PossessionOut])
 async def list_active_possession(
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(get_current_user_ready),
 ):
     return await PossessionService(db).list_active(current_user=current_user)
 
@@ -234,7 +234,7 @@ async def create_possession(
 async def get_possession_photo(
     possession_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(get_current_user_ready),
 ) -> FileResponse:
     return await PossessionService(db).get_photo_file(possession_id)
 
@@ -244,7 +244,7 @@ async def get_possession_photo_by_id(
     possession_id: UUID,
     photo_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(get_current_user_ready),
 ) -> FileResponse:
     return await PossessionService(db).get_photo_file(possession_id, photo_id=photo_id)
 
@@ -253,7 +253,7 @@ async def get_possession_photo_by_id(
 async def get_possession_document(
     possession_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(get_current_user_ready),
 ) -> FileResponse:
     return await PossessionService(db).get_document_file(possession_id, document_kind="loan")
 
@@ -262,7 +262,7 @@ async def get_possession_document(
 async def get_possession_loan_term_document(
     possession_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(get_current_user_ready),
 ) -> FileResponse:
     return await PossessionService(db).get_document_file(possession_id, document_kind="loan")
 
@@ -271,7 +271,7 @@ async def get_possession_loan_term_document(
 async def get_possession_return_term_document(
     possession_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    _current_user: User = Depends(get_current_user),
+    _current_user: User = Depends(get_current_user_ready),
 ) -> FileResponse:
     return await PossessionService(db).get_document_file(possession_id, document_kind="return")
 

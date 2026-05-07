@@ -55,12 +55,19 @@ export function AuthProvider({ children }) {
     setLoading(false)
   }
 
+  async function changePassword({ current_password, new_password }) {
+    await api.post('/auth/change-password', { current_password, new_password })
+    return await loadMe({ silent: true })
+  }
+
   const value = useMemo(() => ({
     user,
     loading,
     login,
     logout,
+    changePassword,
     reload: loadMe,
+    mustChangePassword: Boolean(user?.must_change_password),
     isAdmin: isAdmin(user?.role),
     isPosto: isPosto(user?.role),
     canWrite: canWrite(user?.role),

@@ -51,7 +51,7 @@ async def require_admin(current_user: User = Depends(get_current_user_ready)) ->
     return current_user
 
 
-async def require_writer(current_user: User = Depends(get_current_user)) -> User:
+async def require_writer(current_user: User = Depends(get_current_user_ready)) -> User:
     if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -60,7 +60,7 @@ async def require_writer(current_user: User = Depends(get_current_user)) -> User
     return current_user
 
 
-async def require_fuel_station_user(current_user: User = Depends(get_current_user)) -> User:
+async def require_fuel_station_user(current_user: User = Depends(get_current_user_ready)) -> User:
     if current_user.role not in {UserRole.ADMIN, UserRole.POSTO}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -69,7 +69,7 @@ async def require_fuel_station_user(current_user: User = Depends(get_current_use
     return current_user
 
 
-async def require_fuel_module_user(current_user: User = Depends(get_current_user)) -> User:
+async def require_fuel_module_user(current_user: User = Depends(get_current_user_ready)) -> User:
     if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO, UserRole.POSTO}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -78,7 +78,7 @@ async def require_fuel_module_user(current_user: User = Depends(get_current_user
     return current_user
 
 
-async def require_fuel_supply_viewer(current_user: User = Depends(get_current_user)) -> User:
+async def require_fuel_supply_viewer(current_user: User = Depends(get_current_user_ready)) -> User:
     if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -87,7 +87,7 @@ async def require_fuel_supply_viewer(current_user: User = Depends(get_current_us
     return current_user
 
 
-async def require_fuel_supply_confirmer(current_user: User = Depends(get_current_user)) -> User:
+async def require_fuel_supply_confirmer(current_user: User = Depends(get_current_user_ready)) -> User:
     if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO, UserRole.POSTO}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,

@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user, require_writer
+from app.api.deps import get_current_user_ready, require_writer
 from app.db.session import get_db_session
 from app.models.claim import ClaimStatus, ClaimType
 from app.schemas.claim import ClaimCreate, ClaimListResponse, ClaimOut, ClaimUpdate
@@ -12,7 +12,7 @@ from app.services.claim_service import ClaimService
 router = APIRouter(prefix="/api/claims", tags=["Claims"])
 
 
-@router.get("", response_model=ClaimListResponse, dependencies=[Depends(get_current_user)])
+@router.get("", response_model=ClaimListResponse, dependencies=[Depends(get_current_user_ready)])
 async def list_claims(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),
@@ -32,7 +32,7 @@ async def list_claims(
     )
 
 
-@router.get("/{claim_id}", response_model=ClaimOut, dependencies=[Depends(get_current_user)])
+@router.get("/{claim_id}", response_model=ClaimOut, dependencies=[Depends(get_current_user_ready)])
 async def get_claim(claim_id: UUID, db: AsyncSession = Depends(get_db_session)):
     return await ClaimService(db).get(claim_id)
 

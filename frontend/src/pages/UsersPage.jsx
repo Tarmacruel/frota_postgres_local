@@ -45,6 +45,7 @@ export default function UsersPage() {
     { header: 'Nome', value: (user) => user.name },
     { header: 'E-mail', value: (user) => user.email },
     { header: 'Perfil', value: (user) => getRoleLabel(user.role) },
+    { header: 'Senha', value: (user) => (user.must_change_password ? 'Troca pendente' : 'Regularizada') },
     { header: 'Criado em', value: (user) => formatDate(user.created_at) },
     { header: 'Atualizado em', value: (user) => formatDate(user.updated_at) },
   ]
@@ -238,6 +239,10 @@ export default function UsersPage() {
           <strong>{users.filter((user) => user.role === 'ADMIN').length}</strong>
           <span>administradores</span>
         </div>
+        <div className="metric-inline">
+          <strong>{users.filter((user) => user.must_change_password).length}</strong>
+          <span>trocas pendentes</span>
+        </div>
       </div>
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
@@ -251,6 +256,7 @@ export default function UsersPage() {
                 <th>Nome</th>
                 <th>E-mail</th>
                 <th>Perfil</th>
+                <th>Senha</th>
                 <th>Criado em</th>
                 <th>Atualizado em</th>
                 <th>Ações</th>
@@ -259,11 +265,11 @@ export default function UsersPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="6" className="muted">Carregando usuários...</td>
+                  <td colSpan="7" className="muted">Carregando usuários...</td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan="6">
+                  <td colSpan="7">
                     <div className="empty-state">Nenhum usuário encontrado para os filtros aplicados.</div>
                   </td>
                 </tr>
@@ -280,6 +286,11 @@ export default function UsersPage() {
                     <td data-label="Perfil">
                       <span className={`status-badge ${user.role === 'ADMIN' ? 'status-ATIVO' : user.role === 'PRODUCAO' ? 'status-PRODUCAO' : user.role === 'POSTO' ? 'status-POSTO' : 'status-INATIVO'}`}>
                         {getRoleLabel(user.role)}
+                      </span>
+                    </td>
+                    <td data-label="Senha">
+                      <span className={`status-badge ${user.must_change_password ? 'status-MANUTENCAO' : 'status-ATIVO'}`}>
+                        {user.must_change_password ? 'Troca pendente' : 'Regularizada'}
                       </span>
                     </td>
                     <td data-label="Criado em">{formatDate(user.created_at)}</td>
@@ -326,12 +337,12 @@ export default function UsersPage() {
             />
           </div>
           <div className="form-field">
-            <label htmlFor="user-password">{editingUser ? 'Nova senha (opcional)' : 'Senha'}</label>
+            <label htmlFor="user-password">{editingUser ? 'Redefinir senha provisória (opcional)' : 'Senha provisória'}</label>
             <input
               id="user-password"
               className="app-input"
               type="password"
-              placeholder={editingUser ? 'Preencha apenas se quiser trocar' : 'Mínimo de 8 caracteres'}
+              placeholder={editingUser ? 'Preencha para exigir troca no próximo acesso' : 'Mínimo de 8 caracteres'}
               value={form.password}
               onChange={(event) => setForm({ ...form, password: event.target.value })}
             />

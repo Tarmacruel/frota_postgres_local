@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user, require_admin, require_writer
+from app.api.deps import get_current_user_ready, require_admin, require_writer
 from app.db.session import get_db_session
 from app.models.user import User
 from app.schemas.auth import MessageOut
@@ -24,12 +24,12 @@ from app.services.master_data_service import MasterDataService
 router = APIRouter(prefix="/api/master-data", tags=["MasterData"])
 
 
-@router.get("/catalog", response_model=MasterDataCatalogOut, dependencies=[Depends(get_current_user)])
+@router.get("/catalog", response_model=MasterDataCatalogOut, dependencies=[Depends(get_current_user_ready)])
 async def get_catalog(db: AsyncSession = Depends(get_db_session)):
     return await MasterDataService(db).get_catalog()
 
 
-@router.get("/organizations", response_model=list[OrganizationOut], dependencies=[Depends(get_current_user)])
+@router.get("/organizations", response_model=list[OrganizationOut], dependencies=[Depends(get_current_user_ready)])
 async def list_organizations(db: AsyncSession = Depends(get_db_session)):
     return await MasterDataService(db).list_organizations()
 
@@ -63,7 +63,7 @@ async def delete_organization(
     return {"message": "Removido"}
 
 
-@router.get("/departments", response_model=list[DepartmentOut], dependencies=[Depends(get_current_user)])
+@router.get("/departments", response_model=list[DepartmentOut], dependencies=[Depends(get_current_user_ready)])
 async def list_departments(
     organization_id: UUID | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
@@ -100,7 +100,7 @@ async def delete_department(
     return {"message": "Removido"}
 
 
-@router.get("/allocations", response_model=list[AllocationOut], dependencies=[Depends(get_current_user)])
+@router.get("/allocations", response_model=list[AllocationOut], dependencies=[Depends(get_current_user_ready)])
 async def list_allocations(
     organization_id: UUID | None = Query(default=None),
     department_id: UUID | None = Query(default=None),

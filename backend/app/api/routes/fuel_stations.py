@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user, require_admin
+from app.api.deps import get_current_user_ready, require_admin
 from app.db.session import get_db_session
 from app.models.user import User
 from app.schemas.auth import MessageOut
@@ -20,7 +20,7 @@ from app.services.fuel_station_service import FuelStationService
 router = APIRouter(prefix="/api/fuel-stations", tags=["FuelStations"])
 
 
-@router.get("", response_model=list[FuelStationOut], dependencies=[Depends(get_current_user)])
+@router.get("", response_model=list[FuelStationOut], dependencies=[Depends(get_current_user_ready)])
 async def list_fuel_stations(
     active_only: bool | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
