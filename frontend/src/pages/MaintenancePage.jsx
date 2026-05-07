@@ -6,6 +6,7 @@ import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
 import { maintenanceAPI } from '../api/maintenance'
+import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
@@ -13,7 +14,7 @@ import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 const statusOptions = [
   { value: 'TODAS', label: 'Todas' },
   { value: 'EM_ANDAMENTO', label: 'Em andamento' },
-  { value: 'CONCLUIDAS', label: 'Concluidas' },
+  { value: 'CONCLUÍDAS', label: 'Concluídas' },
 ]
 
 function formatDate(value) {
@@ -26,11 +27,11 @@ function formatMoney(value) {
 }
 
 function buildVehicleOption(vehicle) {
-  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
+  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
   return {
     value: vehicle.id,
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
-    description: `${vehicle.ownership_type === 'LOCADO' ? 'Locado' : 'Proprio'} | ${locationLabel}`,
+    description: `${vehicle.ownership_type === 'LOCADO' ? 'Locado' : 'Próprio'} | ${locationLabel}`,
     keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.chassis_number, locationLabel].filter(Boolean).join(' '),
   }
 }
@@ -54,18 +55,18 @@ export default function MaintenancePage() {
   const focusRecordId = searchParams.get('focus')
 
   const exportColumns = [
-    { header: 'Veiculo', value: (record) => record.vehicle_plate },
-    { header: 'Inicio', value: (record) => formatDate(record.start_date) },
-    { header: 'Conclusao', value: (record) => formatDate(record.end_date) },
-    { header: 'Servico', value: (record) => record.service_description },
-    { header: 'Pecas', value: (record) => record.parts_replaced || 'Sem observacao' },
+    { header: 'Veículo', value: (record) => record.vehicle_plate },
+    { header: 'Início', value: (record) => formatDate(record.start_date) },
+    { header: 'Conclusão', value: (record) => formatDate(record.end_date) },
+    { header: 'Serviço', value: (record) => record.service_description },
+    { header: 'Peças', value: (record) => record.parts_replaced || 'Sem observação' },
     { header: 'Custo', value: (record) => formatMoney(record.total_cost) },
-    { header: 'Status', value: (record) => (record.end_date ? 'CONCLUIDA' : 'EM ANDAMENTO') },
+    { header: 'Status', value: (record) => (record.end_date ? 'CONCLUÍDA' : 'EM ANDAMENTO') },
     { header: 'Atualizado em', value: (record) => formatDate(record.updated_at) },
   ]
 
   async function loadVehicles() {
-    const { data } = await api.get('/vehicles')
+    const { data } = await api.get('/vehicles', { params: { limit: VEHICLE_LIST_LIMIT } })
     setVehicles(data)
   }
 
@@ -82,7 +83,7 @@ export default function MaintenancePage() {
       const { data } = await maintenanceAPI.list(params)
       setRecords(data)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar as manutencoes.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar as manutenções.'))
     } finally {
       setLoading(false)
     }
@@ -93,7 +94,7 @@ export default function MaintenancePage() {
       try {
         await loadVehicles()
       } catch (err) {
-        setError(getApiErrorMessage(err, 'Nao foi possivel carregar a frota para o formulario.'))
+        setError(getApiErrorMessage(err, 'Não foi possível carregar a frota para o formulario.'))
       }
     }
     loadPage()
@@ -125,7 +126,7 @@ export default function MaintenancePage() {
       const matchesStatus =
         statusFilter === 'TODAS' ||
         (statusFilter === 'EM_ANDAMENTO' && isOpen) ||
-        (statusFilter === 'CONCLUIDAS' && !isOpen)
+        (statusFilter === 'CONCLUÍDAS' && !isOpen)
 
       return matchesSearch && matchesStatus
     })
@@ -157,16 +158,16 @@ export default function MaintenancePage() {
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('Confirma a exclusao deste registro de manutencao?')) return
+    if (!window.confirm('Confirma a exclusão deste registro de manutenção?')) return
 
     try {
       setError('')
       setFeedback('')
       await maintenanceAPI.remove(id)
-      setFeedback('Manutencao removida com sucesso.')
+      setFeedback('Manutenção removida com sucesso.')
       await loadRecords()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel remover a manutencao.'))
+      setError(getApiErrorMessage(err, 'Não foi possível remover a manutenção.'))
     }
   }
 
@@ -177,7 +178,7 @@ export default function MaintenancePage() {
 
   async function handleExportPdf() {
     if (filteredRecords.length === 0) {
-      setFeedback('Nao ha manutencoes filtradas para previsualizar.')
+      setFeedback('Não há manutenções filtradas para pré-visualizar.')
       return
     }
 
@@ -185,28 +186,28 @@ export default function MaintenancePage() {
       setError('')
       setFeedback('')
       await previewRowsToPdf({
-        title: 'Frota PMTF - Manutencoes',
-        fileName: 'frota-pmtf-manutencoes',
-        subtitle: 'Relatorio das manutencoes filtradas no painel operacional.',
+        title: 'Frota PMTF - Manutenções',
+        fileName: 'frota-pmtf-manutenções',
+        subtitle: 'Relatório das manutenções filtradas no painel operacional.',
         columns: exportColumns,
         rows: filteredRecords,
         filters: [
           { label: 'Status', value: statusOptions.find((option) => option.value === statusFilter)?.label || 'Todas' },
-          ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
-          ...(startFilter ? [{ label: 'Inicio a partir de', value: formatDate(new Date(startFilter).toISOString()) }] : []),
-          ...(endFilter ? [{ label: 'Fim ate', value: formatDate(new Date(endFilter).toISOString()) }] : []),
+          ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+          ...(startFilter ? [{ label: 'Início a partir de', value: formatDate(new Date(startFilter).toISOString()) }] : []),
+          ...(endFilter ? [{ label: 'Fim até', value: formatDate(new Date(endFilter).toISOString()) }] : []),
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
-      setFeedback('Pre-visualizacao do PDF de manutencoes aberta em nova guia.')
+      setFeedback('Pré-visualização do PDF de manutenções aberta em nova guia.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o PDF de manutencoes.'))
+      setError(getApiErrorMessage(err, 'Não foi possível gerar o PDF de manutenções.'))
     }
   }
 
   async function handleExportXlsx() {
     if (filteredRecords.length === 0) {
-      setFeedback('Nao ha manutencoes filtradas para exportar.')
+      setFeedback('Não há manutenções filtradas para exportar.')
       return
     }
 
@@ -214,19 +215,19 @@ export default function MaintenancePage() {
       setError('')
       setFeedback('')
       await exportRowsToXlsx({
-        fileName: 'frota-pmtf-manutencoes',
-        sheetName: 'Manutencoes',
+        fileName: 'frota-pmtf-manutenções',
+        sheetName: 'Manutenções',
         columns: exportColumns,
         rows: filteredRecords,
         filters: [
           { label: 'Status', value: statusOptions.find((option) => option.value === statusFilter)?.label || 'Todas' },
-          ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+          ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
-      setFeedback('Exportacao de manutencoes em XLSX iniciada com sucesso.')
+      setFeedback('Exportação de manutenções em XLSX iniciada com sucesso.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar as manutencoes em XLSX.'))
+      setError(getApiErrorMessage(err, 'Não foi possível exportar as manutenções em XLSX.'))
     }
   }
 
@@ -237,16 +238,16 @@ export default function MaintenancePage() {
     <div className="surface-panel">
       <div className="panel-heading">
         <div>
-          <h2 className="section-title">Manutencoes</h2>
-          <p className="section-copy">Acompanhe revisoes concluidas e servicos ainda em aberto sem sair do painel principal.</p>
+          <h2 className="section-title">Manutenções</h2>
+          <p className="section-copy">Acompanhe revisões concluídas e serviços ainda em aberto sem sair do painel principal.</p>
         </div>
         <div className="actions-inline">
           {canWrite ? (
             <button className="app-button" type="button" onClick={() => setIsModalOpen(true)}>
-              Nova manutencao
+              Nova manutenção
             </button>
           ) : null}
-          <button className="secondary-button" type="button" onClick={handleExportPdf}>Previsualizar PDF</button>
+          <button className="secondary-button" type="button" onClick={handleExportPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
       </div>
@@ -268,16 +269,16 @@ export default function MaintenancePage() {
           <div className="filter-inline">
             <input
               className="app-input"
-              placeholder="Buscar por placa, servico ou pecas"
+              placeholder="Buscar por placa, serviço ou peças"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
             <SearchableSelect
               value={vehicleFilter}
               onChange={setVehicleFilter}
-              options={[{ value: '', label: 'Todos os veiculos' }, ...vehicles.map(buildVehicleOption)]}
-              placeholder="Filtrar veiculo"
-              searchPlaceholder="Buscar veiculo por placa, modelo ou chassi"
+              options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(buildVehicleOption)]}
+              placeholder="Filtrar veículo"
+              searchPlaceholder="Buscar veículo por placa, modelo ou chassi"
             />
             <input type="datetime-local" className="app-input" value={startFilter} onChange={(event) => setStartFilter(event.target.value)} />
             <input type="datetime-local" className="app-input" value={endFilter} onChange={(event) => setEndFilter(event.target.value)} />
@@ -296,15 +297,15 @@ export default function MaintenancePage() {
         </div>
         <div className="metric-inline">
           <strong>{closedCount}</strong>
-          <span>concluidas</span>
+          <span>concluídas</span>
         </div>
       </div>
 
       {focusedRecord ? (
         <div className="table-focus-banner">
           <div>
-            <strong>Mostrando apenas a manutencao de {focusedRecord.vehicle_plate}</strong>
-            <span>Este foco veio de uma navegacao direta. Use o botao ao lado para voltar a lista completa.</span>
+            <strong>Mostrando apenas a manutenção de {focusedRecord.vehicle_plate}</strong>
+            <span>Este foco veio de uma navegação direta. Use o botao ao lado para voltar a lista completa.</span>
           </div>
           <button className="ghost-button" type="button" onClick={clearFocus}>Reexibir todas</button>
         </div>
@@ -318,20 +319,20 @@ export default function MaintenancePage() {
           <table className="data-table data-table-wide">
             <thead>
               <tr>
-                <th>Veiculo</th>
-                <th>Inicio</th>
-                <th>Conclusao</th>
-                <th>Servico</th>
-                <th>Pecas</th>
+                <th>Veículo</th>
+                <th>Início</th>
+                <th>Conclusão</th>
+                <th>Serviço</th>
+                <th>Peças</th>
                 <th>Custo</th>
                 <th>Status</th>
-                {canWrite ? <th>Acoes</th> : null}
+                {canWrite ? <th>Ações</th> : null}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={canWrite ? 8 : 7} className="muted">Carregando manutencoes...</td>
+                  <td colSpan={canWrite ? 8 : 7} className="muted">Carregando manutenções...</td>
                 </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
@@ -342,25 +343,25 @@ export default function MaintenancePage() {
               ) : (
                 paginatedRecords.map((record) => (
                   <tr key={record.id} className={focusedRecord?.id === record.id ? 'is-focused-row' : ''}>
-                    <td data-label="Veiculo"><strong>{record.vehicle_plate}</strong></td>
-                    <td data-label="Inicio">{formatDate(record.start_date)}</td>
-                    <td data-label="Conclusao">{formatDate(record.end_date)}</td>
-                    <td data-label="Servico">
+                    <td data-label="Veículo"><strong>{record.vehicle_plate}</strong></td>
+                    <td data-label="Início">{formatDate(record.start_date)}</td>
+                    <td data-label="Conclusão">{formatDate(record.end_date)}</td>
+                    <td data-label="Serviço">
                       <div className="stack">
                         <strong>{record.service_description}</strong>
                         <span className="muted">Atualizado em {formatDate(record.updated_at)}</span>
                         {isAdmin ? <span className="muted">Criado em {formatDate(record.created_at)}</span> : null}
                       </div>
                     </td>
-                    <td data-label="Pecas">{record.parts_replaced || 'Sem observacao'}</td>
+                    <td data-label="Peças">{record.parts_replaced || 'Sem observação'}</td>
                     <td data-label="Custo">{formatMoney(record.total_cost)}</td>
                     <td data-label="Status">
                       <span className={`status-badge ${record.end_date ? 'status-ATIVO' : 'status-MANUTENCAO'}`}>
-                        {record.end_date ? 'CONCLUIDA' : 'EM ANDAMENTO'}
+                        {record.end_date ? 'CONCLUÍDA' : 'EM ANDAMENTO'}
                       </span>
                     </td>
                     {canWrite ? (
-                      <td data-label="Acoes">
+                      <td data-label="Ações">
                         <div className="actions-inline">
                           <button type="button" className="mini-button" onClick={() => { setEditingRecord(record); setIsModalOpen(true) }}>
                             Editar
@@ -385,8 +386,8 @@ export default function MaintenancePage() {
 
       <Modal
         open={isModalOpen}
-        title={editingRecord ? 'Atualizar manutencao' : 'Nova manutencao'}
-        description="Registre servicos, custo e conclusao para manter o historico mecanico confiavel."
+        title={editingRecord ? 'Atualizar manutenção' : 'Nova manutenção'}
+        description="Registre serviços, custo e conclusão para manter o histórico mecânico confiável."
         onClose={closeModal}
       >
         <MaintenanceForm

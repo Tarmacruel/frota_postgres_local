@@ -5,7 +5,7 @@ const currencyFormatter = new Intl.NumberFormat('pt-BR', {
 
 export const ORDER_STATUS_LABELS = {
   OPEN: 'Aberta',
-  COMPLETED: 'Concluida',
+  COMPLETED: 'Concluída',
   EXPIRED: 'Expirada',
   CANCELLED: 'Cancelada',
 }

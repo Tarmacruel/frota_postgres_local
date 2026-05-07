@@ -18,7 +18,7 @@ class AuthService:
     async def authenticate(self, data: LoginInput) -> User:
         user = await self.users.get_by_email(data.email.lower())
         if not user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario nao encontrado")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário não encontrado")
         if not verify_password(data.password, user.password_hash):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Senha incorreta")
         return user
@@ -29,13 +29,14 @@ class AuthService:
         if verify_password(new_password, user.password_hash):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nova senha deve ser diferente da atual")
         user.password_hash = get_password_hash(new_password)
+        user.must_change_password = False
         await self.audit.record(
             actor=user,
             action="UPDATE",
             entity_type="USER_PASSWORD",
             entity_id=user.id,
             entity_label=user.email,
-            details={"password_changed": True},
+            details={"password_changed": True, "must_change_password": False},
         )
         await self.db.flush()
         await self.db.commit()

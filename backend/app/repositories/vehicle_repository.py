@@ -9,6 +9,8 @@ from app.models.master_data import Allocation, Department
 from app.models.possession import VehiclePossession
 from app.models.vehicle import Vehicle, VehicleOwnershipType, VehicleStatus
 
+DEFAULT_VEHICLE_LIST_LIMIT = 1000
+
 
 class VehicleRepository:
     def __init__(self, db: AsyncSession):
@@ -22,7 +24,7 @@ class VehicleRepository:
         result = await self.db.execute(select(Vehicle).where(Vehicle.plate == plate.upper()))
         return result.scalar_one_or_none()
 
-    async def list(self, skip: int = 0, limit: int = 50, status: VehicleStatus | None = None) -> list[Vehicle]:
+    async def list(self, skip: int = 0, limit: int = DEFAULT_VEHICLE_LIST_LIMIT, status: VehicleStatus | None = None) -> list[Vehicle]:
         stmt = select(Vehicle).offset(skip).limit(limit).order_by(Vehicle.created_at.desc())
         if status:
             stmt = stmt.where(Vehicle.status == status)

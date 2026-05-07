@@ -28,29 +28,29 @@ function isSecureCaptureContext() {
 }
 
 function getEvidenceErrorMessage(error) {
-  if (!error) return 'Nao foi possivel capturar a evidencia.'
+  if (!error) return 'Não foi possível capturar a evidência.'
 
   if (error.code === 1 || error.name === 'NotAllowedError' || error.name === 'PermissionDeniedError') {
-    return 'Permita camera e localizacao para registrar a posse.'
+    return 'Permita câmera e localização para registrar a posse.'
   }
 
   if (error.code === 2 || error.name === 'PositionUnavailableError') {
-    return 'Nao foi possivel obter a localizacao atual do dispositivo.'
+    return 'Não foi possível obter a localização atual do dispositivo.'
   }
 
   if (error.code === 3 || error.name === 'TimeoutError') {
-    return 'A captura da localizacao expirou. Tente novamente.'
+    return 'A captura da localização expirou. Tente novamente.'
   }
 
   if (error.name === 'NotFoundError' || error.name === 'DevicesNotFoundError') {
-    return 'Nenhuma camera disponivel foi encontrada neste dispositivo.'
+    return 'Nenhuma câmera disponível foi encontrada neste dispositivo.'
   }
 
   if (error.name === 'NotReadableError' || error.name === 'TrackStartError') {
-    return 'A camera esta ocupada por outro aplicativo. Feche-o e tente novamente.'
+    return 'A câmera está ocupada por outro aplicativo. Feche-o e tente novamente.'
   }
 
-  return 'Nao foi possivel capturar foto e localizacao da posse.'
+  return 'Não foi possível capturar foto e localização da posse.'
 }
 
 function getCurrentPosition(options) {
@@ -67,7 +67,7 @@ function canvasToJpegBlob(canvas) {
           resolve(blob)
           return
         }
-        reject(new Error('Nao foi possivel gerar a foto da posse.'))
+        reject(new Error('Não foi possível gerar a foto da posse.'))
       },
       'image/jpeg',
       0.82,
@@ -109,7 +109,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
   const [draftPreviewUrl, setDraftPreviewUrl] = useState('')
   const [draftCaptureLocation, setDraftCaptureLocation] = useState(null)
   const [draftPhotoCapturedAt, setDraftPhotoCapturedAt] = useState('')
-  const [signedDocument, setSignedDocument] = useState(null)
+  const [loanTermDocument, setLoanTermDocument] = useState(null)
   const [documentError, setDocumentError] = useState('')
   const videoRef = useRef(null)
   const streamRef = useRef(null)
@@ -166,8 +166,8 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
   }
 
   function buildVehicleOption(vehicle) {
-    const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
-    const ownershipLabel = vehicle.ownership_type === 'LOCADO' ? 'Locado' : vehicle.ownership_type === 'CEDIDO' ? 'Cedido' : 'Proprio'
+    const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
+    const ownershipLabel = vehicle.ownership_type === 'LOCADO' ? 'Locado' : vehicle.ownership_type === 'CEDIDO' ? 'Cedido' : 'Próprio'
     return {
       value: vehicle.id,
       label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
@@ -181,14 +181,14 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
   function handleDocumentChange(event) {
     const nextFile = event.target.files?.[0] || null
     if (!nextFile) {
-      setSignedDocument(null)
+      setLoanTermDocument(null)
       setDocumentError('')
       return
     }
 
     if (!ALLOWED_DOCUMENT_TYPES.includes(nextFile.type)) {
-      setSignedDocument(null)
-      setDocumentError('Anexe PDF, imagem, DOC ou DOCX para arquivar o termo assinado.')
+      setLoanTermDocument(null)
+      setDocumentError('Anexe PDF, imagem, DOC ou DOCX para arquivar o termo de empréstimo.')
       if (documentInputRef.current) {
         documentInputRef.current.value = ''
       }
@@ -196,7 +196,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
     }
 
     if (nextFile.size > MAX_DOCUMENT_SIZE_BYTES) {
-      setSignedDocument(null)
+      setLoanTermDocument(null)
       setDocumentError('O documento anexado deve ter no maximo 12 MB.')
       if (documentInputRef.current) {
         documentInputRef.current.value = ''
@@ -204,12 +204,12 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       return
     }
 
-    setSignedDocument(nextFile)
+    setLoanTermDocument(nextFile)
     setDocumentError('')
   }
 
   function clearDocument() {
-    setSignedDocument(null)
+    setLoanTermDocument(null)
     setDocumentError('')
     if (documentInputRef.current) {
       documentInputRef.current.value = ''
@@ -223,7 +223,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
     }
 
     if (!navigator.geolocation || !navigator.mediaDevices?.getUserMedia) {
-      setCaptureError('Este dispositivo nao oferece suporte completo a camera e localizacao.')
+      setCaptureError('Este dispositivo não oferece suporte completo a câmera e localização.')
       return
     }
 
@@ -266,7 +266,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
 
   async function handleTakePhoto() {
     if (!videoRef.current || !draftCaptureLocation) {
-      setCaptureError('Localizacao e camera precisam estar ativas antes da captura.')
+      setCaptureError('Localização e câmera precisam estar ativas antes da captura.')
       return
     }
 
@@ -281,7 +281,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       const context = canvas.getContext('2d')
 
       if (!context) {
-        throw new Error('Nao foi possivel preparar a foto capturada.')
+        throw new Error('Não foi possível preparar a foto capturada.')
       }
 
       context.drawImage(video, 0, 0, canvas.width, canvas.height)
@@ -302,7 +302,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
 
   function confirmCapturedEvidence() {
     if (!draftPhotoBlob || !draftCaptureLocation || !draftPhotoCapturedAt || !draftPreviewUrl) {
-      setCaptureError('Foto e localizacao precisam ser capturadas antes de continuar.')
+      setCaptureError('Foto e localização precisam ser capturadas antes de continuar.')
       return
     }
 
@@ -338,7 +338,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
     event.preventDefault()
 
     if (!form.vehicle_id) {
-      setError('Selecione um veiculo para continuar.')
+      setError('Selecione um veículo para continuar.')
       return
     }
 
@@ -377,15 +377,15 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
           payload.append('photos', photo.blob, `posse-${form.vehicle_id}-${index + 1}.jpg`)
         })
       }
-      if (signedDocument) {
-        payload.append('signed_document', signedDocument, signedDocument.name)
+      if (loanTermDocument) {
+        payload.append('loan_term_document', loanTermDocument, loanTermDocument.name)
       }
 
       await possessionAPI.create(payload)
       onSuccess?.('Posse registrada com sucesso. Se havia posse ativa, ela foi encerrada automaticamente.')
       onClose?.()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel registrar a posse.'))
+      setError(getApiErrorMessage(err, 'Não foi possível registrar a posse.'))
     } finally {
       setSubmitting(false)
     }
@@ -396,26 +396,26 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       ? 'Solicitando acesso...'
       : capturedPhotos.length > 0
         ? 'Adicionar outra foto'
-        : 'Capturar foto e localizacao'
+        : 'Capturar foto e localização'
 
   return (
     <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
 
       <div className="form-field">
-        <label>Veiculo</label>
+        <label>Veículo</label>
         <SearchableSelect
           value={form.vehicle_id}
           onChange={(value) => setForm({ ...form, vehicle_id: value })}
           options={vehicles.map(buildVehicleOption)}
-          placeholder="Selecione o veiculo"
-          searchPlaceholder="Buscar veiculo por placa, modelo, chassi ou lotacao"
-          emptyLabel="Nenhum veiculo disponivel."
+          placeholder="Selecione o veículo"
+          searchPlaceholder="Buscar veículo por placa, modelo, chassi ou lotação"
+          emptyLabel="Nenhum veículo disponível."
         />
       </div>
 
       <div className="form-field">
-        <label htmlFor="possession-start">Inicio da posse</label>
+        <label htmlFor="possession-start">Início da posse</label>
         <input
           id="possession-start"
           type="datetime-local"
@@ -426,7 +426,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       </div>
 
       <div className="form-field">
-        <label htmlFor="possession-start-odometer">Odometro inicial (km)</label>
+        <label htmlFor="possession-start-odometer">Odômetro inicial (km)</label>
         <input
           id="possession-start-odometer"
           type="number"
@@ -476,23 +476,23 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       </div>
 
       <div className="form-field modal-field-span">
-        <label htmlFor="possession-observation">Observacao</label>
+        <label htmlFor="possession-observation">Observação</label>
         <textarea
           id="possession-observation"
           className="app-textarea"
           rows="4"
-          placeholder="Contexto da posse, rota ou observacoes adicionais."
+          placeholder="Contexto da posse, rota ou observações adicionais."
           value={form.observation}
           onChange={(event) => setForm({ ...form, observation: event.target.value })}
         />
       </div>
 
       <div className="form-field modal-field-span">
-        <label>Evidencia (opcional)</label>
+        <label>Evidência (opcional)</label>
         <div className="evidence-shell">
           <div className="evidence-copy">
-            <strong>Foto e localizacao sao opcionais no registro de posse.</strong>
-            <span>Se desejar, use a camera do dispositivo para registrar evidencias das partes do veiculo.</span>
+            <strong>Foto e localização são opcionais no registro de posse.</strong>
+            <span>Se desejar, use a câmera do dispositivo para registrar evidências das partes do veículo.</span>
           </div>
 
           {!draftPreviewUrl && captureState !== 'preview' ? (
@@ -516,7 +516,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
                 <video ref={videoRef} autoPlay playsInline muted className="camera-preview" />
               </div>
               <div className="camera-stage-footer">
-                <span className="muted">Enquadre o veiculo e capture a evidencia atual.</span>
+                <span className="muted">Enquadre o veículo e capture a evidência atual.</span>
                 <div className="actions-inline">
                   <button className="app-button" type="button" onClick={handleTakePhoto}>Capturar</button>
                   <button className="ghost-button" type="button" onClick={clearDraftEvidence}>Cancelar</button>
@@ -528,17 +528,17 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
           {draftPreviewUrl ? (
             <div className="evidence-review-grid">
               <div className="evidence-image-card">
-                <img src={draftPreviewUrl} alt="Foto capturada do veiculo" className="evidence-image" />
+                <img src={draftPreviewUrl} alt="Foto capturada do veículo" className="evidence-image" />
               </div>
               <div className="evidence-meta-card">
-                <strong>Revise a evidencia capturada</strong>
+                <strong>Revise a evidência capturada</strong>
                 <div className="stack">
-                  <span><strong>Horario:</strong> {formatDateTime(draftPhotoCapturedAt)}</span>
+                  <span><strong>Horário:</strong> {formatDateTime(draftPhotoCapturedAt)}</span>
                   <span>
-                    <strong>Localizacao:</strong> {draftCaptureLocation ? `${draftCaptureLocation.latitude.toFixed(6)}, ${draftCaptureLocation.longitude.toFixed(6)}` : '-'}
+                    <strong>Localização:</strong> {draftCaptureLocation ? `${draftCaptureLocation.latitude.toFixed(6)}, ${draftCaptureLocation.longitude.toFixed(6)}` : '-'}
                   </span>
                   <span>
-                    <strong>Precisao:</strong> {draftCaptureLocation ? `${Math.round(draftCaptureLocation.accuracy_meters)} m` : '-'}
+                    <strong>Precisão:</strong> {draftCaptureLocation ? `${Math.round(draftCaptureLocation.accuracy_meters)} m` : '-'}
                   </span>
                 </div>
                 <div className="actions-inline">
@@ -572,11 +572,11 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       </div>
 
       <div className="form-field modal-field-span">
-        <label htmlFor="signed-document">Documento assinado</label>
+        <label htmlFor="signed-document">Termo de empréstimo assinado</label>
         <div className="evidence-shell">
           <div className="evidence-copy">
-            <strong>Anexe o termo assinado pelo responsavel, se ele ja estiver pronto.</strong>
-            <span>O arquivo fica vinculado ao registro de posse para consulta posterior no modulo de condutores.</span>
+            <strong>Anexe o termo de empréstimo assinado pelo responsável, se ele já estiver pronto.</strong>
+            <span>O arquivo fica vinculado ao início da posse para consulta posterior no módulo de condutores.</span>
           </div>
 
           <input
@@ -590,11 +590,11 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
 
           {documentError ? <div className="alert alert-error evidence-alert">{documentError}</div> : null}
 
-          {signedDocument ? (
+          {loanTermDocument ? (
             <div className="camera-stage-footer">
               <div className="stack">
-                <strong>{signedDocument.name}</strong>
-                <span className="muted">Tipo: {signedDocument.type || 'Arquivo compativel'} | Tamanho: {formatFileSize(signedDocument.size)}</span>
+                <strong>{loanTermDocument.name}</strong>
+                <span className="muted">Tipo: {loanTermDocument.type || 'Arquivo compativel'} | Tamanho: {formatFileSize(loanTermDocument.size)}</span>
               </div>
               <div className="actions-inline">
                 <button className="ghost-button" type="button" onClick={clearDocument}>Remover anexo</button>

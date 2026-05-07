@@ -56,7 +56,7 @@ export default function UsersPage() {
       const { data } = await api.get('/users')
       setUsers(data)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar os usuarios.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar os usuários.'))
     } finally {
       setLoading(false)
     }
@@ -104,38 +104,38 @@ export default function UsersPage() {
         }
         if (form.password.trim()) payload.password = form.password
         await api.put(`/users/${editingUser.id}`, payload)
-        setFeedback('Usuario atualizado com sucesso.')
+        setFeedback('Usuário atualizado com sucesso.')
       } else {
         await api.post('/users', form)
-        setFeedback('Usuario criado com sucesso.')
+        setFeedback('Usuário criado com sucesso.')
       }
 
       closeModal()
       await loadUsers()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o usuario.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar o usuário.'))
     } finally {
       setSubmitting(false)
     }
   }
 
   async function handleDelete(user) {
-    if (!window.confirm(`Excluir o usuario ${user.email}?`)) return
+    if (!window.confirm(`Excluir o usuário ${user.email}?`)) return
 
     try {
       setError('')
       setFeedback('')
       await api.delete(`/users/${user.id}`)
-      setFeedback('Usuario removido com sucesso.')
+      setFeedback('Usuário removido com sucesso.')
       await loadUsers()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel excluir o usuario.'))
+      setError(getApiErrorMessage(err, 'Não foi possível excluir o usuário.'))
     }
   }
 
   async function handleExportPdf() {
     if (filteredUsers.length === 0) {
-      setFeedback('Nao ha usuarios filtrados para previsualizar.')
+      setFeedback('Não há usuários filtrados para pré-visualizar.')
       return
     }
 
@@ -143,9 +143,9 @@ export default function UsersPage() {
       setError('')
       setFeedback('')
       await previewRowsToPdf({
-        title: 'Frota PMTF - Usuarios',
-        fileName: 'frota-pmtf-usuarios',
-        subtitle: 'Relatorio dos perfis administrativos, de producao, posto e consulta.',
+        title: 'Frota PMTF - Usuários',
+        fileName: 'frota-pmtf-usuários',
+        subtitle: 'Relatório dos perfis administrativos, de produção, posto e consulta.',
         columns: exportColumns,
         rows: filteredUsers,
         filters: [
@@ -153,15 +153,15 @@ export default function UsersPage() {
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
-      setFeedback('Pre-visualizacao do PDF de usuarios aberta em nova guia.')
+      setFeedback('Pré-visualização do PDF de usuários aberta em nova guia.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o PDF dos usuarios.'))
+      setError(getApiErrorMessage(err, 'Não foi possível gerar o PDF dos usuários.'))
     }
   }
 
   async function handleExportXlsx() {
     if (filteredUsers.length === 0) {
-      setFeedback('Nao ha usuarios filtrados para exportar.')
+      setFeedback('Não há usuários filtrados para exportar.')
       return
     }
 
@@ -169,8 +169,8 @@ export default function UsersPage() {
       setError('')
       setFeedback('')
       await exportRowsToXlsx({
-        fileName: 'frota-pmtf-usuarios',
-        sheetName: 'Usuarios',
+        fileName: 'frota-pmtf-usuários',
+        sheetName: 'Usuários',
         columns: exportColumns,
         rows: filteredUsers,
         filters: [
@@ -178,9 +178,9 @@ export default function UsersPage() {
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
-      setFeedback('Exportacao de usuarios em XLSX iniciada com sucesso.')
+      setFeedback('Exportação de usuários em XLSX iniciada com sucesso.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar os usuarios em XLSX.'))
+      setError(getApiErrorMessage(err, 'Não foi possível exportar os usuários em XLSX.'))
     }
   }
 
@@ -193,12 +193,12 @@ export default function UsersPage() {
     <div className="surface-panel">
       <div className="panel-heading">
         <div>
-          <h2 className="section-title">Gestao de usuarios</h2>
-          <p className="section-copy">Gerencie perfis administrativos, operadores de producao, postos credenciados e usuarios apenas de consulta.</p>
+          <h2 className="section-title">Gestão de usuários</h2>
+          <p className="section-copy">Gerencie perfis administrativos, operadores de produção, postos credenciados e usuários apenas de consulta.</p>
         </div>
         <div className="actions-inline">
-          <button className="app-button" type="button" onClick={openCreateModal}>Novo usuario</button>
-          <button className="secondary-button" type="button" onClick={handleExportPdf}>Previsualizar PDF</button>
+          <button className="app-button" type="button" onClick={openCreateModal}>Novo usuário</button>
+          <button className="secondary-button" type="button" onClick={handleExportPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
       </div>
@@ -224,11 +224,11 @@ export default function UsersPage() {
       <div className="panel-metrics">
         <div className="metric-inline">
           <strong>{filteredUsers.length}</strong>
-          <span>usuarios exibidos</span>
+          <span>usuários exibidos</span>
         </div>
         <div className="metric-inline">
           <strong>{users.filter((user) => user.role === 'PRODUCAO').length}</strong>
-          <span>perfil producao</span>
+          <span>perfil produção</span>
         </div>
         <div className="metric-inline">
           <strong>{users.filter((user) => user.role === 'POSTO').length}</strong>
@@ -253,18 +253,18 @@ export default function UsersPage() {
                 <th>Perfil</th>
                 <th>Criado em</th>
                 <th>Atualizado em</th>
-                <th>Acoes</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="6" className="muted">Carregando usuarios...</td>
+                  <td colSpan="6" className="muted">Carregando usuários...</td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
                   <td colSpan="6">
-                    <div className="empty-state">Nenhum usuario encontrado para os filtros aplicados.</div>
+                    <div className="empty-state">Nenhum usuário encontrado para os filtros aplicados.</div>
                   </td>
                 </tr>
               ) : (
@@ -284,7 +284,7 @@ export default function UsersPage() {
                     </td>
                     <td data-label="Criado em">{formatDate(user.created_at)}</td>
                     <td data-label="Atualizado em">{formatDate(user.updated_at)}</td>
-                    <td data-label="Acoes">
+                    <td data-label="Ações">
                       <div className="actions-inline">
                         <button type="button" className="mini-button" onClick={() => openEditModal(user)}>Editar</button>
                         <button type="button" className="mini-button danger" onClick={() => handleDelete(user)}>Excluir</button>
@@ -300,8 +300,8 @@ export default function UsersPage() {
 
       <Modal
         open={isModalOpen}
-        title={editingUser ? 'Editar usuario' : 'Novo usuario'}
-        description="Defina o perfil correto para cada pessoa: administracao total, operacao de producao, posto credenciado ou consulta."
+        title={editingUser ? 'Editar usuário' : 'Novo usuário'}
+        description="Defina o perfil correto para cada pessoa: administração total, operação de produção, posto credenciado ou consulta."
         onClose={closeModal}
       >
         <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
@@ -331,7 +331,7 @@ export default function UsersPage() {
               id="user-password"
               className="app-input"
               type="password"
-              placeholder={editingUser ? 'Preencha apenas se quiser trocar' : 'Minimo de 8 caracteres'}
+              placeholder={editingUser ? 'Preencha apenas se quiser trocar' : 'Mínimo de 8 caracteres'}
               value={form.password}
               onChange={(event) => setForm({ ...form, password: event.target.value })}
             />
@@ -346,7 +346,7 @@ export default function UsersPage() {
           </div>
           <div className="actions-inline modal-actions">
             <button className="app-button" type="submit" disabled={submitting}>
-              {submitting ? 'Salvando...' : editingUser ? 'Atualizar usuario' : 'Criar usuario'}
+              {submitting ? 'Salvando...' : editingUser ? 'Atualizar usuário' : 'Criar usuário'}
             </button>
             <button className="ghost-button" type="button" onClick={closeModal}>Cancelar</button>
           </div>

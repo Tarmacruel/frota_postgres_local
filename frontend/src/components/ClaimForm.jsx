@@ -9,7 +9,7 @@ const typeOptions = ['COLISAO', 'ROUBO', 'FURTO', 'AVARIA', 'OUTRO']
 const statusOptions = ['ABERTO', 'EM_ANALISE', 'ENCERRADO']
 
 function vehicleOption(vehicle) {
-  const location = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
+  const location = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
   return {
     value: vehicle.id,
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
@@ -66,7 +66,7 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
       }
       onClose?.()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o sinistro.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar o sinistro.'))
     } finally {
       setSubmitting(false)
     }
@@ -77,12 +77,12 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
 
       <div className="form-field modal-field-span">
-        <label>Veiculo</label>
+        <label>Veículo</label>
         <SearchableSelect
           value={form.vehicle_id}
           onChange={(value) => setForm({ ...form, vehicle_id: value })}
           options={vehicles.map(vehicleOption)}
-          placeholder="Selecione o veiculo envolvido"
+          placeholder="Selecione o veículo envolvido"
           searchPlaceholder="Buscar por placa, modelo ou chassi"
         />
       </div>
@@ -116,7 +116,7 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
       </div>
 
       <div className="form-field modal-field-span">
-        <label htmlFor="claim-description">Descricao</label>
+        <label htmlFor="claim-description">Descrição</label>
         <textarea id="claim-description" className="app-textarea" rows="4" value={form.descricao} onChange={(event) => setForm({ ...form, descricao: event.target.value })} />
       </div>
 

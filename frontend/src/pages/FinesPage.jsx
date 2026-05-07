@@ -5,6 +5,7 @@ import SearchableSelect from '../components/SearchableSelect'
 import { finesAPI } from '../api/fines'
 import { vehiclesAPI } from '../api/vehicles'
 import { driversAPI } from '../api/drivers'
+import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
@@ -29,7 +30,7 @@ function formatDate(value) {
 }
 
 function vehicleOption(vehicle) {
-  const location = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
+  const location = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
   return {
     value: vehicle.id,
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
@@ -64,7 +65,7 @@ export default function FinesPage() {
   const [form, setForm] = useState(initialForm)
   const [submitting, setSubmitting] = useState(false)
   const exportColumns = [
-    { header: 'Veiculo', value: (item) => item.vehicle_plate },
+    { header: 'Veículo', value: (item) => item.vehicle_plate },
     { header: 'Auto', value: (item) => item.ticket_number },
     { header: 'Condutor', value: (item) => item.driver_name || '-' },
     { header: 'Data infracao', value: (item) => formatDate(item.infraction_date) },
@@ -75,7 +76,7 @@ export default function FinesPage() {
 
   async function loadAux() {
     const [vehicleResponse, driverResponse] = await Promise.all([
-      vehiclesAPI.list({ limit: 200 }),
+      vehiclesAPI.list({ limit: VEHICLE_LIST_LIMIT }),
       driversAPI.listActive({ limit: 200 }),
     ])
     setVehicles(Array.isArray(vehicleResponse.data) ? vehicleResponse.data : [])
@@ -103,7 +104,7 @@ export default function FinesPage() {
       setRecords(data.data)
       setPagination(data.pagination)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar as multas.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar as multas.'))
     } finally {
       setLoading(false)
     }
@@ -139,7 +140,7 @@ export default function FinesPage() {
     try {
       setSubmitting(true)
       if (!form.vehicle_id) {
-        setError('Selecione um veiculo para registrar a multa.')
+        setError('Selecione um veículo para registrar a multa.')
         return
       }
       const payload = { ...form, driver_id: form.driver_id || null, due_date: form.due_date || null, location: form.location || null, amount: Number(form.amount) }
@@ -154,7 +155,7 @@ export default function FinesPage() {
       setForm(initialForm)
       await loadFines(editingRecord ? pagination.page : 1)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar a multa.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar a multa.'))
     } finally {
       setSubmitting(false)
     }
@@ -165,12 +166,12 @@ export default function FinesPage() {
     await previewRowsToPdf({
       title: 'Frota PMTF - Multas',
       fileName: 'frota-pmtf-multas',
-      subtitle: 'Relatorio da pagina atual de multas cadastradas.',
+      subtitle: 'Relatório da pagina atual de multas cadastradas.',
       columns: exportColumns,
       rows: records,
       filters: [
         { label: 'Status', value: statusFilter },
-        ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+        ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
         ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
       ],
     })
@@ -185,7 +186,7 @@ export default function FinesPage() {
       rows: records,
       filters: [
         { label: 'Status', value: statusFilter },
-        ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+        ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
       ],
     })
   }
@@ -199,20 +200,20 @@ export default function FinesPage() {
         </div>
         <div className="actions-inline">
           {canWrite ? <button className="app-button" onClick={openCreate}>Nova multa</button> : null}
-          <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Previsualizar PDF</button>
+          <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
       </div>
 
       <div className="toolbar-row" style={{ marginBottom: 18 }}>
         <div className="filter-inline">
-          <input className="app-input" placeholder="Buscar por auto, descricao ou local" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input className="app-input" placeholder="Buscar por auto, descrição ou local" value={search} onChange={(e) => setSearch(e.target.value)} />
           <SearchableSelect
             value={vehicleFilter}
             onChange={setVehicleFilter}
-            options={[{ value: '', label: 'Todos os veiculos' }, ...vehicles.map(vehicleOption)]}
-            placeholder="Filtrar veiculo"
-            searchPlaceholder="Buscar veiculo"
+            options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(vehicleOption)]}
+            placeholder="Filtrar veículo"
+            searchPlaceholder="Buscar veículo"
           />
           <select className="app-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>{statusOptions.map((o) => <option key={o} value={o}>{o}</option>)}</select>
         </div>
@@ -224,7 +225,7 @@ export default function FinesPage() {
       <div className="surface-panel panel-nested">
         <div className="table-wrap table-wrap-wide">
           <table className="data-table data-table-wide">
-            <thead><tr><th>Veiculo</th><th>Auto</th><th>Condutor</th><th>Infracao</th><th>Vencimento</th><th>Valor</th><th>Status</th>{canWrite ? <th>Acoes</th> : null}</tr></thead>
+            <thead><tr><th>Veículo</th><th>Auto</th><th>Condutor</th><th>Infracao</th><th>Vencimento</th><th>Valor</th><th>Status</th>{canWrite ? <th>Ações</th> : null}</tr></thead>
             <tbody>
               {loading ? <tr><td colSpan={canWrite ? 8 : 7}>Carregando multas...</td></tr> : records.length === 0 ? <tr><td colSpan={canWrite ? 8 : 7}><div className="empty-state">Nenhuma multa encontrada.</div></td></tr> : records.map((record) => (
                 <tr key={record.id}>
@@ -248,13 +249,13 @@ export default function FinesPage() {
       <Modal open={isModalOpen} title={editingRecord ? 'Editar multa' : 'Nova multa'} onClose={() => setIsModalOpen(false)}>
         <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
           <div className="form-field">
-            <label>Veiculo</label>
+            <label>Veículo</label>
             <SearchableSelect
               value={form.vehicle_id}
               onChange={handleVehicleChange}
               options={vehicles.map(vehicleOption)}
-              placeholder="Selecionar veiculo"
-              searchPlaceholder="Buscar veiculo por placa, marca ou modelo"
+              placeholder="Selecionar veículo"
+              searchPlaceholder="Buscar veículo por placa, marca ou modelo"
             />
           </div>
           <div className="form-field">
@@ -262,16 +263,16 @@ export default function FinesPage() {
             <SearchableSelect
               value={form.driver_id}
               onChange={(value) => setForm({ ...form, driver_id: value })}
-              options={[{ value: '', label: 'Nao informado' }, ...drivers.map(driverOption)]}
+              options={[{ value: '', label: 'Não informado' }, ...drivers.map(driverOption)]}
               placeholder="Selecionar condutor"
               searchPlaceholder="Buscar condutor por nome ou documento"
             />
           </div>
-          <div className="form-field"><label>Numero do auto</label><input className="app-input" value={form.ticket_number} onChange={(e) => setForm({ ...form, ticket_number: e.target.value })} required /></div>
+          <div className="form-field"><label>Número do auto</label><input className="app-input" value={form.ticket_number} onChange={(e) => setForm({ ...form, ticket_number: e.target.value })} required /></div>
           <div className="form-field"><label>Data infracao</label><input type="date" className="app-input" value={form.infraction_date} onChange={(e) => setForm({ ...form, infraction_date: e.target.value })} required /></div>
           <div className="form-field"><label>Vencimento</label><input type="date" className="app-input" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></div>
           <div className="form-field"><label>Valor</label><input type="number" min="0" step="0.01" className="app-input" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></div>
-          <div className="form-field" style={{ gridColumn: '1 / -1' }}><label>Descricao</label><textarea className="app-input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required /></div>
+          <div className="form-field" style={{ gridColumn: '1 / -1' }}><label>Descrição</label><textarea className="app-input" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required /></div>
           <div className="form-field"><label>Local</label><input className="app-input" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
           <div className="form-field"><label>Status</label><select className="app-select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{statusOptions.filter((o) => o !== 'TODOS').map((o) => <option key={o} value={o}>{o}</option>)}</select></div>
           <div className="actions-inline modal-actions" style={{ gridColumn: '1 / -1' }}>

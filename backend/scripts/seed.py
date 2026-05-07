@@ -41,7 +41,7 @@ async def seed() -> None:
             standard = await session.scalar(select(User).where(User.email == "padrao@frota.local"))
             if not standard:
                 standard = User(
-                    name="Usuario Padrao",
+                    name="Usuário Padrão",
                     email="padrao@frota.local",
                     password_hash=get_password_hash("User@1234"),
                     role=UserRole.PADRAO,
@@ -51,9 +51,9 @@ async def seed() -> None:
             production = await session.scalar(select(User).where(User.email == "producao@frota.local"))
             if not production:
                 production = User(
-                    name="Usuario de Producao",
+                    name="Usuário de Produção",
                     email="producao@frota.local",
-                    password_hash=get_password_hash("Producao@1234"),
+                    password_hash=get_password_hash("Produção@1234"),
                     role=UserRole.PRODUCAO,
                 )
                 session.add(production)
@@ -122,17 +122,17 @@ async def seed() -> None:
                 await session.flush()
                 return allocation
 
-            admin_org = await ensure_organization("Secretaria de Administracao")
-            admin_dep = await ensure_department(admin_org, "Gestao Administrativa")
+            admin_org = await ensure_organization("Secretaria de Administração")
+            admin_dep = await ensure_department(admin_org, "Gestão Administrativa")
             admin_alloc = await ensure_allocation(admin_dep, "Garagem Central")
 
             works_org = await ensure_organization("Secretaria de Infraestrutura")
             works_dep = await ensure_department(works_org, "Oficina")
             works_alloc = await ensure_allocation(works_dep, "Oficina Central")
 
-            health_org = await ensure_organization("Secretaria de Saude")
+            health_org = await ensure_organization("Secretaria de Saúde")
             health_dep = await ensure_department(health_org, "Transporte")
-            health_alloc = await ensure_allocation(health_dep, "Patio Municipal")
+            health_alloc = await ensure_allocation(health_dep, "Pátio Municipal")
 
             vehicles_data = [
                 ("ABC-1D23", "9BFZH55L0G1234567", "Ford", "Ka", VehicleOwnershipType.PROPRIO, VehicleStatus.ATIVO, admin_alloc),
@@ -220,15 +220,15 @@ async def seed() -> None:
                             vehicle_id=vehicle_map["ABC-1D23"].id,
                             start_date=datetime.now(timezone.utc) - timedelta(days=10),
                             end_date=datetime.now(timezone.utc) - timedelta(days=7),
-                            service_description="Troca de oleo e filtros",
-                            parts_replaced="Filtro de oleo, filtro de ar, oleo 5W30",
+                            service_description="Troca de óleo e filtros",
+                            parts_replaced="Filtro de óleo, filtro de ar, óleo 5W30",
                             total_cost=Decimal("285.50"),
                             created_by=admin.id,
                         ),
                         MaintenanceRecord(
                             vehicle_id=vehicle_map["DEF-4E56"].id,
                             start_date=datetime.now(timezone.utc) - timedelta(days=3),
-                            service_description="Revisao de freios em andamento",
+                            service_description="Revisão de freios em andamento",
                             parts_replaced="Pastilhas de freio dianteiras",
                             total_cost=Decimal("420.00"),
                             created_by=admin.id,
@@ -268,8 +268,8 @@ async def seed() -> None:
                         driver_id=None,
                         data_ocorrencia=datetime.now(timezone.utc) - timedelta(days=2),
                         tipo=ClaimType.AVARIA,
-                        descricao="Avaria registrada durante deslocamento para oficina, com dano lateral e necessidade de avaliacao tecnica.",
-                        local="Avenida Principal, proximo ao patio municipal",
+                        descricao="Avaria registrada durante deslocamento para oficina, com dano lateral e necessidade de avaliação técnica.",
+                        local="Avenida Principal, próximo ao pátio municipal",
                         boletim_ocorrencia="BO-2026-001",
                         valor_estimado=Decimal("1850.00"),
                         status=ClaimStatus.EM_ANALISE,
@@ -290,12 +290,12 @@ async def seed() -> None:
                         expires_at=datetime.now(timezone.utc) + timedelta(hours=8),
                         requested_liters=Decimal("45.000"),
                         max_amount=Decimal("320.00"),
-                        notes="Ordem inicial de abastecimento para validacao local do fluxo de posto.",
+                        notes="Ordem inicial de abastecimento para validação local do fluxo de posto.",
                         status=FuelSupplyOrderStatus.OPEN,
                     )
                 )
 
-    print("Seed concluido com sucesso.")
+    print("Seed concluído com sucesso.")
 
 
 if __name__ == "__main__":

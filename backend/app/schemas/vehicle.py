@@ -44,7 +44,7 @@ class VehicleUpdate(BaseModel):
     def validate_edit_reason(cls, value: str) -> str:
         normalized = value.strip()
         if len(normalized) < 8:
-            raise ValueError("Justificativa da edicao deve ter ao menos 8 caracteres")
+            raise ValueError("Justificativa da edição deve ter ao menos 8 caracteres")
         return normalized
 
 

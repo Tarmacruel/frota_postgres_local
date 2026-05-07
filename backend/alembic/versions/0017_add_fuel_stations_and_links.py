@@ -104,7 +104,7 @@ def upgrade() -> None:
         op.add_column("fuel_stations", sa.Column("cnpj", sa.String(length=18), nullable=True))
     if _has_table("fuel_stations") and not _has_column("fuel_stations", "address"):
         op.add_column("fuel_stations", sa.Column("address", sa.String(length=255), nullable=True))
-        op.execute("UPDATE fuel_stations SET address = COALESCE(address, 'Endereco nao informado') WHERE address IS NULL")
+        op.execute("UPDATE fuel_stations SET address = COALESCE(address, 'Endereco não informado') WHERE address IS NULL")
         op.alter_column("fuel_stations", "address", existing_type=sa.String(length=255), nullable=False)
 
     if not _has_index("fuel_stations", "idx_fuel_stations_name", ["name"]):

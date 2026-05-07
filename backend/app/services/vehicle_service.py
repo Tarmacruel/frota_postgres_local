@@ -64,7 +64,7 @@ class VehicleService:
     async def get_history(self, vehicle_id: UUID):
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
         history = await self.vehicles.list_history(vehicle_id)
         audit_logs = await self._list_vehicle_audit_logs(vehicle_id)
         events = [self._serialize_history(item) for item in history]
@@ -74,13 +74,13 @@ class VehicleService:
     async def create(self, data: VehicleCreate, current_user: User) -> dict:
         existing = await self.vehicles.get_by_plate(data.plate.upper())
         if existing:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Placa ja cadastrada")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Placa já cadastrada")
 
         chassis_number = self._normalize_chassis(data.chassis_number)
         if chassis_number:
             duplicate_chassis = await self._get_by_chassis(chassis_number)
             if duplicate_chassis:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Chassi ja cadastrado")
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Chassi já cadastrado")
 
         allocation = await self._require_allocation(data.allocation_id)
         vehicle = Vehicle(
@@ -120,7 +120,7 @@ class VehicleService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel criar o veiculo") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível criar o veículo") from exc
 
         active = await self.vehicles.get_active_history(vehicle.id)
         return self._serialize_vehicle(vehicle, active, None)
@@ -128,7 +128,7 @@ class VehicleService:
     async def update(self, vehicle_id: UUID, data: VehicleUpdate, current_user: User) -> dict:
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
         previous_active = await self.vehicles.get_active_history(vehicle.id)
         previous_values = {
@@ -145,14 +145,14 @@ class VehicleService:
         if data.plate and data.plate.upper().strip() != vehicle.plate:
             duplicate = await self.vehicles.get_by_plate(data.plate.upper().strip())
             if duplicate and duplicate.id != vehicle.id:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Placa ja cadastrada")
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Placa já cadastrada")
 
         if data.chassis_number is not None:
             next_chassis = self._normalize_chassis(data.chassis_number)
             if next_chassis != vehicle.chassis_number:
                 duplicate_chassis = await self._get_by_chassis(next_chassis)
                 if duplicate_chassis and duplicate_chassis.id != vehicle.id:
-                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Chassi ja cadastrado")
+                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Chassi já cadastrado")
 
         try:
             if data.plate is not None:
@@ -212,7 +212,7 @@ class VehicleService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar o veiculo") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar o veículo") from exc
 
         active = await self.vehicles.get_active_history(vehicle.id)
         possession = await self.vehicles.get_active_possession(vehicle.id)
@@ -221,7 +221,7 @@ class VehicleService:
     async def delete(self, vehicle_id: UUID, current_user: User) -> None:
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
         active = await self.vehicles.get_active_history(vehicle.id)
         possession = await self.vehicles.get_active_possession(vehicle.id)
@@ -248,7 +248,7 @@ class VehicleService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel remover o veiculo") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível remover o veículo") from exc
 
     async def _get_by_chassis(self, chassis_number: str | None) -> Vehicle | None:
         if not chassis_number:
@@ -261,7 +261,7 @@ class VehicleService:
     async def _require_allocation(self, allocation_id: UUID) -> Allocation:
         allocation = await self.master_data.get_allocation(allocation_id)
         if not allocation:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lotacao nao encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lotação não encontrada")
         return allocation
 
     async def _list_vehicle_audit_logs(self, vehicle_id: UUID) -> list[AuditLog]:
@@ -319,7 +319,7 @@ class VehicleService:
             "event_type": "MOVEMENT",
             "action": None,
             "occurred_at": history.start_date,
-            "title": "Movimentacao de lotacao",
+            "title": "Movimentacao de lotação",
             "actor_name": None,
             "justification": history.justification,
             "allocation_id": history.allocation_id,
@@ -350,7 +350,7 @@ class VehicleService:
             "event_type": "CREATE" if log.action == "CREATE" else "EDIT",
             "action": log.action,
             "occurred_at": log.created_at,
-            "title": "Cadastro do veiculo" if log.action == "CREATE" else "Edicao cadastral",
+            "title": "Cadastro do veículo" if log.action == "CREATE" else "Edição cadastral",
             "actor_name": log.actor_name,
             "justification": details.get("reason"),
             "allocation_id": None,

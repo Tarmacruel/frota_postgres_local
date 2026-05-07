@@ -19,11 +19,14 @@ from app.services.vehicle_service import VehicleService
 
 router = APIRouter(prefix="/api/vehicles", tags=["Vehicles"])
 
+VEHICLE_LIST_DEFAULT_LIMIT = 1000
+VEHICLE_LIST_MAX_LIMIT = 5000
+
 
 @router.get("", response_model=list[VehicleOut], dependencies=[Depends(get_current_user)])
 async def list_vehicles(
     skip: int = Query(default=0, ge=0),
-    limit: int = Query(default=50, ge=1, le=200),
+    limit: int = Query(default=VEHICLE_LIST_DEFAULT_LIMIT, ge=1, le=VEHICLE_LIST_MAX_LIMIT),
     status_filter: VehicleStatus | None = Query(default=None, alias="status"),
     db: AsyncSession = Depends(get_db_session),
 ):
@@ -54,17 +57,17 @@ async def list_vehicles_paginated(
 
 @router.get("/em-atividade", response_model=list[VehicleOut], dependencies=[Depends(get_current_user)])
 async def vehicles_active(db: AsyncSession = Depends(get_db_session)):
-    return await VehicleService(db).list(skip=0, limit=200, status_filter=VehicleStatus.ATIVO)
+    return await VehicleService(db).list(skip=0, limit=VEHICLE_LIST_DEFAULT_LIMIT, status_filter=VehicleStatus.ATIVO)
 
 
 @router.get("/em-manutencao", response_model=list[VehicleOut], dependencies=[Depends(get_current_user)])
 async def vehicles_maintenance(db: AsyncSession = Depends(get_db_session)):
-    return await VehicleService(db).list(skip=0, limit=200, status_filter=VehicleStatus.MANUTENCAO)
+    return await VehicleService(db).list(skip=0, limit=VEHICLE_LIST_DEFAULT_LIMIT, status_filter=VehicleStatus.MANUTENCAO)
 
 
 @router.get("/inativos", response_model=list[VehicleOut], dependencies=[Depends(get_current_user)])
 async def vehicles_inactive(db: AsyncSession = Depends(get_db_session)):
-    return await VehicleService(db).list(skip=0, limit=200, status_filter=VehicleStatus.INATIVO)
+    return await VehicleService(db).list(skip=0, limit=VEHICLE_LIST_DEFAULT_LIMIT, status_filter=VehicleStatus.INATIVO)
 
 
 @router.post("", response_model=VehicleOut, status_code=status.HTTP_201_CREATED)

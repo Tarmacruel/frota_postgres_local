@@ -76,7 +76,7 @@ async function buildDocument(order) {
   const titleLineHeight = 14
   const systemLineHeight = 9
   const generatedAtLabel = `Emissao do documento: ${formatDateTimeLabel(new Date())}`
-  const validationCodeLabel = `Codigo de validacao: ${buildReferenceCode(order)}`
+  const validationCodeLabel = `Código de validação: ${buildReferenceCode(order)}`
   const footerPageLabelWidth = 104
 
   function getHeaderLayout() {
@@ -259,42 +259,42 @@ async function buildDocument(order) {
   let cursorY = headerDividerY + 16
 
   cursorY = addSection('Identificacao da ordem', [
-    ['Numero da ordem', formatOrderNumber(order)],
-    ['Situacao atual', getOrderStatusLabel(order.status)],
+    ['Número da ordem', formatOrderNumber(order)],
+    ['Situação atual', getOrderStatusLabel(order.status)],
     ['Emitida em', formatDateTimeLabel(order.created_at)],
-    ['Valida ate', formatDateTimeLabel(order.expires_at)],
-    ['Codigo de validacao', buildReferenceCode(order)],
+    ['Valida até', formatDateTimeLabel(order.expires_at)],
+    ['Código de validação', buildReferenceCode(order)],
   ], cursorY)
 
   cursorY = addSection('Dados operacionais', [
-    ['Veiculo', order.vehicle_description || order.vehicle_plate || '-'],
-    ['Condutor', order.driver_name || 'Nao informado'],
-    ['Orgao solicitante', order.organization_name || 'Nao informado'],
-    ['Posto credenciado', order.fuel_station_name || 'Nao informado'],
-    ['Endereco do posto', order.fuel_station_address || 'Nao informado'],
-    ['CNPJ do posto', order.fuel_station_cnpj || 'Nao informado'],
-    ['Servidor emissor', order.created_by_name || 'Nao informado'],
-    ['Conclusao da ordem', order.confirmed_at ? formatDateTimeLabel(order.confirmed_at) : 'Pendente'],
+    ['Veículo', order.vehicle_description || order.vehicle_plate || '-'],
+    ['Condutor', order.driver_name || 'Não informado'],
+    ['Órgão solicitante', order.organization_name || 'Não informado'],
+    ['Posto credenciado', order.fuel_station_name || 'Não informado'],
+    ['Endereço do posto', order.fuel_station_address || 'Não informado'],
+    ['CNPJ do posto', order.fuel_station_cnpj || 'Não informado'],
+    ['Servidor emissor', order.created_by_name || 'Não informado'],
+    ['Conclusão da ordem', order.confirmed_at ? formatDateTimeLabel(order.confirmed_at) : 'Pendente'],
   ], cursorY)
 
   cursorY = addSection('Limites autorizados', [
-    ['Litros previstos', order.requested_liters ? `${formatNumber(order.requested_liters, 2)} L` : 'Nao informado'],
+    ['Litros previstos', order.requested_liters ? `${formatNumber(order.requested_liters, 2)} L` : 'Não informado'],
     ['Valor maximo autorizado', formatCurrencyBRL(order.max_amount)],
-    ['Responsavel pelo encerramento', order.confirmed_by_name || 'Nao informado'],
+    ['Responsável pelo encerramento', order.confirmed_by_name || 'Não informado'],
   ], cursorY)
 
   if (order.notes) {
-    cursorY = addWrappedBlock('Observacoes institucionais', order.notes, cursorY)
+    cursorY = addWrappedBlock('Observações institucionais', order.notes, cursorY)
   }
 
   doc.setFont('helvetica', 'normal')
   doc.setFontSize(8.6)
   const validationLines = doc.splitTextToSize(
-    'Este documento foi emitido pelo sistema oficial da frota municipal. Para validar sua autenticidade, leia o QR Code ou acesse o endereco publico informado ao lado. Nao e necessario login para confirmar os dados e baixar novamente este comprovante.',
+    'Este documento foi emitido pelo sistema oficial da frota municipal. Para validar sua autenticidade, leia o QR Code ou acesse o endereço público informado ao lado. Não é necessário login para confirmar os dados e baixar novamente este comprovante.',
     pageWidth - (marginX * 2) - 118,
   )
   const validationLinkLines = doc.splitTextToSize(
-    validationUrl || 'Link publico indisponivel',
+    validationUrl || 'Link público indisponível',
     pageWidth - (marginX * 2) - 124,
   )
   const validationTextHeight = (validationLines.length * 10) + 8 + 10 + (validationLinkLines.length * 9)
@@ -309,7 +309,7 @@ async function buildDocument(order) {
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
   doc.setTextColor(32, 48, 74)
-  doc.text('VALIDACAO DE AUTENTICIDADE', marginX, cursorY)
+  doc.text('VALIDAÇÃO DE AUTENTICIDADE', marginX, cursorY)
 
   doc.setDrawColor(32, 48, 74)
   doc.setLineWidth(0.8)
@@ -324,7 +324,7 @@ async function buildDocument(order) {
   doc.setTextColor(55, 65, 81)
   doc.text(validationLines, marginX + 108, cursorY + 28)
   doc.setFont('helvetica', 'bold')
-  doc.text(`Codigo: ${buildReferenceCode(order)}`, marginX + 108, cursorY + 28 + (validationLines.length * 10) + 8)
+  doc.text(`Código: ${buildReferenceCode(order)}`, marginX + 108, cursorY + 28 + (validationLines.length * 10) + 8)
   doc.setFont('helvetica', 'normal')
   doc.setTextColor(32, 48, 74)
   doc.text(validationLinkLines, marginX + 108, cursorY + 28 + (validationLines.length * 10) + 24)

@@ -113,7 +113,7 @@ async function loadImageDataUrlFromBlob(blob) {
     const image = await new Promise((resolve, reject) => {
       const element = new Image()
       element.onload = () => resolve(element)
-      element.onerror = () => reject(new Error('Nao foi possivel carregar o brasao oficial.'))
+      element.onerror = () => reject(new Error('Não foi possível carregar o brasão oficial.'))
       element.src = objectUrl
     })
 
@@ -139,7 +139,7 @@ export async function loadOptimizedLogo() {
     optimizedLogoPromise = (async () => {
       const response = await fetch(officialBrand.logoPath)
       if (!response.ok) {
-        throw new Error('Nao foi possivel carregar o brasao oficial.')
+        throw new Error('Não foi possível carregar o brasão oficial.')
       }
 
       const blob = await response.blob()
@@ -169,7 +169,7 @@ async function buildPdfDocument({
   summaryMetrics = [],
   reportCode,
   referenceLabel,
-  responsibleSector = 'Departamento de Gestao da Frota',
+  responsibleSector = 'Departamento de Gestão da Frota',
   orientation,
   generatedBy = 'Sistema oficial da frota municipal',
 }) {
@@ -393,7 +393,7 @@ export async function previewRowsToPdf(options) {
             }
           </style>
         </head>
-        <body>Gerando relatorio em PDF...</body>
+        <body>Gerando relatório em PDF...</body>
       </html>
     `)
     previewWindow.document.close()

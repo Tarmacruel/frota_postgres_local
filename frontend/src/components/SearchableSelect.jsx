@@ -7,11 +7,11 @@ export default function SearchableSelect({
   onChange,
   options,
   placeholder = 'Selecione',
-  searchPlaceholder = 'Buscar opcao',
-  emptyLabel = 'Nenhuma opcao encontrada.',
+  searchPlaceholder = 'Buscar opção',
+  emptyLabel = 'Nenhuma opção encontrada.',
   disabled = false,
   allowClear = false,
-  clearLabel = 'Limpar selecao',
+  clearLabel = 'Limpar seleção',
 }) {
   const rootRef = useRef(null)
   const inputRef = useRef(null)

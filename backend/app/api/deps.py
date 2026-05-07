@@ -10,6 +10,12 @@ from app.models.user import User, UserRole
 from app.repositories.user_repository import UserRepository
 
 
+PASSWORD_CHANGE_REQUIRED_DETAIL = {
+    "code": "PASSWORD_CHANGE_REQUIRED",
+    "message": "Troca de senha obrigatória no primeiro acesso",
+}
+
+
 async def get_current_user(
     db: AsyncSession = Depends(get_db_session),
     access_token: str | None = Cookie(default=None),
@@ -33,7 +39,13 @@ async def get_current_user(
     return user
 
 
-async def require_admin(current_user: User = Depends(get_current_user)) -> User:
+async def get_current_user_ready(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.must_change_password:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=PASSWORD_CHANGE_REQUIRED_DETAIL)
+    return current_user
+
+
+async def require_admin(current_user: User = Depends(get_current_user_ready)) -> User:
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso restrito a administradores")
     return current_user
@@ -43,7 +55,7 @@ async def require_writer(current_user: User = Depends(get_current_user)) -> User
     if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso restrito a perfis com permissao de cadastro e edicao",
+            detail="Acesso restrito a perfis com permissão de cadastro e edição",
         )
     return current_user
 
@@ -52,7 +64,7 @@ async def require_fuel_station_user(current_user: User = Depends(get_current_use
     if current_user.role not in {UserRole.ADMIN, UserRole.POSTO}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso restrito a administradores e usuarios de posto",
+            detail="Acesso restrito a administradores e usuários de posto",
         )
     return current_user
 
@@ -61,7 +73,7 @@ async def require_fuel_module_user(current_user: User = Depends(get_current_user
     if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO, UserRole.POSTO}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso restrito ao modulo de abastecimentos",
+            detail="Acesso restrito ao módulo de abastecimentos",
         )
     return current_user
 
@@ -70,7 +82,7 @@ async def require_fuel_supply_viewer(current_user: User = Depends(get_current_us
     if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso restrito ao historico de abastecimentos",
+            detail="Acesso restrito ao histórico de abastecimentos",
         )
     return current_user
 
@@ -79,6 +91,6 @@ async def require_fuel_supply_confirmer(current_user: User = Depends(get_current
     if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO, UserRole.POSTO}:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso restrito a perfis com permissao de confirmacao no modulo de abastecimentos",
+            detail="Acesso restrito a perfis com permissão de confirmação no módulo de abastecimentos",
         )
     return current_user

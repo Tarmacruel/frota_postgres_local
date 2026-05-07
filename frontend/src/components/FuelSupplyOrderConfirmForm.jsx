@@ -53,7 +53,7 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
     setError('')
 
     if (!form.odometer_km || Number(form.odometer_km) < 0) {
-      setError('Informe um odometro valido.')
+      setError('Informe um odômetro valido.')
       return
     }
     if (!form.liters || Number(form.liters) <= 0) {
@@ -83,7 +83,7 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
       onSuccess?.('Abastecimento confirmado com sucesso.')
       onClose?.()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel confirmar o abastecimento.'))
+      setError(getApiErrorMessage(err, 'Não foi possível confirmar o abastecimento.'))
     } finally {
       setSubmitting(false)
     }
@@ -94,7 +94,7 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
 
       <div className="form-field">
-        <label>Odometro real (km)</label>
+        <label>Odômetro real (km)</label>
         <input type="number" min="0" step="0.1" className="app-input" value={form.odometer_km} onChange={(event) => setForm((current) => ({ ...current, odometer_km: event.target.value }))} required />
       </div>
 
@@ -120,7 +120,7 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
       </div>
 
       <div className="form-field modal-field-span">
-        <label>Observacoes</label>
+        <label>Observações</label>
         <textarea className="app-textarea" rows="3" value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} />
       </div>
 

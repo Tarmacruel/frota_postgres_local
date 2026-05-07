@@ -231,7 +231,7 @@ def credentials_table():
             Paragraph("<b>Senha</b>", STYLES["Small"]),
         ],
         ["ADMIN", "Emissão de ordens, gestão, relatórios e auditoria do fluxo.", "admin@frota.local", "Admin@1234"],
-        ["PRODUÇÃO", "Operação equivalente ao perfil administrativo do módulo.", "producao@frota.local", "Producao@1234"],
+        ["PRODUÇÃO", "Operação equivalente ao perfil administrativo do módulo.", "producao@frota.local", "Produção@1234"],
         ["POSTO", "Confirmação das ordens abertas do posto vinculado.", "posto@frota.local", "Posto@1234"],
         ["PADRÃO", "Perfil base para navegação geral sem foco operacional do módulo.", "padrao@frota.local", "User@1234"],
     ]
@@ -388,7 +388,7 @@ def build_story():
     story.append(Paragraph("Pontos de atenção nesta tela:", STYLES["CardTitle"]))
     admin_points = [
         "O botão <b>Nova ordem</b> inicia a emissão.",
-        "As ações <b>Previsualizar PDF</b> e <b>Exportar XLSX</b> geram relatórios das ordens conforme os filtros aplicados.",
+        "As ações <b>Pré-visualizar PDF</b> e <b>Exportar XLSX</b> geram relatórios das ordens conforme os filtros aplicados.",
         "A seção <b>Histórico de abastecimentos</b> passa a mostrar os abastecimentos já confirmados pelo posto.",
     ]
     story.append(

@@ -6,7 +6,7 @@ import { toDateTimeLocalValue } from '../utils/datetime'
 import { formatCurrencyInput, parseCurrencyInput } from '../utils/fuelSupplyOrders'
 
 function buildVehicleOption(vehicle) {
-  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
+  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
   return {
     value: vehicle.id,
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
@@ -59,12 +59,12 @@ export default function FuelSupplyOrderCreateForm({ vehicles, drivers, organizat
     setError('')
 
     if (!form.vehicle_id) {
-      setError('Selecione um veiculo para emitir a ordem.')
+      setError('Selecione um veículo para emitir a ordem.')
       return
     }
 
     if (!form.fuel_station_id) {
-      setError('Selecione o posto responsavel pela ordem.')
+      setError('Selecione o posto responsável pela ordem.')
       return
     }
 
@@ -99,7 +99,7 @@ export default function FuelSupplyOrderCreateForm({ vehicles, drivers, organizat
       })
       onClose?.()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel criar a ordem de abastecimento.'))
+      setError(getApiErrorMessage(err, 'Não foi possível criar a ordem de abastecimento.'))
     } finally {
       setSubmitting(false)
     }
@@ -110,13 +110,13 @@ export default function FuelSupplyOrderCreateForm({ vehicles, drivers, organizat
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
 
       <div className="form-field">
-        <label>Veiculo</label>
+        <label>Veículo</label>
         <SearchableSelect
           value={form.vehicle_id}
           onChange={(value) => setForm((current) => ({ ...current, vehicle_id: value }))}
           options={vehicles.map(buildVehicleOption)}
-          placeholder="Selecione o veiculo"
-          searchPlaceholder="Buscar veiculo"
+          placeholder="Selecione o veículo"
+          searchPlaceholder="Buscar veículo"
         />
       </div>
 
@@ -136,20 +136,20 @@ export default function FuelSupplyOrderCreateForm({ vehicles, drivers, organizat
         <SearchableSelect
           value={form.driver_id}
           onChange={(value) => setForm((current) => ({ ...current, driver_id: value }))}
-          options={[{ value: '', label: 'Nao informado' }, ...drivers.map(buildDriverOption)]}
+          options={[{ value: '', label: 'Não informado' }, ...drivers.map(buildDriverOption)]}
           placeholder="Selecione o condutor"
           searchPlaceholder="Buscar condutor"
         />
       </div>
 
       <div className="form-field">
-        <label>Orgao solicitante</label>
+        <label>Órgão solicitante</label>
         <SearchableSelect
           value={form.organization_id}
           onChange={(value) => setForm((current) => ({ ...current, organization_id: value }))}
-          options={[{ value: '', label: 'Nao informado' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))]}
-          placeholder="Selecione o orgao"
-          searchPlaceholder="Buscar orgao"
+          options={[{ value: '', label: 'Não informado' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))]}
+          placeholder="Selecione o órgão"
+          searchPlaceholder="Buscar órgão"
         />
       </div>
 
@@ -189,13 +189,13 @@ export default function FuelSupplyOrderCreateForm({ vehicles, drivers, organizat
       </div>
 
       <div className="form-field modal-field-span">
-        <label>Observacoes</label>
+        <label>Observações</label>
         <textarea
           className="app-textarea"
           rows="4"
           value={form.notes}
           onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
-          placeholder="Informacoes adicionais para o posto e para a equipe solicitante."
+          placeholder="Informações adicionais para o posto e para a equipe solicitante."
         />
       </div>
 

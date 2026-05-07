@@ -38,9 +38,9 @@ function getDeadlineMeta(order) {
 
   if (minutesRemaining < 0) {
     const lateMinutes = Math.abs(minutesRemaining)
-    if (lateMinutes < 60) return { label: `Expirada ha ${lateMinutes} min`, tone: 'danger', minutesRemaining }
+    if (lateMinutes < 60) return { label: `Expirada há ${lateMinutes} min`, tone: 'danger', minutesRemaining }
     const lateHours = Math.round(lateMinutes / 60)
-    return { label: `Expirada ha ${lateHours} h`, tone: 'danger', minutesRemaining }
+    return { label: `Expirada há ${lateHours} h`, tone: 'danger', minutesRemaining }
   }
 
   if (minutesRemaining <= 60) {
@@ -68,7 +68,7 @@ export default function FuelSupplyOrdersPage() {
       const payload = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
       setOrders(payload)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar as ordens abertas de abastecimento.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar as ordens abertas de abastecimento.'))
     } finally {
       setLoading(false)
     }
@@ -107,7 +107,7 @@ export default function FuelSupplyOrdersPage() {
       setError('')
       await previewFuelSupplyOrderDocument(order)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel abrir o comprovante da ordem.'))
+      setError(getApiErrorMessage(err, 'Não foi possível abrir o comprovante da ordem.'))
     }
   }
 
@@ -124,7 +124,7 @@ export default function FuelSupplyOrdersPage() {
         <div className="filter-inline">
           <input
             className="app-input"
-            placeholder="Buscar por placa, solicitante, condutor ou numero"
+            placeholder="Buscar por placa, solicitante, condutor ou número"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -141,13 +141,13 @@ export default function FuelSupplyOrdersPage() {
             <thead>
               <tr>
                 <th>Ordem</th>
-                <th>Veiculo</th>
+                <th>Veículo</th>
                 <th>Posto</th>
                 <th>Solicitada em</th>
                 <th>Prazo</th>
                 <th>Condutor</th>
                 <th>Litros previstos</th>
-                <th>Acoes</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -158,7 +158,7 @@ export default function FuelSupplyOrdersPage() {
                 return (
                   <tr key={order.id}>
                     <td data-label="Ordem">{formatOrderNumber(order)}</td>
-                    <td data-label="Veiculo">{order.vehicle_plate || '-'}</td>
+                    <td data-label="Veículo">{order.vehicle_plate || '-'}</td>
                     <td data-label="Posto">{order.fuel_station_name || '-'}</td>
                     <td data-label="Solicitada em">{formatDate(order.requested_at || order.created_at)}</td>
                     <td data-label="Prazo">
@@ -167,7 +167,7 @@ export default function FuelSupplyOrdersPage() {
                     </td>
                     <td data-label="Condutor">{order.driver_name || order.created_by_name || '-'}</td>
                     <td data-label="Litros previstos">{formatNumber(order.requested_liters)}</td>
-                    <td data-label="Acoes">
+                    <td data-label="Ações">
                       <div className="actions-inline">
                         <button className="mini-button" type="button" onClick={() => handlePreviewOrderDocument(order)}>Comprovante</button>
                         <button className="app-button" type="button" onClick={() => setSelectedOrder(order)}>Confirmar abastecimento</button>

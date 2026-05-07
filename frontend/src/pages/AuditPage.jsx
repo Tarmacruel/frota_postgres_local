@@ -64,7 +64,7 @@ export default function AuditPage() {
 
   const exportColumns = [
     { header: 'Data', value: (log) => formatDate(log.created_at) },
-    { header: 'Acao', value: (log) => log.action },
+    { header: 'Ação', value: (log) => log.action },
     { header: 'Entidade', value: (log) => log.entity_type },
     { header: 'Registro', value: (log) => log.entity_label },
     { header: 'Ator', value: (log) => `${log.actor_name}${log.actor_email ? ` <${log.actor_email}>` : ''}` },
@@ -80,7 +80,7 @@ export default function AuditPage() {
         const { data } = await api.get('/audit', { params: { limit: 200 } })
         setLogs(data)
       } catch (err) {
-        setError(getApiErrorMessage(err, 'Nao foi possivel carregar a trilha de auditoria.'))
+        setError(getApiErrorMessage(err, 'Não foi possível carregar a trilha de auditoria.'))
       } finally {
         setLoading(false)
       }
@@ -91,7 +91,7 @@ export default function AuditPage() {
 
   async function handleExportPdf() {
     if (filteredLogs.length === 0) {
-      setFeedback('Nao ha eventos de auditoria filtrados para previsualizar.')
+      setFeedback('Não há eventos de auditoria filtrados para pré-visualizar.')
       return
     }
 
@@ -101,24 +101,24 @@ export default function AuditPage() {
       await previewRowsToPdf({
         title: 'Frota PMTF - Auditoria',
         fileName: 'frota-pmtf-auditoria',
-        subtitle: 'Relatorio administrativo da trilha de auditoria filtrada.',
+        subtitle: 'Relatório administrativo da trilha de auditoria filtrada.',
         columns: exportColumns,
         rows: filteredLogs,
         filters: [
-          { label: 'Acao', value: actionFilter === 'TODAS' ? 'Todas' : actionFilter },
+          { label: 'Ação', value: actionFilter === 'TODAS' ? 'Todas' : actionFilter },
           { label: 'Entidade', value: entityFilter === 'TODOS' ? 'Todas' : entityFilter },
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
-      setFeedback('Pre-visualizacao do PDF de auditoria aberta em nova guia.')
+      setFeedback('Pré-visualização do PDF de auditoria aberta em nova guia.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o PDF da auditoria.'))
+      setError(getApiErrorMessage(err, 'Não foi possível gerar o PDF da auditoria.'))
     }
   }
 
   async function handleExportXlsx() {
     if (filteredLogs.length === 0) {
-      setFeedback('Nao ha eventos de auditoria filtrados para exportar.')
+      setFeedback('Não há eventos de auditoria filtrados para exportar.')
       return
     }
 
@@ -131,14 +131,14 @@ export default function AuditPage() {
         columns: exportColumns,
         rows: filteredLogs,
         filters: [
-          { label: 'Acao', value: actionFilter === 'TODAS' ? 'Todas' : actionFilter },
+          { label: 'Ação', value: actionFilter === 'TODAS' ? 'Todas' : actionFilter },
           { label: 'Entidade', value: entityFilter === 'TODOS' ? 'Todas' : entityFilter },
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
-      setFeedback('Exportacao de auditoria em XLSX iniciada com sucesso.')
+      setFeedback('Exportação de auditoria em XLSX iniciada com sucesso.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar a auditoria em XLSX.'))
+      setError(getApiErrorMessage(err, 'Não foi possível exportar a auditoria em XLSX.'))
     }
   }
 
@@ -147,10 +147,10 @@ export default function AuditPage() {
       <div className="panel-heading">
         <div>
           <h2 className="section-title">Auditoria administrativa</h2>
-          <p className="section-copy">Acompanhe criacoes, edicoes e exclusoes registradas nas areas sensiveis do sistema.</p>
+          <p className="section-copy">Acompanhe criacoes, edições e exclusoes registradas nas áreas sensíveis do sistema.</p>
         </div>
         <div className="actions-inline">
-          <button className="secondary-button" type="button" onClick={handleExportPdf}>Previsualizar PDF</button>
+          <button className="secondary-button" type="button" onClick={handleExportPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
       </div>
@@ -159,7 +159,7 @@ export default function AuditPage() {
         <div className="filter-inline">
           <input
             className="app-input"
-            placeholder="Buscar por ator, entidade, acao ou detalhes"
+            placeholder="Buscar por ator, entidade, ação ou detalhes"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -196,7 +196,7 @@ export default function AuditPage() {
             <thead>
               <tr>
                 <th>Data</th>
-                <th>Acao</th>
+                <th>Ação</th>
                 <th>Entidade</th>
                 <th>Registro</th>
                 <th>Ator</th>
@@ -218,7 +218,7 @@ export default function AuditPage() {
                 filteredLogs.map((log) => (
                   <tr key={log.id}>
                     <td data-label="Data">{formatDate(log.created_at)}</td>
-                    <td data-label="Acao"><span className={`status-badge audit-action-${log.action}`}>{log.action}</span></td>
+                    <td data-label="Ação"><span className={`status-badge audit-action-${log.action}`}>{log.action}</span></td>
                     <td data-label="Entidade">{log.entity_type}</td>
                     <td data-label="Registro"><strong>{log.entity_label}</strong></td>
                     <td data-label="Ator">

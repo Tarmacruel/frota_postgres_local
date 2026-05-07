@@ -37,7 +37,7 @@ export default function PublicFuelSupplyOrderPage() {
         const { data } = await fuelSupplyOrdersAPI.getPublic(validationCode)
         setOrder(data)
       } catch (err) {
-        setError(getApiErrorMessage(err, 'Nao foi possivel validar o comprovante publico da ordem.'))
+        setError(getApiErrorMessage(err, 'Não foi possível validar o comprovante público da ordem.'))
       } finally {
         setLoading(false)
       }
@@ -51,14 +51,14 @@ export default function PublicFuelSupplyOrderPage() {
   async function handleCopyLink() {
     if (!publicUrl) return
     if (!navigator.clipboard) {
-      setFeedback(`Link publico: ${publicUrl}`)
+      setFeedback(`Link público: ${publicUrl}`)
       return
     }
     try {
       await navigator.clipboard.writeText(publicUrl)
-      setFeedback('Link publico copiado para a area de transferencia.')
+      setFeedback('Link público copiado para a área de transferencia.')
     } catch {
-      setFeedback('Nao foi possivel copiar o link automaticamente.')
+      setFeedback('Não foi possível copiar o link automaticamente.')
     }
   }
 
@@ -67,7 +67,7 @@ export default function PublicFuelSupplyOrderPage() {
       <div className="public-order-card">
         <header className="public-order-header">
           <div>
-            <span className="public-order-eyebrow">{officialBrand.systemName} . validacao publica</span>
+            <span className="public-order-eyebrow">{officialBrand.systemName} . validação pública</span>
             <h1>Comprovante institucional de ordem de abastecimento</h1>
             <p>
               Este ambiente permite consultar e baixar novamente o documento oficial emitido pela Prefeitura Municipal de
@@ -88,12 +88,12 @@ export default function PublicFuelSupplyOrderPage() {
           <>
             <section className="public-order-summary">
               <div className="public-order-highlight">
-                <span className="muted">Numero da ordem</span>
+                <span className="muted">Número da ordem</span>
                 <strong>{formatOrderNumber(order)}</strong>
                 <span className={`status-badge ${getOrderStatusClass(order.status)}`}>{getOrderStatusLabel(order.status)}</span>
               </div>
               <div className="public-order-highlight">
-                <span className="muted">Codigo de validacao</span>
+                <span className="muted">Código de validação</span>
                 <strong>{order.validation_code}</strong>
                 <span className="muted">Emitida em {formatDate(order.created_at)}</span>
               </div>
@@ -103,22 +103,22 @@ export default function PublicFuelSupplyOrderPage() {
               <article className="public-order-block">
                 <h2>Dados operacionais</h2>
                 <dl>
-                  <div><dt>Veiculo</dt><dd>{order.vehicle_description || order.vehicle_plate || '-'}</dd></div>
-                  <div><dt>Condutor</dt><dd>{order.driver_name || 'Nao informado'}</dd></div>
-                  <div><dt>Orgao solicitante</dt><dd>{order.organization_name || 'Nao informado'}</dd></div>
-                  <div><dt>Posto credenciado</dt><dd>{order.fuel_station_name || 'Nao informado'}</dd></div>
-                  <div><dt>Endereco do posto</dt><dd>{order.fuel_station_address || 'Nao informado'}</dd></div>
-                  <div><dt>CNPJ do posto</dt><dd>{order.fuel_station_cnpj || 'Nao informado'}</dd></div>
+                  <div><dt>Veículo</dt><dd>{order.vehicle_description || order.vehicle_plate || '-'}</dd></div>
+                  <div><dt>Condutor</dt><dd>{order.driver_name || 'Não informado'}</dd></div>
+                  <div><dt>Órgão solicitante</dt><dd>{order.organization_name || 'Não informado'}</dd></div>
+                  <div><dt>Posto credenciado</dt><dd>{order.fuel_station_name || 'Não informado'}</dd></div>
+                  <div><dt>Endereço do posto</dt><dd>{order.fuel_station_address || 'Não informado'}</dd></div>
+                  <div><dt>CNPJ do posto</dt><dd>{order.fuel_station_cnpj || 'Não informado'}</dd></div>
                 </dl>
               </article>
 
               <article className="public-order-block">
                 <h2>Controle institucional</h2>
                 <dl>
-                  <div><dt>Servidor emissor</dt><dd>{order.created_by_name || 'Nao informado'}</dd></div>
-                  <div><dt>Valida ate</dt><dd>{formatDate(order.expires_at)}</dd></div>
+                  <div><dt>Servidor emissor</dt><dd>{order.created_by_name || 'Não informado'}</dd></div>
+                  <div><dt>Valida até</dt><dd>{formatDate(order.expires_at)}</dd></div>
                   <div><dt>Confirmada em</dt><dd>{formatDate(order.confirmed_at)}</dd></div>
-                  <div><dt>Concluida por</dt><dd>{order.confirmed_by_name || 'Pendente'}</dd></div>
+                  <div><dt>Concluída por</dt><dd>{order.confirmed_by_name || 'Pendente'}</dd></div>
                   <div><dt>Litros previstos</dt><dd>{formatLiters(order.requested_liters)}</dd></div>
                   <div><dt>Valor maximo</dt><dd>{formatCurrencyBRL(order.max_amount)}</dd></div>
                 </dl>
@@ -127,7 +127,7 @@ export default function PublicFuelSupplyOrderPage() {
 
             {order.notes ? (
               <section className="public-order-notes">
-                <h2>Observacoes</h2>
+                <h2>Observações</h2>
                 <p>{order.notes}</p>
               </section>
             ) : null}
@@ -137,15 +137,15 @@ export default function PublicFuelSupplyOrderPage() {
                 Baixar comprovante em PDF
               </button>
               <button type="button" className="secondary-button" onClick={() => previewFuelSupplyOrderDocument(order)}>
-                Previsualizar PDF
+                Pré-visualizar PDF
               </button>
               <button type="button" className="ghost-button" onClick={handleCopyLink}>
-                Copiar link publico
+                Copiar link público
               </button>
             </section>
 
             <footer className="public-order-footer">
-              <span>Endereco publico de validacao</span>
+              <span>Endereço público de validação</span>
               <strong>{publicUrl}</strong>
             </footer>
           </>

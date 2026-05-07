@@ -29,17 +29,17 @@ class FineService:
     async def get(self, fine_id: UUID) -> dict:
         fine = await self.fines.get_by_id(fine_id)
         if not fine:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Multa nao encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Multa não encontrada")
         return self._serialize(fine)
 
     async def create(self, data: FineCreate, current_user: User) -> dict:
         vehicle = await self.vehicles.get_by_id(data.vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
         if data.driver_id:
             driver = await self.drivers.get_by_id(data.driver_id)
             if not driver:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
 
         fine = Fine(created_by=current_user.id, **data.model_dump())
         try:
@@ -48,19 +48,19 @@ class FineService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel registrar a multa") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível registrar a multa") from exc
         return await self.get(fine.id)
 
     async def update(self, fine_id: UUID, data: FineUpdate, current_user: User) -> dict:
         fine = await self.fines.get_by_id(fine_id)
         if not fine:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Multa nao encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Multa não encontrada")
 
         payload = data.model_dump(exclude_unset=True)
         if "driver_id" in payload and payload["driver_id"]:
             driver = await self.drivers.get_by_id(payload["driver_id"])
             if not driver:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
 
         before = self._serialize(fine)
         for field, value in payload.items():
@@ -72,7 +72,7 @@ class FineService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar a multa") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar a multa") from exc
         return await self.get(fine.id)
 
     def _serialize(self, fine: Fine) -> dict:

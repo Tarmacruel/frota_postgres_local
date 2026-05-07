@@ -8,6 +8,7 @@ import { fuelStationsAPI } from '../api/fuelStations'
 import { masterDataAPI } from '../api/masterData'
 import { fuelSuppliesAPI } from '../api/fuelSupplies'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
+import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { getApiErrorMessage } from '../utils/apiError'
 import { downloadFuelSupplyOrderDocument, previewFuelSupplyOrderDocument } from '../utils/fuelSupplyOrderDocument'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
@@ -20,9 +21,9 @@ import {
 } from '../utils/fuelSupplyOrders'
 
 const ORDER_STATUS_OPTIONS = [
-  { value: 'TODOS', label: 'Todas as situacoes' },
+  { value: 'TODOS', label: 'Todas as situações' },
   { value: 'OPEN', label: 'Abertas' },
-  { value: 'COMPLETED', label: 'Concluidas' },
+  { value: 'COMPLETED', label: 'Concluídas' },
   { value: 'EXPIRED', label: 'Expiradas' },
   { value: 'CANCELLED', label: 'Canceladas' },
 ]
@@ -42,7 +43,7 @@ function formatCurrency(value) {
 }
 
 function buildVehicleOption(vehicle) {
-  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
+  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
   return { value: vehicle.id, label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`, description: locationLabel }
 }
 
@@ -76,7 +77,7 @@ export default function FuelSuppliesPage() {
     async function loadDependencies() {
       try {
         const [vehiclesResponse, driversResponse, organizationsResponse, stationsResponse] = await Promise.all([
-          api.get('/vehicles'),
+          api.get('/vehicles', { params: { limit: VEHICLE_LIST_LIMIT } }),
           api.get('/drivers'),
           masterDataAPI.listOrganizations(),
           fuelStationsAPI.list({ active_only: true }),
@@ -86,7 +87,7 @@ export default function FuelSuppliesPage() {
         setOrganizations(asArray(organizationsResponse.data))
         setFuelStations(asArray(stationsResponse.data))
       } catch (err) {
-        setError(getApiErrorMessage(err, 'Nao foi possivel carregar os cadastros de apoio.'))
+        setError(getApiErrorMessage(err, 'Não foi possível carregar os cadastros de apoio.'))
       }
     }
     loadDependencies()
@@ -105,7 +106,7 @@ export default function FuelSuppliesPage() {
       const { data } = await fuelSuppliesAPI.list(params)
       setRecords(data.data || [])
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar os abastecimentos.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar os abastecimentos.'))
     } finally {
       setHistoryLoading(false)
     }
@@ -121,7 +122,7 @@ export default function FuelSuppliesPage() {
       const { data } = await fuelSupplyOrdersAPI.list(params)
       setOrders(asArray(data))
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar as ordens de abastecimento.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar as ordens de abastecimento.'))
     } finally {
       setOrdersLoading(false)
     }
@@ -170,15 +171,15 @@ export default function FuelSuppliesPage() {
 
   const orderExportColumns = useMemo(() => [
     { header: 'Ordem', value: (order) => formatOrderNumber(order) },
-    { header: 'Situacao', value: (order) => getOrderStatusLabel(order.status) },
-    { header: 'Veiculo', value: (order) => order.vehicle_description || order.vehicle_plate || '-' },
+    { header: 'Situação', value: (order) => getOrderStatusLabel(order.status) },
+    { header: 'Veículo', value: (order) => order.vehicle_description || order.vehicle_plate || '-' },
     { header: 'Posto', value: (order) => order.fuel_station_name || '-' },
-    { header: 'Orgao', value: (order) => order.organization_name || '-' },
+    { header: 'Órgão', value: (order) => order.organization_name || '-' },
     { header: 'Solicitante', value: (order) => order.created_by_name || '-' },
     { header: 'Prazo', value: (order) => formatDate(order.expires_at) },
     { header: 'Litros previstos', value: (order) => order.requested_liters ?? '-' },
     { header: 'Valor maximo', value: (order) => formatCurrency(order.max_amount) },
-    { header: 'Codigo publico', value: (order) => order.validation_code || '-' },
+    { header: 'Código público', value: (order) => order.validation_code || '-' },
   ], [])
 
   useEffect(() => {
@@ -202,13 +203,13 @@ export default function FuelSuppliesPage() {
       setFeedback(`Ordem ${formatOrderNumber(order)} cancelada com sucesso.`)
       await loadOrders()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel cancelar a ordem de abastecimento.'))
+      setError(getApiErrorMessage(err, 'Não foi possível cancelar a ordem de abastecimento.'))
     }
   }
 
   async function handlePreviewOrdersPdf() {
     if (filteredOrders.length === 0) {
-      setFeedback('Nao ha ordens filtradas para previsualizar em PDF.')
+      setFeedback('Não há ordens filtradas para pré-visualizar em PDF.')
       return
     }
 
@@ -218,30 +219,30 @@ export default function FuelSuppliesPage() {
       await previewRowsToPdf({
         title: 'Frota PMTF - Ordens de abastecimento',
         fileName: 'frota-pmtf-ordens-abastecimento',
-        subtitle: 'Relatorio institucional das ordens emitidas para os postos credenciados.',
+        subtitle: 'Relatório institucional das ordens emitidas para os postos credenciados.',
         columns: orderExportColumns,
         rows: filteredOrders,
         filters: [
-          { label: 'Situacao', value: orderFilters.status === 'TODOS' ? 'Todas as situacoes' : getOrderStatusLabel(orderFilters.status) },
+          { label: 'Situação', value: orderFilters.status === 'TODOS' ? 'Todas as situações' : getOrderStatusLabel(orderFilters.status) },
           { label: 'Posto', value: fuelStations.find((station) => station.id === orderFilters.fuel_station_id)?.name || 'Todos os postos' },
           ...(orderSearch.trim() ? [{ label: 'Busca', value: orderSearch.trim() }] : []),
         ],
         summaryMetrics: [
           { label: 'Ordens exibidas', value: filteredOrders.length },
           { label: 'Abertas', value: filteredOrders.filter((order) => order.status === 'OPEN').length },
-          { label: 'Concluidas', value: filteredOrders.filter((order) => order.status === 'COMPLETED').length },
+          { label: 'Concluídas', value: filteredOrders.filter((order) => order.status === 'COMPLETED').length },
         ],
         orientation: 'landscape',
       })
-      setFeedback('Pre-visualizacao do PDF das ordens aberta em nova guia.')
+      setFeedback('Pré-visualização do PDF das ordens aberta em nova guia.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o PDF das ordens de abastecimento.'))
+      setError(getApiErrorMessage(err, 'Não foi possível gerar o PDF das ordens de abastecimento.'))
     }
   }
 
   async function handleExportOrdersXlsx() {
     if (filteredOrders.length === 0) {
-      setFeedback('Nao ha ordens filtradas para exportar.')
+      setFeedback('Não há ordens filtradas para exportar.')
       return
     }
 
@@ -254,14 +255,14 @@ export default function FuelSuppliesPage() {
         columns: orderExportColumns,
         rows: filteredOrders,
         filters: [
-          { label: 'Situacao', value: orderFilters.status === 'TODOS' ? 'Todas as situacoes' : getOrderStatusLabel(orderFilters.status) },
+          { label: 'Situação', value: orderFilters.status === 'TODOS' ? 'Todas as situações' : getOrderStatusLabel(orderFilters.status) },
           { label: 'Posto', value: fuelStations.find((station) => station.id === orderFilters.fuel_station_id)?.name || 'Todos os postos' },
           ...(orderSearch.trim() ? [{ label: 'Busca', value: orderSearch.trim() }] : []),
         ],
       })
-      setFeedback('Exportacao das ordens em XLSX iniciada com sucesso.')
+      setFeedback('Exportação das ordens em XLSX iniciada com sucesso.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar as ordens em XLSX.'))
+      setError(getApiErrorMessage(err, 'Não foi possível exportar as ordens em XLSX.'))
     }
   }
 
@@ -270,7 +271,7 @@ export default function FuelSuppliesPage() {
       setError('')
       await previewFuelSupplyOrderDocument(order)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel abrir o comprovante da ordem.'))
+      setError(getApiErrorMessage(err, 'Não foi possível abrir o comprovante da ordem.'))
     }
   }
 
@@ -279,27 +280,27 @@ export default function FuelSuppliesPage() {
       setError('')
       await downloadFuelSupplyOrderDocument(order)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel baixar o comprovante da ordem.'))
+      setError(getApiErrorMessage(err, 'Não foi possível baixar o comprovante da ordem.'))
     }
   }
 
   async function handleCopyPublicLink(order) {
     const publicUrl = resolvePublicValidationUrl(order.public_validation_path)
     if (!publicUrl) {
-      setFeedback('Link publico indisponivel para esta ordem.')
+      setFeedback('Link público indisponível para esta ordem.')
       return
     }
 
     if (!navigator.clipboard) {
-      setFeedback(`Link publico: ${publicUrl}`)
+      setFeedback(`Link público: ${publicUrl}`)
       return
     }
 
     try {
       await navigator.clipboard.writeText(publicUrl)
-      setFeedback(`Link publico da ordem ${formatOrderNumber(order)} copiado com sucesso.`)
+      setFeedback(`Link público da ordem ${formatOrderNumber(order)} copiado com sucesso.`)
     } catch {
-      setFeedback(`Link publico: ${publicUrl}`)
+      setFeedback(`Link público: ${publicUrl}`)
     }
   }
 
@@ -317,8 +318,8 @@ export default function FuelSuppliesPage() {
     <div className="surface-panel">
       <div className="panel-heading">
         <div>
-          <h2 className="section-title">Gestao de abastecimentos</h2>
-          <p className="section-copy">Emita ordens para os postos vinculados e acompanhe o historico confirmado com comprovantes e alertas de consumo.</p>
+          <h2 className="section-title">Gestão de abastecimentos</h2>
+          <p className="section-copy">Emita ordens para os postos vinculados e acompanhe o histórico confirmado com comprovantes e alertas de consumo.</p>
         </div>
         <div className="actions-inline">
           <button className="app-button" type="button" onClick={() => setIsOrderModalOpen(true)}>Nova ordem</button>
@@ -351,16 +352,16 @@ export default function FuelSuppliesPage() {
       {lastIssuedOrder ? (
         <div className="table-focus-banner">
           <div>
-            <strong>Comprovante institucional disponivel para {formatOrderNumber(lastIssuedOrder)}</strong>
+            <strong>Comprovante institucional disponível para {formatOrderNumber(lastIssuedOrder)}</strong>
             <span>
-              O documento oficial ja pode ser previsualizado, baixado em PDF ou compartilhado pelo link publico com
-              validacao por QR Code.
+              O documento oficial já pode ser previsualizado, baixado em PDF ou compartilhado pelo link público com
+              validação por QR Code.
             </span>
           </div>
           <div className="actions-inline">
             <button className="app-button" type="button" onClick={() => handlePreviewOrderDocument(lastIssuedOrder)}>Abrir comprovante</button>
             <button className="secondary-button" type="button" onClick={() => handleDownloadOrderDocument(lastIssuedOrder)}>Baixar PDF</button>
-            <button className="ghost-button" type="button" onClick={() => handleCopyPublicLink(lastIssuedOrder)}>Copiar link publico</button>
+            <button className="ghost-button" type="button" onClick={() => handleCopyPublicLink(lastIssuedOrder)}>Copiar link público</button>
           </div>
         </div>
       ) : null}
@@ -372,13 +373,13 @@ export default function FuelSuppliesPage() {
             <p className="section-copy">Acompanhe o ciclo completo das ordens emitidas para os postos credenciados.</p>
           </div>
           <div className="actions-inline">
-            <button className="secondary-button" type="button" onClick={handlePreviewOrdersPdf}>Previsualizar PDF</button>
+            <button className="secondary-button" type="button" onClick={handlePreviewOrdersPdf}>Pré-visualizar PDF</button>
             <button className="ghost-button" type="button" onClick={handleExportOrdersXlsx}>Exportar XLSX</button>
           </div>
         </div>
 
         <div className="filter-inline">
-          <input className="app-input" placeholder="Buscar ordem por placa, posto, solicitante ou observacao" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} />
+          <input className="app-input" placeholder="Buscar ordem por placa, posto, solicitante ou observação" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} />
           <select className="app-select" value={orderFilters.status} onChange={(event) => setOrderFilters((prev) => ({ ...prev, status: event.target.value }))}>
             {ORDER_STATUS_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
@@ -399,14 +400,14 @@ export default function FuelSuppliesPage() {
             <thead>
               <tr>
                 <th>Ordem</th>
-                <th>Veiculo</th>
+                <th>Veículo</th>
                 <th>Posto</th>
-                <th>Situacao</th>
+                <th>Situação</th>
                 <th>Prazo</th>
                 <th>Solicitante</th>
                 <th>Litros previstos</th>
                 <th>Valor maximo</th>
-                <th>Acoes</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -415,24 +416,24 @@ export default function FuelSuppliesPage() {
               {!ordersLoading && paginatedOrders.map((order) => (
                 <tr key={order.id}>
                   <td data-label="Ordem"><strong>{formatOrderNumber(order)}</strong></td>
-                  <td data-label="Veiculo">{order.vehicle_plate}</td>
+                  <td data-label="Veículo">{order.vehicle_plate}</td>
                   <td data-label="Posto">{order.fuel_station_name || '-'}</td>
-                  <td data-label="Situacao">
+                  <td data-label="Situação">
                     <span className={`status-badge ${getOrderStatusClass(order.status)}`}>{getOrderStatusLabel(order.status)}</span>
                   </td>
                   <td data-label="Prazo">{formatDate(order.expires_at)}</td>
                   <td data-label="Solicitante">
                     <div className="stack">
                       <strong>{order.created_by_name || '-'}</strong>
-                      <span className="muted">{order.organization_name || 'Sem orgao informado'}</span>
+                      <span className="muted">{order.organization_name || 'Sem órgão informado'}</span>
                     </div>
                   </td>
                   <td data-label="Litros previstos">{formatNumber(order.requested_liters)}</td>
                   <td data-label="Valor maximo">{formatCurrency(order.max_amount)}</td>
-                  <td data-label="Acoes">
+                  <td data-label="Ações">
                     <div className="actions-inline">
                       <button type="button" className="mini-button" onClick={() => handlePreviewOrderDocument(order)}>Comprovante</button>
-                      <button type="button" className="mini-button" onClick={() => handleCopyPublicLink(order)}>Link publico</button>
+                      <button type="button" className="mini-button" onClick={() => handleCopyPublicLink(order)}>Link público</button>
                       <button type="button" className="mini-button" onClick={() => handleDownloadOrderDocument(order)}>Baixar PDF</button>
                       {order.status === 'OPEN' ? <button type="button" className="mini-button danger" onClick={() => handleCancelOrder(order)}>Cancelar</button> : null}
                     </div>
@@ -448,16 +449,16 @@ export default function FuelSuppliesPage() {
       <div className="surface-panel panel-nested">
         <div className="panel-heading">
           <div>
-            <h3 className="section-title">Historico de abastecimentos</h3>
+            <h3 className="section-title">Histórico de abastecimentos</h3>
             <p className="section-copy">Consulta historica dos abastecimentos confirmados, com comprovantes e alertas de consumo.</p>
           </div>
         </div>
 
         <div className="filter-inline" style={{ marginBottom: 12 }}>
-          <input className="app-input" placeholder="Buscar por placa, condutor, orgao ou posto" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veiculos' }, ...vehicles.map(buildVehicleOption)]} placeholder="Filtrar veiculo" />
+          <input className="app-input" placeholder="Buscar por placa, condutor, órgão ou posto" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(buildVehicleOption)]} placeholder="Filtrar veículo" />
           <SearchableSelect value={filters.driver_id} onChange={(value) => setFilters((prev) => ({ ...prev, driver_id: value }))} options={[{ value: '', label: 'Todos os condutores' }, ...drivers.map((driver) => ({ value: driver.id, label: driver.nome_completo }))]} placeholder="Filtrar condutor" />
-          <SearchableSelect value={filters.organization_id} onChange={(value) => setFilters((prev) => ({ ...prev, organization_id: value }))} options={[{ value: '', label: 'Todos os orgaos' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))]} placeholder="Filtrar orgao" />
+          <SearchableSelect value={filters.organization_id} onChange={(value) => setFilters((prev) => ({ ...prev, organization_id: value }))} options={[{ value: '', label: 'Todos os órgãos' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))]} placeholder="Filtrar órgão" />
           <SearchableSelect value={filters.fuel_station_id} onChange={(value) => setFilters((prev) => ({ ...prev, fuel_station_id: value }))} options={[{ value: '', label: 'Todos os postos' }, ...fuelStations.map((station) => ({ value: station.id, label: station.name, description: station.address }))]} placeholder="Filtrar posto" />
           <select className="app-input" value={filters.only_anomalies} onChange={(event) => setFilters((prev) => ({ ...prev, only_anomalies: event.target.value }))}>
             <option value="">Todos</option>
@@ -470,10 +471,10 @@ export default function FuelSuppliesPage() {
           <table className="data-table data-table-wide">
             <thead>
               <tr>
-                <th>Veiculo</th>
+                <th>Veículo</th>
                 <th>Data</th>
                 <th>Condutor</th>
-                <th>Orgao</th>
+                <th>Órgão</th>
                 <th>Posto</th>
                 <th>Litros</th>
                 <th>Km/l</th>
@@ -486,10 +487,10 @@ export default function FuelSuppliesPage() {
               {!historyLoading && paginatedRecords.length === 0 ? <tr><td colSpan={9}><div className="empty-state">Nenhum abastecimento encontrado.</div></td></tr> : null}
               {!historyLoading && paginatedRecords.map((record) => (
                 <tr key={record.id}>
-                  <td data-label="Veiculo">{record.vehicle_plate}</td>
+                  <td data-label="Veículo">{record.vehicle_plate}</td>
                   <td data-label="Data">{formatDate(record.supplied_at)}</td>
                   <td data-label="Condutor">{record.driver_name || '-'}</td>
-                  <td data-label="Orgao">{record.organization_name || '-'}</td>
+                  <td data-label="Órgão">{record.organization_name || '-'}</td>
                   <td data-label="Posto">{record.fuel_station_name || record.fuel_station || '-'}</td>
                   <td data-label="Litros">{formatNumber(record.liters)}</td>
                   <td data-label="Km/l">{formatNumber(record.consumption_km_l)}</td>

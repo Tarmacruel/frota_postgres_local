@@ -370,11 +370,11 @@ class AnalyticsService:
                         "variance_percentage": round(variance, 2),
                         "severity": severity,
                         "message": (
-                            f"Veiculo tipo {row.vehicle_type} apresenta consumo {abs(variance):.1f}% "
-                            f"{'superior' if variance > 0 else 'inferior'} a media da categoria "
+                            f"Veículo tipo {row.vehicle_type} apresenta consumo {abs(variance):.1f}% "
+                            f"{'superior' if variance > 0 else 'inferior'} a média da categoria "
                             f"({(row.category_average_consumption or 0):.1f} L/100km)."
                         ),
-                        "recommended_action": "Agendar inspecao mecanica preventiva",
+                        "recommended_action": "Agendar inspeção mecânica preventiva",
                         "generated_at": now,
                     }
                 )
@@ -391,10 +391,10 @@ class AnalyticsService:
                         "variance_percentage": round(tco_var, 2),
                         "severity": "HIGH" if abs(tco_var) >= 50 else "MEDIUM",
                         "message": (
-                            f"TCO por km de {row.vehicle_type} esta {abs(tco_var):.1f}% fora do benchmark "
+                            f"TCO por km de {row.vehicle_type} está {abs(tco_var):.1f}% fora do benchmark "
                             f"de mercado ({(row.market_benchmark_tco or 0):.2f}/km)."
                         ),
-                        "recommended_action": "Revisar plano de custos e manutencao",
+                        "recommended_action": "Revisar plano de custos e manutenção",
                         "generated_at": now,
                     }
                 )
@@ -416,7 +416,7 @@ class AnalyticsService:
                             f"Condutor {row.notes or ''} com score de risco {row.driver_risk_score:.1f}/100 "
                             f"(multas={extra.get('fines_count', 0)}, sinistros={extra.get('claims_count', 0)}, anomalias={extra.get('anomalies_count', 0)})."
                         ),
-                        "recommended_action": "Aplicar treinamento de direcao defensiva e monitoramento semanal",
+                        "recommended_action": "Aplicar treinamento de direção defensiva e monitoramento semanal",
                         "generated_at": now,
                     }
                 )
@@ -482,7 +482,7 @@ class AnalyticsService:
 
     async def export(self, period_days: int, export_format: str) -> Response:
         if export_format not in {"pdf", "xlsx"}:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Formato de exportacao suportado: pdf ou xlsx")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Formato de exportação suportado: pdf ou xlsx")
 
         insights = await self.insights(period_days)
         timestamp = datetime.now(timezone.utc)
@@ -500,8 +500,8 @@ class AnalyticsService:
             )
 
         pdf_text = io.StringIO()
-        pdf_text.write("Relatorio de Analytics da Frota\n")
-        pdf_text.write(f"Periodo: ultimos {period_days} dias\n")
+        pdf_text.write("Relatório de Analytics da Frota\n")
+        pdf_text.write(f"Período: últimos {period_days} dias\n")
         pdf_text.write(f"Gerado em: {timestamp.isoformat()}\n\n")
         for item in insights:
             pdf_text.write(f"[{item['severity']}] {item['metric']} - {item['message']}\n")

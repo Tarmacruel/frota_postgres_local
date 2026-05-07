@@ -80,7 +80,7 @@ export default function DriversPage() {
       setRecords(data.data)
       setPagination(data.pagination)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar os condutores.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar os condutores.'))
     } finally {
       setLoading(false)
     }
@@ -136,7 +136,7 @@ export default function DriversPage() {
       closeModal()
       await loadDrivers(editingRecord ? pagination.page : 1)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o condutor.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar o condutor.'))
     } finally {
       setSubmitting(false)
     }
@@ -149,7 +149,7 @@ export default function DriversPage() {
       setFeedback('Condutor inativado com sucesso.')
       await loadDrivers(pagination.page)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel inativar o condutor.'))
+      setError(getApiErrorMessage(err, 'Não foi possível inativar o condutor.'))
     }
   }
 
@@ -158,7 +158,7 @@ export default function DriversPage() {
     await previewRowsToPdf({
       title: 'Frota PMTF - Condutores cadastrados',
       fileName: 'frota-pmtf-condutores-cadastrados',
-      subtitle: 'Relatorio da pagina atual dos condutores cadastrados.',
+      subtitle: 'Relatório da pagina atual dos condutores cadastrados.',
       columns: exportColumns,
       rows: records,
       filters: [
@@ -187,11 +187,11 @@ export default function DriversPage() {
       <div className="panel-heading">
         <div>
           <h2 className="section-title">Condutores cadastrados</h2>
-          <p className="section-copy">Mantenha a base reutilizavel de condutores para posse, busca e futuros modulos operacionais.</p>
+          <p className="section-copy">Mantenha a base reutilizável de condutores para posse, busca e futuros módulos operacionais.</p>
         </div>
         <div className="actions-inline">
           {canWrite ? <button className="app-button" type="button" onClick={openCreateModal}>Novo condutor</button> : null}
-          <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Previsualizar PDF</button>
+          <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
       </div>
@@ -251,7 +251,7 @@ export default function DriversPage() {
                 <th>CNH</th>
                 <th>Alerta CNH</th>
                 <th>Status</th>
-                {canWrite ? <th>Acoes</th> : null}
+                {canWrite ? <th>Ações</th> : null}
               </tr>
             </thead>
             <tbody>
@@ -274,7 +274,7 @@ export default function DriversPage() {
                     </td>
                     <td data-label="Status"><span className={`status-badge ${record.ativo ? 'status-ATIVO' : 'status-INATIVO'}`}>{record.ativo ? 'ATIVO' : 'INATIVO'}</span></td>
                     {canWrite ? (
-                      <td data-label="Acoes">
+                      <td data-label="Ações">
                         <div className="actions-inline">
                           <button type="button" className="mini-button" onClick={() => openEditModal(record)}>Editar</button>
                           {isAdmin && record.ativo ? <button type="button" className="mini-button danger" onClick={() => handleDeactivate(record)}>Inativar</button> : null}
@@ -299,7 +299,7 @@ export default function DriversPage() {
         onClose={closeModal}
       >
         <form onSubmit={handleSubmit} className="stack">
-          <AccordionSection title="Dados basicos" subtitle="Identificacao e contato" open>
+          <AccordionSection title="Dados básicos" subtitle="Identificacao e contato" open>
             <div className="form-grid modal-form-grid">
               <div className="form-field">
                 <label htmlFor="driver-name">Nome completo</label>

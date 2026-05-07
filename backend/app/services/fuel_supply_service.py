@@ -48,18 +48,18 @@ class FuelSupplyService:
     async def get(self, supply_id: UUID) -> dict:
         supply = await self.supplies.get_by_id(supply_id)
         if not supply:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abastecimento nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abastecimento não encontrado")
         return self._serialize(supply)
 
     async def get_for_station(self, *, supply_id: UUID, fuel_station: str) -> dict:
         supply = await self.supplies.get_by_id(supply_id)
         if not supply:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abastecimento nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abastecimento não encontrado")
 
         record_station = (supply.fuel_station or "").strip().lower()
         expected_station = fuel_station.strip().lower()
         if not expected_station or record_station != expected_station:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abastecimento nao encontrado para o posto informado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abastecimento não encontrado para o posto informado")
         return self._serialize(supply)
 
     async def create(self, data: FuelSupplyCreate, receipt: UploadFile, current_user: User) -> dict:
@@ -67,32 +67,32 @@ class FuelSupplyService:
             raise HTTPException(
                 status_code=status.HTTP_410_GONE,
                 detail=(
-                    "Criacao direta em /api/fuel-supplies foi descontinuada. "
+                    "Criação direta em /api/fuel-supplies foi descontinuada. "
                     "Use /api/fuel-supply-orders e confirme a ordem com comprovante."
                 ),
             )
 
         vehicle = await self.vehicles.get_by_id(data.vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
         if data.driver_id:
             driver = await self.drivers.get_by_id(data.driver_id)
             if not driver:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
 
         if data.organization_id:
             organization = await self.master_data.get_organization(data.organization_id)
             if not organization:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Orgao nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Órgão não encontrado")
 
         station = None
         if data.fuel_station_id:
             station = await self.fuel_stations.get(data.fuel_station_id)
             if not station:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posto nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posto não encontrado")
             if not station.active:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Posto selecionado esta inativo")
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Posto selecionado está inativo")
 
         receipt_payload = await self._read_and_validate_receipt(receipt)
         supplied_at = data.supplied_at or datetime.now(timezone.utc)
@@ -103,7 +103,7 @@ class FuelSupplyService:
         if previous_supply:
             km_delta = data.odometer_km - previous_supply.odometer_km
             if km_delta <= 0:
-                alerts.append("Odometro menor ou igual ao ultimo abastecimento. Consumo nao pode ser calculado de forma confiavel.")
+                alerts.append("Odômetro menor ou igual ao último abastecimento. Consumo não pode ser calculado de forma confiável.")
             else:
                 consumption_km_l = km_delta / data.liters
 
@@ -161,11 +161,11 @@ class FuelSupplyService:
         except IntegrityError as exc:
             await self.db.rollback()
             self._cleanup_file(stored_receipt_path)
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel registrar o abastecimento") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível registrar o abastecimento") from exc
         except OSError as exc:
             await self.db.rollback()
             self._cleanup_file(stored_receipt_path)
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Nao foi possivel armazenar o comprovante") from exc
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Não foi possível armazenar o comprovante") from exc
 
         response = await self.get(supply.id)
         response["alerts"] = alerts
@@ -174,10 +174,10 @@ class FuelSupplyService:
     async def get_receipt_file(self, supply_id: UUID) -> FileResponse:
         supply = await self.supplies.get_by_id(supply_id)
         if not supply:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abastecimento nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abastecimento não encontrado")
         absolute_path = self._resolve_receipt_path(supply.receipt_path)
         if not absolute_path.is_file():
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comprovante nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comprovante não encontrado")
 
         return FileResponse(
             absolute_path,
@@ -208,7 +208,7 @@ class FuelSupplyService:
 
     async def _read_and_validate_receipt(self, receipt: UploadFile | None) -> dict:
         if receipt is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Comprovante e obrigatorio para registrar abastecimento")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Comprovante é obrigatório para registrar abastecimento")
 
         mime_type = (receipt.content_type or "").lower()
         if mime_type not in RECEIPT_EXTENSIONS:
@@ -218,7 +218,7 @@ class FuelSupplyService:
         content = await receipt.read()
         await receipt.close()
         if not content:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Comprovante enviado esta vazio")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Comprovante enviado está vazio")
         if len(content) > MAX_RECEIPT_SIZE_BYTES:
             raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Comprovante excede o limite de 8 MB")
 
@@ -259,13 +259,13 @@ class FuelSupplyService:
 
         if consumption_km_l < min_threshold:
             return True, (
-                f"Alerta: consumo {consumption_km_l:.2f} km/l esta mais de 30% abaixo "
-                f"da media historica ({historical_average:.2f} km/l)."
+                f"Alerta: consumo {consumption_km_l:.2f} km/l está mais de 30% abaixo "
+                f"da média histórica ({historical_average:.2f} km/l)."
             )
         if consumption_km_l > max_threshold:
             return True, (
-                f"Alerta: consumo {consumption_km_l:.2f} km/l esta mais de 40% acima "
-                f"da media historica ({historical_average:.2f} km/l)."
+                f"Alerta: consumo {consumption_km_l:.2f} km/l está mais de 40% acima "
+                f"da média histórica ({historical_average:.2f} km/l)."
             )
         return False, None
 

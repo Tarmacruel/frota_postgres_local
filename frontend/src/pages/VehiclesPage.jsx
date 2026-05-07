@@ -7,6 +7,7 @@ import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
+import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -29,13 +30,13 @@ const initialForm = {
 const statusOptions = [
   { value: 'TODOS', label: 'Todos' },
   { value: 'ATIVO', label: 'Ativos' },
-  { value: 'MANUTENCAO', label: 'Manutencao' },
+  { value: 'MANUTENCAO', label: 'Manutenção' },
   { value: 'INATIVO', label: 'Inativos' },
 ]
 
 const ownershipOptions = [
   { value: 'TODOS', label: 'Todos os tipos' },
-  { value: 'PROPRIO', label: 'Proprio' },
+  { value: 'PROPRIO', label: 'Próprio' },
   { value: 'LOCADO', label: 'Locado' },
   { value: 'CEDIDO', label: 'Cedido' },
 ]
@@ -79,13 +80,13 @@ function formatPlate(value) {
 
 function formatChassis(value) {
   const normalized = String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
-  if (!normalized) return 'Nao informado'
+  if (!normalized) return 'Não informado'
   const segments = [normalized.slice(0, 4), normalized.slice(4, 8), normalized.slice(8, 12), normalized.slice(12)]
   return segments.filter(Boolean).join('-')
 }
 
 function getStatusLabel(value) {
-  if (value === 'MANUTENCAO') return 'Em manutencao'
+  if (value === 'MANUTENCAO') return 'Em manutenção'
   if (value === 'INATIVO') return 'Inativo'
   return 'Ativo'
 }
@@ -93,18 +94,18 @@ function getStatusLabel(value) {
 function getOwnershipLabel(value) {
   if (value === 'LOCADO') return 'Locado'
   if (value === 'CEDIDO') return 'Cedido'
-  return 'Proprio'
+  return 'Próprio'
 }
 
 function getVehicleTypeLabel(value) {
-  return vehicleTypeOptions.find((option) => option.value === value)?.label || value || 'Nao informado'
+  return vehicleTypeOptions.find((option) => option.value === value)?.label || value || 'Não informado'
 }
 
 function getStatusBadgeColors(value) {
   if (value === 'Ativo') {
     return { fillColor: [234, 247, 239], textColor: [29, 122, 70] }
   }
-  if (value === 'Em manutencao') {
+  if (value === 'Em manutenção') {
     return { fillColor: [255, 245, 225], textColor: [165, 102, 0] }
   }
   return { fillColor: [253, 236, 235], textColor: [180, 35, 24] }
@@ -121,7 +122,7 @@ function getOwnershipBadgeColors(value) {
 }
 
 function buildVehicleLocationLabel(vehicle) {
-  return vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao registrada'
+  return vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação registrada'
 }
 
 function buildVehicleOption(vehicle) {
@@ -147,7 +148,7 @@ function buildFilterSummary(statusFilter, ownershipFilter, locationFilter, searc
 
   if (locationFilter !== 'TODOS') {
     const locationLabel = locationOptions.find((option) => option.value === locationFilter)?.label || locationFilter
-    filters.push({ label: 'Lotacao', value: locationLabel })
+    filters.push({ label: 'Lotação', value: locationLabel })
   }
 
   if (search.trim()) {
@@ -162,20 +163,20 @@ const vehicleHistoryFieldLabels = {
   chassis_number: 'Chassi',
   brand: 'Marca',
   model: 'Modelo',
-  vehicle_type: 'Tipo de veiculo',
+  vehicle_type: 'Tipo de veículo',
   ownership_type: 'Propriedade',
   status: 'Status',
-  location: 'Lotacao',
+  location: 'Lotação',
 }
 
 function getVehicleHistoryTypeLabel(value) {
   if (value === 'MOVEMENT') return 'Movimentacao'
   if (value === 'CREATE') return 'Cadastro'
-  return 'Edicao'
+  return 'Edição'
 }
 
 function formatVehicleHistoryFieldValue(field, value) {
-  if (value === null || value === undefined || value === '') return 'Nao informado'
+  if (value === null || value === undefined || value === '') return 'Não informado'
   if (field === 'status') return getStatusLabel(value)
   if (field === 'ownership_type') return getOwnershipLabel(value)
   if (field === 'vehicle_type') return getVehicleTypeLabel(value)
@@ -185,10 +186,10 @@ function formatVehicleHistoryFieldValue(field, value) {
 function buildVehicleHistoryChangeLines(item) {
   if (item.event_type === 'MOVEMENT') {
     return [
-      `Lotacao: ${item.display_name || item.department || 'Nao informada'}`,
-      `Orgao: ${item.organization_name || 'Legado'}`,
+      `Lotação: ${item.display_name || item.department || 'Não informada'}`,
+      `Órgão: ${item.organization_name || 'Legado'}`,
       `Departamento: ${item.department_name || item.department || 'Sem departamento'}`,
-      `Periodo: ${formatDate(item.start_date)} ate ${item.end_date ? formatDate(item.end_date) : 'Atual'}`,
+      `Período: ${formatDate(item.start_date)} até ${item.end_date ? formatDate(item.end_date) : 'Atual'}`,
     ]
   }
 
@@ -198,15 +199,15 @@ function buildVehicleHistoryChangeLines(item) {
       `Status inicial: ${formatVehicleHistoryFieldValue('status', after.status)}`,
       `Tipo: ${formatVehicleHistoryFieldValue('vehicle_type', after.vehicle_type)}`,
       `Propriedade: ${formatVehicleHistoryFieldValue('ownership_type', after.ownership_type)}`,
-      `Lotacao inicial: ${formatVehicleHistoryFieldValue('location', after.location)}`,
-    ].filter((line) => !line.endsWith('Nao informado'))
+      `Lotação inicial: ${formatVehicleHistoryFieldValue('location', after.location)}`,
+    ].filter((line) => !line.endsWith('Não informado'))
   }
 
   const before = item.before || {}
   const changedKeys = Object.keys(vehicleHistoryFieldLabels).filter((key) => (before[key] ?? null) !== (after[key] ?? null))
 
   if (changedKeys.length === 0) {
-    return ['Edicao registrada sem diferencas adicionais nos campos auditados.']
+    return ['Edição registrada sem diferenças adicionais nos campos auditados.']
   }
 
   return changedKeys.map((key) => `${vehicleHistoryFieldLabels[key]}: ${formatVehicleHistoryFieldValue(key, before[key])} -> ${formatVehicleHistoryFieldValue(key, after[key])}`)
@@ -283,17 +284,17 @@ export default function VehiclesPage() {
         }
       })
 
-    return [{ value: 'TODOS', label: 'Todas as lotacoes' }, ...Array.from(unique.values()).sort((a, b) => a.label.localeCompare(b.label))]
+    return [{ value: 'TODOS', label: 'Todas as lotações' }, ...Array.from(unique.values()).sort((a, b) => a.label.localeCompare(b.label))]
   }, [allocations, vehicles])
 
   const exportColumns = [
     { header: 'Placa', value: (vehicle) => formatPlate(vehicle.plate), align: 'center', width: 66 },
     { header: 'Chassi', value: (vehicle) => formatChassis(vehicle.chassis_number), align: 'center', width: 118 },
     { header: 'Marca / Modelo', value: (vehicle) => `${vehicle.brand}\n${vehicle.model}` },
-    { header: 'Tipo veiculo', value: (vehicle) => getVehicleTypeLabel(vehicle.vehicle_type), align: 'center', width: 82 },
+    { header: 'Tipo veículo', value: (vehicle) => getVehicleTypeLabel(vehicle.vehicle_type), align: 'center', width: 82 },
     { header: 'Tipo propriedade', value: (vehicle) => getOwnershipLabel(vehicle.ownership_type), align: 'center', width: 74, badgeColors: getOwnershipBadgeColors },
     { header: 'Status', value: (vehicle) => getStatusLabel(vehicle.status), align: 'center', width: 88, badgeColors: getStatusBadgeColors },
-    { header: 'Lotacao atual', value: (vehicle) => buildVehicleLocationLabel(vehicle) },
+    { header: 'Lotação atual', value: (vehicle) => buildVehicleLocationLabel(vehicle) },
     { header: 'Condutor atual', value: (vehicle) => vehicle.current_driver_name || '—' },
     { header: 'Atualizado em', value: (vehicle) => formatDate(vehicle.updated_at), align: 'center', width: 92 },
   ]
@@ -302,7 +303,8 @@ export default function VehiclesPage() {
     try {
       setLoading(true)
       setError('')
-      const params = statusFilter !== 'TODOS' ? { status: statusFilter } : undefined
+      const params = { limit: VEHICLE_LIST_LIMIT }
+      if (statusFilter !== 'TODOS') params.status = statusFilter
       const { data } = await api.get('/vehicles', { params })
       setVehicles(data)
 
@@ -314,7 +316,7 @@ export default function VehiclesPage() {
         }
       }
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar os veiculos.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar os veículos.'))
     } finally {
       setLoading(false)
     }
@@ -402,7 +404,7 @@ export default function VehiclesPage() {
         patchSearchParams({ focus: id })
       }
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar o historico.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar o histórico.'))
     }
   }
 
@@ -474,17 +476,17 @@ export default function VehiclesPage() {
     const touchedLocationSelection = Boolean(form.organization_id || form.department_id || form.allocation_id)
 
     if (!editingId && !form.allocation_id) {
-      setError('Selecione a lotacao completa para cadastrar o veiculo.')
+      setError('Selecione a lotação completa para cadastrar o veículo.')
       return
     }
 
     if (editingId && touchedLocationSelection && !form.allocation_id) {
-      setError('Conclua a selecao ate a lotacao para salvar a alteracao.')
+      setError('Conclua a seleção até a lotação para salvar a alteração.')
       return
     }
 
     if (editingId && !form.edit_reason.trim()) {
-      setError('Informe a justificativa obrigatoria desta edicao.')
+      setError('Informe a justificativa obrigatória desta edição.')
       return
     }
 
@@ -508,29 +510,29 @@ export default function VehiclesPage() {
       } else if (!editingId) {
         payload.allocation_id = form.allocation_id
       } else if (!isEditingLegacyWithoutLocation) {
-        // Mantem a lotacao atual sem forcar atualizacao.
+        // Mantém a lotação atual sem forçar atualização.
       }
 
       if (editingId) {
         payload.edit_reason = form.edit_reason
         await api.put(`/vehicles/${editingId}`, payload)
-        setFeedback('Veiculo atualizado com justificativa e historico.')
+        setFeedback('Veículo atualizado com justificativa e histórico.')
       } else {
         await api.post('/vehicles', payload)
-        setFeedback('Veiculo cadastrado com sucesso.')
+        setFeedback('Veículo cadastrado com sucesso.')
       }
 
       closeVehicleModal()
       await loadVehicles()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o veiculo.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar o veículo.'))
     } finally {
       setSubmitting(false)
     }
   }
 
   async function handleDelete(id) {
-    if (!window.confirm('Confirma a exclusao?')) return
+    if (!window.confirm('Confirma a exclusão?')) return
 
     try {
       setError('')
@@ -540,16 +542,16 @@ export default function VehiclesPage() {
       if (selectedVehicle?.id === id) {
         clearHistoryFocus(false)
       }
-      setFeedback('Veiculo removido com sucesso.')
+      setFeedback('Veículo removido com sucesso.')
       await loadVehicles()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel excluir o veiculo.'))
+      setError(getApiErrorMessage(err, 'Não foi possível excluir o veículo.'))
     }
   }
 
   async function handlePreviewPdf() {
     if (filteredVehicles.length === 0) {
-      setFeedback('Nao ha veiculos filtrados para previsualizar em PDF.')
+      setFeedback('Não há veículos filtrados para pré-visualizar em PDF.')
       return
     }
 
@@ -557,32 +559,32 @@ export default function VehiclesPage() {
       setError('')
       setFeedback('')
       await previewRowsToPdf({
-        title: 'Frota PMTF - Veiculos',
-        fileName: 'frota-pmtf-veiculos',
-        subtitle: 'Relatorio dos veiculos filtrados no painel operacional.',
+        title: 'Frota PMTF - Veículos',
+        fileName: 'frota-pmtf-veículos',
+        subtitle: 'Relatório dos veículos filtrados no painel operacional.',
         columns: exportColumns,
         rows: filteredVehicles,
         filters: buildFilterSummary(statusFilter, ownershipFilter, locationFilter, search, locationOptions),
         summaryMetrics: vehicleReportMetrics,
         summaryChartItems: [
           { label: 'Ativos', value: visibleActiveVehicles, tone: 'green' },
-          { label: 'Manutencao', value: visibleMaintenanceVehicles, tone: 'amber' },
+          { label: 'Manutenção', value: visibleMaintenanceVehicles, tone: 'amber' },
           { label: 'Inativos', value: visibleInactiveVehicles, tone: 'red' },
           { label: 'Sem condutor', value: visibleWithoutDriver, tone: 'slate' },
         ],
-        referenceLabel: latestUpdate ? `Referencia dos dados: atualizado ate ${formatDate(latestUpdate)}` : 'Referencia dos dados: painel operacional atual',
-        responsibleSector: 'Secretaria Municipal de Administracao | Departamento de Gestao da Frota',
-        generatedBy: user?.name || user?.email || 'Usuario autenticado',
+        referenceLabel: latestUpdate ? `Referência dos dados: atualizado até ${formatDate(latestUpdate)}` : 'Referência dos dados: painel operacional atual',
+        responsibleSector: 'Secretaria Municipal de Administração | Departamento de Gestão da Frota',
+        generatedBy: user?.name || user?.email || 'Usuário autenticado',
       })
-      setFeedback('Pre-visualizacao do PDF aberta em nova guia.')
+      setFeedback('Pré-visualização do PDF aberta em nova guia.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel gerar a pre-visualizacao em PDF.'))
+      setError(getApiErrorMessage(err, 'Não foi possível gerar a pré-visualização em PDF.'))
     }
   }
 
   async function handleExportXlsx() {
     if (filteredVehicles.length === 0) {
-      setFeedback('Nao ha veiculos filtrados para exportar.')
+      setFeedback('Não há veículos filtrados para exportar.')
       return
     }
 
@@ -590,26 +592,26 @@ export default function VehiclesPage() {
       setError('')
       setFeedback('')
       await exportRowsToXlsx({
-        fileName: 'frota-pmtf-veiculos',
-        sheetName: 'Veiculos',
+        fileName: 'frota-pmtf-veículos',
+        sheetName: 'Veículos',
         columns: exportColumns,
         rows: filteredVehicles,
         filters: buildFilterSummary(statusFilter, ownershipFilter, locationFilter, search, locationOptions),
       })
-      setFeedback('Exportacao em XLSX iniciada com sucesso.')
+      setFeedback('Exportação em XLSX iniciada com sucesso.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar os veiculos em XLSX.'))
+      setError(getApiErrorMessage(err, 'Não foi possível exportar os veículos em XLSX.'))
     }
   }
 
   async function handlePreviewHistoryPdf() {
     if (!selectedVehicle || selectedHistory.length === 0) {
-      setFeedback('Selecione um veiculo com historico carregado para previsualizar o PDF.')
+      setFeedback('Selecione um veículo com histórico carregado para pré-visualizar o PDF.')
       return
     }
 
     const historyColumns = [
-      { header: 'Veiculo', value: () => selectedVehicle.plate },
+      { header: 'Veículo', value: () => selectedVehicle.plate },
       { header: 'Data', value: (item) => formatDate(item.occurred_at) },
       { header: 'Evento', value: (item) => getVehicleHistoryTypeLabel(item.event_type) },
       { header: 'Resumo', value: (item) => buildVehicleHistorySummary(item) },
@@ -624,31 +626,31 @@ export default function VehiclesPage() {
       setError('')
       setFeedback('')
       await previewRowsToPdf({
-        title: `Frota PMTF - Historico ${selectedVehicle.plate}`,
-        fileName: `frota-pmtf-historico-${selectedVehicle.plate.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-        subtitle: `Historico de edicoes e movimentacoes do veiculo ${selectedVehicle.plate} | ${selectedVehicle.brand} ${selectedVehicle.model}.`,
+        title: `Frota PMTF - Histórico ${selectedVehicle.plate}`,
+        fileName: `frota-pmtf-histórico-${selectedVehicle.plate.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+        subtitle: `Histórico de edições e movimentacoes do veículo ${selectedVehicle.plate} | ${selectedVehicle.brand} ${selectedVehicle.model}.`,
         columns: historyColumns,
         rows: selectedHistory,
         summaryMetrics: [
-          { label: 'Veiculo', value: selectedVehicle.plate, tone: 'blue' },
+          { label: 'Veículo', value: selectedVehicle.plate, tone: 'blue' },
           { label: 'Eventos', value: selectedHistory.length, tone: 'blue' },
-          { label: 'Edicoes', value: historyEditCount, tone: 'amber' },
+          { label: 'Edições', value: historyEditCount, tone: 'amber' },
           { label: 'Movimentacoes', value: historyMovementCount, tone: 'blue' },
           { label: 'Tipo', value: getOwnershipLabel(selectedVehicle.ownership_type), tone: 'blue' },
           { label: 'Status', value: getStatusLabel(selectedVehicle.status), tone: selectedVehicle.status === 'ATIVO' ? 'green' : selectedVehicle.status === 'MANUTENCAO' ? 'amber' : 'red' },
         ],
         filters: [
-          { label: 'Veiculo', value: selectedVehicle.plate },
+          { label: 'Veículo', value: selectedVehicle.plate },
           { label: 'Tipo', value: getOwnershipLabel(selectedVehicle.ownership_type) },
           { label: 'Status', value: getStatusLabel(selectedVehicle.status) },
         ],
-        referenceLabel: selectedVehicle.updated_at ? `Referencia dos dados: atualizado ate ${formatDate(selectedVehicle.updated_at)}` : 'Historico consolidado da frota municipal',
-        responsibleSector: 'Secretaria Municipal de Administracao | Departamento de Gestao da Frota',
-        generatedBy: user?.name || user?.email || 'Usuario autenticado',
+        referenceLabel: selectedVehicle.updated_at ? `Referência dos dados: atualizado até ${formatDate(selectedVehicle.updated_at)}` : 'Histórico consolidado da frota municipal',
+        responsibleSector: 'Secretaria Municipal de Administração | Departamento de Gestão da Frota',
+        generatedBy: user?.name || user?.email || 'Usuário autenticado',
       })
-      setFeedback(`Pre-visualizacao do historico de ${selectedVehicle.plate} aberta em nova guia.`)
+      setFeedback(`Pré-visualização do histórico de ${selectedVehicle.plate} aberta em nova guia.`)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o PDF do historico do veiculo.'))
+      setError(getApiErrorMessage(err, 'Não foi possível gerar o PDF do histórico do veículo.'))
     }
   }
 
@@ -664,12 +666,12 @@ export default function VehiclesPage() {
     .filter(Boolean)
     .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0]
   const vehicleReportMetrics = [
-    { label: 'Total de veiculos', value: filteredVehicles.length, tone: 'blue' },
+    { label: 'Total de veículos', value: filteredVehicles.length, tone: 'blue' },
     { label: 'Ativos', value: visibleActiveVehicles, tone: 'green' },
-    { label: 'Em manutencao', value: visibleMaintenanceVehicles, tone: 'amber' },
+    { label: 'Em manutenção', value: visibleMaintenanceVehicles, tone: 'amber' },
     { label: 'Inativos', value: visibleInactiveVehicles, tone: 'red' },
     { label: 'Sem condutor', value: visibleWithoutDriver, tone: 'slate' },
-    { label: 'Proprios', value: visibleOwnVehicles, tone: 'green' },
+    { label: 'Próprios', value: visibleOwnVehicles, tone: 'green' },
     { label: 'Locados', value: visibleRentedVehicles, tone: 'amber' },
     { label: 'Cedidos', value: visibleAssignedVehicles, tone: 'blue' },
   ]
@@ -678,12 +680,12 @@ export default function VehiclesPage() {
     <div className="surface-panel">
       <div className="panel-heading">
         <div>
-          <h2 className="section-title">Operacao de veiculos</h2>
-          <p className="section-copy">Gerencie placa, chassi, tipo do veiculo e lotacao estruturada sem sair da consulta principal.</p>
+          <h2 className="section-title">Operação de veículos</h2>
+          <p className="section-copy">Gerencie placa, chassi, tipo do veículo e lotação estruturada sem sair da consulta principal.</p>
         </div>
         <div className="actions-inline">
-          {canWrite ? <button className="app-button" type="button" onClick={openNewVehicleModal}>Novo veiculo</button> : null}
-          <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Previsualizar PDF</button>
+          {canWrite ? <button className="app-button" type="button" onClick={openNewVehicleModal}>Novo veículo</button> : null}
+          <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
       </div>
@@ -705,7 +707,7 @@ export default function VehiclesPage() {
           <div className="filter-inline">
             <input
               className="app-input"
-              placeholder="Buscar por placa, chassi, marca, modelo, lotacao ou condutor"
+              placeholder="Buscar por placa, chassi, marca, modelo, lotação ou condutor"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -713,8 +715,8 @@ export default function VehiclesPage() {
               value={locationFilter}
               onChange={setLocationFilter}
               options={locationOptions}
-              placeholder="Filtrar lotacao"
-              searchPlaceholder="Buscar lotacao"
+              placeholder="Filtrar lotação"
+              searchPlaceholder="Buscar lotação"
             />
             <select className="app-select" value={ownershipFilter} onChange={(event) => setOwnershipFilter(event.target.value)}>
               {ownershipOptions.map((option) => (
@@ -729,19 +731,19 @@ export default function VehiclesPage() {
       <div className="panel-metrics">
         <div className="metric-inline">
           <strong>{filteredVehicles.length}</strong>
-          <span>veiculos exibidos</span>
+          <span>veículos exibidos</span>
         </div>
         <div className="metric-inline">
           <strong>{visibleOwnVehicles}</strong>
-          <span>proprios visiveis</span>
+          <span>próprios visíveis</span>
         </div>
         <div className="metric-inline">
           <strong>{visibleRentedVehicles}</strong>
-          <span>locados visiveis</span>
+          <span>locados visíveis</span>
         </div>
         <div className="metric-inline">
           <strong>{visibleAssignedVehicles}</strong>
-          <span>cedidos visiveis</span>
+          <span>cedidos visíveis</span>
         </div>
       </div>
 
@@ -749,7 +751,7 @@ export default function VehiclesPage() {
         <div className="table-focus-banner">
           <div>
             <strong>Mostrando apenas {selectedVehicle.plate}</strong>
-            <span>Clique novamente em Historico no mesmo veiculo para voltar a lista completa.</span>
+            <span>Clique novamente em Histórico no mesmo veículo para voltar a lista completa.</span>
           </div>
           <button className="ghost-button" type="button" onClick={clearHistoryFocus}>Reexibir todos</button>
         </div>
@@ -768,25 +770,25 @@ export default function VehiclesPage() {
                 <th>Chassi</th>
                 <th>Marca</th>
                 <th>Modelo</th>
-                <th>Tipo veiculo</th>
+                <th>Tipo veículo</th>
                 <th>Propriedade</th>
                 <th>Status</th>
-                <th>Lotacao atual</th>
+                <th>Lotação atual</th>
                 <th>Condutor atual</th>
                 <th>Atualizado em</th>
-                <th>Acoes</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="11" className="muted">Carregando veiculos...</td>
+                  <td colSpan="11" className="muted">Carregando veículos...</td>
                 </tr>
               ) : filteredVehicles.length === 0 ? (
                 <tr>
                   <td colSpan="11">
                     <div className="empty-state">
-                      Nenhum veiculo encontrado para os filtros aplicados. Ajuste a busca, a lotacao ou o tipo para revisar a base completa.
+                      Nenhum veículo encontrado para os filtros aplicados. Ajuste a busca, a lotação ou o tipo para revisar a base completa.
                     </div>
                   </td>
                 </tr>
@@ -794,19 +796,19 @@ export default function VehiclesPage() {
                 paginatedVehicles.map((vehicle) => (
                   <tr key={vehicle.id} className={selectedVehicle?.id === vehicle.id ? 'is-focused-row' : ''}>
                     <td data-label="Placa"><strong>{vehicle.plate}</strong></td>
-                    <td data-label="Chassi">{vehicle.chassis_number || 'Nao informado'}</td>
+                    <td data-label="Chassi">{vehicle.chassis_number || 'Não informado'}</td>
                     <td data-label="Marca">{vehicle.brand}</td>
                     <td data-label="Modelo">{vehicle.model}</td>
-                    <td data-label="Tipo veiculo">{getVehicleTypeLabel(vehicle.vehicle_type)}</td>
+                    <td data-label="Tipo veículo">{getVehicleTypeLabel(vehicle.vehicle_type)}</td>
                     <td data-label="Propriedade"><BadgeOwnership value={vehicle.ownership_type} /></td>
                     <td data-label="Status"><span className={`status-badge status-${vehicle.status}`}>{vehicle.status}</span></td>
-                    <td data-label="Lotacao atual">{buildVehicleLocationLabel(vehicle)}</td>
+                    <td data-label="Lotação atual">{buildVehicleLocationLabel(vehicle)}</td>
                     <td data-label="Condutor atual"><DriverBadge name={vehicle.current_driver_name} /></td>
                     <td data-label="Atualizado em">{formatDate(vehicle.updated_at)}</td>
-                    <td data-label="Acoes">
+                    <td data-label="Ações">
                       <div className="actions-inline">
                         <button type="button" className="mini-button" onClick={() => loadHistory(vehicle.id)}>
-                          {selectedVehicle?.id === vehicle.id ? 'Fechar historico' : 'Historico'}
+                          {selectedVehicle?.id === vehicle.id ? 'Fechar histórico' : 'Histórico'}
                         </button>
                         {selectedVehicle?.id === vehicle.id ? <span className="focus-inline">em foco</span> : null}
                         {canWrite ? <button type="button" className="mini-button" onClick={() => editVehicle(vehicle)}>Editar</button> : null}
@@ -826,13 +828,13 @@ export default function VehiclesPage() {
       <section className="surface-panel history-panel">
         <div className="panel-heading">
           <div>
-            <h3 className="section-title">Historico do veiculo</h3>
+            <h3 className="section-title">Histórico do veículo</h3>
             <p className="section-copy">
-              {selectedVehicle ? `Linha do tempo de ${selectedVehicle.plate} com edicoes cadastrais e movimentacoes de lotacao.` : 'Selecione um veiculo na tabela para visualizar o historico consolidado de edicoes e movimentacoes.'}
+              {selectedVehicle ? `Linha do tempo de ${selectedVehicle.plate} com edições cadastrais e movimentações de lotação.` : 'Selecione um veículo na tabela para visualizar o histórico consolidado de edições e movimentações.'}
             </p>
             {selectedVehicle ? (
               <p className="section-copy" style={{ marginTop: 10 }}>
-                Chassi: {selectedVehicle.chassis_number || 'Nao informado'} | Condutor atual: {selectedVehicle.current_driver_name || 'Sem condutor ativo'}
+                Chassi: {selectedVehicle.chassis_number || 'Não informado'} | Condutor atual: {selectedVehicle.current_driver_name || 'Sem condutor ativo'}
               </p>
             ) : null}
           </div>
@@ -840,12 +842,12 @@ export default function VehiclesPage() {
             <div className="actions-inline">
               {selectedHistory.length > 0 ? (
                 <button className="secondary-button" type="button" onClick={handlePreviewHistoryPdf}>
-                  Previsualizar PDF
+                  Pré-visualizar PDF
                 </button>
               ) : null}
               {isAdmin ? (
                 <div className="audit-card">
-                  <strong>Auditoria visivel para admin</strong>
+                  <strong>Auditoria visível para admin</strong>
                   <span>Criado em {formatDate(selectedVehicle.created_at)}</span>
                   <span>Atualizado em {formatDate(selectedVehicle.updated_at)}</span>
                 </div>
@@ -876,25 +878,25 @@ export default function VehiclesPage() {
             ))}
           </ul>
         ) : (
-          <div className="empty-state">Ainda nao ha historico carregado para exibicao neste painel.</div>
+          <div className="empty-state">Ainda não há histórico carregado para exibição neste painel.</div>
         )}
       </section>
 
       <Modal
         open={isModalOpen}
-        title={editingId ? 'Editar veiculo' : 'Novo veiculo'}
-        description={editingId ? 'Toda alteracao exige uma nova justificativa. Ela sera registrada no historico de edicoes e movimentacoes do veiculo.' : 'Preencha os dados do veiculo e vincule a lotacao por orgao, departamento e lotacao cadastrados.'}
+        title={editingId ? 'Editar veículo' : 'Novo veículo'}
+        description={editingId ? 'Toda alteração exige uma nova justificativa. Ela será registrada no histórico de edições e movimentações do veículo.' : 'Preencha os dados do veículo e vincule a lotação por órgão, departamento e lotação cadastrados.'}
         onClose={closeVehicleModal}
       >
         <form onSubmit={handleSubmit} className="stack">
-          <AccordionSection title="Dados basicos" subtitle="Identificacao e classificacao" open>
+          <AccordionSection title="Dados básicos" subtitle="Identificacao e classificacao" open>
             <div className="form-grid modal-form-grid">
               <div className="form-field">
                 <label htmlFor="plate">Placa</label>
                 <input id="plate" className="app-input" placeholder="ABC-1D23" value={form.plate} onChange={(event) => setForm({ ...form, plate: event.target.value })} />
               </div>
               <div className="form-field">
-                <label htmlFor="chassis_number">Numero do chassi</label>
+                <label htmlFor="chassis_number">Número do chassi</label>
                 <input id="chassis_number" className="app-input" placeholder="17 caracteres ou identificador interno" value={form.chassis_number} onChange={(event) => setForm({ ...form, chassis_number: event.target.value.toUpperCase() })} />
               </div>
               <div className="form-field">
@@ -906,7 +908,7 @@ export default function VehiclesPage() {
                 <input id="model" className="app-input" placeholder="Ex.: Ranger" value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })} />
               </div>
               <div className="form-field">
-                <label htmlFor="vehicle_type">Categoria do veiculo</label>
+                <label htmlFor="vehicle_type">Categoria do veículo</label>
                 <select id="vehicle_type" className="app-select" value={form.vehicle_type} onChange={(event) => setForm({ ...form, vehicle_type: event.target.value })}>
                   {vehicleTypeOptions.map((option) => (
                     <option key={option.value} value={option.value}>{option.label}</option>
@@ -916,7 +918,7 @@ export default function VehiclesPage() {
               <div className="form-field">
                 <label htmlFor="ownership_type">Tipo de propriedade</label>
                 <select id="ownership_type" className="app-select" value={form.ownership_type} onChange={(event) => setForm({ ...form, ownership_type: event.target.value })}>
-                  <option value="PROPRIO">Proprio</option>
+                  <option value="PROPRIO">Próprio</option>
                   <option value="LOCADO">Locado</option>
                   <option value="CEDIDO">Cedido</option>
                 </select>
@@ -925,45 +927,45 @@ export default function VehiclesPage() {
                 <label htmlFor="status">Status</label>
                 <select id="status" className="app-select" value={form.status} onChange={(event) => setForm({ ...form, status: event.target.value })}>
                   <option value="ATIVO">ATIVO</option>
-                  <option value="MANUTENCAO">MANUTENCAO</option>
+                  <option value="MANUTENCAO">Manutenção</option>
                   <option value="INATIVO">INATIVO</option>
                 </select>
               </div>
             </div>
           </AccordionSection>
 
-          <AccordionSection title="Lotacao" subtitle="Orgao, departamento e lotacao">
+          <AccordionSection title="Lotação" subtitle="Órgão, departamento e lotação">
             <div className="form-grid modal-form-grid">
               <div className="form-field">
-                <label>Orgao</label>
-                <SearchableSelect value={form.organization_id} onChange={(value) => setForm({ ...form, organization_id: value, department_id: '', allocation_id: '' })} options={organizationOptions} placeholder={catalogLoading ? 'Carregando orgaos...' : 'Selecione o orgao'} searchPlaceholder="Buscar orgao" disabled={catalogLoading || organizationOptions.length === 0} />
+                <label>Órgão</label>
+                <SearchableSelect value={form.organization_id} onChange={(value) => setForm({ ...form, organization_id: value, department_id: '', allocation_id: '' })} options={organizationOptions} placeholder={catalogLoading ? 'Carregando órgãos...' : 'Selecione o órgão'} searchPlaceholder="Buscar órgão" disabled={catalogLoading || organizationOptions.length === 0} />
               </div>
               <div className="form-field">
                 <label>Departamento</label>
-                <SearchableSelect value={form.department_id} onChange={(value) => setForm({ ...form, department_id: value, allocation_id: '' })} options={departmentOptions} placeholder={!form.organization_id ? 'Selecione primeiro o orgao' : 'Selecione o departamento'} searchPlaceholder="Buscar departamento" disabled={!form.organization_id || departmentOptions.length === 0} />
+                <SearchableSelect value={form.department_id} onChange={(value) => setForm({ ...form, department_id: value, allocation_id: '' })} options={departmentOptions} placeholder={!form.organization_id ? 'Selecione primeiro o órgão' : 'Selecione o departamento'} searchPlaceholder="Buscar departamento" disabled={!form.organization_id || departmentOptions.length === 0} />
               </div>
               <div className="form-field modal-field-span">
-                <label>Lotacao</label>
-                <SearchableSelect value={form.allocation_id} onChange={(value) => setForm({ ...form, allocation_id: value })} options={allocationOptions} placeholder={!form.department_id ? 'Selecione primeiro o departamento' : 'Selecione a lotacao'} searchPlaceholder="Buscar lotacao" disabled={!form.department_id || allocationOptions.length === 0} />
+                <label>Lotação</label>
+                <SearchableSelect value={form.allocation_id} onChange={(value) => setForm({ ...form, allocation_id: value })} options={allocationOptions} placeholder={!form.department_id ? 'Selecione primeiro o departamento' : 'Selecione a lotação'} searchPlaceholder="Buscar lotação" disabled={!form.department_id || allocationOptions.length === 0} />
                 {editingId && !form.allocation_id && vehicles.find((vehicle) => vehicle.id === editingId)?.current_department ? <span className="helper-text">Registro legado atual: {vehicles.find((vehicle) => vehicle.id === editingId)?.current_department}</span> : null}
               </div>
             </div>
           </AccordionSection>
 
           {editingId ? (
-            <AccordionSection title="Justificativa" subtitle="Observacao obrigatoria da edicao" open>
+            <AccordionSection title="Justificativa" subtitle="Observação obrigatória da edição" open>
               <div className="form-grid modal-form-grid">
                 <div className="form-field modal-field-span">
-                  <label htmlFor="edit_reason">Justificativa da edicao</label>
+                  <label htmlFor="edit_reason">Justificativa da edição</label>
                   <textarea
                     id="edit_reason"
                     className="app-textarea"
                     rows="4"
-                    placeholder="Explique por que este cadastro do veiculo esta sendo alterado."
+                    placeholder="Explique por que este cadastro do veículo está sendo alterado."
                     value={form.edit_reason}
                     onChange={(event) => setForm({ ...form, edit_reason: event.target.value })}
                   />
-                  <span className="helper-text">Uma nova justificativa fica registrada em cada edicao e em qualquer nova movimentacao de lotacao gerada pela alteracao.</span>
+                  <span className="helper-text">Uma nova justificativa fica registrada em cada edição e em qualquer nova movimentacao de lotação gerada pela alteração.</span>
                 </div>
               </div>
             </AccordionSection>
@@ -971,7 +973,7 @@ export default function VehiclesPage() {
 
           <div className="actions-inline modal-actions">
             <button className="app-button" type="submit" disabled={submitting || catalogLoading || Boolean(editingId && !form.edit_reason.trim())}>
-              {submitting ? 'Salvando...' : editingId ? 'Atualizar veiculo' : 'Cadastrar veiculo'}
+              {submitting ? 'Salvando...' : editingId ? 'Atualizar veículo' : 'Cadastrar veículo'}
             </button>
             <button className="ghost-button" type="button" onClick={closeVehicleModal}>Cancelar</button>
           </div>

@@ -69,23 +69,23 @@ class FuelSupplyOrderService:
 
         vehicle = await self.vehicles.get_by_id(data.vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
         if data.driver_id:
             driver = await self.drivers.get_by_id(data.driver_id)
             if not driver:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
 
         if data.organization_id:
             organization = await self.master_data.get_organization(data.organization_id)
             if not organization:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Orgao/posto nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Órgão/posto não encontrado")
 
         station = await self.fuel_stations.get(data.fuel_station_id)
         if not station:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posto nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posto não encontrado")
         if not station.active:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Posto selecionado esta inativo")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Posto selecionado está inativo")
 
         order = FuelSupplyOrder(
             vehicle_id=data.vehicle_id,
@@ -114,7 +114,7 @@ class FuelSupplyOrderService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel criar a ordem de abastecimento") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível criar a ordem de abastecimento") from exc
 
         return await self.get_order(order.id)
 
@@ -122,7 +122,7 @@ class FuelSupplyOrderService:
         await self._expire_overdue_orders()
         order = await self.orders.get_by_id(order_id)
         if not order:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento nao encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento não encontrada")
         if current_user and current_user.role == UserRole.POSTO:
             await self._ensure_station_access(current_user=current_user, order=order)
         return self._serialize_order(order)
@@ -131,20 +131,20 @@ class FuelSupplyOrderService:
         await self._expire_overdue_orders()
         normalized_code = (validation_code or "").strip().upper()
         if not normalized_code:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comprovante publico nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comprovante público não encontrado")
 
         order = await self.orders.get_by_validation_code(normalized_code)
         if not order:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comprovante publico nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comprovante público não encontrado")
         return self._serialize_public_order(order)
 
     async def confirm_order(self, order_id: UUID, data: FuelSupplyOrderConfirm, receipt: UploadFile, current_user: User) -> dict:
         order = await self.orders.get_by_id(order_id)
         if not order:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento nao encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento não encontrada")
 
         if order.status == FuelSupplyOrderStatus.COMPLETED:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem ja confirmada")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem já confirmada")
         if order.status == FuelSupplyOrderStatus.CANCELLED:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem cancelada")
         if order.status == FuelSupplyOrderStatus.EXPIRED:
@@ -171,9 +171,9 @@ class FuelSupplyOrderService:
 
         station = await self.fuel_stations.get(order.fuel_station_id)
         if not station:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posto nao encontrado para a ordem")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posto não encontrado para a ordem")
         if not station.active:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Posto vinculado a ordem esta inativo")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Posto vinculado a ordem está inativo")
 
         if current_user.role == UserRole.POSTO:
             await self._ensure_station_access(current_user=current_user, order=order)
@@ -181,7 +181,7 @@ class FuelSupplyOrderService:
         if data.driver_id:
             driver = await self.drivers.get_by_id(data.driver_id)
             if not driver:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
 
         receipt_payload = await self._read_and_validate_receipt(receipt)
         supplied_at = data.supplied_at or now
@@ -192,7 +192,7 @@ class FuelSupplyOrderService:
         if previous_supply:
             km_delta = data.odometer_km - previous_supply.odometer_km
             if km_delta <= 0:
-                alerts.append("Odometro menor ou igual ao ultimo abastecimento. Consumo nao pode ser calculado de forma confiavel.")
+                alerts.append("Odômetro menor ou igual ao último abastecimento. Consumo não pode ser calculado de forma confiável.")
             else:
                 consumption_km_l = km_delta / data.liters
 
@@ -252,22 +252,22 @@ class FuelSupplyOrderService:
         except IntegrityError as exc:
             await self.db.rollback()
             self._cleanup_file(stored_receipt_path)
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel confirmar a ordem") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível confirmar a ordem") from exc
         except OSError as exc:
             await self.db.rollback()
             self._cleanup_file(stored_receipt_path)
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Nao foi possivel armazenar o comprovante") from exc
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Não foi possível armazenar o comprovante") from exc
 
         return await self.get_order(order.id)
 
     async def cancel_order(self, order_id: UUID, payload: FuelSupplyOrderCancel, current_user: User) -> dict:
         order = await self.orders.get_by_id(order_id)
         if not order:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento nao encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento não encontrada")
         if order.status == FuelSupplyOrderStatus.COMPLETED:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem ja confirmada")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem já confirmada")
         if order.status == FuelSupplyOrderStatus.CANCELLED:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem ja cancelada")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem já cancelada")
         if order.status == FuelSupplyOrderStatus.EXPIRED:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem expirada")
         if datetime.now(timezone.utc) > order.expires_at:
@@ -302,7 +302,7 @@ class FuelSupplyOrderService:
             fuel_station_id=order.fuel_station_id,
         )
         if not has_access:
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuario nao possui vinculo ativo com o posto da ordem")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuário não possui vínculo ativo com o posto da ordem")
 
     async def _generate_validation_code(self) -> str:
         for _ in range(8):
@@ -311,12 +311,12 @@ class FuelSupplyOrderService:
                 return candidate
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Nao foi possivel gerar o codigo publico da ordem",
+            detail="Não foi possível gerar o código público da ordem",
         )
 
     async def _read_and_validate_receipt(self, receipt: UploadFile | None) -> dict:
         if receipt is None:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Comprovante e obrigatorio para confirmar ordem")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Comprovante é obrigatório para confirmar ordem")
 
         mime_type = (receipt.content_type or "").lower()
         if mime_type not in RECEIPT_EXTENSIONS:
@@ -326,7 +326,7 @@ class FuelSupplyOrderService:
         content = await receipt.read()
         await receipt.close()
         if not content:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Comprovante enviado esta vazio")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Comprovante enviado está vazio")
         if len(content) > MAX_RECEIPT_SIZE_BYTES:
             raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Comprovante excede o limite de 8 MB")
 
@@ -364,13 +364,13 @@ class FuelSupplyOrderService:
 
         if consumption_km_l < min_threshold:
             return True, (
-                f"Alerta: consumo {consumption_km_l:.2f} km/l esta mais de 30% abaixo "
-                f"da media historica ({historical_average:.2f} km/l)."
+                f"Alerta: consumo {consumption_km_l:.2f} km/l está mais de 30% abaixo "
+                f"da média histórica ({historical_average:.2f} km/l)."
             )
         if consumption_km_l > max_threshold:
             return True, (
-                f"Alerta: consumo {consumption_km_l:.2f} km/l esta mais de 40% acima "
-                f"da media historica ({historical_average:.2f} km/l)."
+                f"Alerta: consumo {consumption_km_l:.2f} km/l está mais de 40% acima "
+                f"da média histórica ({historical_average:.2f} km/l)."
             )
         return False, None
 

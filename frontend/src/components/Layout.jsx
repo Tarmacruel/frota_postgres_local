@@ -38,7 +38,7 @@ export default function Layout() {
         {
           title: 'Abastecimento',
           items: [
-            { to: '/ordens-abastecimento', label: 'Ordens abertas', description: 'Confirmacao das ordens pendentes', icon: 'maintenance' },
+            { to: '/ordens-abastecimento', label: 'Ordens abertas', description: 'Confirmação das ordens pendentes', icon: 'maintenance' },
           ],
         },
       ]
@@ -48,19 +48,19 @@ export default function Layout() {
       {
         title: 'Visao geral',
         items: [
-          { to: '/', label: 'Inicio', description: 'Hub operacional da frota', icon: 'dashboard' },
+          { to: '/', label: 'Início', description: 'Hub operacional da frota', icon: 'dashboard' },
         ],
       },
       {
         title: 'Operacional',
         items: [
-          { to: '/vehicles', label: 'Veiculos', description: 'Cadastro, consulta e historico', icon: 'vehicles' },
-          { to: '/posses', label: 'Posses', description: 'Posse, alocacao e responsaveis', icon: 'drivers' },
-          { to: '/condutores', label: 'Condutores', description: 'Base reutilizavel de motoristas', icon: 'users' },
-          { to: '/manutencoes', label: 'Manutencoes', description: 'Custos, servicos e oficina', icon: 'maintenance' },
-          { to: '/sinistros', label: 'Sinistros', description: 'Ocorrencias, BO e prejuizos', icon: 'audit' },
+          { to: '/vehicles', label: 'Veículos', description: 'Cadastro, consulta e histórico', icon: 'vehicles' },
+          { to: '/posses', label: 'Posses', description: 'Posse, alocação e responsáveis', icon: 'drivers' },
+          { to: '/condutores', label: 'Condutores', description: 'Base reutilizável de motoristas', icon: 'users' },
+          { to: '/manutencoes', label: 'Manutenções', description: 'Custos, serviços e oficina', icon: 'maintenance' },
+          { to: '/sinistros', label: 'Sinistros', description: 'Ocorrências, BO e prejuízos', icon: 'audit' },
           { to: '/multas', label: 'Multas', description: 'Autos, vencimentos e pagamentos', icon: 'catalog' },
-          ...(canAccessFuelSupplies ? [{ to: '/abastecimentos', label: 'Abastecimentos', description: 'Ordens, historico e alertas de consumo', icon: 'maintenance' }] : []),
+          ...(canAccessFuelSupplies ? [{ to: '/abastecimentos', label: 'Abastecimentos', description: 'Ordens, histórico e alertas de consumo', icon: 'maintenance' }] : []),
         ],
       },
     ]
@@ -68,18 +68,18 @@ export default function Layout() {
     if (isAdmin || canManageCadastros) {
       const managementItems = []
       if (canManageCadastros) {
-        managementItems.push({ to: '/cadastros', label: 'Cadastros', description: 'Orgaos, departamentos e lotacoes', icon: 'catalog' })
+        managementItems.push({ to: '/cadastros', label: 'Cadastros', description: 'Órgãos, departamentos e lotações', icon: 'catalog' })
       }
       if (isAdmin) {
         managementItems.push(
-          { to: '/postos', label: 'Postos', description: 'Cadastro de postos e vinculos', icon: 'catalog' },
+          { to: '/postos', label: 'Postos', description: 'Cadastro de postos e vínculos', icon: 'catalog' },
           { to: '/analytics', label: 'Analytics', description: 'BI operacional da frota', icon: 'dashboard' },
-          { to: '/users', label: 'Usuarios', description: 'Perfis e niveis de acesso', icon: 'users' },
+          { to: '/users', label: 'Usuários', description: 'Perfis e níveis de acesso', icon: 'users' },
           { to: '/auditoria', label: 'Auditoria', description: 'Rastreabilidade administrativa', icon: 'audit' },
         )
       }
       sections.push({
-        title: 'Gestao',
+        title: 'Gestão',
         items: managementItems,
       })
     }
@@ -186,7 +186,7 @@ export default function Layout() {
     setPasswordFeedback('')
     try {
       if (passwordForm.new_password !== passwordForm.confirm_password) {
-        setPasswordFeedback('A confirmacao da nova senha nao confere.')
+        setPasswordFeedback('A confirmação da nova senha não confere.')
         return
       }
       await api.post('/auth/change-password', {
@@ -196,7 +196,7 @@ export default function Layout() {
       setPasswordFeedback('Senha alterada com sucesso.')
       setPasswordForm({ current_password: '', new_password: '', confirm_password: '' })
     } catch {
-      setPasswordFeedback('Nao foi possivel alterar a senha. Confira a senha atual.')
+      setPasswordFeedback('Não foi possível alterar a senha. Confira a senha atual.')
     }
   }
 
@@ -224,13 +224,13 @@ export default function Layout() {
     <div className={`app-shell${sidebarCompact ? ' sidebar-compact' : ''}`}>
       <SearchOverlay open={searchOpen} onClose={() => setSearchOpen(false)} onSelect={(result) => navigate(result.route)} />
 
-      <button type="button" className={`sidebar-scrim${navOpen ? ' is-visible' : ''}`} aria-label="Fechar navegacao" onClick={() => setNavOpen(false)} />
+      <button type="button" className={`sidebar-scrim${navOpen ? ' is-visible' : ''}`} aria-label="Fechar navegação" onClick={() => setNavOpen(false)} />
 
       <aside className={`app-sidebar${navOpen ? ' is-open' : ''}${sidebarCompact ? ' is-compact' : ''}`}>
         <div className="sidebar-head">
           <div className="brand-block">
             <div className="brand-mark brand-mark-official">
-              <img src={officialBrand.logoPath} alt="Brasao oficial da Prefeitura Municipal de Teixeira de Freitas" />
+              <img src={officialBrand.logoPath} alt="Brasão oficial da Prefeitura Municipal de Teixeira de Freitas" />
             </div>
             <div className="brand-copy">
               <strong className="brand-name">{officialBrand.systemName}</strong>
@@ -273,13 +273,13 @@ export default function Layout() {
       <div className="content-shell">
         <header className="app-topbar">
           <div className="topbar-leading">
-            <button type="button" className="icon-button mobile-only" aria-label={navOpen ? 'Fechar navegacao' : 'Abrir navegacao'} aria-expanded={navOpen} onClick={() => setNavOpen((current) => !current)}>
+            <button type="button" className="icon-button mobile-only" aria-label={navOpen ? 'Fechar navegação' : 'Abrir navegação'} aria-expanded={navOpen} onClick={() => setNavOpen((current) => !current)}>
               <AppIcon name="menu" className="app-icon" />
             </button>
 
             <div className="topbar-route">
               <span className="topbar-kicker">Frota PMTF . acompanhamento operacional</span>
-              <h1 className="page-title topbar-route-title">{currentItem?.label || 'Inicio'}</h1>
+              <h1 className="page-title topbar-route-title">{currentItem?.label || 'Início'}</h1>
             </div>
           </div>
 
@@ -287,7 +287,7 @@ export default function Layout() {
             <button type="button" className="topbar-search-trigger" aria-label="Abrir busca global" onClick={() => setSearchOpen(true)} onFocus={() => setSearchOpen(true)}>
               <span className="topbar-search-copy">
                 <AppIcon name="search" className="app-icon" />
-                <span>Buscar veiculo, posse ou manutencao</span>
+                <span>Buscar veículo, posse ou manutenção</span>
               </span>
               <span className="topbar-search-hint">Ctrl K</span>
             </button>
@@ -297,8 +297,8 @@ export default function Layout() {
               <button
                 type="button"
                 className="icon-button theme-button"
-                aria-label="Abrir central de notificacoes"
-                title="Central de notificacoes"
+                aria-label="Abrir central de notificações"
+                title="Central de notificações"
                 onClick={openNotificationsCenter}
               >
                 <AppIcon name="audit" className="app-icon" />
@@ -316,7 +316,7 @@ export default function Layout() {
         </main>
       </div>
 
-      <nav className="mobile-bottom-bar" aria-label="Navegacao mobile">
+      <nav className="mobile-bottom-bar" aria-label="Navegação mobile">
         {mobileTabs.map((item) => (
           <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({ isActive }) => `mobile-bottom-link${isActive ? ' active' : ''}`}>
             <AppIcon name={item.icon} className="app-icon" />
@@ -325,9 +325,9 @@ export default function Layout() {
         ))}
       </nav>
 
-      <Modal open={notificationsOpen} title="Central de notificacoes" description="Ocorrencias administrativas de divergencia de quilometragem entre posses." onClose={() => setNotificationsOpen(false)}>
+      <Modal open={notificationsOpen} title="Central de notificações" description="Ocorrências administrativas de divergência de quilometragem entre posses." onClose={() => setNotificationsOpen(false)}>
         {!isAdmin ? <div className="alert alert-info">Acesso restrito a administradores.</div> : null}
-        {isAdmin && adminNotifications.length === 0 ? <div className="empty-state">Nenhuma notificacao registrada ate o momento.</div> : null}
+        {isAdmin && adminNotifications.length === 0 ? <div className="empty-state">Nenhuma notificação registrada até o momento.</div> : null}
         {isAdmin && adminNotifications.length > 0 ? (
           <div className="stack" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
             {adminNotifications.map((notification) => (
@@ -351,7 +351,7 @@ export default function Layout() {
       <Modal open={passwordModalOpen} title="Alterar senha" description="Defina uma nova senha para seu acesso." onClose={() => setPasswordModalOpen(false)}>
         <form onSubmit={handlePasswordChange} className="stack">
           <input className="app-input" type="password" placeholder="Senha atual" value={passwordForm.current_password} onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })} required />
-          <input className="app-input" type="password" placeholder="Nova senha (minimo 8 caracteres)" value={passwordForm.new_password} onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })} required />
+          <input className="app-input" type="password" placeholder="Nova senha (mínimo 8 caracteres)" value={passwordForm.new_password} onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })} required />
           <input className="app-input" type="password" placeholder="Confirmar nova senha" value={passwordForm.confirm_password} onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })} required />
           {passwordFeedback ? <div className="alert alert-info">{passwordFeedback}</div> : null}
           <div className="actions-inline modal-actions">

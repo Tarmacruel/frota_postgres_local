@@ -1,10 +1,24 @@
 [CmdletBinding()]
 param(
-    [ValidateSet("Menu", "Start", "Publish", "Stop", "Reset", "Status", "Logs", "Backup", "Migrate", "Update", "FullReset")]
+    [ValidateSet(
+        "Menu",
+        "StartStack",
+        "Start",
+        "Backend",
+        "Frontend",
+        "Postgres",
+        "Publish",
+        "Stop",
+        "Status",
+        "Logs",
+        "Backup",
+        "BackupAuto",
+        "Migrate",
+        "Update"
+    )]
     [string]$Action = "Menu",
     [int]$Port = 8000,
-    [switch]$BuildFrontend = $true,
-    [switch]$SeedDemoData = $true,
+    [int]$FrontendPort = 3001,
     [switch]$InstallDeps,
     [switch]$SkipGitPull,
     [switch]$NoPause
@@ -18,144 +32,354 @@ $repoRoot = Convert-Path (Join-Path $opsRoot "..\..")
 
 . (Join-Path $opsRoot "common.ps1")
 
-function Invoke-CheckedCommand {
+Initialize-FrotaStorage
+$paths = Get-FrotaPaths
+
+function Get-CurrentIpAddress {
+    $ipAddress = (Get-NetIPAddress -AddressFamily IPv4 -Type Unicast -ErrorAction SilentlyContinue |
+        Where-Object { $_.IPAddress -notlike "127.*" } |
+        Select-Object -First 1).IPAddress
+
+    if (-not $ipAddress) {
+        return "localhost"
+    }
+
+    return $ipAddress
+}
+
+function Start-FrotaProcess {
     param(
-        [Parameter(Mandatory = $true)][string]$Label,
-        [Parameter(Mandatory = $true)][scriptblock]$Command
+        [Parameter(Mandatory = $true)][string]$Title,
+        [Parameter(Mandatory = $true)][string]$ScriptPath,
+        [Parameter(Mandatory = $true)][string[]]$Arguments,
+        [Parameter(Mandatory = $true)][string]$OutFile,
+        [Parameter(Mandatory = $true)][string]$ErrFile,
+        [Parameter(Mandatory = $true)][string]$PidFile
     )
 
-    & $Command
-    if ($LASTEXITCODE -ne 0) {
-        throw "$Label failed with exit code $LASTEXITCODE."
+    if (-not (Test-Path -LiteralPath $ScriptPath)) {
+        throw "Script nao encontrado: $ScriptPath"
     }
+
+    $argumentList = @(
+        "-NoProfile",
+        "-ExecutionPolicy", "Bypass",
+        "-File", "`"$ScriptPath`""
+    ) + $Arguments
+
+    $process = Start-Process `
+        -FilePath "powershell.exe" `
+        -ArgumentList $argumentList `
+        -WorkingDirectory $paths.Root `
+        -RedirectStandardOutput $OutFile `
+        -RedirectStandardError $ErrFile `
+        -WindowStyle Hidden `
+        -PassThru
+
+    Set-Content -LiteralPath $PidFile -Value "$($process.Id)" -Encoding ASCII
+    Write-Host "$Title iniciado. PID: $($process.Id)" -ForegroundColor Green
+    return $process
+}
+
+function Wait-PortReady {
+    param(
+        [Parameter(Mandatory = $true)][int]$TargetPort,
+        [int]$TimeoutSeconds = 60
+    )
+
+    $deadline = (Get-Date).AddSeconds($TimeoutSeconds)
+    while ((Get-Date) -lt $deadline) {
+        $ownerPid = Get-PortOwnerPid -Port $TargetPort
+        if ($ownerPid) {
+            return $true
+        }
+        Start-Sleep -Seconds 2
+    }
+
+    return $false
+}
+
+function Invoke-Migrations {
+    $alembic = Join-Path $paths.BackendRoot ".venv\Scripts\alembic.exe"
+    if (-not (Test-Path -LiteralPath $alembic)) {
+        throw "Alembic nao encontrado em '$alembic'. Execute a preparacao do ambiente primeiro."
+    }
+
+    Push-Location $paths.BackendRoot
+    try {
+        Write-Host "Aplicando migrations..." -ForegroundColor Cyan
+        Invoke-CheckedCommand -Label "Alembic upgrade heads" -Command { & $alembic upgrade heads }
+        Write-Host "Migrations aplicadas." -ForegroundColor Green
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Invoke-Seed {
+    $python = Join-Path $paths.BackendRoot ".venv\Scripts\python.exe"
+    if (-not (Test-Path -LiteralPath $python)) {
+        throw "Python venv nao encontrado em '$python'."
+    }
+
+    Push-Location $paths.BackendRoot
+    try {
+        Write-Host "Carregando dados iniciais..." -ForegroundColor Cyan
+        Invoke-CheckedCommand -Label "Seed" -Command { & $python -m scripts.seed }
+        Write-Host "Seed concluido." -ForegroundColor Green
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Invoke-FrontendBuild {
+    Push-Location $paths.FrontendRoot
+    try {
+        if (-not (Test-Path -LiteralPath "node_modules")) {
+            Write-Host "Instalando dependencias do frontend..." -ForegroundColor Cyan
+            Invoke-CheckedCommand -Label "npm install" -Command { npm install }
+        }
+
+        Write-Host "Buildando frontend..." -ForegroundColor Cyan
+        Invoke-CheckedCommand -Label "npm run build" -Command { npm run build }
+    }
+    finally {
+        Pop-Location
+    }
+}
+
+function Invoke-PostgresSetup {
+    if (-not (Test-Path -LiteralPath $paths.PostgresScript)) {
+        throw "Bootstrap de PostgreSQL local nao encontrado: $($paths.PostgresScript)"
+    }
+
+    Write-Host "Preparando PostgreSQL local..." -ForegroundColor Cyan
+    Invoke-CheckedCommand -Label "PostgreSQL local" -Command {
+        & $paths.PostgresScript `
+            -PgHost "localhost" `
+            -Port 5432 `
+            -Database "frota_db" `
+            -DbUser "frota_user" `
+            -DbPassword "frota_secret" `
+            -SuperUser "frota_user"
+    }
+
+    Invoke-Migrations
+    Invoke-Seed
+}
+
+function Stop-FrotaEnvironment {
+    $stopped = $false
+    $pidFiles = @($paths.AppPidFile, $paths.FrontendPidFile)
+
+    foreach ($pidFile in $pidFiles) {
+        $processId = Get-ProcessIdFromFile -Path $pidFile
+        if ($processId -and (Test-ProcessAlive -ProcessId $processId)) {
+            Write-Host "Encerrando PID registrado: $processId" -ForegroundColor Yellow
+            Stop-ProcessTreeSafe -ProcessId $processId
+            $stopped = $true
+        }
+        Remove-IfExists -Path $pidFile
+    }
+
+    foreach ($targetPort in @($Port, $FrontendPort, 80)) {
+        $ownerPid = Get-PortOwnerPid -Port $targetPort
+        if ($ownerPid -and (Test-ProcessAlive -ProcessId $ownerPid)) {
+            Write-Host "Encerrando processo na porta ${targetPort}: PID $ownerPid" -ForegroundColor Yellow
+            Stop-ProcessTreeSafe -ProcessId $ownerPid
+            $stopped = $true
+        }
+    }
+
+    Remove-IfExists -Path $paths.SessionFile
+
+    if ($stopped) {
+        Write-Host "Ambiente Frota parado." -ForegroundColor Green
+    }
+    else {
+        Write-Host "Nenhum processo ativo foi encontrado." -ForegroundColor Yellow
+    }
+}
+
+function Show-Status {
+    $session = Read-FrotaSession
+    $backendPid = Get-ProcessIdFromFile -Path $paths.AppPidFile
+    $frontendPid = Get-ProcessIdFromFile -Path $paths.FrontendPidFile
+    $backendOwner = Get-PortOwnerPid -Port $Port
+    $frontendOwner = Get-PortOwnerPid -Port $FrontendPort
+    $publishOwner = Get-PortOwnerPid -Port 80
+    $ipAddress = Get-CurrentIpAddress
+
+    Write-Host "===========================================" -ForegroundColor Cyan
+    Write-Host " FROTA - Status Operacional" -ForegroundColor Cyan
+    Write-Host "===========================================" -ForegroundColor Cyan
+    Write-Host "Repositorio        : $($paths.Root)"
+    Write-Host "Backend PID file   : $backendPid"
+    Write-Host "Frontend PID file  : $frontendPid"
+    Write-Host "Porta backend $Port : $backendOwner"
+    Write-Host "Porta frontend $FrontendPort : $frontendOwner"
+    Write-Host "Porta publicacao 80: $publishOwner"
+    Write-Host "URL backend        : http://localhost:$Port"
+    Write-Host "URL frontend       : http://localhost:$FrontendPort"
+    Write-Host "URL rede frontend  : http://${ipAddress}:$FrontendPort"
+    Write-Host "Logs               : $($paths.LogsRoot)"
+
+    if ($session) {
+        Write-Host "Sessao iniciada em : $($session.startedAt)"
+        Write-Host "Modo producao      : $($session.production)"
+    }
+}
+
+function Open-Logs {
+    Initialize-FrotaStorage
+    Start-Process explorer.exe $paths.LogsRoot | Out-Null
+    Write-Host "Pasta de logs aberta: $($paths.LogsRoot)" -ForegroundColor Green
+}
+
+function Start-Backend {
+    param([int]$TargetPort = $Port)
+
+    $existing = Get-PortOwnerPid -Port $TargetPort
+    if ($existing) {
+        throw "A porta $TargetPort ja esta em uso pelo PID $existing."
+    }
+
+    $process = Start-FrotaProcess `
+        -Title "Backend" `
+        -ScriptPath $paths.BackendDevScript `
+        -Arguments @("-Port", "$TargetPort") `
+        -OutFile $paths.AppLogFile `
+        -ErrFile $paths.AppErrLogFile `
+        -PidFile $paths.AppPidFile
+
+    if (-not (Wait-PortReady -TargetPort $TargetPort -TimeoutSeconds 90)) {
+        throw "Backend iniciou com PID $($process.Id), mas a porta $TargetPort nao respondeu. Verifique os logs."
+    }
+
+    Write-FrotaSession -ProcessId $process.Id -Port $TargetPort -Production ($TargetPort -eq 80)
+    Write-Host "Backend: http://localhost:$TargetPort" -ForegroundColor Cyan
+}
+
+function Start-Frontend {
+    $existing = Get-PortOwnerPid -Port $FrontendPort
+    if ($existing) {
+        throw "A porta $FrontendPort ja esta em uso pelo PID $existing."
+    }
+
+    $process = Start-FrotaProcess `
+        -Title "Frontend" `
+        -ScriptPath $paths.FrontendDevScript `
+        -Arguments @("-Port", "$FrontendPort") `
+        -OutFile $paths.FrontendLogFile `
+        -ErrFile $paths.FrontendErrLogFile `
+        -PidFile $paths.FrontendPidFile
+
+    if (-not (Wait-PortReady -TargetPort $FrontendPort -TimeoutSeconds 90)) {
+        throw "Frontend iniciou com PID $($process.Id), mas a porta $FrontendPort nao respondeu. Verifique os logs."
+    }
+
+    Write-Host "Frontend: http://localhost:$FrontendPort" -ForegroundColor Cyan
+}
+
+function Start-Stack {
+    Start-Backend -TargetPort $Port
+    Start-Frontend
+
+    $backendPid = Get-ProcessIdFromFile -Path $paths.AppPidFile
+    $frontendPid = Get-ProcessIdFromFile -Path $paths.FrontendPidFile
+    Write-FrotaSession -ProcessId $backendPid -FrontendProcessId $frontendPid -Port $Port -FrontendPort $FrontendPort -Production $false
 }
 
 function Invoke-Action {
     param([Parameter(Mandatory = $true)][string]$SelectedAction)
 
     switch ($SelectedAction) {
-        "Start" {
-            & (Join-Path $opsRoot "start-dev.ps1") -Port $Port -BuildFrontend:$BuildFrontend -SeedDemoData:$SeedDemoData
-        }
+        "Start" { Start-Stack }
+        "StartStack" { Start-Stack }
+        "Backend" { Start-Backend -TargetPort $Port }
+        "Frontend" { Start-Frontend }
+        "Postgres" { Invoke-PostgresSetup }
         "Publish" {
-            & (Join-Path $opsRoot "start-dev.ps1") -Port 80 -AppHost "127.0.0.1" -Production -BuildFrontend -SeedDemoData:$SeedDemoData
+            Invoke-Migrations
+            Invoke-FrontendBuild
+            Start-Backend -TargetPort 80
         }
-        "Stop" {
-            & (Join-Path $opsRoot "stop-dev.ps1") -Port $Port
-        }
-        "Reset" {
-            & (Join-Path $opsRoot "reset-dev.ps1") -Port $Port
-        }
-        "Status" {
-            & (Join-Path $opsRoot "status-dev.ps1") -Port $Port
-        }
-        "Logs" {
-            & (Join-Path $opsRoot "logs-local.ps1")
-        }
-        "Backup" {
-            & (Join-Path $repoRoot "scripts\backup-local.ps1")
-        }
-        "Migrate" {
-            Push-Location (Join-Path $repoRoot "backend")
-            try {
-                $alembic = Join-Path $repoRoot "backend\.venv\Scripts\alembic.exe"
-                if (-not (Test-Path -LiteralPath $alembic)) {
-                    throw "Alembic not found at '$alembic'. Start the environment once to create venv."
-                }
-
-                Write-Host "Applying migrations (upgrade heads)..." -ForegroundColor Cyan
-                Invoke-CheckedCommand -Label "Alembic upgrade heads" -Command { & $alembic upgrade heads }
-                Write-Host "Migrations applied successfully." -ForegroundColor Green
-            }
-            finally {
-                Pop-Location
-            }
-        }
+        "Stop" { Stop-FrotaEnvironment }
+        "Status" { Show-Status }
+        "Logs" { Open-Logs }
+        "Backup" { & $paths.BackupAutoScript }
+        "BackupAuto" { & $paths.BackupAutoInstallScript }
+        "Migrate" { Invoke-Migrations }
         "Update" {
-            Set-Location $repoRoot
-
+            Set-Location $paths.Root
             if (-not $SkipGitPull) {
-                Write-Host "Updating repository (git pull --ff-only)..." -ForegroundColor Cyan
+                Write-Host "Atualizando repositorio..." -ForegroundColor Cyan
                 Invoke-CheckedCommand -Label "git pull" -Command { git pull --ff-only }
             }
-
             if ($InstallDeps) {
-                $python = Join-Path $repoRoot "backend\.venv\Scripts\python.exe"
-                if (Test-Path -LiteralPath $python) {
-                    Write-Host "Updating Python dependencies..." -ForegroundColor Cyan
-                    Invoke-CheckedCommand -Label "pip install -r requirements.txt" -Command { & $python -m pip install -r (Join-Path $repoRoot "backend\requirements.txt") }
-                }
-            }
-
-            & $PSCommandPath -Action Migrate -NoPause
-
-            if ($BuildFrontend) {
-                Push-Location (Join-Path $repoRoot "frontend")
+                Push-Location $paths.BackendRoot
                 try {
-                    if (-not (Test-Path -LiteralPath "node_modules")) {
-                        Write-Host "Installing frontend dependencies..." -ForegroundColor Cyan
-                        Invoke-CheckedCommand -Label "npm install" -Command { npm install }
-                    }
-                    Write-Host "Building frontend..." -ForegroundColor Cyan
-                    Invoke-CheckedCommand -Label "npm run build" -Command { npm run build }
+                    $python = Join-Path $paths.BackendRoot ".venv\Scripts\python.exe"
+                    Invoke-CheckedCommand -Label "pip install" -Command { & $python -m pip install -r requirements.txt }
                 }
                 finally {
                     Pop-Location
                 }
             }
-
-            Write-Host "Update completed." -ForegroundColor Green
+            Invoke-Migrations
+            Invoke-FrontendBuild
+            Write-Host "Atualizacao concluida." -ForegroundColor Green
         }
-        "FullReset" {
-            & (Join-Path $repoRoot "scripts\reset_frota.ps1")
-        }
-        default {
-            throw "Unsupported action: $SelectedAction"
-        }
+        default { throw "Acao nao suportada: $SelectedAction" }
     }
 }
 
 function Show-Menu {
     Clear-Host
     Write-Host "===========================================" -ForegroundColor Cyan
-    Write-Host "         FROTA - Operations Center        " -ForegroundColor Cyan
+    Write-Host "        FROTA - Central Operacional        " -ForegroundColor Cyan
     Write-Host "===========================================" -ForegroundColor Cyan
-    Write-Host "[1] Start local (port 8000)"
-    Write-Host "[2] Publish local (port 80)"
-    Write-Host "[3] Stop environment"
-    Write-Host "[4] Reset operational (app/logs)"
-    Write-Host "[5] Status"
-    Write-Host "[6] Logs"
-    Write-Host "[7] Backup"
-    Write-Host "[8] Apply migrations"
-    Write-Host "[9] Update (git pull + migrate + build)"
-    Write-Host "[10] Full database reset"
-    Write-Host "[0] Exit"
+    Write-Host "[1] Iniciar stack dev (backend + frontend)"
+    Write-Host "[2] Iniciar backend"
+    Write-Host "[3] Iniciar frontend"
+    Write-Host "[4] Preparar PostgreSQL local"
+    Write-Host "[5] Publicar na porta 80"
+    Write-Host "[6] Parar ambiente"
+    Write-Host "[7] Status"
+    Write-Host "[8] Abrir logs"
+    Write-Host "[9] Backup manual"
+    Write-Host "[10] Configurar backup automatico"
+    Write-Host "[11] Aplicar migrations"
+    Write-Host "[12] Atualizar projeto"
+    Write-Host "[0] Sair"
     Write-Host ""
 
-    $option = Read-Host "Choose an option"
+    $option = Read-Host "Escolha uma opcao"
     $selectedAction = switch ($option) {
-        "1" { "Start" }
-        "2" { "Publish" }
-        "3" { "Stop" }
-        "4" { "Reset" }
-        "5" { "Status" }
-        "6" { "Logs" }
-        "7" { "Backup" }
-        "8" { "Migrate" }
-        "9" { "Update" }
-        "10" { "FullReset" }
+        "1" { "StartStack" }
+        "2" { "Backend" }
+        "3" { "Frontend" }
+        "4" { "Postgres" }
+        "5" { "Publish" }
+        "6" { "Stop" }
+        "7" { "Status" }
+        "8" { "Logs" }
+        "9" { "Backup" }
+        "10" { "BackupAuto" }
+        "11" { "Migrate" }
+        "12" { "Update" }
         "0" { $null }
         default { "Invalid" }
     }
 
     if ($selectedAction -eq "Invalid") {
-        Write-Host "Invalid option." -ForegroundColor Red
+        Write-Host "Opcao invalida." -ForegroundColor Red
         return $true
     }
 
     if (-not $selectedAction) {
-        Write-Host "Closing operations center." -ForegroundColor Yellow
+        Write-Host "Fechando central operacional." -ForegroundColor Yellow
         return $false
     }
 
@@ -167,7 +391,7 @@ if ($Action -eq "Menu") {
     $keepRunning = Show-Menu
     if ($keepRunning -and -not $NoPause) {
         Write-Host ""
-        Read-Host "Press Enter to close"
+        Read-Host "Pressione Enter para fechar"
     }
     exit 0
 }
@@ -176,5 +400,5 @@ Invoke-Action -SelectedAction $Action
 
 if (-not $NoPause) {
     Write-Host ""
-    Read-Host "Done. Press Enter to close"
+    Read-Host "Concluido. Pressione Enter para fechar"
 }

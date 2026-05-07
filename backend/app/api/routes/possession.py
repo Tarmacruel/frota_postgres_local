@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from uuid import UUID
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
@@ -49,13 +49,13 @@ def _parse_photo_metadata(
     try:
         payload = json.loads(photo_metadata_json)
     except json.JSONDecodeError as exc:
-        _raise_form_error("photo_metadata_json", "Os metadados das fotos estao em formato invalido.")
+        _raise_form_error("photo_metadata_json", "Os metadados das fotos estao em formato inválido.")
 
     if not isinstance(payload, list):
         _raise_form_error("photo_metadata_json", "Os metadados das fotos devem ser enviados como lista.")
 
     if required and not payload:
-        _raise_form_error("photo_metadata_json", "Ao menos uma foto georreferenciada e obrigatoria para registrar a posse.")
+        _raise_form_error("photo_metadata_json", "Ao menos uma foto georreferenciada é obrigatória para registrar a posse.")
 
     try:
         return [PossessionPhotoCreate.model_validate(item) for item in payload]
@@ -129,6 +129,48 @@ def parse_admin_photo_metadata(
     return _parse_photo_metadata(photo_metadata_json, required=False)
 
 
+def _nullable_form_value(value):
+    if value is None or hasattr(value, "filename"):
+        return None
+    normalized = str(value).strip()
+    return normalized or None
+
+
+def _form_upload(value) -> UploadFile | None:
+    if hasattr(value, "filename") and getattr(value, "filename", None):
+        return value
+    return None
+
+
+async def parse_possession_end_request(request: Request) -> tuple[PossessionUpdate, UploadFile | None]:
+    content_type = request.headers.get("content-type", "").lower()
+    return_term_document: UploadFile | None = None
+
+    if content_type.startswith("multipart/form-data") or content_type.startswith("application/x-www-form-urlencoded"):
+        form = await request.form()
+        payload = {}
+        for field_name in ("end_date", "observation", "end_odometer_km"):
+            value = _nullable_form_value(form.get(field_name))
+            if value is not None:
+                payload[field_name] = value
+        return_term_document = _form_upload(form.get("return_term_document"))
+    else:
+        try:
+            payload = await request.json()
+        except json.JSONDecodeError:
+            payload = {}
+
+        if payload is None:
+            payload = {}
+        if not isinstance(payload, dict):
+            _raise_form_error("body", "Dados de encerramento da posse em formato invÃ¡lido.")
+
+    try:
+        return PossessionUpdate.model_validate(payload), return_term_document
+    except ValidationError as exc:
+        raise RequestValidationError(exc.errors()) from exc
+
+
 @router.get("", response_model=list[PossessionOut])
 async def list_possession(
     vehicle_id: UUID | None = Query(default=None),
@@ -174,6 +216,7 @@ async def create_possession(
     data: PossessionCreate = Depends(parse_possession_form),
     photo_metadata: list[PossessionPhotoCreate] = Depends(parse_possession_photo_metadata),
     photos: list[UploadFile] | None = File(default=None),
+    loan_term_document: UploadFile | None = File(default=None),
     signed_document: UploadFile | None = File(default=None),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_writer),
@@ -182,7 +225,7 @@ async def create_possession(
         data,
         photos=photos or [],
         photo_metadata=photo_metadata,
-        signed_document=signed_document,
+        loan_term_document=loan_term_document or signed_document,
         current_user=current_user,
     )
 
@@ -212,17 +255,41 @@ async def get_possession_document(
     db: AsyncSession = Depends(get_db_session),
     _current_user: User = Depends(get_current_user),
 ) -> FileResponse:
-    return await PossessionService(db).get_document_file(possession_id)
+    return await PossessionService(db).get_document_file(possession_id, document_kind="loan")
+
+
+@router.get("/{possession_id}/documents/loan-term")
+async def get_possession_loan_term_document(
+    possession_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    _current_user: User = Depends(get_current_user),
+) -> FileResponse:
+    return await PossessionService(db).get_document_file(possession_id, document_kind="loan")
+
+
+@router.get("/{possession_id}/documents/return-term")
+async def get_possession_return_term_document(
+    possession_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    _current_user: User = Depends(get_current_user),
+) -> FileResponse:
+    return await PossessionService(db).get_document_file(possession_id, document_kind="return")
 
 
 @router.put("/{possession_id}/end", response_model=PossessionOut)
 async def end_possession(
     possession_id: UUID,
-    data: PossessionUpdate,
+    parsed: tuple[PossessionUpdate, UploadFile | None] = Depends(parse_possession_end_request),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_writer),
 ):
-    return await PossessionService(db).end(possession_id, data, current_user)
+    data, return_term_document = parsed
+    return await PossessionService(db).end(
+        possession_id,
+        data,
+        current_user,
+        return_term_document=return_term_document,
+    )
 
 
 @router.put("/{possession_id}", response_model=PossessionOut)
@@ -230,7 +297,9 @@ async def update_possession(
     possession_id: UUID,
     data: PossessionAdminUpdate = Depends(parse_admin_update_form),
     photo_metadata: list[PossessionPhotoCreate] = Depends(parse_admin_photo_metadata),
+    loan_term_document: UploadFile | None = File(default=None),
     signed_document: UploadFile | None = File(default=None),
+    return_term_document: UploadFile | None = File(default=None),
     new_photos: list[UploadFile] | None = File(default=None),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_admin),
@@ -239,7 +308,8 @@ async def update_possession(
         possession_id,
         data,
         current_user,
-        signed_document=signed_document,
+        loan_term_document=loan_term_document or signed_document,
+        return_term_document=return_term_document,
         new_photos=new_photos or [],
         new_photo_metadata=photo_metadata,
     )

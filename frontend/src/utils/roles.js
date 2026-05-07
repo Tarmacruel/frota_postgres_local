@@ -1,8 +1,8 @@
 export const ROLE_LABELS = {
   ADMIN: 'Administrador',
-  PRODUCAO: 'Producao',
+  PRODUCAO: 'Produção',
   POSTO: 'Posto',
-  PADRAO: 'Padrao',
+  PADRAO: 'Padrão',
 }
 
 export function isAdmin(role) {

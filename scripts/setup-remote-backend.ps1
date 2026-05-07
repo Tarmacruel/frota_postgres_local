@@ -125,7 +125,7 @@ Write-Host ""
 Write-Host "NEXT STEPS:" -ForegroundColor Yellow
 Write-Host ""
 Write-Host "1. Start Backend:" -ForegroundColor White
-Write-Host "   Iniciar_Dev_Server.bat" -ForegroundColor Cyan
+Write-Host "   FROTA_Iniciar.bat -> Iniciar backend" -ForegroundColor Cyan
 Write-Host ""
 Write-Host "2. Or run manually:" -ForegroundColor White
 Write-Host "   cd backend" -ForegroundColor Cyan

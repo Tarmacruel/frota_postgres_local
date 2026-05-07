@@ -5,21 +5,28 @@ function Get-FrotaPaths {
     $root = Convert-Path (Join-Path $PSScriptRoot "..\..")
 
     $paths = [ordered]@{
-        Root             = $root
-        ScriptsRoot      = Join-Path $root "scripts"
-        OpsRoot          = Join-Path $root "scripts\ops"
-        BackendRoot      = Join-Path $root "backend"
-        FrontendRoot     = Join-Path $root "frontend"
-        RuntimeRoot      = Join-Path $root "storage\runtime"
-        LogsRoot         = Join-Path $root "storage\logs"
-        BackupsRoot      = Join-Path $root "storage\backups"
-        StartScript      = Join-Path $root "scripts\start_frota.ps1"
-        PostgresScript   = Join-Path $root "scripts\start_local_postgres.ps1"
-        BackupScript     = Join-Path $root "scripts\backup-local.ps1"
-        AppPidFile       = Join-Path $root "storage\runtime\frota-app.pid"
-        SessionFile      = Join-Path $root "storage\runtime\frota-session.json"
-        AppLogFile       = Join-Path $root "storage\logs\frota-app.log"
-        AppErrLogFile    = Join-Path $root "storage\logs\frota-app.error.log"
+        Root                    = $root
+        ScriptsRoot             = Join-Path $root "scripts"
+        OpsRoot                 = Join-Path $root "scripts\ops"
+        BackendRoot             = Join-Path $root "backend"
+        FrontendRoot            = Join-Path $root "frontend"
+        RuntimeRoot             = Join-Path $root "storage\runtime"
+        LogsRoot                = Join-Path $root "storage\logs"
+        BackupsRoot             = Join-Path $root "storage\backups"
+        BackendDevScript        = Join-Path $root "scripts\run-dev-server.ps1"
+        FrontendDevScript       = Join-Path $root "scripts\run-frontend-dev.ps1"
+        PostgresScript          = Join-Path $root "scripts\start_local_postgres.ps1"
+        BackupScript            = Join-Path $root "scripts\backup-local.ps1"
+        BackupAutoScript        = Join-Path $root "scripts\run-backup-automatico.ps1"
+        BackupAutoInstallScript = Join-Path $root "scripts\install-backup-automatico.ps1"
+        RemoteSetupScript       = Join-Path $root "scripts\setup-remote-backend.ps1"
+        AppPidFile              = Join-Path $root "storage\runtime\frota-app.pid"
+        FrontendPidFile         = Join-Path $root "storage\runtime\frota-frontend.pid"
+        SessionFile             = Join-Path $root "storage\runtime\frota-session.json"
+        AppLogFile              = Join-Path $root "storage\logs\frota-app.log"
+        AppErrLogFile           = Join-Path $root "storage\logs\frota-app.error.log"
+        FrontendLogFile         = Join-Path $root "storage\logs\frota-frontend.log"
+        FrontendErrLogFile      = Join-Path $root "storage\logs\frota-frontend.error.log"
     }
 
     return [pscustomobject]$paths
@@ -38,6 +45,14 @@ function Initialize-FrotaStorage {
     Ensure-Directory -Path $paths.RuntimeRoot
     Ensure-Directory -Path $paths.LogsRoot
     Ensure-Directory -Path $paths.BackupsRoot
+}
+
+function Remove-IfExists {
+    param([Parameter(Mandatory = $true)][string]$Path)
+
+    if (Test-Path -LiteralPath $Path) {
+        Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
+    }
 }
 
 function Get-ProcessIdFromFile {
@@ -73,14 +88,6 @@ function Test-ProcessAlive {
     }
     catch {
         return $false
-    }
-}
-
-function Remove-IfExists {
-    param([Parameter(Mandatory = $true)][string]$Path)
-
-    if (Test-Path -LiteralPath $Path) {
-        Remove-Item -LiteralPath $Path -Force -ErrorAction SilentlyContinue
     }
 }
 
@@ -124,29 +131,46 @@ function Stop-ProcessTreeSafe {
     }
 }
 
+function Invoke-CheckedCommand {
+    param(
+        [Parameter(Mandatory = $true)][string]$Label,
+        [Parameter(Mandatory = $true)][scriptblock]$Command
+    )
+
+    & $Command
+    if ($LASTEXITCODE -ne 0) {
+        throw "$Label falhou com codigo $LASTEXITCODE."
+    }
+}
+
 function Write-FrotaSession {
     param(
         [int]$ProcessId,
+        [int]$FrontendProcessId = 0,
         [int]$Port,
-        [bool]$BuildFrontend,
-        [bool]$SeedDemoData,
+        [int]$FrontendPort = 0,
         [bool]$Production
     )
 
     $paths = Get-FrotaPaths
     $payload = [ordered]@{
-        startedAt     = (Get-Date).ToString("s")
-        pid           = $ProcessId
-        port          = $Port
-        buildFrontend = $BuildFrontend
-        seedDemoData  = $SeedDemoData
-        production    = $Production
-        machine       = $env:COMPUTERNAME
-        user          = $env:USERNAME
+        startedAt   = (Get-Date).ToString("s")
+        pid         = $ProcessId
+        frontendPid = $FrontendProcessId
+        port        = $Port
+        frontendPort = $FrontendPort
+        production  = $Production
+        machine     = $env:COMPUTERNAME
+        user        = $env:USERNAME
     } | ConvertTo-Json -Depth 4
 
     Set-Content -LiteralPath $paths.SessionFile -Value $payload -Encoding UTF8
-    Set-Content -LiteralPath $paths.AppPidFile -Value "$ProcessId" -Encoding ASCII
+    if ($ProcessId) {
+        Set-Content -LiteralPath $paths.AppPidFile -Value "$ProcessId" -Encoding ASCII
+    }
+    if ($FrontendProcessId) {
+        Set-Content -LiteralPath $paths.FrontendPidFile -Value "$FrontendProcessId" -Encoding ASCII
+    }
 }
 
 function Read-FrotaSession {

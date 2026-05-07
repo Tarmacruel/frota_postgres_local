@@ -8,7 +8,7 @@ const MAX_RECEIPT_SIZE_BYTES = 8 * 1024 * 1024
 const ALLOWED_RECEIPT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
 
 function buildVehicleOption(vehicle) {
-  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
+  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
   return {
     value: vehicle.id,
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
@@ -75,11 +75,11 @@ export default function FuelSupplyForm({ vehicles, drivers, organizations, fuelS
   async function handleSubmit(event) {
     event.preventDefault()
     if (!form.vehicle_id) {
-      setError('Selecione um veiculo para registrar o abastecimento.')
+      setError('Selecione um veículo para registrar o abastecimento.')
       return
     }
     if (!receiptFile) {
-      setReceiptError('O comprovante e obrigatorio para registrar o abastecimento.')
+      setReceiptError('O comprovante é obrigatório para registrar o abastecimento.')
       return
     }
 
@@ -103,7 +103,7 @@ export default function FuelSupplyForm({ vehicles, drivers, organizations, fuelS
       onSuccess?.(`Abastecimento registrado com sucesso.${alerts}`)
       onClose?.()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel registrar o abastecimento.'))
+      setError(getApiErrorMessage(err, 'Não foi possível registrar o abastecimento.'))
     } finally {
       setSubmitting(false)
     }
@@ -113,23 +113,23 @@ export default function FuelSupplyForm({ vehicles, drivers, organizations, fuelS
     <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
       <div className="form-field">
-        <label>Veiculo</label>
-        <SearchableSelect value={form.vehicle_id} onChange={(value) => setForm({ ...form, vehicle_id: value })} options={vehicles.map(buildVehicleOption)} placeholder="Selecione o veiculo" searchPlaceholder="Buscar veiculo" />
+        <label>Veículo</label>
+        <SearchableSelect value={form.vehicle_id} onChange={(value) => setForm({ ...form, vehicle_id: value })} options={vehicles.map(buildVehicleOption)} placeholder="Selecione o veículo" searchPlaceholder="Buscar veículo" />
       </div>
       <div className="form-field">
         <label>Condutor</label>
-        <SearchableSelect value={form.driver_id} onChange={(value) => setForm({ ...form, driver_id: value })} options={[{ value: '', label: 'Nao informado' }, ...drivers.map(buildDriverOption)]} placeholder="Selecione o condutor" searchPlaceholder="Buscar condutor" />
+        <SearchableSelect value={form.driver_id} onChange={(value) => setForm({ ...form, driver_id: value })} options={[{ value: '', label: 'Não informado' }, ...drivers.map(buildDriverOption)]} placeholder="Selecione o condutor" searchPlaceholder="Buscar condutor" />
       </div>
       <div className="form-field">
-        <label>Orgao</label>
-        <SearchableSelect value={form.organization_id} onChange={(value) => setForm({ ...form, organization_id: value })} options={[{ value: '', label: 'Nao informado' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))]} placeholder="Selecione o orgao" searchPlaceholder="Buscar orgao" />
+        <label>Órgão</label>
+        <SearchableSelect value={form.organization_id} onChange={(value) => setForm({ ...form, organization_id: value })} options={[{ value: '', label: 'Não informado' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))]} placeholder="Selecione o órgão" searchPlaceholder="Buscar órgão" />
       </div>
       <div className="form-field">
         <label>Data/hora</label>
         <input type="datetime-local" className="app-input" value={form.supplied_at} onChange={(event) => setForm({ ...form, supplied_at: event.target.value })} />
       </div>
       <div className="form-field">
-        <label>Odometro (km)</label>
+        <label>Odômetro (km)</label>
         <input type="number" min="0" step="0.1" className="app-input" value={form.odometer_km} onChange={(event) => setForm({ ...form, odometer_km: event.target.value })} required />
       </div>
       <div className="form-field">
@@ -142,17 +142,17 @@ export default function FuelSupplyForm({ vehicles, drivers, organizations, fuelS
       </div>
       <div className="form-field">
         <label>Posto</label>
-        <SearchableSelect value={form.fuel_station_id} onChange={(value) => setForm({ ...form, fuel_station_id: value })} options={[{ value: '', label: 'Nao informado' }, ...fuelStations.map((station) => ({ value: station.id, label: station.name, description: station.address }))]} placeholder="Selecione o posto" searchPlaceholder="Buscar posto" />
+        <SearchableSelect value={form.fuel_station_id} onChange={(value) => setForm({ ...form, fuel_station_id: value })} options={[{ value: '', label: 'Não informado' }, ...fuelStations.map((station) => ({ value: station.id, label: station.name, description: station.address }))]} placeholder="Selecione o posto" searchPlaceholder="Buscar posto" />
       </div>
 
       <div className="form-field modal-field-span">
-        <label>Comprovante (obrigatorio)</label>
+        <label>Comprovante (obrigatório)</label>
         <input ref={receiptRef} type="file" accept=".pdf,image/jpeg,image/png,image/webp" onChange={handleReceiptChange} required />
         {receiptError ? <small className="form-error">{receiptError}</small> : null}
       </div>
 
       <div className="form-field modal-field-span">
-        <label>Observacoes</label>
+        <label>Observações</label>
         <textarea className="app-textarea" rows="3" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
       </div>
 

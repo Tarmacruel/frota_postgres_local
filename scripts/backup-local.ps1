@@ -1,6 +1,7 @@
 [CmdletBinding()]
 param(
     [string]$BackupRoot = "storage\backups",
+    [string]$MirrorRoot = "",
     [int]$RetentionCount = 10
 )
 
@@ -14,6 +15,7 @@ $envFile = Join-Path $backendRoot ".env"
 
 function Ensure-Directory {
     param([string]$Path)
+
     if (-not (Test-Path -LiteralPath $Path)) {
         New-Item -ItemType Directory -Force -Path $Path | Out-Null
     }
@@ -52,7 +54,7 @@ function Find-PgDump {
         return ($candidates | Select-Object -First 1)
     }
 
-    throw "pg_dump não foi encontrado. Instale o PostgreSQL client tools."
+    throw "pg_dump nao foi encontrado. Instale o PostgreSQL client tools."
 }
 
 function Get-FileSha256 {
@@ -85,9 +87,20 @@ function Remove-OldBackups {
         }
 }
 
+function Get-NormalizedPath {
+    param([string]$Path)
+
+    $trimChars = [char[]]@(
+        [System.IO.Path]::DirectorySeparatorChar,
+        [System.IO.Path]::AltDirectorySeparatorChar
+    )
+
+    return ([System.IO.Path]::GetFullPath($Path)).TrimEnd($trimChars)
+}
+
 $databaseUrl = Get-EnvValue -Path $envFile -Name "DATABASE_URL"
 if (-not $databaseUrl) {
-    throw "DATABASE_URL não encontrada em backend\.env"
+    throw "DATABASE_URL nao encontrada em backend\.env"
 }
 
 $uri = [System.Uri]$databaseUrl
@@ -101,9 +114,15 @@ $dbPort = if ($uri.Port -gt 0) { $uri.Port } else { 5432 }
 $backupRootAbsolute = if ([System.IO.Path]::IsPathRooted($BackupRoot)) { $BackupRoot } else { Join-Path $repoRoot $BackupRoot }
 Ensure-Directory -Path $backupRootAbsolute
 
+$mirrorRootAbsolute = $null
+if (-not [string]::IsNullOrWhiteSpace($MirrorRoot)) {
+    $mirrorRootAbsolute = if ([System.IO.Path]::IsPathRooted($MirrorRoot)) { $MirrorRoot } else { Join-Path $repoRoot $MirrorRoot }
+    Ensure-Directory -Path $mirrorRootAbsolute
+}
+
 $lockFile = Join-Path $backupRootAbsolute ".backup.lock"
 if (Test-Path -LiteralPath $lockFile) {
-    throw "Já existe uma rotina de backup em andamento."
+    throw "Ja existe uma rotina de backup em andamento."
 }
 
 try {
@@ -115,6 +134,7 @@ try {
     $sqlPath = Join-Path $workDir "database.sql"
     $metaPath = Join-Path $workDir "metadata.json"
     $envBackupPath = Join-Path $workDir ".env.backup"
+    $mirrorArchivePath = $null
 
     Ensure-Directory -Path $workDir
 
@@ -122,18 +142,22 @@ try {
 
     Write-Host "Gerando dump PostgreSQL..." -ForegroundColor Yellow
     $env:PGPASSWORD = $dbPassword
-    & $pgDump `
-        --host=$dbHost `
-        --port=$dbPort `
-        --username=$dbUser `
-        --dbname=$dbName `
-        --file=$sqlPath `
-        --no-owner `
-        --no-privileges
-    Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
+    try {
+        & $pgDump `
+            --host=$dbHost `
+            --port=$dbPort `
+            --username=$dbUser `
+            --dbname=$dbName `
+            --file=$sqlPath `
+            --no-owner `
+            --no-privileges
 
-    if ($LASTEXITCODE -ne 0) {
-        throw "Falha ao gerar dump PostgreSQL."
+        if ($LASTEXITCODE -ne 0) {
+            throw "Falha ao gerar dump PostgreSQL."
+        }
+    }
+    finally {
+        Remove-Item Env:PGPASSWORD -ErrorAction SilentlyContinue
     }
 
     if (Test-Path -LiteralPath $envFile) {
@@ -154,6 +178,7 @@ try {
             databaseSql = (Split-Path $sqlPath -Leaf)
             envBackup   = (Split-Path $envBackupPath -Leaf)
         }
+        mirror = if ($mirrorRootAbsolute) { $mirrorRootAbsolute } else { $null }
     } | ConvertTo-Json -Depth 5
 
     Set-Content -LiteralPath $metaPath -Value $metadata -Encoding UTF8
@@ -166,14 +191,35 @@ try {
     [System.IO.Compression.ZipFile]::CreateFromDirectory($workDir, $archivePath)
 
     $archiveSha = Get-FileSha256 -Path $archivePath
-    Set-Content -LiteralPath "$archivePath.sha256.txt" -Value $archiveSha -Encoding ASCII
+    $archiveShaPath = "$archivePath.sha256.txt"
+    Set-Content -LiteralPath $archiveShaPath -Value $archiveSha -Encoding ASCII
+
+    if ($mirrorRootAbsolute) {
+        Write-Host "Espelhando backup..." -ForegroundColor Yellow
+        $mirrorArchivePath = Join-Path $mirrorRootAbsolute (Split-Path $archivePath -Leaf)
+        $mirrorShaPath = "$mirrorArchivePath.sha256.txt"
+
+        Copy-Item -LiteralPath $archivePath -Destination $mirrorArchivePath -Force
+        Copy-Item -LiteralPath $archiveShaPath -Destination $mirrorShaPath -Force
+
+        $mirrorArchiveSha = Get-FileSha256 -Path $mirrorArchivePath
+        if ($mirrorArchiveSha -ne $archiveSha) {
+            throw "Falha ao validar a copia espelhada do backup."
+        }
+    }
 
     Remove-Item -LiteralPath $workDir -Recurse -Force
 
     Remove-OldBackups -Path $backupRootAbsolute -KeepCount $RetentionCount
+    if ($mirrorRootAbsolute -and ((Get-NormalizedPath $mirrorRootAbsolute) -ne (Get-NormalizedPath $backupRootAbsolute))) {
+        Remove-OldBackups -Path $mirrorRootAbsolute -KeepCount $RetentionCount
+    }
 
-    Write-Host "Backup concluído com sucesso." -ForegroundColor Green
+    Write-Host "Backup concluido com sucesso." -ForegroundColor Green
     Write-Host "Arquivo: $archivePath"
+    if ($mirrorArchivePath) {
+        Write-Host "Espelho: $mirrorArchivePath"
+    }
 }
 finally {
     if (Test-Path -LiteralPath $lockFile) {

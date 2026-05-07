@@ -21,7 +21,7 @@ $pythonExe = Join-Path $backendDir ".venv\Scripts\python.exe"
 # Validate
 if (-not (Test-Path $pythonExe)) {
     Write-Host "[ERR] venv not found at $backendDir" -ForegroundColor Red
-    Write-Host "Run Setup first: Setup_Backend_Remoto.bat" -ForegroundColor Yellow
+    Write-Host "Run FROTA_Iniciar.bat and choose the PostgreSQL/setup option first." -ForegroundColor Yellow
     exit 1
 }
 

@@ -33,6 +33,8 @@ async def test_openapi_contains_new_routes(client):
     assert "/api/possession/paginated" in paths
     assert "/api/possession/{possession_id}" in paths
     assert "/api/possession/{possession_id}/document" in paths
+    assert "/api/possession/{possession_id}/documents/loan-term" in paths
+    assert "/api/possession/{possession_id}/documents/return-term" in paths
     assert "/api/possession/{possession_id}/photo" in paths
     assert "/api/possession/{possession_id}/photos/{photo_id}" in paths
     assert "/api/possession/{possession_id}/end" in paths
@@ -73,3 +75,10 @@ async def test_openapi_contains_new_routes(client):
     public_fuel_supply_order = schemas["FuelSupplyOrderPublicOut"]
     assert "validation_code" in public_fuel_supply_order["properties"]
     assert "public_validation_path" in public_fuel_supply_order["properties"]
+
+    possession = schemas["PossessionOut"]
+    assert "loan_term_available" in possession["properties"]
+    assert "loan_term_url" in possession["properties"]
+    assert "return_term_available" in possession["properties"]
+    assert "return_term_url" in possession["properties"]
+    assert "document_available" in possession["properties"]

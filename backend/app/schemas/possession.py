@@ -80,7 +80,7 @@ class PossessionAdminUpdate(BaseModel):
     def validate_edit_reason(cls, value: str) -> str:
         normalized = value.strip()
         if len(normalized) < 8:
-            raise ValueError("Justificativa da edicao deve ter ao menos 8 caracteres")
+            raise ValueError("Justificativa da edição deve ter ao menos 8 caracteres")
         return normalized
 
 
@@ -115,7 +115,7 @@ class PossessionPhotoCreate(BaseModel):
     @classmethod
     def validate_photo_accuracy(cls, value: float) -> float:
         if value <= 0:
-            raise ValueError("Precisao da localizacao deve ser maior que zero")
+            raise ValueError("Precisão da localização deve ser maior que zero")
         return value
 
 
@@ -150,6 +150,14 @@ class PossessionOut(BaseModel):
     photo_url: str | None
     photo_captured_at: datetime | None
     photos: list[PossessionPhotoOut]
+    loan_term_available: bool
+    loan_term_name: str | None
+    loan_term_url: str | None
+    loan_term_uploaded_at: datetime | None
+    return_term_available: bool
+    return_term_name: str | None
+    return_term_url: str | None
+    return_term_uploaded_at: datetime | None
     document_available: bool
     document_name: str | None
     document_url: str | None

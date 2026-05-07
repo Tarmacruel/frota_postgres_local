@@ -8,6 +8,7 @@ import PossessionForm from '../components/PossessionForm'
 import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
 import { possessionAPI } from '../api/possession'
+import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
@@ -83,8 +84,8 @@ function buildEndState(record) {
 }
 
 function buildVehicleOption(vehicle) {
-  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
-  const ownershipLabel = vehicle.ownership_type === 'LOCADO' ? 'Locado' : vehicle.ownership_type === 'CEDIDO' ? 'Cedido' : 'Proprio'
+  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
+  const ownershipLabel = vehicle.ownership_type === 'LOCADO' ? 'Locado' : vehicle.ownership_type === 'CEDIDO' ? 'Cedido' : 'Próprio'
   return {
     value: vehicle.id,
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
@@ -128,31 +129,39 @@ export default function PossessionPage() {
   const [savingEdit, setSavingEdit] = useState(false)
   const [editDocumentFile, setEditDocumentFile] = useState(null)
   const [editDocumentError, setEditDocumentError] = useState('')
+  const [editReturnDocumentFile, setEditReturnDocumentFile] = useState(null)
+  const [editReturnDocumentError, setEditReturnDocumentError] = useState('')
+  const [endReturnDocumentFile, setEndReturnDocumentFile] = useState(null)
+  const [endReturnDocumentError, setEndReturnDocumentError] = useState('')
   const [editPhotoFiles, setEditPhotoFiles] = useState([])
   const [editPhotoError, setEditPhotoError] = useState('')
   const [photoRecord, setPhotoRecord] = useState(null)
   const [locationRecord, setLocationRecord] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const editDocumentInputRef = useRef(null)
+  const editReturnDocumentInputRef = useRef(null)
+  const endReturnDocumentInputRef = useRef(null)
   const editPhotoInputRef = useRef(null)
   const focusRecordId = searchParams.get('focus')
 
   const exportColumns = [
-    { header: 'Veiculo', value: (record) => record.vehicle_plate },
+    { header: 'Veículo', value: (record) => record.vehicle_plate },
     { header: 'Condutor', value: (record) => record.driver_name },
     { header: 'Documento', value: (record) => record.driver_document || '-' },
     { header: 'Contato', value: (record) => record.driver_contact || '-' },
-    { header: 'Inicio', value: (record) => formatDate(record.start_date) },
+    { header: 'Início', value: (record) => formatDate(record.start_date) },
     { header: 'Fim', value: (record) => formatDate(record.end_date) },
     { header: 'Status', value: (record) => (record.is_active ? 'ATIVA' : 'ENCERRADA') },
     { header: 'Km inicial', value: (record) => record.start_odometer_km ?? '-' },
     { header: 'Km final', value: (record) => record.end_odometer_km ?? '-' },
     { header: 'Km rodados', value: (record) => record.kilometers_driven ?? '-' },
-    { header: 'Observacao', value: (record) => record.observation || 'Sem observacao' },
+    { header: 'Termo empréstimo', value: (record) => (record.loan_term_available ?? record.document_available) ? 'Anexado' : 'Pendente' },
+    { header: 'Termo devolução', value: (record) => record.return_term_available ? 'Anexado' : record.is_active ? 'Aguardando devolução' : 'Pendente' },
+    { header: 'Observação', value: (record) => record.observation || 'Sem observação' },
   ]
 
   async function loadVehicles() {
-    const { data } = await api.get('/vehicles')
+    const { data } = await api.get('/vehicles', { params: { limit: VEHICLE_LIST_LIMIT } })
     setVehicles(data)
   }
 
@@ -179,7 +188,7 @@ export default function PossessionPage() {
 
       setRecords(data)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar as posses.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar as posses.'))
     } finally {
       setLoading(false)
     }
@@ -190,7 +199,7 @@ export default function PossessionPage() {
       try {
         await loadVehicles()
       } catch (err) {
-        setError(getApiErrorMessage(err, 'Nao foi possivel carregar os veiculos.'))
+        setError(getApiErrorMessage(err, 'Não foi possível carregar os veículos.'))
       }
     }
     loadPage()
@@ -269,10 +278,15 @@ export default function PossessionPage() {
     })
     setEditDocumentFile(null)
     setEditDocumentError('')
+    setEditReturnDocumentFile(null)
+    setEditReturnDocumentError('')
     setEditPhotoFiles([])
     setEditPhotoError('')
     if (editDocumentInputRef.current) {
       editDocumentInputRef.current.value = ''
+    }
+    if (editReturnDocumentInputRef.current) {
+      editReturnDocumentInputRef.current.value = ''
     }
     if (editPhotoInputRef.current) {
       editPhotoInputRef.current.value = ''
@@ -282,6 +296,11 @@ export default function PossessionPage() {
   function closeEndModal() {
     setEndingRecord(null)
     setEndForm(buildEndState(null))
+    setEndReturnDocumentFile(null)
+    setEndReturnDocumentError('')
+    if (endReturnDocumentInputRef.current) {
+      endReturnDocumentInputRef.current.value = ''
+    }
   }
 
   function closeEditModal() {
@@ -300,10 +319,15 @@ export default function PossessionPage() {
     })
     setEditDocumentFile(null)
     setEditDocumentError('')
+    setEditReturnDocumentFile(null)
+    setEditReturnDocumentError('')
     setEditPhotoFiles([])
     setEditPhotoError('')
     if (editDocumentInputRef.current) {
       editDocumentInputRef.current.value = ''
+    }
+    if (editReturnDocumentInputRef.current) {
+      editReturnDocumentInputRef.current.value = ''
     }
     if (editPhotoInputRef.current) {
       editPhotoInputRef.current.value = ''
@@ -328,7 +352,7 @@ export default function PossessionPage() {
 
     if (!ALLOWED_DOCUMENT_TYPES.includes(nextFile.type)) {
       setEditDocumentFile(null)
-      setEditDocumentError('Anexe PDF, imagem, DOC ou DOCX no documento da posse.')
+      setEditDocumentError('Anexe PDF, imagem, DOC ou DOCX no termo de empréstimo.')
       if (editDocumentInputRef.current) {
         editDocumentInputRef.current.value = ''
       }
@@ -353,6 +377,82 @@ export default function PossessionPage() {
     setEditDocumentError('')
     if (editDocumentInputRef.current) {
       editDocumentInputRef.current.value = ''
+    }
+  }
+
+  function handleEditReturnDocumentChange(event) {
+    const nextFile = event.target.files?.[0] || null
+    if (!nextFile) {
+      setEditReturnDocumentFile(null)
+      setEditReturnDocumentError('')
+      return
+    }
+
+    if (!ALLOWED_DOCUMENT_TYPES.includes(nextFile.type)) {
+      setEditReturnDocumentFile(null)
+      setEditReturnDocumentError('Anexe PDF, imagem, DOC ou DOCX no termo de devolução.')
+      if (editReturnDocumentInputRef.current) {
+        editReturnDocumentInputRef.current.value = ''
+      }
+      return
+    }
+
+    if (nextFile.size > MAX_DOCUMENT_SIZE_BYTES) {
+      setEditReturnDocumentFile(null)
+      setEditReturnDocumentError('O termo de devolução precisa ter no maximo 12 MB.')
+      if (editReturnDocumentInputRef.current) {
+        editReturnDocumentInputRef.current.value = ''
+      }
+      return
+    }
+
+    setEditReturnDocumentFile(nextFile)
+    setEditReturnDocumentError('')
+  }
+
+  function clearEditReturnDocument() {
+    setEditReturnDocumentFile(null)
+    setEditReturnDocumentError('')
+    if (editReturnDocumentInputRef.current) {
+      editReturnDocumentInputRef.current.value = ''
+    }
+  }
+
+  function handleEndReturnDocumentChange(event) {
+    const nextFile = event.target.files?.[0] || null
+    if (!nextFile) {
+      setEndReturnDocumentFile(null)
+      setEndReturnDocumentError('')
+      return
+    }
+
+    if (!ALLOWED_DOCUMENT_TYPES.includes(nextFile.type)) {
+      setEndReturnDocumentFile(null)
+      setEndReturnDocumentError('Anexe PDF, imagem, DOC ou DOCX no termo de devolução.')
+      if (endReturnDocumentInputRef.current) {
+        endReturnDocumentInputRef.current.value = ''
+      }
+      return
+    }
+
+    if (nextFile.size > MAX_DOCUMENT_SIZE_BYTES) {
+      setEndReturnDocumentFile(null)
+      setEndReturnDocumentError('O termo de devolução precisa ter no maximo 12 MB.')
+      if (endReturnDocumentInputRef.current) {
+        endReturnDocumentInputRef.current.value = ''
+      }
+      return
+    }
+
+    setEndReturnDocumentFile(nextFile)
+    setEndReturnDocumentError('')
+  }
+
+  function clearEndReturnDocument() {
+    setEndReturnDocumentFile(null)
+    setEndReturnDocumentError('')
+    if (endReturnDocumentInputRef.current) {
+      endReturnDocumentInputRef.current.value = ''
     }
   }
 
@@ -403,16 +503,17 @@ export default function PossessionPage() {
     try {
       setEnding(true)
       setError('')
-      await possessionAPI.end(endingRecord.id, {
-        end_date: endForm.end_date ? new Date(endForm.end_date).toISOString() : null,
-        end_odometer_km: endForm.end_odometer_km === '' ? null : Number(endForm.end_odometer_km),
-        observation: endForm.observation || null,
-      })
+      const payload = new FormData()
+      if (endForm.end_date) payload.append('end_date', new Date(endForm.end_date).toISOString())
+      if (endForm.end_odometer_km !== '') payload.append('end_odometer_km', String(Number(endForm.end_odometer_km)))
+      if (endForm.observation) payload.append('observation', endForm.observation)
+      if (endReturnDocumentFile) payload.append('return_term_document', endReturnDocumentFile, endReturnDocumentFile.name)
+      await possessionAPI.end(endingRecord.id, payload)
       setFeedback('Posse encerrada com sucesso.')
       closeEndModal()
       await loadPossessions()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel encerrar a posse.'))
+      setError(getApiErrorMessage(err, 'Não foi possível encerrar a posse.'))
     } finally {
       setEnding(false)
     }
@@ -437,7 +538,10 @@ export default function PossessionPage() {
       if (editForm.end_odometer_km !== '') payload.append('end_odometer_km', String(Number(editForm.end_odometer_km)))
       payload.append('edit_reason', editForm.edit_reason)
       if (editDocumentFile) {
-        payload.append('signed_document', editDocumentFile, editDocumentFile.name)
+        payload.append('loan_term_document', editDocumentFile, editDocumentFile.name)
+      }
+      if (editReturnDocumentFile) {
+        payload.append('return_term_document', editReturnDocumentFile, editReturnDocumentFile.name)
       }
       editPhotoFiles.forEach((file) => {
         payload.append('new_photos', file, file.name)
@@ -448,7 +552,7 @@ export default function PossessionPage() {
       closeEditModal()
       await loadPossessions()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel atualizar a posse.'))
+      setError(getApiErrorMessage(err, 'Não foi possível atualizar a posse.'))
     } finally {
       setSavingEdit(false)
     }
@@ -456,7 +560,7 @@ export default function PossessionPage() {
 
   async function handlePreviewPdf() {
     if (filteredRecords.length === 0) {
-      setFeedback('Nao ha registros de posse filtrados para previsualizar.')
+      setFeedback('Não há registros de posse filtrados para pré-visualizar.')
       return
     }
 
@@ -464,26 +568,26 @@ export default function PossessionPage() {
       setError('')
       setFeedback('')
       await previewRowsToPdf({
-        title: 'Frota PMTF - Posses de veiculos',
+        title: 'Frota PMTF - Posses de veículos',
         fileName: 'frota-pmtf-posses',
-        subtitle: 'Relatorio das posses filtradas no painel operacional.',
+        subtitle: 'Relatório das posses filtradas no painel operacional.',
         columns: exportColumns,
         rows: filteredRecords,
         filters: [
           { label: 'Status', value: viewOptions.find((option) => option.value === viewFilter)?.label || 'Todas' },
-          ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+          ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
-      setFeedback('Pre-visualizacao do PDF de posses aberta em nova guia.')
+      setFeedback('Pré-visualização do PDF de posses aberta em nova guia.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o PDF dos condutores.'))
+      setError(getApiErrorMessage(err, 'Não foi possível gerar o PDF dos condutores.'))
     }
   }
 
   async function handleExportXlsx() {
     if (filteredRecords.length === 0) {
-      setFeedback('Nao ha registros de posse filtrados para exportar.')
+      setFeedback('Não há registros de posse filtrados para exportar.')
       return
     }
 
@@ -497,13 +601,13 @@ export default function PossessionPage() {
         rows: filteredRecords,
         filters: [
           { label: 'Status', value: viewOptions.find((option) => option.value === viewFilter)?.label || 'Todas' },
-          ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+          ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
-      setFeedback('Exportacao de posses em XLSX iniciada com sucesso.')
+      setFeedback('Exportação de posses em XLSX iniciada com sucesso.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar os condutores em XLSX.'))
+      setError(getApiErrorMessage(err, 'Não foi possível exportar os condutores em XLSX.'))
     }
   }
 
@@ -513,8 +617,8 @@ export default function PossessionPage() {
     <div className="surface-panel">
       <div className="panel-heading">
         <div>
-          <h2 className="section-title">Posses de veiculos</h2>
-          <p className="section-copy">Controle quem esta com cada veiculo, anexe evidencias e mantenha um historico simples de transferencias.</p>
+          <h2 className="section-title">Posses de veículos</h2>
+          <p className="section-copy">Controle quem está com cada veículo, anexe evidências e mantenha um histórico simples de transferências.</p>
         </div>
         <div className="actions-inline">
           {canWrite ? (
@@ -522,7 +626,7 @@ export default function PossessionPage() {
               Nova posse
             </button>
           ) : null}
-          <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Previsualizar PDF</button>
+          <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
       </div>
@@ -551,9 +655,9 @@ export default function PossessionPage() {
             <SearchableSelect
               value={vehicleFilter}
               onChange={setVehicleFilter}
-              options={[{ value: '', label: 'Todos os veiculos' }, ...vehicles.map(buildVehicleOption)]}
-              placeholder="Filtrar veiculo"
-              searchPlaceholder="Buscar veiculo por placa, modelo, chassi ou lotacao"
+              options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(buildVehicleOption)]}
+              placeholder="Filtrar veículo"
+              searchPlaceholder="Buscar veículo por placa, modelo, chassi ou lotação"
             />
           </div>
         </div>
@@ -588,16 +692,16 @@ export default function PossessionPage() {
           <table className="data-table data-table-wide">
             <thead>
               <tr>
-                <th>Veiculo</th>
+                <th>Veículo</th>
                 <th>Condutor</th>
-                <th>Inicio</th>
+                <th>Início</th>
                 <th>Fim</th>
-                <th>Observacao</th>
+                <th>Observação</th>
                 <th>Status</th>
                 <th>Km inicial</th>
                 <th>Km final</th>
                 <th>Km rodados</th>
-                <th>Acoes</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -614,7 +718,7 @@ export default function PossessionPage() {
               ) : (
                 paginatedRecords.map((record) => (
                   <tr key={record.id} className={focusedRecord?.id === record.id ? 'is-focused-row' : ''}>
-                    <td data-label="Veiculo"><strong>{record.vehicle_plate}</strong></td>
+                    <td data-label="Veículo"><strong>{record.vehicle_plate}</strong></td>
                     <td data-label="Condutor">
                       <DriverBadge
                         name={record.driver_name}
@@ -622,11 +726,11 @@ export default function PossessionPage() {
                         contact={record.driver_contact}
                       />
                     </td>
-                    <td data-label="Inicio">{formatDate(record.start_date)}</td>
+                    <td data-label="Início">{formatDate(record.start_date)}</td>
                     <td data-label="Fim">{formatDate(record.end_date)}</td>
-                    <td data-label="Observacao">
+                    <td data-label="Observação">
                       <div className="stack">
-                        <span>{record.observation || 'Sem observacao'}</span>
+                        <span>{record.observation || 'Sem observação'}</span>
                         {record.photo_available ? (
                           <span className="muted">
                             {record.photo_count} foto(s) vinculada(s){record.photo_captured_at ? ` | primeira em ${formatTimestamp(record.photo_captured_at)}` : ''}
@@ -634,12 +738,19 @@ export default function PossessionPage() {
                         ) : (
                           <span className="muted">Sem evidencia (legado)</span>
                         )}
-                        {record.document_available ? (
+                        {(record.loan_term_available ?? record.document_available) ? (
                           <span className="muted">
-                            Documento anexado: {record.document_name || 'Documento assinado'} | {formatTimestamp(record.document_uploaded_at)}
+                            Termo de empréstimo: {record.loan_term_name || record.document_name || 'Anexado'} | {formatTimestamp(record.loan_term_uploaded_at || record.document_uploaded_at)}
                           </span>
                         ) : (
-                          <span className="muted">Sem documento anexado</span>
+                          <span className="muted">Sem termo de empréstimo anexado</span>
+                        )}
+                        {record.return_term_available ? (
+                          <span className="muted">
+                            Termo de devolução: {record.return_term_name || 'Anexado'} | {formatTimestamp(record.return_term_uploaded_at)}
+                          </span>
+                        ) : (
+                          <span className="muted">{record.is_active ? 'Termo de devolução aguardando encerramento' : 'Sem termo de devolução anexado'}</span>
                         )}
                         {isAdmin ? <span className="muted">Criado em {formatDate(record.created_at)}</span> : null}
                       </div>
@@ -652,7 +763,7 @@ export default function PossessionPage() {
                     <td data-label="Km inicial">{record.start_odometer_km ?? '-'}</td>
                     <td data-label="Km final">{record.end_odometer_km ?? '-'}</td>
                     <td data-label="Km rodados">{record.kilometers_driven ?? '-'}</td>
-                    <td data-label="Acoes">
+                    <td data-label="Ações">
                       <div className="actions-inline">
                         {record.photo_available ? (
                           <button type="button" className="mini-button" onClick={() => setPhotoRecord(record)}>
@@ -661,9 +772,14 @@ export default function PossessionPage() {
                         ) : (
                           <span className="muted">Legado</span>
                         )}
-                        {record.document_available ? (
-                          <button type="button" className="mini-button" onClick={() => openProtectedFile(record.document_url)}>
-                            Documento
+                        {(record.loan_term_available ?? record.document_available) ? (
+                          <button type="button" className="mini-button" onClick={() => openProtectedFile(record.loan_term_url || record.document_url)}>
+                            Empréstimo
+                          </button>
+                        ) : null}
+                        {record.return_term_available ? (
+                          <button type="button" className="mini-button" onClick={() => openProtectedFile(record.return_term_url)}>
+                            Devolução
                           </button>
                         ) : null}
                         {isAdmin ? (
@@ -691,7 +807,7 @@ export default function PossessionPage() {
       <Modal
         open={isCreateModalOpen}
         title="Nova posse"
-        description="Ao registrar um novo condutor, qualquer posse ativa do mesmo veiculo sera encerrada automaticamente. Foto e localizacao sao opcionais, voce pode capturar varias fotos, e o termo assinado pode ser anexado no mesmo fluxo."
+        description="Ao registrar um novo condutor, qualquer posse ativa do mesmo veículo será encerrada automaticamente. Foto e localização são opcionais, você pode capturar várias fotos, e o termo de empréstimo pode ser anexado no mesmo fluxo."
         onClose={() => setIsCreateModalOpen(false)}
       >
         <PossessionForm
@@ -707,7 +823,7 @@ export default function PossessionPage() {
       <Modal
         open={Boolean(editingRecord)}
         title="Editar posse"
-        description={editingRecord ? `Edicao administrativa de ${editingRecord.driver_name} no veiculo ${editingRecord.vehicle_plate}. A justificativa e obrigatoria, entra na auditoria e agora tambem pode incluir documento e fotos complementares.` : ''}
+        description={editingRecord ? `Edição administrativa de ${editingRecord.driver_name} no veículo ${editingRecord.vehicle_plate}. A justificativa é obrigatória, entra na auditoria e também pode substituir termos e fotos complementares.` : ''}
         onClose={closeEditModal}
       >
         <form onSubmit={handleEditPossession} className="form-grid modal-form-grid">
@@ -744,7 +860,7 @@ export default function PossessionPage() {
             />
           </div>
           <div className="form-field">
-            <label htmlFor="edit-possession-start">Inicio</label>
+            <label htmlFor="edit-possession-start">Início</label>
             <input
               id="edit-possession-start"
               type="datetime-local"
@@ -764,7 +880,7 @@ export default function PossessionPage() {
             />
           </div>
           <div className="form-field">
-            <label htmlFor="edit-possession-start-odometer">Odometro inicial (km)</label>
+            <label htmlFor="edit-possession-start-odometer">Odômetro inicial (km)</label>
             <input
               id="edit-possession-start-odometer"
               type="number"
@@ -777,7 +893,7 @@ export default function PossessionPage() {
           </div>
 
           <div className="form-field">
-            <label htmlFor="edit-possession-end-odometer">Odometro final (km)</label>
+            <label htmlFor="edit-possession-end-odometer">Odômetro final (km)</label>
             <input
               id="edit-possession-end-odometer"
               type="number"
@@ -790,7 +906,7 @@ export default function PossessionPage() {
           </div>
 
           <div className="form-field modal-field-span">
-            <label htmlFor="edit-possession-observation">Observacao</label>
+            <label htmlFor="edit-possession-observation">Observação</label>
             <textarea
               id="edit-possession-observation"
               className="app-textarea"
@@ -800,7 +916,7 @@ export default function PossessionPage() {
             />
           </div>
           <div className="form-field modal-field-span">
-            <label htmlFor="edit-possession-reason">Justificativa da edicao</label>
+            <label htmlFor="edit-possession-reason">Justificativa da edição</label>
             <textarea
               id="edit-possession-reason"
               className="app-textarea"
@@ -811,11 +927,11 @@ export default function PossessionPage() {
             />
           </div>
           <div className="form-field modal-field-span">
-            <label htmlFor="edit-possession-document-file">Documento assinado</label>
+            <label htmlFor="edit-possession-document-file">Termo de empréstimo assinado</label>
             <div className="evidence-shell">
               <div className="evidence-copy">
-                <strong>Anexe ou substitua o documento da posse, se necessario.</strong>
-                <span>{editingRecord?.document_available ? `Documento atual: ${editingRecord.document_name || 'Documento anexado'}.` : 'Ainda nao ha documento anexado neste registro.'}</span>
+                <strong>Anexe ou substitua o termo de empréstimo da posse, se necessário.</strong>
+                <span>{(editingRecord?.loan_term_available ?? editingRecord?.document_available) ? `Termo atual: ${editingRecord.loan_term_name || editingRecord.document_name || 'Documento anexado'}.` : 'Ainda não há termo de empréstimo anexado neste registro.'}</span>
               </div>
               <input
                 ref={editDocumentInputRef}
@@ -838,11 +954,38 @@ export default function PossessionPage() {
             </div>
           </div>
           <div className="form-field modal-field-span">
+            <label htmlFor="edit-possession-return-document-file">Termo de devolução assinado</label>
+            <div className="evidence-shell">
+              <div className="evidence-copy">
+                <strong>Anexe ou substitua o termo de devolução da posse, se necessário.</strong>
+                <span>{editingRecord?.return_term_available ? `Termo atual: ${editingRecord.return_term_name || 'Documento anexado'}.` : 'Ainda não há termo de devolução anexado neste registro.'}</span>
+              </div>
+              <input
+                ref={editReturnDocumentInputRef}
+                id="edit-possession-return-document-file"
+                type="file"
+                className="app-input"
+                accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                onChange={handleEditReturnDocumentChange}
+              />
+              {editReturnDocumentError ? <div className="alert alert-error evidence-alert">{editReturnDocumentError}</div> : null}
+              {editReturnDocumentFile ? (
+                <div className="camera-stage-footer">
+                  <div className="stack">
+                    <strong>{editReturnDocumentFile.name}</strong>
+                    <span className="muted">Tipo: {editReturnDocumentFile.type || 'Arquivo compativel'} | Tamanho: {formatFileSize(editReturnDocumentFile.size)}</span>
+                  </div>
+                  <button className="ghost-button" type="button" onClick={clearEditReturnDocument}>Remover anexo</button>
+                </div>
+              ) : null}
+            </div>
+          </div>
+          <div className="form-field modal-field-span">
             <label htmlFor="edit-possession-photos">Fotos adicionais</label>
             <div className="evidence-shell">
               <div className="evidence-copy">
-                <strong>Inclua fotos complementares do veiculo quando a correcao exigir mais evidencias.</strong>
-                <span>{editingRecord?.photo_available ? `${editingRecord.photo_count} foto(s) ja vinculada(s) a esta posse.` : 'Nenhuma foto vinculada ainda a este registro.'}</span>
+                <strong>Inclua fotos complementares do veículo quando a correção exigir mais evidências.</strong>
+                <span>{editingRecord?.photo_available ? `${editingRecord.photo_count} foto(s) já vinculada(s) a esta posse.` : 'Nenhuma foto vinculada ainda a este registro.'}</span>
               </div>
               <input
                 ref={editPhotoInputRef}
@@ -870,7 +1013,7 @@ export default function PossessionPage() {
           </div>
           <div className="actions-inline modal-actions">
             <button className="app-button" type="submit" disabled={savingEdit || !editForm.start_date || !editForm.edit_reason.trim()}>
-              {savingEdit ? 'Salvando...' : 'Salvar edicao'}
+              {savingEdit ? 'Salvando...' : 'Salvar edição'}
             </button>
             <button className="ghost-button" type="button" onClick={closeEditModal}>Cancelar</button>
           </div>
@@ -880,7 +1023,7 @@ export default function PossessionPage() {
       <Modal
         open={Boolean(endingRecord)}
         title="Encerrar posse"
-        description={endingRecord ? `Finalize a posse ativa de ${endingRecord.driver_name} no veiculo ${endingRecord.vehicle_plate}.` : ''}
+        description={endingRecord ? `Finalize a posse ativa de ${endingRecord.driver_name} no veículo ${endingRecord.vehicle_plate}.` : ''}
         onClose={closeEndModal}
       >
         <form onSubmit={handleEndPossession} className="form-grid modal-form-grid">
@@ -895,7 +1038,7 @@ export default function PossessionPage() {
             />
           </div>
           <div className="form-field">
-            <label htmlFor="end-possession-odometer">Odometro final (km)</label>
+            <label htmlFor="end-possession-odometer">Odômetro final (km)</label>
             <input
               id="end-possession-odometer"
               type="number"
@@ -908,7 +1051,7 @@ export default function PossessionPage() {
           </div>
 
           <div className="form-field modal-field-span">
-            <label htmlFor="end-possession-note">Observacao</label>
+            <label htmlFor="end-possession-note">Observação</label>
             <textarea
               id="end-possession-note"
               className="app-textarea"
@@ -916,6 +1059,35 @@ export default function PossessionPage() {
               value={endForm.observation}
               onChange={(event) => setEndForm({ ...endForm, observation: event.target.value })}
             />
+          </div>
+          <div className="form-field modal-field-span">
+            <label htmlFor="end-possession-return-document">Termo de devolução assinado</label>
+            <div className="evidence-shell">
+              <div className="evidence-copy">
+                <strong>Anexe o termo de devolução assinado no encerramento da posse.</strong>
+                <span>O arquivo fica vinculado ao registro encerrado para consulta posterior.</span>
+              </div>
+              <input
+                ref={endReturnDocumentInputRef}
+                id="end-possession-return-document"
+                type="file"
+                className="app-input"
+                accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+                onChange={handleEndReturnDocumentChange}
+              />
+              {endReturnDocumentError ? <div className="alert alert-error evidence-alert">{endReturnDocumentError}</div> : null}
+              {endReturnDocumentFile ? (
+                <div className="camera-stage-footer">
+                  <div className="stack">
+                    <strong>{endReturnDocumentFile.name}</strong>
+                    <span className="muted">Tipo: {endReturnDocumentFile.type || 'Arquivo compativel'} | Tamanho: {formatFileSize(endReturnDocumentFile.size)}</span>
+                  </div>
+                  <button className="ghost-button" type="button" onClick={clearEndReturnDocument}>Remover anexo</button>
+                </div>
+              ) : (
+                <span className="helper-text">Aceita PDF, imagem, DOC e DOCX. O anexo e opcional.</span>
+              )}
+            </div>
           </div>
           <div className="actions-inline modal-actions">
             <button className="app-button" type="submit" disabled={ending}>
@@ -929,14 +1101,14 @@ export default function PossessionPage() {
       <Modal
         open={Boolean(photoRecord)}
         title="Fotos da posse"
-        description={photoRecord ? `Evidencias registradas para ${photoRecord.driver_name} no veiculo ${photoRecord.vehicle_plate}.` : ''}
+        description={photoRecord ? `Evidências registradas para ${photoRecord.driver_name} no veículo ${photoRecord.vehicle_plate}.` : ''}
         onClose={closePhotoModal}
       >
         {photoRecord ? (
           <div className="evidence-gallery-grid">
             {(photoRecord.photos || []).map((photo, index) => (
               <article key={photo.id || `legacy-${index}`} className="evidence-thumb-card evidence-thumb-card-large">
-                <img src={photo.url} alt={`Foto ${index + 1} da posse do veiculo ${photoRecord.vehicle_plate}`} className="evidence-thumb-image" />
+                <img src={photo.url} alt={`Foto ${index + 1} da posse do veículo ${photoRecord.vehicle_plate}`} className="evidence-thumb-image" />
                 <div className="stack">
                   <strong>Foto {index + 1}</strong>
                   <span className="muted">Condutor: {photoRecord.driver_name}</span>
@@ -979,9 +1151,9 @@ export default function PossessionPage() {
             <div className="evidence-meta-card">
               <strong>Coordenadas da captura</strong>
               <div className="stack">
-                <span><strong>Veiculo:</strong> {locationRecord.record.vehicle_plate}</span>
+                <span><strong>Veículo:</strong> {locationRecord.record.vehicle_plate}</span>
                 <span><strong>Latitude/Longitude:</strong> {formatCoordinates(locationRecord.photo.capture_location)}</span>
-                <span><strong>Precisao:</strong> {Math.round(locationRecord.photo.capture_location.accuracy_meters)} m</span>
+                <span><strong>Precisão:</strong> {Math.round(locationRecord.photo.capture_location.accuracy_meters)} m</span>
                 <span><strong>Capturada em:</strong> {formatTimestamp(locationRecord.photo.captured_at)}</span>
               </div>
               <a

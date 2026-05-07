@@ -78,9 +78,9 @@ class SearchService:
         return {
             "type": "maintenance",
             "id": record.id,
-            "title": vehicle_plate or "Manutencao",
+            "title": vehicle_plate or "Manutenção",
             "subtitle": record.service_description,
-            "status": "CONCLUIDA" if record.end_date else "EM_ANDAMENTO",
+            "status": "CONCLUÍDA" if record.end_date else "EM_ANDAMENTO",
             "route": f"/manutencoes?focus={record.id}",
             "context": {
                 "vehicle_plate": vehicle_plate,

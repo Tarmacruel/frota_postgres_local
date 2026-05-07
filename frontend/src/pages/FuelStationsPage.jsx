@@ -44,7 +44,7 @@ export default function FuelStationsPage() {
   const exportColumns = useMemo(() => [
     { header: 'Nome', value: (station) => station.name },
     { header: 'CNPJ', value: (station) => station.cnpj || '-' },
-    { header: 'Endereco', value: (station) => station.address },
+    { header: 'Endereço', value: (station) => station.address },
     { header: 'Status', value: (station) => station.active ? 'Ativo' : 'Inativo' },
     { header: 'Criado em', value: (station) => formatDate(station.created_at) },
     { header: 'Atualizado em', value: (station) => formatDate(station.updated_at) },
@@ -80,7 +80,7 @@ export default function FuelStationsPage() {
         setError('')
         await Promise.all([loadStations(), loadUsers()])
       } catch (err) {
-        setError(getApiErrorMessage(err, 'Nao foi possivel carregar postos e usuarios.'))
+        setError(getApiErrorMessage(err, 'Não foi possível carregar postos e usuários.'))
       } finally {
         setLoading(false)
       }
@@ -89,7 +89,7 @@ export default function FuelStationsPage() {
   }, [])
 
   useEffect(() => {
-    loadLinks(selectedStationId).catch((err) => setError(getApiErrorMessage(err, 'Nao foi possivel carregar vinculos do posto.')))
+    loadLinks(selectedStationId).catch((err) => setError(getApiErrorMessage(err, 'Não foi possível carregar vínculos do posto.')))
   }, [selectedStationId])
 
   function openCreateModal() {
@@ -134,7 +134,7 @@ export default function FuelStationsPage() {
       closeModal()
       await loadStations({ preferredStationId: data.id })
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o posto.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar o posto.'))
     } finally {
       setSubmitting(false)
     }
@@ -149,7 +149,7 @@ export default function FuelStationsPage() {
       setFeedback('Posto removido com sucesso.')
       await loadStations({ preferredStationId: selectedStationId === stationId ? null : selectedStationId })
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel remover o posto.'))
+      setError(getApiErrorMessage(err, 'Não foi possível remover o posto.'))
     }
   }
 
@@ -158,11 +158,11 @@ export default function FuelStationsPage() {
     try {
       setError('')
       await fuelStationsAPI.createUser(selectedStationId, { user_id: userId, active: true })
-      setFeedback('Usuario vinculado ao posto.')
+      setFeedback('Usuário vinculado ao posto.')
       setUserId('')
       await loadLinks(selectedStationId)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel vincular usuario ao posto.'))
+      setError(getApiErrorMessage(err, 'Não foi possível vincular usuário ao posto.'))
     }
   }
 
@@ -172,7 +172,7 @@ export default function FuelStationsPage() {
       await fuelStationsAPI.updateUser(selectedStationId, link.id, { active: !link.active })
       await loadLinks(selectedStationId)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel atualizar vinculo.'))
+      setError(getApiErrorMessage(err, 'Não foi possível atualizar vínculo.'))
     }
   }
 
@@ -182,13 +182,13 @@ export default function FuelStationsPage() {
       await fuelStationsAPI.removeUser(selectedStationId, linkId)
       await loadLinks(selectedStationId)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel remover vinculo.'))
+      setError(getApiErrorMessage(err, 'Não foi possível remover vínculo.'))
     }
   }
 
   async function handlePreviewPdf() {
     if (filteredStations.length === 0) {
-      setFeedback('Nao ha postos filtrados para previsualizar em PDF.')
+      setFeedback('Não há postos filtrados para pré-visualizar em PDF.')
       return
     }
 
@@ -198,7 +198,7 @@ export default function FuelStationsPage() {
       await previewRowsToPdf({
         title: 'Frota PMTF - Postos de combustivel',
         fileName: 'frota-pmtf-postos-combustivel',
-        subtitle: 'Relatorio institucional dos postos credenciados no modulo de abastecimentos.',
+        subtitle: 'Relatório institucional dos postos credenciados no módulo de abastecimentos.',
         columns: exportColumns,
         rows: filteredStations,
         filters: [
@@ -211,15 +211,15 @@ export default function FuelStationsPage() {
           { label: 'Inativos', value: filteredStations.filter((station) => !station.active).length },
         ],
       })
-      setFeedback('Pre-visualizacao do PDF dos postos aberta em nova guia.')
+      setFeedback('Pré-visualização do PDF dos postos aberta em nova guia.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o PDF dos postos.'))
+      setError(getApiErrorMessage(err, 'Não foi possível gerar o PDF dos postos.'))
     }
   }
 
   async function handleExportXlsx() {
     if (filteredStations.length === 0) {
-      setFeedback('Nao ha postos filtrados para exportar.')
+      setFeedback('Não há postos filtrados para exportar.')
       return
     }
 
@@ -236,9 +236,9 @@ export default function FuelStationsPage() {
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
-      setFeedback('Exportacao dos postos em XLSX iniciada com sucesso.')
+      setFeedback('Exportação dos postos em XLSX iniciada com sucesso.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar os postos em XLSX.'))
+      setError(getApiErrorMessage(err, 'Não foi possível exportar os postos em XLSX.'))
     }
   }
 
@@ -252,11 +252,11 @@ export default function FuelStationsPage() {
       <div className="panel-heading">
         <div>
           <h2 className="section-title">Postos de combustivel</h2>
-          <p className="section-copy">Cadastro administrativo de postos credenciados, relatorios institucionais e vinculos de usuarios.</p>
+          <p className="section-copy">Cadastro administrativo de postos credenciados, relatórios institucionais e vínculos de usuários.</p>
         </div>
         <div className="actions-inline">
           <button className="app-button" type="button" onClick={openCreateModal}>Novo posto</button>
-          <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Previsualizar PDF</button>
+          <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
       </div>
@@ -265,7 +265,7 @@ export default function FuelStationsPage() {
         <div className="filter-inline">
           <input
             className="app-input"
-            placeholder="Buscar por nome, CNPJ ou endereco"
+            placeholder="Buscar por nome, CNPJ ou endereço"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -293,7 +293,7 @@ export default function FuelStationsPage() {
         </div>
         <div className="metric-inline">
           <strong>{links.length}</strong>
-          <span>vinculos no posto selecionado</span>
+          <span>vínculos no posto selecionado</span>
         </div>
       </div>
 
@@ -307,10 +307,10 @@ export default function FuelStationsPage() {
               <tr>
                 <th>Nome</th>
                 <th>CNPJ</th>
-                <th>Endereco</th>
+                <th>Endereço</th>
                 <th>Status</th>
                 <th>Atualizado em</th>
-                <th>Acoes</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -325,17 +325,17 @@ export default function FuelStationsPage() {
                     </div>
                   </td>
                   <td data-label="CNPJ">{station.cnpj || '-'}</td>
-                  <td data-label="Endereco">{station.address}</td>
+                  <td data-label="Endereço">{station.address}</td>
                   <td data-label="Status">
                     <span className={`status-badge ${station.active ? 'status-ATIVO' : 'status-INATIVO'}`}>
                       {station.active ? 'Ativo' : 'Inativo'}
                     </span>
                   </td>
                   <td data-label="Atualizado em">{formatDate(station.updated_at)}</td>
-                  <td data-label="Acoes">
+                  <td data-label="Ações">
                     <div className="actions-inline">
                       <button type="button" className="mini-button" onClick={() => openEditModal(station)}>Editar</button>
-                      <button type="button" className="mini-button" onClick={() => setSelectedStationId(station.id)}>Vinculos</button>
+                      <button type="button" className="mini-button" onClick={() => setSelectedStationId(station.id)}>Vínculos</button>
                       <button type="button" className="mini-button danger" onClick={() => removeStation(station.id)}>Excluir</button>
                     </div>
                   </td>
@@ -349,29 +349,29 @@ export default function FuelStationsPage() {
       <div className="surface-panel panel-nested">
         <div className="panel-heading">
           <div>
-            <h3 className="section-title">Vinculos de usuarios {selectedStation ? `- ${selectedStation.name}` : ''}</h3>
+            <h3 className="section-title">Vínculos de usuários {selectedStation ? `- ${selectedStation.name}` : ''}</h3>
             <p className="section-copy">Associe operadores ao posto selecionado e controle o status de acesso operacional.</p>
           </div>
         </div>
         <div className="filter-inline" style={{ marginBottom: 12 }}>
           <select className="app-input" value={userId} onChange={(event) => setUserId(event.target.value)}>
-            <option value="">Selecione um usuario</option>
+            <option value="">Selecione um usuário</option>
             {users.map((user) => <option key={user.id} value={user.id}>{user.name} ({user.email})</option>)}
           </select>
-          <button type="button" className="app-button" onClick={createLink} disabled={!selectedStationId || !userId}>Vincular usuario</button>
+          <button type="button" className="app-button" onClick={createLink} disabled={!selectedStationId || !userId}>Vincular usuário</button>
         </div>
         <div className="table-wrap">
           <table className="data-table">
-            <thead><tr><th>Usuario</th><th>Email</th><th>Status</th><th>Acoes</th></tr></thead>
+            <thead><tr><th>Usuário</th><th>Email</th><th>Status</th><th>Ações</th></tr></thead>
             <tbody>
-              {!selectedStationId ? <tr><td colSpan={4}><div className="empty-state">Selecione um posto para gerenciar os vinculos.</div></td></tr> : null}
-              {selectedStationId && links.length === 0 ? <tr><td colSpan={4}><div className="empty-state">Nenhum usuario vinculado a este posto.</div></td></tr> : null}
+              {!selectedStationId ? <tr><td colSpan={4}><div className="empty-state">Selecione um posto para gerenciar os vínculos.</div></td></tr> : null}
+              {selectedStationId && links.length === 0 ? <tr><td colSpan={4}><div className="empty-state">Nenhum usuário vinculado a este posto.</div></td></tr> : null}
               {selectedStationId && links.map((link) => (
                 <tr key={link.id}>
-                  <td data-label="Usuario">{link.user_name || link.user_id}</td>
+                  <td data-label="Usuário">{link.user_name || link.user_id}</td>
                   <td data-label="Email">{link.user_email || '-'}</td>
                   <td data-label="Status">{link.active ? 'Ativo' : 'Inativo'}</td>
-                  <td data-label="Acoes">
+                  <td data-label="Ações">
                     <div className="actions-inline">
                       <button type="button" className="mini-button" onClick={() => toggleLink(link)}>{link.active ? 'Desativar' : 'Ativar'}</button>
                       <button type="button" className="mini-button danger" onClick={() => removeLink(link.id)}>Remover</button>
@@ -412,7 +412,7 @@ export default function FuelStationsPage() {
             />
           </div>
           <div className="form-field modal-field-span">
-            <label htmlFor="station-address">Endereco</label>
+            <label htmlFor="station-address">Endereço</label>
             <input
               id="station-address"
               className="app-input"
