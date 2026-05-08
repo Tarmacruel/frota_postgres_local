@@ -1,16 +1,41 @@
 import { useEffect, useMemo, useState } from 'react'
 import Modal from '../components/Modal'
+import StationLocationPicker from '../components/StationLocationPicker'
 import { fuelStationsAPI } from '../api/fuelStations'
 import { getApiErrorMessage } from '../utils/apiError'
 import api from '../api/client'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 import { formatCnpjInput } from '../utils/fuelSupplyOrders'
 
-const initialStationForm = { id: null, name: '', cnpj: '', address: '', active: true }
+const initialStationForm = { id: null, name: '', cnpj: '', address: '', phone: '', latitude: '', longitude: '', active: true }
 
 function formatDate(value) {
   if (!value) return '-'
   return new Date(value).toLocaleString('pt-BR')
+}
+
+function buildMapsUrl(station) {
+  if (station.latitude === null || station.latitude === undefined || station.longitude === null || station.longitude === undefined) {
+    return ''
+  }
+  const latitude = Number(station.latitude).toFixed(6)
+  const longitude = Number(station.longitude).toFixed(6)
+  return `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=18/${latitude}/${longitude}`
+}
+
+function formatCoordinates(station) {
+  if (!buildMapsUrl(station)) return '-'
+  return `${Number(station.latitude).toFixed(6)}, ${Number(station.longitude).toFixed(6)}`
+}
+
+function parseOptionalCoordinate(value) {
+  const normalized = String(value || '').trim().replace(',', '.')
+  if (!normalized) return null
+  return Number(normalized)
+}
+
+function formatFormCoordinate(value) {
+  return Number(value).toFixed(6)
 }
 
 export default function FuelStationsPage() {
@@ -33,7 +58,7 @@ export default function FuelStationsPage() {
   const filteredStations = useMemo(() => {
     const term = search.trim().toLowerCase()
     return stations.filter((station) => {
-      const matchesSearch = !term || [station.name, station.cnpj, station.address]
+      const matchesSearch = !term || [station.name, station.cnpj, station.address, station.phone]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(term))
       const matchesStatus = statusFilter === 'TODOS' || (statusFilter === 'ATIVOS' ? station.active : !station.active)
@@ -44,7 +69,10 @@ export default function FuelStationsPage() {
   const exportColumns = useMemo(() => [
     { header: 'Nome', value: (station) => station.name },
     { header: 'CNPJ', value: (station) => station.cnpj || '-' },
+    { header: 'Telefone', value: (station) => station.phone || '-' },
     { header: 'Endereço', value: (station) => station.address },
+    { header: 'Geolocalização', value: (station) => formatCoordinates(station) },
+    { header: 'Mapa', value: (station) => buildMapsUrl(station) || '-' },
     { header: 'Status', value: (station) => station.active ? 'Ativo' : 'Inativo' },
     { header: 'Criado em', value: (station) => formatDate(station.created_at) },
     { header: 'Atualizado em', value: (station) => formatDate(station.updated_at) },
@@ -103,6 +131,9 @@ export default function FuelStationsPage() {
       name: station.name,
       cnpj: station.cnpj || '',
       address: station.address,
+      phone: station.phone || '',
+      latitude: station.latitude ?? '',
+      longitude: station.longitude ?? '',
       active: station.active,
     })
     setIsModalOpen(true)
@@ -111,6 +142,14 @@ export default function FuelStationsPage() {
   function closeModal() {
     setStationForm(initialStationForm)
     setIsModalOpen(false)
+  }
+
+  function handleLocationChange(location) {
+    setStationForm((current) => ({
+      ...current,
+      latitude: location ? formatFormCoordinate(location.latitude) : '',
+      longitude: location ? formatFormCoordinate(location.longitude) : '',
+    }))
   }
 
   async function saveStation(event) {
@@ -123,6 +162,9 @@ export default function FuelStationsPage() {
         name: stationForm.name.trim(),
         cnpj: stationForm.cnpj.trim() || null,
         address: stationForm.address.trim(),
+        phone: stationForm.phone.trim() || null,
+        latitude: parseOptionalCoordinate(stationForm.latitude),
+        longitude: parseOptionalCoordinate(stationForm.longitude),
         active: stationForm.active,
       }
 
@@ -141,7 +183,7 @@ export default function FuelStationsPage() {
   }
 
   async function removeStation(stationId) {
-    if (!window.confirm('Excluir este posto de combustivel?')) return
+    if (!window.confirm('Excluir este posto de combustível?')) return
 
     try {
       setError('')
@@ -196,7 +238,7 @@ export default function FuelStationsPage() {
       setError('')
       setFeedback('')
       await previewRowsToPdf({
-        title: 'Frota PMTF - Postos de combustivel',
+        title: 'Frota PMTF - Postos de combustível',
         fileName: 'frota-pmtf-postos-combustivel',
         subtitle: 'Relatório institucional dos postos credenciados no módulo de abastecimentos.',
         columns: exportColumns,
@@ -228,7 +270,7 @@ export default function FuelStationsPage() {
       setFeedback('')
       await exportRowsToXlsx({
         fileName: 'frota-pmtf-postos-combustivel',
-        sheetName: 'Postos de combustivel',
+        sheetName: 'Postos de combustível',
         columns: exportColumns,
         rows: filteredStations,
         filters: [
@@ -251,7 +293,7 @@ export default function FuelStationsPage() {
     <div className="surface-panel">
       <div className="panel-heading">
         <div>
-          <h2 className="section-title">Postos de combustivel</h2>
+          <h2 className="section-title">Postos de combustível</h2>
           <p className="section-copy">Cadastro administrativo de postos credenciados, relatórios institucionais e vínculos de usuários.</p>
         </div>
         <div className="actions-inline">
@@ -265,7 +307,7 @@ export default function FuelStationsPage() {
         <div className="filter-inline">
           <input
             className="app-input"
-            placeholder="Buscar por nome, CNPJ ou endereço"
+            placeholder="Buscar por nome, CNPJ, telefone ou endereço"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -301,21 +343,23 @@ export default function FuelStationsPage() {
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
       <div className="surface-panel panel-nested" style={{ marginBottom: 16 }}>
-        <div className="table-wrap">
-          <table className="data-table">
+        <div className="table-wrap table-wrap-wide">
+          <table className="data-table data-table-wide">
             <thead>
               <tr>
                 <th>Nome</th>
                 <th>CNPJ</th>
+                <th>Contato</th>
                 <th>Endereço</th>
+                <th>Localização</th>
                 <th>Status</th>
                 <th>Atualizado em</th>
                 <th>Ações</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan={6} className="muted">Carregando postos...</td></tr> : null}
-              {!loading && filteredStations.length === 0 ? <tr><td colSpan={6}><div className="empty-state">Nenhum posto encontrado para os filtros aplicados.</div></td></tr> : null}
+              {loading ? <tr><td colSpan={8} className="muted">Carregando postos...</td></tr> : null}
+              {!loading && filteredStations.length === 0 ? <tr><td colSpan={8}><div className="empty-state">Nenhum posto encontrado para os filtros aplicados.</div></td></tr> : null}
               {!loading && filteredStations.map((station) => (
                 <tr key={station.id}>
                   <td data-label="Nome">
@@ -325,7 +369,17 @@ export default function FuelStationsPage() {
                     </div>
                   </td>
                   <td data-label="CNPJ">{station.cnpj || '-'}</td>
+                  <td data-label="Contato">{station.phone || '-'}</td>
                   <td data-label="Endereço">{station.address}</td>
+                  <td data-label="Localização">
+                    {buildMapsUrl(station) ? (
+                      <a className="mini-button" href={buildMapsUrl(station)} target="_blank" rel="noreferrer">
+                        Abrir mapa
+                      </a>
+                    ) : (
+                      <span className="muted">Sem coordenadas</span>
+                    )}
+                  </td>
                   <td data-label="Status">
                     <span className={`status-badge ${station.active ? 'status-ATIVO' : 'status-INATIVO'}`}>
                       {station.active ? 'Ativo' : 'Inativo'}
@@ -386,7 +440,7 @@ export default function FuelStationsPage() {
 
       <Modal
         open={isModalOpen}
-        title={stationForm.id ? 'Editar posto de combustivel' : 'Novo posto de combustivel'}
+        title={stationForm.id ? 'Editar posto de combustível' : 'Novo posto de combustível'}
         description="Cadastre ou atualize os dados institucionais do posto credenciado."
         onClose={closeModal}
       >
@@ -419,6 +473,24 @@ export default function FuelStationsPage() {
               value={stationForm.address}
               onChange={(event) => setStationForm((current) => ({ ...current, address: event.target.value }))}
               required
+            />
+          </div>
+          <div className="form-field">
+            <label htmlFor="station-phone">Telefone</label>
+            <input
+              id="station-phone"
+              className="app-input"
+              value={stationForm.phone}
+              onChange={(event) => setStationForm((current) => ({ ...current, phone: event.target.value }))}
+              placeholder="(00) 00000-0000"
+            />
+          </div>
+          <div className="form-field modal-field-span">
+            <label>Localização do posto</label>
+            <StationLocationPicker
+              latitude={stationForm.latitude}
+              longitude={stationForm.longitude}
+              onChange={handleLocationChange}
             />
           </div>
           <div className="form-field modal-field-span">

@@ -7,4 +7,5 @@ export const possessionAPI = {
   create: (data) => api.post('/possession', data),
   update: (id, data) => api.put(`/possession/${id}`, data),
   end: (id, data) => api.put(`/possession/${id}/end`, data),
+  getPublicTerm: (termType, validationCode) => api.get(`/public/possession-terms/${termType}/${validationCode}`),
 }

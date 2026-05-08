@@ -16,6 +16,7 @@ import LoginPage from './pages/LoginPage'
 import MaintenancePage from './pages/MaintenancePage'
 import PossessionPage from './pages/PossessionPage'
 import PublicFuelSupplyOrderPage from './pages/PublicFuelSupplyOrderPage'
+import PublicPossessionTermPage from './pages/PublicPossessionTermPage'
 import UsersPage from './pages/UsersPage'
 import VehiclesPage from './pages/VehiclesPage'
 import UnauthorizedPage from './pages/UnauthorizedPage'
@@ -34,6 +35,8 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
           <Route path="/validar/ordem-abastecimento/:validationCode" element={<PublicFuelSupplyOrderPage />} />
+          <Route path="/validar/termo-emprestimo/:validationCode" element={<PublicPossessionTermPage termType="loan" />} />
+          <Route path="/validar/termo-devolucao/:validationCode" element={<PublicPossessionTermPage termType="return" />} />
           <Route
             path="/"
             element={

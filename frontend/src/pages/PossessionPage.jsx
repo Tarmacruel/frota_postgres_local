@@ -13,6 +13,10 @@ import { useAuth } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 import { toDateTimeLocalValue } from '../utils/datetime'
+import {
+  previewPossessionTermDocument,
+  resolvePossessionTermValidationUrl,
+} from '../utils/possessionTermDocument'
 
 const viewOptions = [
   { value: 'ATIVAS', label: 'Ativas' },
@@ -137,6 +141,7 @@ export default function PossessionPage() {
   const [editPhotoError, setEditPhotoError] = useState('')
   const [photoRecord, setPhotoRecord] = useState(null)
   const [locationRecord, setLocationRecord] = useState(null)
+  const [termRecord, setTermRecord] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const editDocumentInputRef = useRef(null)
   const editReturnDocumentInputRef = useRef(null)
@@ -340,6 +345,10 @@ export default function PossessionPage() {
 
   function closeLocationModal() {
     setLocationRecord(null)
+  }
+
+  function closeTermModal() {
+    setTermRecord(null)
   }
 
   function handleEditDocumentChange(event) {
@@ -611,6 +620,38 @@ export default function PossessionPage() {
     }
   }
 
+  async function handlePreviewTerm(record, termType) {
+    try {
+      setError('')
+      await previewPossessionTermDocument(record, termType)
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Não foi possível gerar o PDF do termo.'))
+    }
+  }
+
+  async function handleCopyTermLink(record, termType) {
+    const path = termType === 'return'
+      ? record.return_term_public_validation_path
+      : record.loan_term_public_validation_path
+    const publicUrl = resolvePossessionTermValidationUrl(path)
+    if (!publicUrl) {
+      setFeedback('Link público indisponível para este termo.')
+      return
+    }
+
+    if (!navigator.clipboard) {
+      setFeedback(`Link público: ${publicUrl}`)
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(publicUrl)
+      setFeedback(`Link público do termo de ${termType === 'return' ? 'devolução' : 'empréstimo'} copiado com sucesso.`)
+    } catch {
+      setFeedback(`Link público: ${publicUrl}`)
+    }
+  }
+
   const activeCount = filteredRecords.filter((item) => item.is_active).length
 
   return (
@@ -772,16 +813,9 @@ export default function PossessionPage() {
                         ) : (
                           <span className="muted">Legado</span>
                         )}
-                        {(record.loan_term_available ?? record.document_available) ? (
-                          <button type="button" className="mini-button" onClick={() => openProtectedFile(record.loan_term_url || record.document_url)}>
-                            Empréstimo
-                          </button>
-                        ) : null}
-                        {record.return_term_available ? (
-                          <button type="button" className="mini-button" onClick={() => openProtectedFile(record.return_term_url)}>
-                            Devolução
-                          </button>
-                        ) : null}
+                        <button type="button" className="mini-button" onClick={() => setTermRecord(record)}>
+                          Termos
+                        </button>
                         {isAdmin ? (
                           <button type="button" className="mini-button" onClick={() => openEditModal(record)}>
                             Editar
@@ -1096,6 +1130,70 @@ export default function PossessionPage() {
             <button className="ghost-button" type="button" onClick={closeEndModal}>Cancelar</button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={Boolean(termRecord)}
+        title="Termos da posse"
+        description={termRecord ? `Documentos gerados e anexos assinados da posse de ${termRecord.driver_name} no veículo ${termRecord.vehicle_plate}.` : ''}
+        onClose={closeTermModal}
+      >
+        {termRecord ? (
+          <div className="evidence-gallery-grid">
+            <article className="evidence-meta-card">
+              <strong>Termo de empréstimo</strong>
+              <div className="stack">
+                <span className="muted">Código: {termRecord.loan_term_validation_code || '-'}</span>
+                <span className="muted">
+                  Anexo assinado: {(termRecord.loan_term_available ?? termRecord.document_available) ? (termRecord.loan_term_name || termRecord.document_name || 'Documento anexado') : 'Pendente'}
+                </span>
+              </div>
+              <div className="actions-inline">
+                <button type="button" className="app-button" onClick={() => handlePreviewTerm(termRecord, 'loan')}>
+                  Gerar empréstimo
+                </button>
+                <button type="button" className="secondary-button" onClick={() => handleCopyTermLink(termRecord, 'loan')}>
+                  Copiar link empréstimo
+                </button>
+                {(termRecord.loan_term_available ?? termRecord.document_available) ? (
+                  <button type="button" className="ghost-button" onClick={() => openProtectedFile(termRecord.loan_term_url || termRecord.document_url)}>
+                    Abrir anexo empréstimo
+                  </button>
+                ) : null}
+              </div>
+            </article>
+
+            {!termRecord.is_active ? (
+              <article className="evidence-meta-card">
+                <strong>Termo de devolução</strong>
+                <div className="stack">
+                  <span className="muted">Código: {termRecord.return_term_validation_code || '-'}</span>
+                  <span className="muted">
+                    Anexo assinado: {termRecord.return_term_available ? (termRecord.return_term_name || 'Documento anexado') : 'Pendente'}
+                  </span>
+                </div>
+                <div className="actions-inline">
+                  <button type="button" className="app-button" onClick={() => handlePreviewTerm(termRecord, 'return')}>
+                    Gerar devolução
+                  </button>
+                  <button type="button" className="secondary-button" onClick={() => handleCopyTermLink(termRecord, 'return')}>
+                    Copiar link devolução
+                  </button>
+                  {termRecord.return_term_available ? (
+                    <button type="button" className="ghost-button" onClick={() => openProtectedFile(termRecord.return_term_url)}>
+                      Abrir anexo devolução
+                    </button>
+                  ) : null}
+                </div>
+              </article>
+            ) : (
+              <article className="evidence-meta-card">
+                <strong>Termo de devolução</strong>
+                <span className="muted">Disponível após o encerramento da posse.</span>
+              </article>
+            )}
+          </div>
+        ) : null}
       </Modal>
 
       <Modal

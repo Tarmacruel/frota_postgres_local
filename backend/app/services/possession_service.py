@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 from re import sub
-from uuid import UUID
+from uuid import UUID, uuid4
 from fastapi import HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
@@ -37,6 +37,8 @@ DOCUMENT_EXTENSIONS = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
 }
 INLINE_DOCUMENT_MIME_TYPES = {"application/pdf", "image/jpeg", "image/png", "image/webp"}
+PUBLIC_LOAN_TERM_PATH_PREFIX = "/validar/termo-emprestimo"
+PUBLIC_RETURN_TERM_PATH_PREFIX = "/validar/termo-devolucao"
 
 
 class PossessionService:
@@ -146,6 +148,8 @@ class PossessionService:
             document_mime_type=loan_term_payload["mime_type"] if loan_term_payload else None,
             document_size_bytes=loan_term_payload["size_bytes"] if loan_term_payload else None,
             document_uploaded_at=datetime.now(timezone.utc) if loan_term_payload else None,
+            loan_term_validation_code=await self._generate_validation_code("TE"),
+            return_term_validation_code=await self._generate_validation_code("TD"),
         )
 
         stored_loan_term_path: Path | None = None
@@ -539,6 +543,24 @@ class PossessionService:
             },
         )
 
+    async def get_public_term(self, validation_code: str, *, term_type: str) -> dict:
+        normalized_code = (validation_code or "").strip().upper()
+        if not normalized_code:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Termo publico nao encontrado")
+
+        if term_type == "return":
+            record = await self.possessions.get_by_return_term_validation_code(normalized_code)
+            if not record:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Termo publico nao encontrado")
+            if record.end_date is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Termo de devolucao ainda nao disponivel")
+        else:
+            record = await self.possessions.get_by_loan_term_validation_code(normalized_code)
+            if not record:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Termo publico nao encontrado")
+
+        return self._serialize_public_term(record, term_type=term_type)
+
     async def _get_by_id(self, possession_id: UUID, current_user: User | None = None) -> dict:
         record = await self.possessions.get_by_id(possession_id)
         if not record:
@@ -715,6 +737,16 @@ class PossessionService:
             "size_bytes": len(content),
         }
 
+    async def _generate_validation_code(self, prefix: str) -> str:
+        for _ in range(8):
+            candidate = f"{prefix}-{uuid4().hex[:12].upper()}"
+            if not await self.possessions.has_validation_code(candidate):
+                return candidate
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Nao foi possivel gerar o codigo publico do termo",
+        )
+
     async def _store_photo_payloads(
         self,
         possession: VehiclePossession,
@@ -793,6 +825,30 @@ class PossessionService:
         normalized = normalized.strip(".-") or "documento-assinado"
         return normalized[:120]
 
+    def _build_public_validation_path(self, validation_code: str | None, *, term_type: str) -> str | None:
+        if not validation_code:
+            return None
+        prefix = PUBLIC_RETURN_TERM_PATH_PREFIX if term_type == "return" else PUBLIC_LOAN_TERM_PATH_PREFIX
+        return f"{prefix}/{validation_code}"
+
+    def _build_vehicle_description(self, record: VehiclePossession) -> str | None:
+        if not record.vehicle:
+            return record.vehicle_id and str(record.vehicle_id)
+
+        parts = [record.vehicle.plate]
+        vehicle_name = " ".join(filter(None, [record.vehicle.brand, record.vehicle.model])).strip()
+        if vehicle_name:
+            parts.append(vehicle_name)
+        return " - ".join(parts)
+
+    def _mask_document(self, value: str | None) -> str | None:
+        if not value:
+            return None
+        digits = "".join(character for character in value if character.isdigit())
+        if len(digits) <= 4:
+            return "***"
+        return f"{digits[:3]}.***.***-{digits[-2:]}"
+
     def _serialize(self, record: VehiclePossession, *, can_view_location: bool) -> dict:
         photos = self._serialize_photo_entries(record, can_view_location=can_view_location)
         primary_photo = photos[0] if photos else None
@@ -803,6 +859,9 @@ class PossessionService:
             "id": record.id,
             "vehicle_id": record.vehicle_id,
             "vehicle_plate": record.vehicle.plate if record.vehicle else "",
+            "vehicle_brand": record.vehicle.brand if record.vehicle else None,
+            "vehicle_model": record.vehicle.model if record.vehicle else None,
+            "vehicle_description": self._build_vehicle_description(record),
             "driver_id": record.driver_id,
             "driver_name": record.driver_name,
             "driver_document": record.driver_document,
@@ -824,15 +883,52 @@ class PossessionService:
             "loan_term_name": record.document_name,
             "loan_term_url": loan_term_url,
             "loan_term_uploaded_at": record.document_uploaded_at,
+            "loan_term_validation_code": record.loan_term_validation_code,
+            "loan_term_public_validation_path": self._build_public_validation_path(
+                record.loan_term_validation_code,
+                term_type="loan",
+            ),
             "return_term_available": bool(record.return_document_path),
             "return_term_name": record.return_document_name,
             "return_term_url": return_term_url,
             "return_term_uploaded_at": record.return_document_uploaded_at,
+            "return_term_validation_code": record.return_term_validation_code,
+            "return_term_public_validation_path": self._build_public_validation_path(
+                record.return_term_validation_code,
+                term_type="return",
+            ),
             "document_available": bool(record.document_path),
             "document_name": record.document_name,
             "document_url": f"/api/possession/{record.id}/document" if record.document_path else None,
             "document_uploaded_at": record.document_uploaded_at,
             "capture_location": primary_photo["capture_location"] if primary_photo else None,
+        }
+
+    def _serialize_public_term(self, record: VehiclePossession, *, term_type: str) -> dict:
+        validation_code = (
+            record.return_term_validation_code
+            if term_type == "return"
+            else record.loan_term_validation_code
+        )
+        return {
+            "term_type": term_type,
+            "validation_code": validation_code,
+            "public_validation_path": self._build_public_validation_path(validation_code, term_type=term_type),
+            "possession_id": record.id,
+            "vehicle_plate": record.vehicle.plate if record.vehicle else "",
+            "vehicle_brand": record.vehicle.brand if record.vehicle else None,
+            "vehicle_model": record.vehicle.model if record.vehicle else None,
+            "vehicle_description": self._build_vehicle_description(record),
+            "driver_name": record.driver_name,
+            "driver_document_masked": self._mask_document(record.driver_document),
+            "driver_contact": record.driver_contact,
+            "start_date": record.start_date,
+            "end_date": record.end_date,
+            "start_odometer_km": record.start_odometer_km,
+            "end_odometer_km": record.end_odometer_km,
+            "kilometers_driven": self._calculate_kilometers_driven(record.start_odometer_km, record.end_odometer_km),
+            "observation": record.observation,
+            "created_at": record.created_at,
         }
 
     def _serialize_photo_entries(self, record: VehiclePossession, *, can_view_location: bool) -> list[dict]:

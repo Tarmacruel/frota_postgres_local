@@ -20,6 +20,31 @@ class PossessionRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_by_loan_term_validation_code(self, validation_code: str) -> VehiclePossession | None:
+        result = await self.db.execute(
+            select(VehiclePossession)
+            .options(joinedload(VehiclePossession.vehicle), joinedload(VehiclePossession.driver), selectinload(VehiclePossession.photos))
+            .where(VehiclePossession.loan_term_validation_code == validation_code)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_return_term_validation_code(self, validation_code: str) -> VehiclePossession | None:
+        result = await self.db.execute(
+            select(VehiclePossession)
+            .options(joinedload(VehiclePossession.vehicle), joinedload(VehiclePossession.driver), selectinload(VehiclePossession.photos))
+            .where(VehiclePossession.return_term_validation_code == validation_code)
+        )
+        return result.scalar_one_or_none()
+
+    async def has_validation_code(self, validation_code: str) -> bool:
+        result = await self.db.execute(
+            select(VehiclePossession.id).where(
+                (VehiclePossession.loan_term_validation_code == validation_code)
+                | (VehiclePossession.return_term_validation_code == validation_code)
+            )
+        )
+        return result.scalar_one_or_none() is not None
+
     async def list(self, vehicle_id: UUID | None = None, active: bool | None = None) -> list[VehiclePossession]:
         stmt = (
             select(VehiclePossession)

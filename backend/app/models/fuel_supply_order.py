@@ -60,6 +60,7 @@ class FuelSupplyOrder(Base):
 
     requested_liters: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
     max_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    requester_contact: Mapped[str | None] = mapped_column(String(50), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
     confirmed_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)

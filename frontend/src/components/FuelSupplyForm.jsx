@@ -26,6 +26,15 @@ function buildDriverOption(driver) {
   }
 }
 
+function buildFuelStationOption(station) {
+  return {
+    value: station.id,
+    label: station.name,
+    description: [station.address, station.phone].filter(Boolean).join(' | '),
+    keywords: [station.name, station.cnpj, station.address, station.phone].filter(Boolean).join(' '),
+  }
+}
+
 export default function FuelSupplyForm({ vehicles, drivers, organizations, fuelStations, onClose, onSuccess }) {
   const [form, setForm] = useState({
     vehicle_id: '',
@@ -142,7 +151,7 @@ export default function FuelSupplyForm({ vehicles, drivers, organizations, fuelS
       </div>
       <div className="form-field">
         <label>Posto</label>
-        <SearchableSelect value={form.fuel_station_id} onChange={(value) => setForm({ ...form, fuel_station_id: value })} options={[{ value: '', label: 'Não informado' }, ...fuelStations.map((station) => ({ value: station.id, label: station.name, description: station.address }))]} placeholder="Selecione o posto" searchPlaceholder="Buscar posto" />
+        <SearchableSelect value={form.fuel_station_id} onChange={(value) => setForm({ ...form, fuel_station_id: value })} options={[{ value: '', label: 'Não informado' }, ...fuelStations.map(buildFuelStationOption)]} placeholder="Selecione o posto" searchPlaceholder="Buscar posto" />
       </div>
 
       <div className="form-field modal-field-span">

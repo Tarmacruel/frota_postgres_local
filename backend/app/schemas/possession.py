@@ -133,6 +133,9 @@ class PossessionOut(BaseModel):
     id: UUID
     vehicle_id: UUID
     vehicle_plate: str
+    vehicle_brand: str | None
+    vehicle_model: str | None
+    vehicle_description: str | None
     driver_id: UUID | None
     driver_name: str
     driver_document: str | None
@@ -154,10 +157,14 @@ class PossessionOut(BaseModel):
     loan_term_name: str | None
     loan_term_url: str | None
     loan_term_uploaded_at: datetime | None
+    loan_term_validation_code: str | None
+    loan_term_public_validation_path: str | None
     return_term_available: bool
     return_term_name: str | None
     return_term_url: str | None
     return_term_uploaded_at: datetime | None
+    return_term_validation_code: str | None
+    return_term_public_validation_path: str | None
     document_available: bool
     document_name: str | None
     document_url: str | None
@@ -167,3 +174,24 @@ class PossessionOut(BaseModel):
 
 class PossessionListResponse(PaginatedResponse[PossessionOut]):
     pass
+
+
+class PossessionTermPublicOut(BaseModel):
+    term_type: str
+    validation_code: str
+    public_validation_path: str
+    possession_id: UUID
+    vehicle_plate: str
+    vehicle_brand: str | None
+    vehicle_model: str | None
+    vehicle_description: str | None
+    driver_name: str
+    driver_document_masked: str | None
+    driver_contact: str | None
+    start_date: datetime
+    end_date: datetime | None
+    start_odometer_km: float | None
+    end_odometer_km: float | None
+    kilometers_driven: float | None
+    observation: str | None
+    created_at: datetime

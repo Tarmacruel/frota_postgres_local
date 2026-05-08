@@ -98,11 +98,12 @@ class FuelSupplyOrderCreate(BaseModel):
     expires_at: datetime
     requested_liters: float | None = Field(default=None, gt=0)
     max_amount: float | None = Field(default=None, ge=0)
+    requester_contact: str | None = Field(default=None, max_length=50)
     notes: str | None = Field(default=None, max_length=4000)
 
-    @field_validator("notes")
+    @field_validator("requester_contact", "notes")
     @classmethod
-    def normalize_notes(cls, value: str | None) -> str | None:
+    def normalize_order_text(cls, value: str | None) -> str | None:
         if value is None:
             return None
         normalized = value.strip()
@@ -152,14 +153,20 @@ class FuelSupplyOrderOut(BaseModel):
     vehicle_description: str | None
     driver_id: UUID | None
     driver_name: str | None
+    driver_contact: str | None
     organization_id: UUID | None
     organization_name: str | None
     fuel_station_id: UUID | None
     fuel_station_name: str | None
     fuel_station_cnpj: str | None
     fuel_station_address: str | None
+    fuel_station_phone: str | None
+    fuel_station_latitude: float | None
+    fuel_station_longitude: float | None
+    fuel_station_maps_url: str | None
     created_by_user_id: UUID
     created_by_name: str | None
+    created_by_contact: str | None
     confirmed_by_user_id: UUID | None
     confirmed_by_name: str | None
     expires_at: datetime
@@ -183,11 +190,17 @@ class FuelSupplyOrderPublicOut(BaseModel):
     vehicle_plate: str
     vehicle_description: str | None
     driver_name: str | None
+    driver_contact: str | None
     organization_name: str | None
     fuel_station_name: str | None
     fuel_station_cnpj: str | None
     fuel_station_address: str | None
+    fuel_station_phone: str | None
+    fuel_station_latitude: float | None
+    fuel_station_longitude: float | None
+    fuel_station_maps_url: str | None
     created_by_name: str | None
+    created_by_contact: str | None
     confirmed_by_name: str | None
     requested_liters: float | None
     max_amount: float | None

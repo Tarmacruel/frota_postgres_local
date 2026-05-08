@@ -17,11 +17,13 @@ from app.schemas.possession import (
     PossessionListResponse,
     PossessionOut,
     PossessionPhotoCreate,
+    PossessionTermPublicOut,
     PossessionUpdate,
 )
 from app.services.possession_service import PossessionService
 
 router = APIRouter(prefix="/api/possession", tags=["Possession"])
+public_router = APIRouter(prefix="/api/public/possession-terms", tags=["PublicPossessionTerms"])
 
 
 def _raise_form_error(loc: str, message: str) -> None:
@@ -313,3 +315,19 @@ async def update_possession(
         new_photos=new_photos or [],
         new_photo_metadata=photo_metadata,
     )
+
+
+@public_router.get("/loan/{validation_code}", response_model=PossessionTermPublicOut)
+async def get_public_loan_term(
+    validation_code: str,
+    db: AsyncSession = Depends(get_db_session),
+):
+    return await PossessionService(db).get_public_term(validation_code, term_type="loan")
+
+
+@public_router.get("/return/{validation_code}", response_model=PossessionTermPublicOut)
+async def get_public_return_term(
+    validation_code: str,
+    db: AsyncSession = Depends(get_db_session),
+):
+    return await PossessionService(db).get_public_term(validation_code, term_type="return")

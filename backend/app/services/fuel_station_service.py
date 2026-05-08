@@ -29,7 +29,15 @@ class FuelStationService:
         return station
 
     async def create(self, data: FuelStationCreate, actor: User) -> FuelStation:
-        station = FuelStation(name=data.name, cnpj=data.cnpj, address=data.address, active=data.active)
+        station = FuelStation(
+            name=data.name,
+            cnpj=data.cnpj,
+            address=data.address,
+            phone=data.phone,
+            latitude=data.latitude,
+            longitude=data.longitude,
+            active=data.active,
+        )
         try:
             station = await self.repo.create(station)
             await self.audit.record(
@@ -38,7 +46,15 @@ class FuelStationService:
                 entity_type="FUEL_STATION",
                 entity_id=station.id,
                 entity_label=station.name,
-                details={"name": station.name, "cnpj": station.cnpj, "active": station.active},
+                details={
+                    "name": station.name,
+                    "cnpj": station.cnpj,
+                    "address": station.address,
+                    "phone": station.phone,
+                    "latitude": station.latitude,
+                    "longitude": station.longitude,
+                    "active": station.active,
+                },
             )
             await self.db.commit()
             return station
@@ -48,10 +64,21 @@ class FuelStationService:
 
     async def update(self, fuel_station_id: UUID, data: FuelStationUpdate, actor: User) -> FuelStation:
         station = await self.get(fuel_station_id)
-        before = {"name": station.name, "cnpj": station.cnpj, "address": station.address, "active": station.active}
+        before = {
+            "name": station.name,
+            "cnpj": station.cnpj,
+            "address": station.address,
+            "phone": station.phone,
+            "latitude": station.latitude,
+            "longitude": station.longitude,
+            "active": station.active,
+        }
         station.name = data.name
         station.cnpj = data.cnpj
         station.address = data.address
+        station.phone = data.phone
+        station.latitude = data.latitude
+        station.longitude = data.longitude
         station.active = data.active
         try:
             await self.audit.record(
@@ -60,7 +87,18 @@ class FuelStationService:
                 entity_type="FUEL_STATION",
                 entity_id=station.id,
                 entity_label=station.name,
-                details={"before": before, "after": {"name": station.name, "cnpj": station.cnpj, "address": station.address, "active": station.active}},
+                details={
+                    "before": before,
+                    "after": {
+                        "name": station.name,
+                        "cnpj": station.cnpj,
+                        "address": station.address,
+                        "phone": station.phone,
+                        "latitude": station.latitude,
+                        "longitude": station.longitude,
+                        "active": station.active,
+                    },
+                },
             )
             await self.db.flush()
             await self.db.refresh(station)

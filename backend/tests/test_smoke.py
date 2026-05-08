@@ -38,6 +38,8 @@ async def test_openapi_contains_new_routes(client):
     assert "/api/possession/{possession_id}/photo" in paths
     assert "/api/possession/{possession_id}/photos/{photo_id}" in paths
     assert "/api/possession/{possession_id}/end" in paths
+    assert "/api/public/possession-terms/loan/{validation_code}" in paths
+    assert "/api/public/possession-terms/return/{validation_code}" in paths
     assert "/api/search" in paths
     assert "/api/fuel-stations" in paths
     assert "/api/fuel-stations/{fuel_station_id}/users" in paths
@@ -64,24 +66,52 @@ async def test_openapi_contains_new_routes(client):
 
     fuel_supply_order_create = schemas["FuelSupplyOrderCreate"]
     assert "fuel_station_id" in fuel_supply_order_create["required"]
+    assert "requester_contact" in fuel_supply_order_create["properties"]
+
+    fuel_station = schemas["FuelStationOut"]
+    assert "phone" in fuel_station["properties"]
+    assert "latitude" in fuel_station["properties"]
+    assert "longitude" in fuel_station["properties"]
 
     fuel_supply_order = schemas["FuelSupplyOrderOut"]
     assert "request_number" in fuel_supply_order["properties"]
     assert "validation_code" in fuel_supply_order["properties"]
     assert "public_validation_path" in fuel_supply_order["properties"]
     assert "driver_name" in fuel_supply_order["properties"]
+    assert "driver_contact" in fuel_supply_order["properties"]
     assert "fuel_station_name" in fuel_supply_order["properties"]
+    assert "fuel_station_phone" in fuel_supply_order["properties"]
+    assert "fuel_station_latitude" in fuel_supply_order["properties"]
+    assert "fuel_station_longitude" in fuel_supply_order["properties"]
+    assert "fuel_station_maps_url" in fuel_supply_order["properties"]
+    assert "created_by_contact" in fuel_supply_order["properties"]
 
     public_fuel_supply_order = schemas["FuelSupplyOrderPublicOut"]
     assert "validation_code" in public_fuel_supply_order["properties"]
     assert "public_validation_path" in public_fuel_supply_order["properties"]
+    assert "driver_contact" in public_fuel_supply_order["properties"]
+    assert "fuel_station_phone" in public_fuel_supply_order["properties"]
+    assert "fuel_station_latitude" in public_fuel_supply_order["properties"]
+    assert "fuel_station_longitude" in public_fuel_supply_order["properties"]
+    assert "fuel_station_maps_url" in public_fuel_supply_order["properties"]
+    assert "created_by_contact" in public_fuel_supply_order["properties"]
 
     possession = schemas["PossessionOut"]
     assert "loan_term_available" in possession["properties"]
     assert "loan_term_url" in possession["properties"]
     assert "return_term_available" in possession["properties"]
     assert "return_term_url" in possession["properties"]
+    assert "loan_term_validation_code" in possession["properties"]
+    assert "loan_term_public_validation_path" in possession["properties"]
+    assert "return_term_validation_code" in possession["properties"]
+    assert "return_term_public_validation_path" in possession["properties"]
+    assert "vehicle_description" in possession["properties"]
     assert "document_available" in possession["properties"]
+
+    public_possession_term = schemas["PossessionTermPublicOut"]
+    assert "validation_code" in public_possession_term["properties"]
+    assert "public_validation_path" in public_possession_term["properties"]
+    assert "driver_document_masked" in public_possession_term["properties"]
 
     current_user = schemas["CurrentUserOut"]
     assert "must_change_password" in current_user["properties"]

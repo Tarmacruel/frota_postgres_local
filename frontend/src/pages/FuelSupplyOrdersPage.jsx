@@ -18,6 +18,15 @@ function formatNumber(value, digits = 2) {
   return Number(value).toFixed(digits)
 }
 
+function buildOrderMapsUrl(order) {
+  if (order.fuel_station_maps_url) return order.fuel_station_maps_url
+  if (order.fuel_station_latitude === null || order.fuel_station_latitude === undefined) return ''
+  if (order.fuel_station_longitude === null || order.fuel_station_longitude === undefined) return ''
+  const latitude = Number(order.fuel_station_latitude).toFixed(6)
+  const longitude = Number(order.fuel_station_longitude).toFixed(6)
+  return `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=18/${latitude}/${longitude}`
+}
+
 function formatOrderNumber(order) {
   if (order.request_number) return order.request_number
   return `AB-${String(order.id).slice(0, 8).toUpperCase()}`
@@ -86,8 +95,11 @@ export default function FuelSupplyOrdersPage() {
         order.request_number,
         order.vehicle_plate,
         order.created_by_name,
+        order.created_by_contact,
         order.driver_name,
+        order.driver_contact,
         order.fuel_station_name,
+        order.fuel_station_phone,
         order.notes,
       ]
         .filter(Boolean)
@@ -124,7 +136,7 @@ export default function FuelSupplyOrdersPage() {
         <div className="filter-inline">
           <input
             className="app-input"
-            placeholder="Buscar por placa, solicitante, condutor ou número"
+            placeholder="Buscar por placa, solicitante, contato, condutor ou número"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -159,13 +171,30 @@ export default function FuelSupplyOrdersPage() {
                   <tr key={order.id}>
                     <td data-label="Ordem">{formatOrderNumber(order)}</td>
                     <td data-label="Veículo">{order.vehicle_plate || '-'}</td>
-                    <td data-label="Posto">{order.fuel_station_name || '-'}</td>
+                    <td data-label="Posto">
+                      <div className="stack">
+                        <strong>{order.fuel_station_name || '-'}</strong>
+                        <span className="muted">{order.fuel_station_phone || 'Telefone do posto não informado'}</span>
+                        {buildOrderMapsUrl(order) ? (
+                          <a className="link-inline" href={buildOrderMapsUrl(order)} target="_blank" rel="noreferrer">Abrir mapa</a>
+                        ) : (
+                          <span className="muted">Sem localização</span>
+                        )}
+                      </div>
+                    </td>
                     <td data-label="Solicitada em">{formatDate(order.requested_at || order.created_at)}</td>
                     <td data-label="Prazo">
                       <div>{formatDate(pickDeadline(order))}</div>
                       <span className={`deadline-pill ${deadlineMeta.tone}`}>{deadlineMeta.label}</span>
                     </td>
-                    <td data-label="Condutor">{order.driver_name || order.created_by_name || '-'}</td>
+                    <td data-label="Condutor">
+                      <div className="stack">
+                        <strong>{order.driver_name || 'Não informado'}</strong>
+                        <span className="muted">Contato motorista: {order.driver_contact || 'Não informado'}</span>
+                        <span className="muted">Emissor: {order.created_by_name || 'Não informado'}</span>
+                        <span className="muted">Contato emissor: {order.created_by_contact || 'Não informado'}</span>
+                      </div>
+                    </td>
                     <td data-label="Litros previstos">{formatNumber(order.requested_liters)}</td>
                     <td data-label="Ações">
                       <div className="actions-inline">

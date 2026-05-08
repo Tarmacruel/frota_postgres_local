@@ -28,8 +28,8 @@ function buildFuelStationOption(station) {
   return {
     value: station.id,
     label: station.name,
-    description: station.address,
-    keywords: [station.name, station.cnpj, station.address].filter(Boolean).join(' '),
+    description: [station.address, station.phone].filter(Boolean).join(' | '),
+    keywords: [station.name, station.cnpj, station.address, station.phone].filter(Boolean).join(' '),
   }
 }
 
@@ -44,6 +44,7 @@ export default function FuelSupplyOrderCreateForm({ vehicles, drivers, organizat
     driver_id: '',
     organization_id: '',
     fuel_station_id: '',
+    requester_contact: '',
     expires_at: buildDefaultDeadline(),
     requested_liters: '',
     max_amount: '',
@@ -68,6 +69,11 @@ export default function FuelSupplyOrderCreateForm({ vehicles, drivers, organizat
       return
     }
 
+    if (!form.requester_contact.trim()) {
+      setError('Informe o contato de quem está emitindo a ordem.')
+      return
+    }
+
     if (!form.expires_at) {
       setError('Informe o prazo limite da ordem.')
       return
@@ -78,13 +84,14 @@ export default function FuelSupplyOrderCreateForm({ vehicles, drivers, organizat
       return
     }
 
-      try {
+    try {
       setSubmitting(true)
       const parsedMaxAmount = parseCurrencyInput(form.max_amount)
       const payload = {
         vehicle_id: form.vehicle_id,
         expires_at: new Date(form.expires_at).toISOString(),
         fuel_station_id: form.fuel_station_id,
+        requester_contact: form.requester_contact.trim(),
       }
       if (form.driver_id) payload.driver_id = form.driver_id
       if (form.organization_id) payload.organization_id = form.organization_id
@@ -154,6 +161,19 @@ export default function FuelSupplyOrderCreateForm({ vehicles, drivers, organizat
       </div>
 
       <div className="form-field">
+        <label>Contato do emissor</label>
+        <input
+          type="text"
+          className="app-input"
+          value={form.requester_contact}
+          onChange={(event) => setForm((current) => ({ ...current, requester_contact: event.target.value }))}
+          placeholder="Telefone ou ramal para contato"
+          maxLength={50}
+          required
+        />
+      </div>
+
+      <div className="form-field">
         <label>Prazo limite</label>
         <input
           type="datetime-local"
@@ -177,7 +197,7 @@ export default function FuelSupplyOrderCreateForm({ vehicles, drivers, organizat
       </div>
 
       <div className="form-field">
-        <label>Valor maximo (R$)</label>
+        <label>Valor máximo (R$)</label>
         <input
           type="text"
           inputMode="numeric"

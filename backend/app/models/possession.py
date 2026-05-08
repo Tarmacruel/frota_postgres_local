@@ -13,6 +13,8 @@ class VehiclePossession(Base):
     __table_args__ = (
         Index("idx_possession_vehicle", "vehicle_id"),
         Index("idx_possession_driver", "driver_name"),
+        Index("idx_possession_loan_term_validation_code", "loan_term_validation_code", unique=True),
+        Index("idx_possession_return_term_validation_code", "return_term_validation_code", unique=True),
         Index("uq_possession_active", "vehicle_id", unique=True, postgresql_where=text("end_date IS NULL")),
     )
 
@@ -45,11 +47,13 @@ class VehiclePossession(Base):
     document_mime_type = mapped_column(String(120), nullable=True)
     document_size_bytes = mapped_column(Integer, nullable=True)
     document_uploaded_at = mapped_column(DateTime(timezone=True), nullable=True)
+    loan_term_validation_code = mapped_column(String(24), nullable=True)
     return_document_path = mapped_column(String(255), nullable=True)
     return_document_name = mapped_column(String(255), nullable=True)
     return_document_mime_type = mapped_column(String(120), nullable=True)
     return_document_size_bytes = mapped_column(Integer, nullable=True)
     return_document_uploaded_at = mapped_column(DateTime(timezone=True), nullable=True)
+    return_term_validation_code = mapped_column(String(24), nullable=True)
     capture_latitude = mapped_column(Float, nullable=True)
     capture_longitude = mapped_column(Float, nullable=True)
     capture_accuracy_meters = mapped_column(Float, nullable=True)

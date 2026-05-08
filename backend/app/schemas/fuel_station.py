@@ -9,9 +9,12 @@ class FuelStationCreate(BaseModel):
     name: str = Field(min_length=2, max_length=180)
     cnpj: str | None = Field(default=None, max_length=18)
     address: str = Field(min_length=4, max_length=255)
+    phone: str | None = Field(default=None, max_length=50)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
     active: bool = True
 
-    @field_validator("name", "address", "cnpj")
+    @field_validator("name", "address", "cnpj", "phone")
     @classmethod
     def normalize_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -24,9 +27,12 @@ class FuelStationUpdate(BaseModel):
     name: str = Field(min_length=2, max_length=180)
     cnpj: str | None = Field(default=None, max_length=18)
     address: str = Field(min_length=4, max_length=255)
+    phone: str | None = Field(default=None, max_length=50)
+    latitude: float | None = Field(default=None, ge=-90, le=90)
+    longitude: float | None = Field(default=None, ge=-180, le=180)
     active: bool = True
 
-    @field_validator("name", "address", "cnpj")
+    @field_validator("name", "address", "cnpj", "phone")
     @classmethod
     def normalize_text(cls, value: str | None) -> str | None:
         if value is None:
@@ -42,6 +48,9 @@ class FuelStationOut(BaseModel):
     name: str
     cnpj: str | None
     address: str
+    phone: str | None
+    latitude: float | None
+    longitude: float | None
     active: bool
     created_at: datetime
     updated_at: datetime

@@ -42,6 +42,24 @@ function formatCurrency(value) {
   return formatCurrencyBRL(value)
 }
 
+function buildOrderMapsUrl(order) {
+  if (order.fuel_station_maps_url) return order.fuel_station_maps_url
+  if (order.fuel_station_latitude === null || order.fuel_station_latitude === undefined) return ''
+  if (order.fuel_station_longitude === null || order.fuel_station_longitude === undefined) return ''
+  const latitude = Number(order.fuel_station_latitude).toFixed(6)
+  const longitude = Number(order.fuel_station_longitude).toFixed(6)
+  return `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=18/${latitude}/${longitude}`
+}
+
+function buildStationOption(station) {
+  return {
+    value: station.id,
+    label: station.name,
+    description: [station.address, station.phone].filter(Boolean).join(' | '),
+    keywords: [station.name, station.cnpj, station.address, station.phone].filter(Boolean).join(' '),
+  }
+}
+
 function buildVehicleOption(vehicle) {
   const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
   return { value: vehicle.id, label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`, description: locationLabel }
@@ -157,6 +175,9 @@ export default function FuelSuppliesPage() {
         order.organization_name,
         order.fuel_station_name,
         order.created_by_name,
+        order.created_by_contact,
+        order.driver_contact,
+        order.fuel_station_phone,
         order.notes,
       ]
         .filter(Boolean)
@@ -174,11 +195,15 @@ export default function FuelSuppliesPage() {
     { header: 'Situação', value: (order) => getOrderStatusLabel(order.status) },
     { header: 'Veículo', value: (order) => order.vehicle_description || order.vehicle_plate || '-' },
     { header: 'Posto', value: (order) => order.fuel_station_name || '-' },
+    { header: 'Telefone posto', value: (order) => order.fuel_station_phone || '-' },
+    { header: 'Localização posto', value: (order) => order.fuel_station_maps_url || buildOrderMapsUrl(order) || '-' },
     { header: 'Órgão', value: (order) => order.organization_name || '-' },
     { header: 'Solicitante', value: (order) => order.created_by_name || '-' },
+    { header: 'Contato emissor', value: (order) => order.created_by_contact || '-' },
+    { header: 'Contato motorista', value: (order) => order.driver_contact || '-' },
     { header: 'Prazo', value: (order) => formatDate(order.expires_at) },
     { header: 'Litros previstos', value: (order) => order.requested_liters ?? '-' },
-    { header: 'Valor maximo', value: (order) => formatCurrency(order.max_amount) },
+    { header: 'Valor máximo', value: (order) => formatCurrency(order.max_amount) },
     { header: 'Código público', value: (order) => order.validation_code || '-' },
   ], [])
 
@@ -354,7 +379,7 @@ export default function FuelSuppliesPage() {
           <div>
             <strong>Comprovante institucional disponível para {formatOrderNumber(lastIssuedOrder)}</strong>
             <span>
-              O documento oficial já pode ser previsualizado, baixado em PDF ou compartilhado pelo link público com
+              O documento oficial já pode ser pré-visualizado, baixado em PDF ou compartilhado pelo link público com
               validação por QR Code.
             </span>
           </div>
@@ -379,7 +404,7 @@ export default function FuelSuppliesPage() {
         </div>
 
         <div className="filter-inline">
-          <input className="app-input" placeholder="Buscar ordem por placa, posto, solicitante ou observação" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} />
+          <input className="app-input" placeholder="Buscar ordem por placa, posto, contato, solicitante ou observação" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} />
           <select className="app-select" value={orderFilters.status} onChange={(event) => setOrderFilters((prev) => ({ ...prev, status: event.target.value }))}>
             {ORDER_STATUS_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
@@ -388,7 +413,7 @@ export default function FuelSuppliesPage() {
           <SearchableSelect
             value={orderFilters.fuel_station_id}
             onChange={(value) => setOrderFilters((prev) => ({ ...prev, fuel_station_id: value }))}
-            options={[{ value: '', label: 'Todos os postos' }, ...fuelStations.map((station) => ({ value: station.id, label: station.name, description: station.address }))]}
+            options={[{ value: '', label: 'Todos os postos' }, ...fuelStations.map(buildStationOption)]}
             placeholder="Filtrar posto"
             searchPlaceholder="Buscar posto"
           />
@@ -406,7 +431,7 @@ export default function FuelSuppliesPage() {
                 <th>Prazo</th>
                 <th>Solicitante</th>
                 <th>Litros previstos</th>
-                <th>Valor maximo</th>
+                <th>Valor máximo</th>
                 <th>Ações</th>
               </tr>
             </thead>
@@ -416,8 +441,26 @@ export default function FuelSuppliesPage() {
               {!ordersLoading && paginatedOrders.map((order) => (
                 <tr key={order.id}>
                   <td data-label="Ordem"><strong>{formatOrderNumber(order)}</strong></td>
-                  <td data-label="Veículo">{order.vehicle_plate}</td>
-                  <td data-label="Posto">{order.fuel_station_name || '-'}</td>
+                  <td data-label="Veículo">
+                    <div className="stack">
+                      <strong>{order.vehicle_plate || '-'}</strong>
+                      <span className="muted">
+                        Motorista: {order.driver_name || 'Não informado'}
+                        {order.driver_contact ? ` | ${order.driver_contact}` : ''}
+                      </span>
+                    </div>
+                  </td>
+                  <td data-label="Posto">
+                    <div className="stack">
+                      <strong>{order.fuel_station_name || '-'}</strong>
+                      <span className="muted">{order.fuel_station_phone || 'Telefone não informado'}</span>
+                      {buildOrderMapsUrl(order) ? (
+                        <a className="link-inline" href={buildOrderMapsUrl(order)} target="_blank" rel="noreferrer">Abrir mapa</a>
+                      ) : (
+                        <span className="muted">Sem localização</span>
+                      )}
+                    </div>
+                  </td>
                   <td data-label="Situação">
                     <span className={`status-badge ${getOrderStatusClass(order.status)}`}>{getOrderStatusLabel(order.status)}</span>
                   </td>
@@ -426,10 +469,11 @@ export default function FuelSuppliesPage() {
                     <div className="stack">
                       <strong>{order.created_by_name || '-'}</strong>
                       <span className="muted">{order.organization_name || 'Sem órgão informado'}</span>
+                      <span className="muted">Contato: {order.created_by_contact || 'Não informado'}</span>
                     </div>
                   </td>
                   <td data-label="Litros previstos">{formatNumber(order.requested_liters)}</td>
-                  <td data-label="Valor maximo">{formatCurrency(order.max_amount)}</td>
+                  <td data-label="Valor máximo">{formatCurrency(order.max_amount)}</td>
                   <td data-label="Ações">
                     <div className="actions-inline">
                       <button type="button" className="mini-button" onClick={() => handlePreviewOrderDocument(order)}>Comprovante</button>
@@ -450,7 +494,7 @@ export default function FuelSuppliesPage() {
         <div className="panel-heading">
           <div>
             <h3 className="section-title">Histórico de abastecimentos</h3>
-            <p className="section-copy">Consulta historica dos abastecimentos confirmados, com comprovantes e alertas de consumo.</p>
+            <p className="section-copy">Consulta histórica dos abastecimentos confirmados, com comprovantes e alertas de consumo.</p>
           </div>
         </div>
 
@@ -459,7 +503,7 @@ export default function FuelSuppliesPage() {
           <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(buildVehicleOption)]} placeholder="Filtrar veículo" />
           <SearchableSelect value={filters.driver_id} onChange={(value) => setFilters((prev) => ({ ...prev, driver_id: value }))} options={[{ value: '', label: 'Todos os condutores' }, ...drivers.map((driver) => ({ value: driver.id, label: driver.nome_completo }))]} placeholder="Filtrar condutor" />
           <SearchableSelect value={filters.organization_id} onChange={(value) => setFilters((prev) => ({ ...prev, organization_id: value }))} options={[{ value: '', label: 'Todos os órgãos' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))]} placeholder="Filtrar órgão" />
-          <SearchableSelect value={filters.fuel_station_id} onChange={(value) => setFilters((prev) => ({ ...prev, fuel_station_id: value }))} options={[{ value: '', label: 'Todos os postos' }, ...fuelStations.map((station) => ({ value: station.id, label: station.name, description: station.address }))]} placeholder="Filtrar posto" />
+          <SearchableSelect value={filters.fuel_station_id} onChange={(value) => setFilters((prev) => ({ ...prev, fuel_station_id: value }))} options={[{ value: '', label: 'Todos os postos' }, ...fuelStations.map(buildStationOption)]} placeholder="Filtrar posto" />
           <select className="app-input" value={filters.only_anomalies} onChange={(event) => setFilters((prev) => ({ ...prev, only_anomalies: event.target.value }))}>
             <option value="">Todos</option>
             <option value="true">Somente alertas</option>

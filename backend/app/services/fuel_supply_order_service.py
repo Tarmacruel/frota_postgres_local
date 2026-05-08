@@ -97,6 +97,7 @@ class FuelSupplyOrderService:
             expires_at=data.expires_at,
             requested_liters=data.requested_liters,
             max_amount=data.max_amount,
+            requester_contact=data.requester_contact,
             notes=data.notes,
             status=FuelSupplyOrderStatus.OPEN,
         )
@@ -377,6 +378,11 @@ class FuelSupplyOrderService:
     def _build_public_validation_path(self, validation_code: str) -> str:
         return f"{PUBLIC_VALIDATION_PATH_PREFIX}/{validation_code}"
 
+    def _build_maps_url(self, latitude: float | None, longitude: float | None) -> str | None:
+        if latitude is None or longitude is None:
+            return None
+        return f"https://www.openstreetmap.org/?mlat={latitude:.6f}&mlon={longitude:.6f}#map=18/{latitude:.6f}/{longitude:.6f}"
+
     def _build_vehicle_description(self, item: FuelSupplyOrder) -> str | None:
         if not item.vehicle:
             return None
@@ -400,14 +406,23 @@ class FuelSupplyOrderService:
             "vehicle_description": self._build_vehicle_description(item),
             "driver_id": item.driver_id,
             "driver_name": item.driver.nome_completo if item.driver else None,
+            "driver_contact": item.driver.contato if item.driver else None,
             "organization_id": item.organization_id,
             "organization_name": item.organization.name if item.organization else None,
             "fuel_station_id": item.fuel_station_id,
             "fuel_station_name": item.fuel_station_ref.name if item.fuel_station_ref else None,
             "fuel_station_cnpj": item.fuel_station_ref.cnpj if item.fuel_station_ref else None,
             "fuel_station_address": item.fuel_station_ref.address if item.fuel_station_ref else None,
+            "fuel_station_phone": item.fuel_station_ref.phone if item.fuel_station_ref else None,
+            "fuel_station_latitude": item.fuel_station_ref.latitude if item.fuel_station_ref else None,
+            "fuel_station_longitude": item.fuel_station_ref.longitude if item.fuel_station_ref else None,
+            "fuel_station_maps_url": self._build_maps_url(
+                item.fuel_station_ref.latitude if item.fuel_station_ref else None,
+                item.fuel_station_ref.longitude if item.fuel_station_ref else None,
+            ),
             "created_by_user_id": item.created_by_user_id,
             "created_by_name": item.creator.name if item.creator else None,
+            "created_by_contact": item.requester_contact,
             "confirmed_by_user_id": item.confirmed_by_user_id,
             "confirmed_by_name": item.confirmer.name if item.confirmer else None,
             "expires_at": item.expires_at,
@@ -429,11 +444,17 @@ class FuelSupplyOrderService:
             "vehicle_plate": serialized["vehicle_plate"],
             "vehicle_description": serialized["vehicle_description"],
             "driver_name": serialized["driver_name"],
+            "driver_contact": serialized["driver_contact"],
             "organization_name": serialized["organization_name"],
             "fuel_station_name": serialized["fuel_station_name"],
             "fuel_station_cnpj": serialized["fuel_station_cnpj"],
             "fuel_station_address": serialized["fuel_station_address"],
+            "fuel_station_phone": serialized["fuel_station_phone"],
+            "fuel_station_latitude": serialized["fuel_station_latitude"],
+            "fuel_station_longitude": serialized["fuel_station_longitude"],
+            "fuel_station_maps_url": serialized["fuel_station_maps_url"],
             "created_by_name": serialized["created_by_name"],
+            "created_by_contact": serialized["created_by_contact"],
             "confirmed_by_name": serialized["confirmed_by_name"],
             "requested_liters": serialized["requested_liters"],
             "max_amount": serialized["max_amount"],

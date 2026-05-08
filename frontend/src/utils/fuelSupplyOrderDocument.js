@@ -75,7 +75,7 @@ async function buildDocument(order) {
   const municipalityLineHeight = 11
   const titleLineHeight = 14
   const systemLineHeight = 9
-  const generatedAtLabel = `Emissao do documento: ${formatDateTimeLabel(new Date())}`
+  const generatedAtLabel = `Emissão do documento: ${formatDateTimeLabel(new Date())}`
   const validationCodeLabel = `Código de validação: ${buildReferenceCode(order)}`
   const footerPageLabelWidth = 104
 
@@ -188,7 +188,7 @@ async function buildDocument(order) {
     doc.setFontSize(7.8)
     doc.setTextColor(102, 117, 140)
     doc.text(footerLayout.footerLines, marginX, footerY + 1)
-    doc.text(`Pagina ${doc.getCurrentPageInfo().pageNumber} de ${totalPagesExp}`, pageWidth - marginX, footerY + 1, { align: 'right' })
+    doc.text(`Página ${doc.getCurrentPageInfo().pageNumber} de ${totalPagesExp}`, pageWidth - marginX, footerY + 1, { align: 'right' })
   }
 
   function addSection(title, rows, startY) {
@@ -258,7 +258,7 @@ async function buildDocument(order) {
 
   let cursorY = headerDividerY + 16
 
-  cursorY = addSection('Identificacao da ordem', [
+  cursorY = addSection('Identificação da ordem', [
     ['Número da ordem', formatOrderNumber(order)],
     ['Situação atual', getOrderStatusLabel(order.status)],
     ['Emitida em', formatDateTimeLabel(order.created_at)],
@@ -269,17 +269,21 @@ async function buildDocument(order) {
   cursorY = addSection('Dados operacionais', [
     ['Veículo', order.vehicle_description || order.vehicle_plate || '-'],
     ['Condutor', order.driver_name || 'Não informado'],
+    ['Contato do motorista', order.driver_contact || 'Não informado'],
     ['Órgão solicitante', order.organization_name || 'Não informado'],
     ['Posto credenciado', order.fuel_station_name || 'Não informado'],
     ['Endereço do posto', order.fuel_station_address || 'Não informado'],
     ['CNPJ do posto', order.fuel_station_cnpj || 'Não informado'],
+    ['Telefone do posto', order.fuel_station_phone || 'Não informado'],
+    ['Localização do posto', order.fuel_station_maps_url || 'Não informado'],
     ['Servidor emissor', order.created_by_name || 'Não informado'],
+    ['Contato do emissor', order.created_by_contact || 'Não informado'],
     ['Conclusão da ordem', order.confirmed_at ? formatDateTimeLabel(order.confirmed_at) : 'Pendente'],
   ], cursorY)
 
   cursorY = addSection('Limites autorizados', [
     ['Litros previstos', order.requested_liters ? `${formatNumber(order.requested_liters, 2)} L` : 'Não informado'],
-    ['Valor maximo autorizado', formatCurrencyBRL(order.max_amount)],
+    ['Valor máximo autorizado', formatCurrencyBRL(order.max_amount)],
     ['Responsável pelo encerramento', order.confirmed_by_name || 'Não informado'],
   ], cursorY)
 

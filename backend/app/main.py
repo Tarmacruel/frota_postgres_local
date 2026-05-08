@@ -17,6 +17,7 @@ from app.api.routes.fuel_supply_orders import public_router as public_fuel_suppl
 from app.api.routes.fuel_supply_orders import router as fuel_supply_orders_router
 from app.api.routes.maintenance import router as maintenance_router
 from app.api.routes.master_data import router as master_data_router
+from app.api.routes.possession import public_router as public_possession_terms_router
 from app.api.routes.possession import router as possession_router
 from app.api.routes.search import router as search_router
 from app.api.routes.users import router as users_router
@@ -45,6 +46,7 @@ app.include_router(drivers_router)
 app.include_router(vehicles_router)
 app.include_router(maintenance_router)
 app.include_router(possession_router)
+app.include_router(public_possession_terms_router)
 app.include_router(claims_router)
 app.include_router(fines_router)
 app.include_router(fuel_supplies_router)
