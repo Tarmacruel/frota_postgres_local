@@ -7,6 +7,7 @@ import { vehiclesAPI } from '../api/vehicles'
 import { driversAPI } from '../api/drivers'
 import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
+import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 
@@ -57,6 +58,7 @@ export default function FinesPage() {
   const [records, setRecords] = useState([])
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
   const [search, setSearch] = useState('')
+  const [organizationFilter, setOrganizationFilter] = useState('')
   const [vehicleFilter, setVehicleFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('TODOS')
   const [loading, setLoading] = useState(true)
@@ -66,8 +68,19 @@ export default function FinesPage() {
   const [editingRecord, setEditingRecord] = useState(null)
   const [form, setForm] = useState(initialForm)
   const [submitting, setSubmitting] = useState(false)
+  const { organizations } = useMasterDataCatalog()
+  const organizationOptions = organizations.map((organization) => ({
+    value: organization.id,
+    label: organization.name,
+  }))
+
+  function getVehicleOrganizationName(vehicleId) {
+    return vehicles.find((vehicle) => vehicle.id === vehicleId)?.current_location?.organization_name || 'Sem secretaria'
+  }
+
   const exportColumns = [
     { header: 'Veículo', value: (item) => item.vehicle_plate },
+    { header: 'Secretaria', value: (item) => getVehicleOrganizationName(item.vehicle_id) },
     { header: 'Auto', value: (item) => item.ticket_number },
     { header: 'Condutor', value: (item) => item.driver_name || '-' },
     { header: 'Data infracao', value: (item) => formatDate(item.infraction_date) },
@@ -102,7 +115,14 @@ export default function FinesPage() {
     try {
       setLoading(true)
       setError('')
-      const { data } = await finesAPI.list({ page, limit: 10, vehicle_id: vehicleFilter || undefined, status: statusFilter !== 'TODOS' ? statusFilter : undefined, search: search || undefined })
+      const { data } = await finesAPI.list({
+        page,
+        limit: 10,
+        vehicle_id: vehicleFilter || undefined,
+        organization_id: organizationFilter || undefined,
+        status: statusFilter !== 'TODOS' ? statusFilter : undefined,
+        search: search || undefined,
+      })
       setRecords(data.data)
       setPagination(data.pagination)
     } catch (err) {
@@ -113,7 +133,7 @@ export default function FinesPage() {
   }
 
   useEffect(() => { loadAux().catch(() => {}) }, [])
-  useEffect(() => { loadFines(1) }, [search, vehicleFilter, statusFilter])
+  useEffect(() => { loadFines(1) }, [search, organizationFilter, vehicleFilter, statusFilter])
 
   function openCreate() {
     setEditingRecord(null)
@@ -177,6 +197,7 @@ export default function FinesPage() {
       rows: records,
       filters: [
         { label: 'Status', value: statusFilter },
+        ...(organizationFilter ? [{ label: 'Secretaria', value: organizationOptions.find((item) => item.value === organizationFilter)?.label || 'Selecionada' }] : []),
         ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
         ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
       ],
@@ -192,6 +213,7 @@ export default function FinesPage() {
       rows: records,
       filters: [
         { label: 'Status', value: statusFilter },
+        ...(organizationFilter ? [{ label: 'Secretaria', value: organizationOptions.find((item) => item.value === organizationFilter)?.label || 'Selecionada' }] : []),
         ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
       ],
     })
@@ -215,6 +237,13 @@ export default function FinesPage() {
         <div className="filter-inline">
           <input className="app-input" placeholder="Buscar por auto, descrição ou local" value={search} onChange={(e) => setSearch(e.target.value)} />
           <SearchableSelect
+            value={organizationFilter}
+            onChange={setOrganizationFilter}
+            options={[{ value: '', label: 'Todas as secretarias' }, ...organizationOptions]}
+            placeholder="Filtrar secretaria"
+            searchPlaceholder="Buscar secretaria"
+          />
+          <SearchableSelect
             value={vehicleFilter}
             onChange={setVehicleFilter}
             options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(vehicleOption)]}
@@ -235,7 +264,12 @@ export default function FinesPage() {
             <tbody>
               {loading ? <tr><td colSpan={canEditFine ? 8 : 7}>Carregando multas...</td></tr> : records.length === 0 ? <tr><td colSpan={canEditFine ? 8 : 7}><div className="empty-state">Nenhuma multa encontrada.</div></td></tr> : records.map((record) => (
                 <tr key={record.id}>
-                  <td><strong>{record.vehicle_plate}</strong></td>
+                  <td data-label="Veículo">
+                    <div className="stack">
+                      <strong>{record.vehicle_plate}</strong>
+                      <span className="muted">{getVehicleOrganizationName(record.vehicle_id)}</span>
+                    </div>
+                  </td>
                   <td>{record.ticket_number}</td>
                   <td>{record.driver_name || '-'}</td>
                   <td>{formatDate(record.infraction_date)}</td>

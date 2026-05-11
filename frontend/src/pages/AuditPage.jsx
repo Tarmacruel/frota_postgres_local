@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import api from '../api/client'
+import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 import { getRoleLabel } from '../utils/roles'
@@ -40,27 +41,45 @@ function summarizeDetails(details) {
 
 export default function AuditPage() {
   const [logs, setLogs] = useState([])
+  const [users, setUsers] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [search, setSearch] = useState('')
   const [actionFilter, setActionFilter] = useState('TODAS')
   const [entityFilter, setEntityFilter] = useState('TODOS')
+  const [organizationFilter, setOrganizationFilter] = useState('TODAS')
+  const { organizations } = useMasterDataCatalog()
+
+  const actorOrganizations = useMemo(() => {
+    return new Map(users.map((user) => [user.id, {
+      id: user.organization_id || '',
+      name: user.organization_name || 'Sem secretaria',
+    }]))
+  }, [users])
+
+  function getActorOrganization(log) {
+    return actorOrganizations.get(log.actor_user_id) || { id: '', name: 'Sem secretaria' }
+  }
 
   const filteredLogs = useMemo(() => {
     return logs.filter((log) => {
       const term = search.trim().toLowerCase()
+      const actorOrganization = getActorOrganization(log)
       const matchesSearch =
         !term ||
-        [log.actor_name, log.actor_email, log.entity_label, log.entity_type, log.action, summarizeDetails(log.details)]
+        [log.actor_name, log.actor_email, actorOrganization.name, log.entity_label, log.entity_type, log.action, summarizeDetails(log.details)]
           .filter(Boolean)
           .some((value) => String(value).toLowerCase().includes(term))
 
       const matchesAction = actionFilter === 'TODAS' || log.action === actionFilter
       const matchesEntity = entityFilter === 'TODOS' || log.entity_type === entityFilter
-      return matchesSearch && matchesAction && matchesEntity
+      const matchesOrganization =
+        organizationFilter === 'TODAS' ||
+        (organizationFilter === 'SEM_SECRETARIA' ? !actorOrganization.id : actorOrganization.id === organizationFilter)
+      return matchesSearch && matchesAction && matchesEntity && matchesOrganization
     })
-  }, [logs, search, actionFilter, entityFilter])
+  }, [logs, search, actionFilter, entityFilter, organizationFilter, actorOrganizations])
 
   const exportColumns = [
     { header: 'Data', value: (log) => formatDate(log.created_at) },
@@ -69,6 +88,7 @@ export default function AuditPage() {
     { header: 'Registro', value: (log) => log.entity_label },
     { header: 'Ator', value: (log) => `${log.actor_name}${log.actor_email ? ` <${log.actor_email}>` : ''}` },
     { header: 'Perfil', value: (log) => getRoleLabel(log.actor_role) },
+    { header: 'Secretaria', value: (log) => getActorOrganization(log).name },
     { header: 'Detalhes', value: (log) => summarizeDetails(log.details) },
   ]
 
@@ -77,8 +97,12 @@ export default function AuditPage() {
       try {
         setLoading(true)
         setError('')
-        const { data } = await api.get('/audit', { params: { limit: 200 } })
-        setLogs(data)
+        const [auditResponse, usersResponse] = await Promise.all([
+          api.get('/audit', { params: { limit: 200 } }),
+          api.get('/users'),
+        ])
+        setLogs(auditResponse.data)
+        setUsers(usersResponse.data)
       } catch (err) {
         setError(getApiErrorMessage(err, 'Não foi possível carregar a trilha de auditoria.'))
       } finally {
@@ -107,6 +131,15 @@ export default function AuditPage() {
         filters: [
           { label: 'Ação', value: actionFilter === 'TODAS' ? 'Todas' : actionFilter },
           { label: 'Entidade', value: entityFilter === 'TODOS' ? 'Todas' : entityFilter },
+          {
+            label: 'Secretaria',
+            value:
+              organizationFilter === 'TODAS'
+                ? 'Todas as secretarias'
+                : organizationFilter === 'SEM_SECRETARIA'
+                  ? 'Sem secretaria'
+                  : organizations.find((organization) => organization.id === organizationFilter)?.name || organizationFilter,
+          },
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
@@ -133,6 +166,15 @@ export default function AuditPage() {
         filters: [
           { label: 'Ação', value: actionFilter === 'TODAS' ? 'Todas' : actionFilter },
           { label: 'Entidade', value: entityFilter === 'TODOS' ? 'Todas' : entityFilter },
+          {
+            label: 'Secretaria',
+            value:
+              organizationFilter === 'TODAS'
+                ? 'Todas as secretarias'
+                : organizationFilter === 'SEM_SECRETARIA'
+                  ? 'Sem secretaria'
+                  : organizations.find((organization) => organization.id === organizationFilter)?.name || organizationFilter,
+          },
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
@@ -159,10 +201,17 @@ export default function AuditPage() {
         <div className="filter-inline">
           <input
             className="app-input"
-            placeholder="Buscar por ator, entidade, ação ou detalhes"
+            placeholder="Buscar por ator, secretaria, entidade, ação ou detalhes"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
+          <select className="app-select" value={organizationFilter} onChange={(event) => setOrganizationFilter(event.target.value)}>
+            <option value="TODAS">Todas as secretarias</option>
+            <option value="SEM_SECRETARIA">Sem secretaria</option>
+            {organizations.map((organization) => (
+              <option key={organization.id} value={organization.id}>{organization.name}</option>
+            ))}
+          </select>
           <select className="app-select" value={actionFilter} onChange={(event) => setActionFilter(event.target.value)}>
             {actionOptions.map((option) => (
               <option key={option} value={option}>{option}</option>
@@ -226,6 +275,7 @@ export default function AuditPage() {
                         <strong>{log.actor_name}</strong>
                         <span className="muted">{log.actor_email || 'Sem e-mail'}</span>
                         <span className="muted">{getRoleLabel(log.actor_role)}</span>
+                        <span className="muted">{getActorOrganization(log).name}</span>
                       </div>
                     </td>
                     <td data-label="Detalhes">{summarizeDetails(log.details)}</td>

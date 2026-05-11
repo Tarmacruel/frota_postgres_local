@@ -131,6 +131,33 @@ function buildVehicleOrganizationLabel(vehicle) {
   return vehicle.current_location?.organization_name || 'Sem secretaria'
 }
 
+function buildVehicleReportLocationLabel(vehicle) {
+  const location = vehicle.current_location
+  if (!location) {
+    return vehicle.current_department || 'Sem lotação'
+  }
+
+  const details = [location.department_name, location.allocation_name].filter(Boolean).join(' / ')
+  return details || location.display_name || 'Sem lotação'
+}
+
+function buildVehicleReportDescription(vehicle) {
+  return [
+    `${vehicle.brand} ${vehicle.model}`.trim(),
+    getVehicleTypeLabel(vehicle.vehicle_type),
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
+
+function buildVehicleReportStatus(vehicle) {
+  return `${getOwnershipLabel(vehicle.ownership_type)}\n${getStatusLabel(vehicle.status)}`
+}
+
+function buildVehicleReportPlacement(vehicle) {
+  return `${buildVehicleOrganizationLabel(vehicle)}\n${buildVehicleReportLocationLabel(vehicle)}`
+}
+
 function buildVehicleOption(vehicle) {
   const locationLabel = buildVehicleLocationLabel(vehicle)
   return {
@@ -322,7 +349,7 @@ export default function VehiclesPage() {
     return [{ value: 'TODOS', label: 'Todas as lotações' }, ...Array.from(unique.values()).sort((a, b) => a.label.localeCompare(b.label))]
   }, [allocations, vehicles])
 
-  const exportColumns = [
+  const xlsxExportColumns = [
     { header: 'Placa', value: (vehicle) => formatPlate(vehicle.plate), align: 'center', width: 66 },
     { header: 'Chassi', value: (vehicle) => formatChassis(vehicle.chassis_number), align: 'center', width: 118 },
     { header: 'Marca / Modelo', value: (vehicle) => `${vehicle.brand}\n${vehicle.model}` },
@@ -333,6 +360,16 @@ export default function VehiclesPage() {
     { header: 'Lotação atual', value: (vehicle) => buildVehicleLocationLabel(vehicle) },
     { header: 'Condutor atual', value: (vehicle) => vehicle.current_driver_name || '—' },
     { header: 'Atualizado em', value: (vehicle) => formatDate(vehicle.updated_at), align: 'center', width: 92 },
+  ]
+
+  const pdfExportColumns = [
+    { header: 'Placa', value: (vehicle) => formatPlate(vehicle.plate), align: 'center', width: 58 },
+    { header: 'Chassi', value: (vehicle) => formatChassis(vehicle.chassis_number), align: 'center', width: 88 },
+    { header: 'Veículo', value: buildVehicleReportDescription, width: 128 },
+    { header: 'Propr. / Status', value: buildVehicleReportStatus, align: 'center', width: 82 },
+    { header: 'Secretaria / Lotação', value: buildVehicleReportPlacement, width: 244 },
+    { header: 'Condutor', value: (vehicle) => vehicle.current_driver_name || '—', width: 78 },
+    { header: 'Atualizado', value: (vehicle) => formatDate(vehicle.updated_at), align: 'center', width: 82 },
   ]
 
   async function loadVehicles() {
@@ -608,7 +645,7 @@ export default function VehiclesPage() {
         title: 'Frota PMTF - Veículos',
         fileName: 'frota-pmtf-veículos',
         subtitle: 'Relatório dos veículos filtrados no painel operacional.',
-        columns: exportColumns,
+        columns: pdfExportColumns,
         rows: filteredVehicles,
         filters: buildFilterSummary(statusFilter, ownershipFilter, organizationFilter, locationFilter, search, organizationFilterOptions, locationOptions),
         summaryMetrics: vehicleReportMetrics,
@@ -640,7 +677,7 @@ export default function VehiclesPage() {
       await exportRowsToXlsx({
         fileName: 'frota-pmtf-veículos',
         sheetName: 'Veículos',
-        columns: exportColumns,
+        columns: xlsxExportColumns,
         rows: filteredVehicles,
         filters: buildFilterSummary(statusFilter, ownershipFilter, organizationFilter, locationFilter, search, organizationFilterOptions, locationOptions),
       })

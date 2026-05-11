@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
+import SearchableSelect from '../components/SearchableSelect'
 import FuelSupplyOrderConfirmForm from '../components/FuelSupplyOrderConfirmForm'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { useAuth } from '../context/AuthContext'
+import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { previewFuelSupplyOrderDocument } from '../utils/fuelSupplyOrderDocument'
 
@@ -64,19 +66,30 @@ function getDeadlineMeta(order) {
 export default function FuelSupplyOrdersPage() {
   const { canEdit } = useAuth()
   const canConfirmOrder = canEdit('fuel_supply_orders')
+  const { organizations } = useMasterDataCatalog()
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [search, setSearch] = useState('')
+  const [organizationFilter, setOrganizationFilter] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedOrder, setSelectedOrder] = useState(null)
+
+  const organizationOptions = useMemo(
+    () => [{ value: '', label: 'Todas as secretarias' }, ...organizations.map((organization) => ({ value: organization.id, label: organization.name }))],
+    [organizations],
+  )
 
   async function loadOrders() {
     try {
       setLoading(true)
       setError('')
-      const { data } = await fuelSupplyOrdersAPI.listOpen({ limit: OPEN_ORDERS_FETCH_LIMIT, page: 1 })
+      const { data } = await fuelSupplyOrdersAPI.listOpen({
+        limit: OPEN_ORDERS_FETCH_LIMIT,
+        page: 1,
+        organization_id: organizationFilter || undefined,
+      })
       const payload = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
       setOrders(payload)
     } catch (err) {
@@ -88,7 +101,7 @@ export default function FuelSupplyOrdersPage() {
 
   useEffect(() => {
     loadOrders()
-  }, [])
+  }, [organizationFilter])
 
   const filteredOrders = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -97,6 +110,7 @@ export default function FuelSupplyOrdersPage() {
       return [
         order.request_number,
         order.vehicle_plate,
+        order.organization_name,
         order.created_by_name,
         order.created_by_contact,
         order.driver_name,
@@ -115,7 +129,7 @@ export default function FuelSupplyOrdersPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, orders.length])
+  }, [search, organizationFilter, orders.length])
 
   async function handlePreviewOrderDocument(order) {
     try {
@@ -139,9 +153,16 @@ export default function FuelSupplyOrdersPage() {
         <div className="filter-inline">
           <input
             className="app-input"
-            placeholder="Buscar por placa, solicitante, contato, condutor ou número"
+            placeholder="Buscar por placa, secretaria, solicitante, contato, condutor ou número"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
+          />
+          <SearchableSelect
+            value={organizationFilter}
+            onChange={setOrganizationFilter}
+            options={organizationOptions}
+            placeholder="Filtrar secretaria"
+            searchPlaceholder="Buscar secretaria"
           />
           <button className="ghost-button" type="button" onClick={loadOrders}>Atualizar</button>
         </div>
@@ -173,7 +194,12 @@ export default function FuelSupplyOrdersPage() {
                 return (
                   <tr key={order.id}>
                     <td data-label="Ordem">{formatOrderNumber(order)}</td>
-                    <td data-label="Veículo">{order.vehicle_plate || '-'}</td>
+                    <td data-label="Veículo">
+                      <div className="stack">
+                        <strong>{order.vehicle_plate || '-'}</strong>
+                        <span className="muted">{order.organization_name || 'Sem secretaria informada'}</span>
+                      </div>
+                    </td>
                     <td data-label="Posto">
                       <div className="stack">
                         <strong>{order.fuel_station_name || '-'}</strong>

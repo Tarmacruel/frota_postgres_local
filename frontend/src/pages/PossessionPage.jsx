@@ -10,6 +10,7 @@ import api from '../api/client'
 import { possessionAPI } from '../api/possession'
 import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
+import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 import { toDateTimeLocalValue } from '../utils/datetime'
@@ -23,6 +24,8 @@ const viewOptions = [
   { value: 'TODAS', label: 'Todas' },
   { value: 'ENCERRADAS', label: 'Encerradas' },
 ]
+
+const unassignedOrganizationFilter = 'SEM_SECRETARIA'
 
 const MAX_DOCUMENT_SIZE_BYTES = 12 * 1024 * 1024
 const MAX_PHOTO_SIZE_BYTES = 8 * 1024 * 1024
@@ -89,12 +92,13 @@ function buildEndState(record) {
 
 function buildVehicleOption(vehicle) {
   const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
+  const organizationLabel = vehicle.current_location?.organization_name || 'Sem secretaria'
   const ownershipLabel = vehicle.ownership_type === 'LOCADO' ? 'Locado' : vehicle.ownership_type === 'CEDIDO' ? 'Cedido' : 'Próprio'
   return {
     value: vehicle.id,
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
-    description: `${ownershipLabel} | ${locationLabel}`,
-    keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.chassis_number, locationLabel].filter(Boolean).join(' '),
+    description: `${ownershipLabel} | ${organizationLabel} | ${locationLabel}`,
+    keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.chassis_number, organizationLabel, locationLabel].filter(Boolean).join(' '),
   }
 }
 
@@ -113,6 +117,7 @@ export default function PossessionPage() {
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [search, setSearch] = useState('')
+  const [organizationFilter, setOrganizationFilter] = useState('')
   const [vehicleFilter, setVehicleFilter] = useState('')
   const [viewFilter, setViewFilter] = useState('ATIVAS')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
@@ -150,9 +155,34 @@ export default function PossessionPage() {
   const endReturnDocumentInputRef = useRef(null)
   const editPhotoInputRef = useRef(null)
   const focusRecordId = searchParams.get('focus')
+  const { organizations } = useMasterDataCatalog()
+
+  const organizationFilterOptions = useMemo(() => {
+    const hasUnassignedVehicles =
+      vehicles.some((vehicle) => !vehicle.current_location?.organization_id) || organizationFilter === unassignedOrganizationFilter
+
+    return [
+      { value: '', label: 'Todas as secretarias' },
+      ...organizations.map((organization) => ({ value: organization.id, label: organization.name })),
+      ...(hasUnassignedVehicles ? [{ value: unassignedOrganizationFilter, label: 'Sem secretaria' }] : []),
+    ]
+  }, [organizationFilter, organizations, vehicles])
+
+  function getRecordVehicle(record) {
+    return vehicles.find((vehicle) => vehicle.id === record.vehicle_id) || null
+  }
+
+  function getRecordOrganizationId(record) {
+    return getRecordVehicle(record)?.current_location?.organization_id || ''
+  }
+
+  function getRecordOrganizationName(record) {
+    return getRecordVehicle(record)?.current_location?.organization_name || 'Sem secretaria'
+  }
 
   const exportColumns = [
     { header: 'Veículo', value: (record) => record.vehicle_plate },
+    { header: 'Secretaria', value: (record) => getRecordOrganizationName(record) },
     { header: 'Condutor', value: (record) => record.driver_name },
     { header: 'Documento', value: (record) => record.driver_document || '-' },
     { header: 'Contato', value: (record) => record.driver_contact || '-' },
@@ -232,12 +262,19 @@ export default function PossessionPage() {
   const baseFilteredRecords = useMemo(() => {
     return records.filter((record) => {
       const term = search.trim().toLowerCase()
-      if (!term) return true
-      return [record.vehicle_plate, record.driver_name, record.driver_document, record.driver_contact, record.observation]
-        .filter(Boolean)
-        .some((value) => value.toLowerCase().includes(term))
+      const matchesSearch =
+        !term ||
+        [record.vehicle_plate, getRecordOrganizationName(record), record.driver_name, record.driver_document, record.driver_contact, record.observation]
+          .filter(Boolean)
+          .some((value) => value.toLowerCase().includes(term))
+      const recordOrganizationId = getRecordOrganizationId(record)
+      const matchesOrganization =
+        !organizationFilter ||
+        (organizationFilter === unassignedOrganizationFilter ? !recordOrganizationId : recordOrganizationId === organizationFilter)
+
+      return matchesSearch && matchesOrganization
     })
-  }, [records, search])
+  }, [organizationFilter, records, search, vehicles])
 
   const focusedRecord = focusRecordId ? records.find((record) => record.id === focusRecordId) || null : null
   const filteredRecords = focusedRecord ? [focusedRecord] : baseFilteredRecords
@@ -246,7 +283,21 @@ export default function PossessionPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, vehicleFilter, viewFilter, focusRecordId, records.length])
+  }, [search, organizationFilter, vehicleFilter, viewFilter, focusRecordId, records.length])
+
+  function buildFilterSummary() {
+    return [
+      { label: 'Status', value: viewOptions.find((option) => option.value === viewFilter)?.label || 'Todas' },
+      ...(organizationFilter ? [{
+        label: 'Secretaria',
+        value: organizationFilter === unassignedOrganizationFilter
+          ? 'Sem secretaria'
+          : organizationFilterOptions.find((option) => option.value === organizationFilter)?.label || 'Selecionada',
+      }] : []),
+      ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+      ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
+    ]
+  }
 
   function patchSearchParams(updates) {
     const next = new URLSearchParams(searchParams)
@@ -592,11 +643,7 @@ export default function PossessionPage() {
         subtitle: 'Relatório das posses filtradas no painel operacional.',
         columns: exportColumns,
         rows: filteredRecords,
-        filters: [
-          { label: 'Status', value: viewOptions.find((option) => option.value === viewFilter)?.label || 'Todas' },
-          ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
-          ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
-        ],
+        filters: buildFilterSummary(),
       })
       setFeedback('Pré-visualização do PDF de posses aberta em nova guia.')
     } catch (err) {
@@ -618,11 +665,7 @@ export default function PossessionPage() {
         sheetName: 'Posses',
         columns: exportColumns,
         rows: filteredRecords,
-        filters: [
-          { label: 'Status', value: viewOptions.find((option) => option.value === viewFilter)?.label || 'Todas' },
-          ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
-          ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
-        ],
+        filters: buildFilterSummary(),
       })
       setFeedback('Exportação de posses em XLSX iniciada com sucesso.')
     } catch (err) {
@@ -699,9 +742,16 @@ export default function PossessionPage() {
           <div className="filter-inline">
             <input
               className="app-input"
-              placeholder="Buscar por placa, condutor ou contato"
+              placeholder="Buscar por placa, secretaria, condutor ou contato"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
+            />
+            <SearchableSelect
+              value={organizationFilter}
+              onChange={setOrganizationFilter}
+              options={organizationFilterOptions}
+              placeholder="Filtrar secretaria"
+              searchPlaceholder="Buscar secretaria"
             />
             <SearchableSelect
               value={vehicleFilter}
@@ -769,7 +819,12 @@ export default function PossessionPage() {
               ) : (
                 paginatedRecords.map((record) => (
                   <tr key={record.id} className={focusedRecord?.id === record.id ? 'is-focused-row' : ''}>
-                    <td data-label="Veículo"><strong>{record.vehicle_plate}</strong></td>
+                    <td data-label="Veículo">
+                      <div className="stack">
+                        <strong>{record.vehicle_plate}</strong>
+                        <span className="muted">{getRecordOrganizationName(record)}</span>
+                      </div>
+                    </td>
                     <td data-label="Condutor">
                       <DriverBadge
                         name={record.driver_name}

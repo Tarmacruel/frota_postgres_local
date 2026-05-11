@@ -22,8 +22,24 @@ class FineService:
         self.drivers = DriverRepository(db)
         self.audit = AuditService(db)
 
-    async def list(self, *, page: int, limit: int, vehicle_id: UUID | None = None, status_filter: FineStatus | None = None, search: str | None = None) -> PaginatedResponse[dict]:
-        items, total = await self.fines.list_paginated(page=page, limit=limit, vehicle_id=vehicle_id, status=status_filter, search=search)
+    async def list(
+        self,
+        *,
+        page: int,
+        limit: int,
+        vehicle_id: UUID | None = None,
+        organization_id: UUID | None = None,
+        status_filter: FineStatus | None = None,
+        search: str | None = None,
+    ) -> PaginatedResponse[dict]:
+        items, total = await self.fines.list_paginated(
+            page=page,
+            limit=limit,
+            vehicle_id=vehicle_id,
+            organization_id=organization_id,
+            status=status_filter,
+            search=search,
+        )
         return PaginatedResponse[dict](data=[self._serialize(item) for item in items], pagination=build_pagination(page, limit, total))
 
     async def get(self, fine_id: UUID) -> dict:

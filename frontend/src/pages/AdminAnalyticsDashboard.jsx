@@ -95,6 +95,8 @@ export default function AdminAnalyticsDashboard() {
   async function handleExport() {
     const { data } = await analyticsAPI.exportReport({
       period_days: filters.period_days,
+      vehicle_type: filters.vehicle_type || undefined,
+      organization: filters.organization || undefined,
       export_format: exportConfig.format,
       include_charts: exportConfig.includeCharts,
       include_details: exportConfig.includeDetails,

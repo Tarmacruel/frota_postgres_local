@@ -8,6 +8,7 @@ import api from '../api/client'
 import { maintenanceAPI } from '../api/maintenance'
 import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
+import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 
@@ -16,6 +17,8 @@ const statusOptions = [
   { value: 'EM_ANDAMENTO', label: 'Em andamento' },
   { value: 'CONCLUÍDAS', label: 'Concluídas' },
 ]
+
+const unassignedOrganizationFilter = 'SEM_SECRETARIA'
 
 function formatDate(value) {
   if (!value) return 'Em andamento'
@@ -28,11 +31,12 @@ function formatMoney(value) {
 
 function buildVehicleOption(vehicle) {
   const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
+  const organizationLabel = vehicle.current_location?.organization_name || 'Sem secretaria'
   return {
     value: vehicle.id,
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
-    description: `${vehicle.ownership_type === 'LOCADO' ? 'Locado' : 'Próprio'} | ${locationLabel}`,
-    keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.chassis_number, locationLabel].filter(Boolean).join(' '),
+    description: `${vehicle.ownership_type === 'LOCADO' ? 'Locado' : 'Próprio'} | ${organizationLabel} | ${locationLabel}`,
+    keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.chassis_number, organizationLabel, locationLabel].filter(Boolean).join(' '),
   }
 }
 
@@ -50,6 +54,7 @@ export default function MaintenancePage() {
   const [feedback, setFeedback] = useState('')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('TODAS')
+  const [organizationFilter, setOrganizationFilter] = useState('')
   const [vehicleFilter, setVehicleFilter] = useState('')
   const [startFilter, setStartFilter] = useState('')
   const [endFilter, setEndFilter] = useState('')
@@ -57,9 +62,34 @@ export default function MaintenancePage() {
   const [editingRecord, setEditingRecord] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
   const focusRecordId = searchParams.get('focus')
+  const { organizations } = useMasterDataCatalog()
+
+  const organizationFilterOptions = useMemo(() => {
+    const hasUnassignedVehicles =
+      vehicles.some((vehicle) => !vehicle.current_location?.organization_id) || organizationFilter === unassignedOrganizationFilter
+
+    return [
+      { value: '', label: 'Todas as secretarias' },
+      ...organizations.map((organization) => ({ value: organization.id, label: organization.name })),
+      ...(hasUnassignedVehicles ? [{ value: unassignedOrganizationFilter, label: 'Sem secretaria' }] : []),
+    ]
+  }, [organizationFilter, organizations, vehicles])
+
+  function getRecordVehicle(record) {
+    return vehicles.find((vehicle) => vehicle.id === record.vehicle_id) || null
+  }
+
+  function getRecordOrganizationId(record) {
+    return getRecordVehicle(record)?.current_location?.organization_id || ''
+  }
+
+  function getRecordOrganizationName(record) {
+    return getRecordVehicle(record)?.current_location?.organization_name || 'Sem secretaria'
+  }
 
   const exportColumns = [
     { header: 'Veículo', value: (record) => record.vehicle_plate },
+    { header: 'Secretaria', value: (record) => getRecordOrganizationName(record) },
     { header: 'Início', value: (record) => formatDate(record.start_date) },
     { header: 'Conclusão', value: (record) => formatDate(record.end_date) },
     { header: 'Serviço', value: (record) => record.service_description },
@@ -122,9 +152,13 @@ export default function MaintenancePage() {
       const term = search.trim().toLowerCase()
       const matchesSearch =
         !term ||
-        [record.vehicle_plate, record.service_description, record.parts_replaced]
+        [record.vehicle_plate, getRecordOrganizationName(record), record.service_description, record.parts_replaced]
           .filter(Boolean)
           .some((value) => value.toLowerCase().includes(term))
+      const recordOrganizationId = getRecordOrganizationId(record)
+      const matchesOrganization =
+        !organizationFilter ||
+        (organizationFilter === unassignedOrganizationFilter ? !recordOrganizationId : recordOrganizationId === organizationFilter)
 
       const isOpen = !record.end_date
       const matchesStatus =
@@ -132,9 +166,9 @@ export default function MaintenancePage() {
         (statusFilter === 'EM_ANDAMENTO' && isOpen) ||
         (statusFilter === 'CONCLUÍDAS' && !isOpen)
 
-      return matchesSearch && matchesStatus
+      return matchesSearch && matchesOrganization && matchesStatus
     })
-  }, [records, search, statusFilter])
+  }, [organizationFilter, records, search, statusFilter, vehicles])
 
   const focusedRecord = focusRecordId ? records.find((record) => record.id === focusRecordId) || null : null
   const filteredRecords = focusedRecord ? [focusedRecord] : baseFilteredRecords
@@ -143,7 +177,23 @@ export default function MaintenancePage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, statusFilter, vehicleFilter, startFilter, endFilter, focusRecordId, records.length])
+  }, [search, organizationFilter, statusFilter, vehicleFilter, startFilter, endFilter, focusRecordId, records.length])
+
+  function buildFilterSummary() {
+    return [
+      { label: 'Status', value: statusOptions.find((option) => option.value === statusFilter)?.label || 'Todas' },
+      ...(organizationFilter ? [{
+        label: 'Secretaria',
+        value: organizationFilter === unassignedOrganizationFilter
+          ? 'Sem secretaria'
+          : organizationFilterOptions.find((option) => option.value === organizationFilter)?.label || 'Selecionada',
+      }] : []),
+      ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+      ...(startFilter ? [{ label: 'Início a partir de', value: formatDate(new Date(startFilter).toISOString()) }] : []),
+      ...(endFilter ? [{ label: 'Fim até', value: formatDate(new Date(endFilter).toISOString()) }] : []),
+      ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
+    ]
+  }
 
   function patchSearchParams(updates) {
     const next = new URLSearchParams(searchParams)
@@ -195,13 +245,7 @@ export default function MaintenancePage() {
         subtitle: 'Relatório das manutenções filtradas no painel operacional.',
         columns: exportColumns,
         rows: filteredRecords,
-        filters: [
-          { label: 'Status', value: statusOptions.find((option) => option.value === statusFilter)?.label || 'Todas' },
-          ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
-          ...(startFilter ? [{ label: 'Início a partir de', value: formatDate(new Date(startFilter).toISOString()) }] : []),
-          ...(endFilter ? [{ label: 'Fim até', value: formatDate(new Date(endFilter).toISOString()) }] : []),
-          ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
-        ],
+        filters: buildFilterSummary(),
       })
       setFeedback('Pré-visualização do PDF de manutenções aberta em nova guia.')
     } catch (err) {
@@ -223,11 +267,7 @@ export default function MaintenancePage() {
         sheetName: 'Manutenções',
         columns: exportColumns,
         rows: filteredRecords,
-        filters: [
-          { label: 'Status', value: statusOptions.find((option) => option.value === statusFilter)?.label || 'Todas' },
-          ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
-          ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
-        ],
+        filters: buildFilterSummary(),
       })
       setFeedback('Exportação de manutenções em XLSX iniciada com sucesso.')
     } catch (err) {
@@ -273,9 +313,16 @@ export default function MaintenancePage() {
           <div className="filter-inline">
             <input
               className="app-input"
-              placeholder="Buscar por placa, serviço ou peças"
+              placeholder="Buscar por placa, secretaria, serviço ou peças"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
+            />
+            <SearchableSelect
+              value={organizationFilter}
+              onChange={setOrganizationFilter}
+              options={organizationFilterOptions}
+              placeholder="Filtrar secretaria"
+              searchPlaceholder="Buscar secretaria"
             />
             <SearchableSelect
               value={vehicleFilter}
@@ -347,7 +394,12 @@ export default function MaintenancePage() {
               ) : (
                 paginatedRecords.map((record) => (
                   <tr key={record.id} className={focusedRecord?.id === record.id ? 'is-focused-row' : ''}>
-                    <td data-label="Veículo"><strong>{record.vehicle_plate}</strong></td>
+                    <td data-label="Veículo">
+                      <div className="stack">
+                        <strong>{record.vehicle_plate}</strong>
+                        <span className="muted">{getRecordOrganizationName(record)}</span>
+                      </div>
+                    </td>
                     <td data-label="Início">{formatDate(record.start_date)}</td>
                     <td data-label="Conclusão">{formatDate(record.end_date)}</td>
                     <td data-label="Serviço">

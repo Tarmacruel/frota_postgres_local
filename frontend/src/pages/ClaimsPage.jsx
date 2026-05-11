@@ -6,6 +6,7 @@ import SearchableSelect from '../components/SearchableSelect'
 import { claimsAPI } from '../api/claims'
 import { vehiclesAPI } from '../api/vehicles'
 import { useAuth } from '../context/AuthContext'
+import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 
@@ -43,14 +44,26 @@ export default function ClaimsPage() {
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [search, setSearch] = useState('')
+  const [organizationFilter, setOrganizationFilter] = useState('')
   const [vehicleFilter, setVehicleFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('TODOS')
   const [typeFilter, setTypeFilter] = useState('TODOS')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState(null)
+  const { organizations } = useMasterDataCatalog()
+
+  const organizationOptions = organizations.map((organization) => ({
+    value: organization.id,
+    label: organization.name,
+  }))
+
+  function getVehicleOrganizationName(vehicleId) {
+    return vehicles.find((vehicle) => vehicle.id === vehicleId)?.current_location?.organization_name || 'Sem secretaria'
+  }
 
   const exportColumns = [
     { header: 'Veículo', value: (item) => item.vehicle_plate },
+    { header: 'Secretaria', value: (item) => getVehicleOrganizationName(item.vehicle_id) },
     { header: 'Condutor', value: (item) => item.driver_name || '-' },
     { header: 'Data', value: (item) => formatDate(item.data_ocorrencia) },
     { header: 'Tipo', value: (item) => item.tipo },
@@ -72,6 +85,7 @@ export default function ClaimsPage() {
         page,
         limit: 10,
         vehicle_id: vehicleFilter || undefined,
+        organization_id: organizationFilter || undefined,
         status: statusFilter !== 'TODOS' ? statusFilter : undefined,
         tipo: typeFilter !== 'TODOS' ? typeFilter : undefined,
         search: search || undefined,
@@ -91,7 +105,7 @@ export default function ClaimsPage() {
 
   useEffect(() => {
     loadClaims(1)
-  }, [vehicleFilter, statusFilter, typeFilter, search])
+  }, [organizationFilter, vehicleFilter, statusFilter, typeFilter, search])
 
   async function handlePreviewPdf() {
     if (!records.length) return
@@ -104,6 +118,7 @@ export default function ClaimsPage() {
       filters: [
         { label: 'Status', value: statusFilter },
         { label: 'Tipo', value: typeFilter },
+        ...(organizationFilter ? [{ label: 'Secretaria', value: organizationOptions.find((item) => item.value === organizationFilter)?.label || 'Selecionada' }] : []),
         ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
         ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
       ],
@@ -120,6 +135,7 @@ export default function ClaimsPage() {
       filters: [
         { label: 'Status', value: statusFilter },
         { label: 'Tipo', value: typeFilter },
+        ...(organizationFilter ? [{ label: 'Secretaria', value: organizationOptions.find((item) => item.value === organizationFilter)?.label || 'Selecionada' }] : []),
         ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
       ],
     })
@@ -143,6 +159,13 @@ export default function ClaimsPage() {
         <div className="toolbar-row">
           <div className="filter-inline">
             <input className="app-input" placeholder="Buscar por descrição, local ou BO" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <SearchableSelect
+              value={organizationFilter}
+              onChange={setOrganizationFilter}
+              options={[{ value: '', label: 'Todas as secretarias' }, ...organizationOptions]}
+              placeholder="Filtrar secretaria"
+              searchPlaceholder="Buscar secretaria"
+            />
             <SearchableSelect
               value={vehicleFilter}
               onChange={setVehicleFilter}
@@ -193,7 +216,12 @@ export default function ClaimsPage() {
               ) : (
                 records.map((record) => (
                   <tr key={record.id}>
-                    <td data-label="Veículo"><strong>{record.vehicle_plate}</strong></td>
+                    <td data-label="Veículo">
+                      <div className="stack">
+                        <strong>{record.vehicle_plate}</strong>
+                        <span className="muted">{getVehicleOrganizationName(record.vehicle_id)}</span>
+                      </div>
+                    </td>
                     <td data-label="Condutor">{record.driver_name || '-'}</td>
                     <td data-label="Data">{formatDate(record.data_ocorrencia)}</td>
                     <td data-label="Tipo">{record.tipo}</td>

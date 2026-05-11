@@ -15,7 +15,9 @@ from app.models.driver import Driver
 from app.models.fine import Fine
 from app.models.fleet_analytics_snapshot import FleetAnalyticsSnapshot
 from app.models.fuel_supply import FuelSupply
+from app.models.location_history import LocationHistory
 from app.models.maintenance import MaintenanceRecord
+from app.models.master_data import Allocation, Department
 from app.models.vehicle import Vehicle, VehicleStatus
 from app.repositories.analytics_repository import AnalyticsRepository
 
@@ -97,6 +99,48 @@ class AnalyticsService:
                 continue
             unique.setdefault(row.driver_id, row)
         return list(unique.values())
+
+    async def _vehicle_ids_for_organization(self, organization_id: UUID | None) -> set[UUID] | None:
+        if not organization_id:
+            return None
+
+        result = await self.db.execute(
+            select(LocationHistory.vehicle_id)
+            .join(Allocation, Allocation.id == LocationHistory.allocation_id)
+            .join(Department, Department.id == Allocation.department_id)
+            .where(
+                LocationHistory.end_date.is_(None),
+                Department.organization_id == organization_id,
+            )
+        )
+        return set(result.scalars().all())
+
+    async def _driver_ids_for_organization(self, organization_id: UUID | None) -> set[UUID] | None:
+        if not organization_id:
+            return None
+
+        result = await self.db.execute(select(Driver.id).where(Driver.organization_id == organization_id))
+        return set(result.scalars().all())
+
+    async def _filter_vehicle_snapshots_by_organization(
+        self,
+        rows: list[FleetAnalyticsSnapshot],
+        organization_id: UUID | None,
+    ) -> list[FleetAnalyticsSnapshot]:
+        vehicle_ids = await self._vehicle_ids_for_organization(organization_id)
+        if vehicle_ids is None:
+            return rows
+        return [row for row in rows if row.vehicle_id in vehicle_ids]
+
+    async def _filter_driver_snapshots_by_organization(
+        self,
+        rows: list[FleetAnalyticsSnapshot],
+        organization_id: UUID | None,
+    ) -> list[FleetAnalyticsSnapshot]:
+        driver_ids = await self._driver_ids_for_organization(organization_id)
+        if driver_ids is None:
+            return rows
+        return [row for row in rows if row.driver_id in driver_ids]
 
     async def _ensure_snapshots(self, period_days: int) -> list[FleetAnalyticsSnapshot]:
         period_start, period_end = self._period_bounds(period_days)
@@ -277,10 +321,17 @@ class AnalyticsService:
         await self.db.commit()
         return snapshots
 
-    async def overview(self, period_days: int) -> dict:
+    async def overview(self, period_days: int, organization_id: UUID | None = None) -> dict:
         snapshots = await self._ensure_snapshots(period_days)
-        vehicle_rows = self._unique_vehicle_snapshots(snapshots)
-        insights = self._build_insights(vehicle_rows, self._unique_driver_snapshots(snapshots))
+        vehicle_rows = await self._filter_vehicle_snapshots_by_organization(
+            self._unique_vehicle_snapshots(snapshots),
+            organization_id,
+        )
+        driver_rows = await self._filter_driver_snapshots_by_organization(
+            self._unique_driver_snapshots(snapshots),
+            organization_id,
+        )
+        insights = self._build_insights(vehicle_rows, driver_rows)
         consumptions = [item.consumption_l_100km for item in vehicle_rows if item.consumption_l_100km is not None]
         tcos = [item.tco_cost_per_km for item in vehicle_rows if item.tco_cost_per_km is not None]
 
@@ -293,8 +344,16 @@ class AnalyticsService:
             "generated_at": datetime.now(timezone.utc),
         }
 
-    async def efficiency(self, period_days: int, vehicle_type: str | None = None) -> list[dict]:
-        rows = self._unique_vehicle_snapshots(await self._ensure_snapshots(period_days))
+    async def efficiency(
+        self,
+        period_days: int,
+        vehicle_type: str | None = None,
+        organization_id: UUID | None = None,
+    ) -> list[dict]:
+        rows = await self._filter_vehicle_snapshots_by_organization(
+            self._unique_vehicle_snapshots(await self._ensure_snapshots(period_days)),
+            organization_id,
+        )
         if vehicle_type:
             rows = [row for row in rows if row.vehicle_type == vehicle_type]
         payload = []
@@ -313,8 +372,16 @@ class AnalyticsService:
             )
         return sorted(payload, key=lambda item: (item["variance_percentage"] or 0), reverse=True)
 
-    async def tco(self, period_days: int, vehicle_type: str | None = None) -> list[dict]:
-        rows = self._unique_vehicle_snapshots(await self._ensure_snapshots(period_days))
+    async def tco(
+        self,
+        period_days: int,
+        vehicle_type: str | None = None,
+        organization_id: UUID | None = None,
+    ) -> list[dict]:
+        rows = await self._filter_vehicle_snapshots_by_organization(
+            self._unique_vehicle_snapshots(await self._ensure_snapshots(period_days)),
+            organization_id,
+        )
         if vehicle_type:
             rows = [row for row in rows if row.vehicle_type == vehicle_type]
 
@@ -334,8 +401,11 @@ class AnalyticsService:
             )
         return sorted(payload, key=lambda item: (item["tco_cost_per_km"] or 0), reverse=True)
 
-    async def driver_risk(self, period_days: int) -> list[dict]:
-        rows = self._unique_driver_snapshots(await self._ensure_snapshots(period_days))
+    async def driver_risk(self, period_days: int, organization_id: UUID | None = None) -> list[dict]:
+        rows = await self._filter_driver_snapshots_by_organization(
+            self._unique_driver_snapshots(await self._ensure_snapshots(period_days)),
+            organization_id,
+        )
         payload = []
         for row in rows:
             extra = row.extra_payload or {}
@@ -424,18 +494,39 @@ class AnalyticsService:
         severity_rank = {"CRITICAL": 0, "HIGH": 1, "MEDIUM": 2}
         return sorted(insights, key=lambda item: severity_rank.get(item["severity"], 99))
 
-    async def insights(self, period_days: int) -> list[dict]:
+    async def insights(
+        self,
+        period_days: int,
+        vehicle_type: str | None = None,
+        organization_id: UUID | None = None,
+    ) -> list[dict]:
         rows = await self._ensure_snapshots(period_days)
-        return self._build_insights(
+        vehicle_rows = await self._filter_vehicle_snapshots_by_organization(
             self._unique_vehicle_snapshots(rows),
+            organization_id,
+        )
+        if vehicle_type:
+            vehicle_rows = [row for row in vehicle_rows if row.vehicle_type == vehicle_type]
+        driver_rows = await self._filter_driver_snapshots_by_organization(
             self._unique_driver_snapshots(rows),
+            organization_id,
+        )
+        return self._build_insights(
+            vehicle_rows,
+            driver_rows,
         )
 
 
-    async def costs_trend(self, months: int = 12, vehicle_type: str | None = None) -> list[dict]:
+    async def costs_trend(
+        self,
+        months: int = 12,
+        vehicle_type: str | None = None,
+        organization_id: UUID | None = None,
+    ) -> list[dict]:
         now = datetime.now(timezone.utc)
         month_end = now.replace(day=1, hour=0, minute=0, second=0, microsecond=0)
         timeline: list[dict] = []
+        organization_vehicle_ids = await self._vehicle_ids_for_organization(organization_id)
 
         for offset in range(months - 1, -1, -1):
             month_start = (month_end - timedelta(days=offset * 31)).replace(day=1)
@@ -463,6 +554,11 @@ class AnalyticsService:
                 maint_stmt = maint_stmt.join(Vehicle, Vehicle.id == MaintenanceRecord.vehicle_id).where(*vehicle_filter)
                 fine_stmt = fine_stmt.join(Vehicle, Vehicle.id == Fine.vehicle_id).where(*vehicle_filter)
 
+            if organization_vehicle_ids is not None:
+                fuel_stmt = fuel_stmt.where(FuelSupply.vehicle_id.in_(organization_vehicle_ids))
+                maint_stmt = maint_stmt.where(MaintenanceRecord.vehicle_id.in_(organization_vehicle_ids))
+                fine_stmt = fine_stmt.where(Fine.vehicle_id.in_(organization_vehicle_ids))
+
             fuel_cost = float((await self.db.execute(fuel_stmt)).scalar_one() or 0)
             maintenance_cost = float((await self.db.execute(maint_stmt)).scalar_one() or 0)
             fines_cost = float((await self.db.execute(fine_stmt)).scalar_one() or 0)
@@ -480,11 +576,17 @@ class AnalyticsService:
 
         return timeline
 
-    async def export(self, period_days: int, export_format: str) -> Response:
+    async def export(
+        self,
+        period_days: int,
+        export_format: str,
+        vehicle_type: str | None = None,
+        organization_id: UUID | None = None,
+    ) -> Response:
         if export_format not in {"pdf", "xlsx"}:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Formato de exportação suportado: pdf ou xlsx")
 
-        insights = await self.insights(period_days)
+        insights = await self.insights(period_days, vehicle_type=vehicle_type, organization_id=organization_id)
         timestamp = datetime.now(timezone.utc)
         if export_format == "xlsx":
             headers = "metric,severity,current_value,category_average,variance_percentage,recommended_action\n"

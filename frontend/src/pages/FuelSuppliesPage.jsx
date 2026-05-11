@@ -84,7 +84,7 @@ export default function FuelSuppliesPage() {
   const [organizations, setOrganizations] = useState([])
   const [fuelStations, setFuelStations] = useState([])
   const [filters, setFilters] = useState({ vehicle_id: '', driver_id: '', organization_id: '', fuel_station_id: '', only_anomalies: '' })
-  const [orderFilters, setOrderFilters] = useState({ status: 'TODOS', fuel_station_id: '' })
+  const [orderFilters, setOrderFilters] = useState({ status: 'TODOS', organization_id: '', fuel_station_id: '' })
   const [search, setSearch] = useState('')
   const [orderSearch, setOrderSearch] = useState('')
   const [historyLoading, setHistoryLoading] = useState(true)
@@ -146,6 +146,7 @@ export default function FuelSuppliesPage() {
       setError('')
       const params = { limit: 100, page: 1 }
       if (orderFilters.status !== 'TODOS') params.status = orderFilters.status
+      if (orderFilters.organization_id) params.organization_id = orderFilters.organization_id
       if (orderFilters.fuel_station_id) params.fuel_station_id = orderFilters.fuel_station_id
       const { data } = await fuelSupplyOrdersAPI.list(params)
       setOrders(asArray(data))
@@ -207,7 +208,7 @@ export default function FuelSuppliesPage() {
     { header: 'Posto', value: (order) => order.fuel_station_name || '-' },
     { header: 'Telefone posto', value: (order) => order.fuel_station_phone || '-' },
     { header: 'Localização posto', value: (order) => order.fuel_station_maps_url || buildOrderMapsUrl(order) || '-' },
-    { header: 'Órgão', value: (order) => order.organization_name || '-' },
+    { header: 'Secretaria', value: (order) => order.organization_name || '-' },
     { header: 'Solicitante', value: (order) => order.created_by_name || '-' },
     { header: 'Contato emissor', value: (order) => order.created_by_contact || '-' },
     { header: 'Contato motorista', value: (order) => order.driver_contact || '-' },
@@ -216,6 +217,16 @@ export default function FuelSuppliesPage() {
     { header: 'Valor máximo', value: (order) => formatCurrency(order.max_amount) },
     { header: 'Código público', value: (order) => order.validation_code || '-' },
   ], [])
+
+  const orderPdfExportColumns = useMemo(
+    () => orderExportColumns.filter((column) => column.header !== 'Localização posto'),
+    [orderExportColumns],
+  )
+
+  const organizationFilterOptions = useMemo(
+    () => [{ value: '', label: 'Todas as secretarias' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))],
+    [organizations],
+  )
 
   useEffect(() => {
     setCurrentHistoryPage(1)
@@ -259,10 +270,11 @@ export default function FuelSuppliesPage() {
         title: 'Frota PMTF - Ordens de abastecimento',
         fileName: 'frota-pmtf-ordens-abastecimento',
         subtitle: 'Relatório institucional das ordens emitidas para os postos credenciados.',
-        columns: orderExportColumns,
+        columns: orderPdfExportColumns,
         rows: filteredOrders,
         filters: [
           { label: 'Situação', value: orderFilters.status === 'TODOS' ? 'Todas as situações' : getOrderStatusLabel(orderFilters.status) },
+          { label: 'Secretaria', value: organizations.find((org) => org.id === orderFilters.organization_id)?.name || 'Todas as secretarias' },
           { label: 'Posto', value: fuelStations.find((station) => station.id === orderFilters.fuel_station_id)?.name || 'Todos os postos' },
           ...(orderSearch.trim() ? [{ label: 'Busca', value: orderSearch.trim() }] : []),
         ],
@@ -295,6 +307,7 @@ export default function FuelSuppliesPage() {
         rows: filteredOrders,
         filters: [
           { label: 'Situação', value: orderFilters.status === 'TODOS' ? 'Todas as situações' : getOrderStatusLabel(orderFilters.status) },
+          { label: 'Secretaria', value: organizations.find((org) => org.id === orderFilters.organization_id)?.name || 'Todas as secretarias' },
           { label: 'Posto', value: fuelStations.find((station) => station.id === orderFilters.fuel_station_id)?.name || 'Todos os postos' },
           ...(orderSearch.trim() ? [{ label: 'Busca', value: orderSearch.trim() }] : []),
         ],
@@ -350,7 +363,7 @@ export default function FuelSuppliesPage() {
 
   function clearOrderFilters() {
     setOrderSearch('')
-    setOrderFilters({ status: 'TODOS', fuel_station_id: '' })
+    setOrderFilters({ status: 'TODOS', organization_id: '', fuel_station_id: '' })
   }
 
   return (
@@ -418,12 +431,19 @@ export default function FuelSuppliesPage() {
         </div>
 
         <div className="filter-inline">
-          <input className="app-input" placeholder="Buscar ordem por placa, posto, contato, solicitante ou observação" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} />
+          <input className="app-input" placeholder="Buscar ordem por placa, secretaria, posto, contato, solicitante ou observação" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} />
           <select className="app-select" value={orderFilters.status} onChange={(event) => setOrderFilters((prev) => ({ ...prev, status: event.target.value }))}>
             {ORDER_STATUS_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
+          <SearchableSelect
+            value={orderFilters.organization_id}
+            onChange={(value) => setOrderFilters((prev) => ({ ...prev, organization_id: value }))}
+            options={organizationFilterOptions}
+            placeholder="Filtrar secretaria"
+            searchPlaceholder="Buscar secretaria"
+          />
           <SearchableSelect
             value={orderFilters.fuel_station_id}
             onChange={(value) => setOrderFilters((prev) => ({ ...prev, fuel_station_id: value }))}
@@ -482,7 +502,7 @@ export default function FuelSuppliesPage() {
                   <td data-label="Solicitante">
                     <div className="stack">
                       <strong>{order.created_by_name || '-'}</strong>
-                      <span className="muted">{order.organization_name || 'Sem órgão informado'}</span>
+                      <span className="muted">{order.organization_name || 'Sem secretaria informada'}</span>
                       <span className="muted">Contato: {order.created_by_contact || 'Não informado'}</span>
                     </div>
                   </td>
@@ -513,10 +533,10 @@ export default function FuelSuppliesPage() {
         </div>
 
         <div className="filter-inline" style={{ marginBottom: 12 }}>
-          <input className="app-input" placeholder="Buscar por placa, condutor, órgão ou posto" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <input className="app-input" placeholder="Buscar por placa, condutor, secretaria ou posto" value={search} onChange={(event) => setSearch(event.target.value)} />
           <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(buildVehicleOption)]} placeholder="Filtrar veículo" />
           <SearchableSelect value={filters.driver_id} onChange={(value) => setFilters((prev) => ({ ...prev, driver_id: value }))} options={[{ value: '', label: 'Todos os condutores' }, ...drivers.map((driver) => ({ value: driver.id, label: driver.nome_completo }))]} placeholder="Filtrar condutor" />
-          <SearchableSelect value={filters.organization_id} onChange={(value) => setFilters((prev) => ({ ...prev, organization_id: value }))} options={[{ value: '', label: 'Todos os órgãos' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))]} placeholder="Filtrar órgão" />
+          <SearchableSelect value={filters.organization_id} onChange={(value) => setFilters((prev) => ({ ...prev, organization_id: value }))} options={organizationFilterOptions} placeholder="Filtrar secretaria" />
           <SearchableSelect value={filters.fuel_station_id} onChange={(value) => setFilters((prev) => ({ ...prev, fuel_station_id: value }))} options={[{ value: '', label: 'Todos os postos' }, ...fuelStations.map(buildStationOption)]} placeholder="Filtrar posto" />
           <select className="app-input" value={filters.only_anomalies} onChange={(event) => setFilters((prev) => ({ ...prev, only_anomalies: event.target.value }))}>
             <option value="">Todos</option>
@@ -532,7 +552,7 @@ export default function FuelSuppliesPage() {
                 <th>Veículo</th>
                 <th>Data</th>
                 <th>Condutor</th>
-                <th>Órgão</th>
+                <th>Secretaria</th>
                 <th>Posto</th>
                 <th>Litros</th>
                 <th>Km/l</th>
@@ -548,7 +568,7 @@ export default function FuelSuppliesPage() {
                   <td data-label="Veículo">{record.vehicle_plate}</td>
                   <td data-label="Data">{formatDate(record.supplied_at)}</td>
                   <td data-label="Condutor">{record.driver_name || '-'}</td>
-                  <td data-label="Órgão">{record.organization_name || '-'}</td>
+                  <td data-label="Secretaria">{record.organization_name || '-'}</td>
                   <td data-label="Posto">{record.fuel_station_name || record.fuel_station || '-'}</td>
                   <td data-label="Litros">{formatNumber(record.liters)}</td>
                   <td data-label="Km/l">{formatNumber(record.consumption_km_l)}</td>

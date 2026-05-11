@@ -17,11 +17,19 @@ async def list_fines(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),
     vehicle_id: UUID | None = Query(default=None),
+    organization_id: UUID | None = Query(default=None),
     status_filter: FineStatus | None = Query(default=None, alias="status"),
     search: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
 ):
-    return await FineService(db).list(page=page, limit=limit, vehicle_id=vehicle_id, status_filter=status_filter, search=search)
+    return await FineService(db).list(
+        page=page,
+        limit=limit,
+        vehicle_id=vehicle_id,
+        organization_id=organization_id,
+        status_filter=status_filter,
+        search=search,
+    )
 
 
 @router.get("/{fine_id}", response_model=FineOut, dependencies=[Depends(require_permission("fines", "view"))])

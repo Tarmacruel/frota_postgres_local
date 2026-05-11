@@ -14,7 +14,7 @@ function buildFilterChips(filters, organizations, vehicleTypeOptions) {
 
   if (filters.organization) {
     const org = organizations.find((item) => String(item.id) === String(filters.organization))
-    chips.push({ key: 'organization', label: `Órgão: ${org?.name || filters.organization}`, clearTo: '' })
+    chips.push({ key: 'organization', label: `Secretaria: ${org?.name || filters.organization}`, clearTo: '' })
   }
 
   return chips
@@ -42,7 +42,7 @@ export default function AdvancedFilters({ filters, organizations = [], loading =
   ]
 
   const organizationOptions = [
-    { value: '', label: 'Todos os órgãos' },
+    { value: '', label: 'Todas as secretarias' },
     ...organizations.map((org) => ({
       value: org.id,
       label: org.name,
@@ -89,15 +89,15 @@ export default function AdvancedFilters({ filters, organizations = [], loading =
           </label>
 
           <label className="analytics-filter-field">
-            <span>Órgão</span>
+            <span>Secretaria</span>
             <SearchableSelect
               value={filters.organization}
               options={organizationOptions}
               onChange={(value) => onChange('organization', value)}
-              searchPlaceholder="Buscar órgão"
-              placeholder="Selecione um órgão"
+              searchPlaceholder="Buscar secretaria"
+              placeholder="Selecione uma secretaria"
               allowClear
-              clearLabel="Limpar órgão"
+              clearLabel="Limpar secretaria"
             />
           </label>
         </div>

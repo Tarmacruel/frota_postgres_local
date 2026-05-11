@@ -5,6 +5,8 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.models.fine import Fine, FineStatus
+from app.models.location_history import LocationHistory
+from app.models.master_data import Allocation, Department
 
 
 class FineRepository:
@@ -21,6 +23,7 @@ class FineRepository:
         page: int,
         limit: int,
         vehicle_id: UUID | None = None,
+        organization_id: UUID | None = None,
         status: FineStatus | None = None,
         search: str | None = None,
     ) -> tuple[list[Fine], int]:
@@ -30,6 +33,21 @@ class FineRepository:
         if vehicle_id:
             stmt = stmt.where(Fine.vehicle_id == vehicle_id)
             count_stmt = count_stmt.where(Fine.vehicle_id == vehicle_id)
+        if organization_id:
+            stmt = (
+                stmt
+                .join(LocationHistory, (LocationHistory.vehicle_id == Fine.vehicle_id) & LocationHistory.end_date.is_(None))
+                .join(Allocation, Allocation.id == LocationHistory.allocation_id)
+                .join(Department, Department.id == Allocation.department_id)
+                .where(Department.organization_id == organization_id)
+            )
+            count_stmt = (
+                count_stmt
+                .join(LocationHistory, (LocationHistory.vehicle_id == Fine.vehicle_id) & LocationHistory.end_date.is_(None))
+                .join(Allocation, Allocation.id == LocationHistory.allocation_id)
+                .join(Department, Department.id == Allocation.department_id)
+                .where(Department.organization_id == organization_id)
+            )
         if status:
             stmt = stmt.where(Fine.status == status)
             count_stmt = count_stmt.where(Fine.status == status)
