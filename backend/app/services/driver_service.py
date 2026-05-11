@@ -7,6 +7,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.driver import Driver
 from app.models.user import User
 from app.repositories.driver_repository import DriverRepository
+from app.repositories.master_data_repository import MasterDataRepository
 from app.schemas.common import PaginatedResponse, build_pagination
 from app.schemas.driver import DriverCreate, DriverUpdate
 from app.services.audit_service import AuditService
@@ -16,10 +17,25 @@ class DriverService:
     def __init__(self, db: AsyncSession):
         self.db = db
         self.drivers = DriverRepository(db)
+        self.master_data = MasterDataRepository(db)
         self.audit = AuditService(db)
 
-    async def list(self, *, page: int, limit: int, search: str | None = None, active_only: bool | None = None) -> PaginatedResponse[dict]:
-        items, total = await self.drivers.list_paginated(page=page, limit=limit, search=search, active_only=active_only)
+    async def list(
+        self,
+        *,
+        page: int,
+        limit: int,
+        search: str | None = None,
+        active_only: bool | None = None,
+        organization_id: UUID | None = None,
+    ) -> PaginatedResponse[dict]:
+        items, total = await self.drivers.list_paginated(
+            page=page,
+            limit=limit,
+            search=search,
+            active_only=active_only,
+            organization_id=organization_id,
+        )
         return PaginatedResponse[dict](data=[self._serialize(item) for item in items], pagination=build_pagination(page, limit, total))
 
     async def list_active(self, *, search: str | None = None, limit: int = 100) -> list[dict]:
@@ -34,7 +50,9 @@ class DriverService:
 
     async def create(self, data: DriverCreate, current_user: User) -> dict:
         await self._ensure_unique_document(data.documento)
+        organization = await self._require_organization(data.organization_id)
         driver = Driver(**data.model_dump())
+        driver.organization = organization
         try:
             await self.drivers.create(driver)
             await self.audit.record(
@@ -45,6 +63,8 @@ class DriverService:
                 entity_label=driver.nome_completo,
                 details={
                     "documento": driver.documento,
+                    "organization_id": str(driver.organization_id) if driver.organization_id else None,
+                    "organization_name": driver.organization_name,
                     "contato": driver.contato,
                     "email": driver.email,
                     "cnh_categoria": driver.cnh_categoria.value,
@@ -56,7 +76,7 @@ class DriverService:
         except IntegrityError as exc:
             await self.db.rollback()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível cadastrar o condutor") from exc
-        return self._serialize(driver)
+        return await self.get(driver.id)
 
     async def update(self, driver_id: UUID, data: DriverUpdate, current_user: User) -> dict:
         driver = await self.drivers.get_by_id(driver_id)
@@ -66,10 +86,16 @@ class DriverService:
         payload = data.model_dump(exclude_unset=True)
         if "documento" in payload and payload["documento"] != driver.documento:
             await self._ensure_unique_document(payload["documento"], exclude_id=driver.id)
+        next_organization = None
+        if "organization_id" in payload:
+            next_organization = await self._require_organization(payload["organization_id"]) if payload["organization_id"] else None
+            payload["organization_id"] = next_organization.id if next_organization else None
 
         before = self._serialize(driver)
         for field, value in payload.items():
             setattr(driver, field, value)
+        if "organization_id" in payload:
+            driver.organization = next_organization
 
         try:
             await self.audit.record(
@@ -85,7 +111,7 @@ class DriverService:
         except IntegrityError as exc:
             await self.db.rollback()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar o condutor") from exc
-        return self._serialize(driver)
+        return await self.get(driver.id)
 
     async def deactivate(self, driver_id: UUID, current_user: User) -> None:
         driver = await self.drivers.get_by_id(driver_id)
@@ -120,11 +146,19 @@ class DriverService:
         if existing:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Documento já cadastrado para outro condutor ativo")
 
+    async def _require_organization(self, organization_id: UUID):
+        organization = await self.master_data.get_organization(organization_id)
+        if not organization:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Secretaria não encontrada")
+        return organization
+
     def _serialize(self, driver: Driver) -> dict:
         return {
             "id": driver.id,
             "nome_completo": driver.nome_completo,
             "documento": driver.documento,
+            "organization_id": driver.organization_id,
+            "organization_name": driver.organization_name,
             "contato": driver.contato,
             "email": driver.email,
             "cnh_categoria": driver.cnh_categoria,

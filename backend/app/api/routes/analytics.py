@@ -3,7 +3,7 @@ from __future__ import annotations
 from fastapi import APIRouter, Depends, Query
 from fastapi.responses import Response
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import require_admin
+from app.api.deps import require_permission
 from app.db.session import get_db_session
 from app.schemas.analytics import (
     AnalyticsEfficiencyItem,
@@ -15,7 +15,7 @@ from app.schemas.analytics import (
 )
 from app.services.analytics_service import AnalyticsService
 
-router = APIRouter(prefix="/api/analytics", tags=["Analytics"], dependencies=[Depends(require_admin)])
+router = APIRouter(prefix="/api/analytics", tags=["Analytics"], dependencies=[Depends(require_permission("analytics", "view"))])
 
 
 @router.get("/overview", response_model=AnalyticsOverviewResponse)

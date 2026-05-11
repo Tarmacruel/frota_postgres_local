@@ -6,6 +6,7 @@ import { getApiErrorMessage } from '../utils/apiError'
 import api from '../api/client'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 import { formatCnpjInput } from '../utils/fuelSupplyOrders'
+import { useAuth } from '../context/AuthContext'
 
 const initialStationForm = { id: null, name: '', cnpj: '', address: '', phone: '', latitude: '', longitude: '', active: true }
 
@@ -39,6 +40,10 @@ function formatFormCoordinate(value) {
 }
 
 export default function FuelStationsPage() {
+  const { canCreate, canEdit, canDeleteModule, isAdmin } = useAuth()
+  const canCreateStation = canCreate('fuel_stations')
+  const canEditStation = canEdit('fuel_stations')
+  const canDeleteStation = canDeleteModule('fuel_stations')
   const [stations, setStations] = useState([])
   const [users, setUsers] = useState([])
   const [selectedStationId, setSelectedStationId] = useState('')
@@ -106,7 +111,7 @@ export default function FuelStationsPage() {
       try {
         setLoading(true)
         setError('')
-        await Promise.all([loadStations(), loadUsers()])
+        await Promise.all([loadStations(), isAdmin ? loadUsers() : Promise.resolve()])
       } catch (err) {
         setError(getApiErrorMessage(err, 'Não foi possível carregar postos e usuários.'))
       } finally {
@@ -117,8 +122,12 @@ export default function FuelStationsPage() {
   }, [])
 
   useEffect(() => {
+    if (!isAdmin) {
+      setLinks([])
+      return
+    }
     loadLinks(selectedStationId).catch((err) => setError(getApiErrorMessage(err, 'Não foi possível carregar vínculos do posto.')))
-  }, [selectedStationId])
+  }, [selectedStationId, isAdmin])
 
   function openCreateModal() {
     setStationForm(initialStationForm)
@@ -154,6 +163,10 @@ export default function FuelStationsPage() {
 
   async function saveStation(event) {
     event.preventDefault()
+    if ((stationForm.id && !canEditStation) || (!stationForm.id && !canCreateStation)) {
+      setError('Você não tem permissão para salvar postos.')
+      return
+    }
     try {
       setSubmitting(true)
       setError('')
@@ -183,6 +196,10 @@ export default function FuelStationsPage() {
   }
 
   async function removeStation(stationId) {
+    if (!canDeleteStation) {
+      setError('Você não tem permissão para excluir postos.')
+      return
+    }
     if (!window.confirm('Excluir este posto de combustível?')) return
 
     try {
@@ -297,7 +314,7 @@ export default function FuelStationsPage() {
           <p className="section-copy">Cadastro administrativo de postos credenciados, relatórios institucionais e vínculos de usuários.</p>
         </div>
         <div className="actions-inline">
-          <button className="app-button" type="button" onClick={openCreateModal}>Novo posto</button>
+          {canCreateStation ? <button className="app-button" type="button" onClick={openCreateModal}>Novo posto</button> : null}
           <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
@@ -333,10 +350,10 @@ export default function FuelStationsPage() {
           <strong>{stations.filter((station) => !station.active).length}</strong>
           <span>postos inativos</span>
         </div>
-        <div className="metric-inline">
+        {isAdmin ? <div className="metric-inline">
           <strong>{links.length}</strong>
           <span>vínculos no posto selecionado</span>
-        </div>
+        </div> : null}
       </div>
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
@@ -371,9 +388,15 @@ export default function FuelStationsPage() {
                   <td data-label="CNPJ">{station.cnpj || '-'}</td>
                   <td data-label="Contato">{station.phone || '-'}</td>
                   <td data-label="Endereço">{station.address}</td>
-                  <td data-label="Localização">
+                  <td data-label="Localização" className="map-action-cell">
                     {buildMapsUrl(station) ? (
-                      <a className="mini-button" href={buildMapsUrl(station)} target="_blank" rel="noreferrer">
+                      <a
+                        className="mini-button map-button"
+                        href={buildMapsUrl(station)}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label={`Abrir mapa do posto ${station.name}`}
+                      >
                         Abrir mapa
                       </a>
                     ) : (
@@ -388,9 +411,9 @@ export default function FuelStationsPage() {
                   <td data-label="Atualizado em">{formatDate(station.updated_at)}</td>
                   <td data-label="Ações">
                     <div className="actions-inline">
-                      <button type="button" className="mini-button" onClick={() => openEditModal(station)}>Editar</button>
-                      <button type="button" className="mini-button" onClick={() => setSelectedStationId(station.id)}>Vínculos</button>
-                      <button type="button" className="mini-button danger" onClick={() => removeStation(station.id)}>Excluir</button>
+                      {canEditStation ? <button type="button" className="mini-button" onClick={() => openEditModal(station)}>Editar</button> : null}
+                      {isAdmin ? <button type="button" className="mini-button" onClick={() => setSelectedStationId(station.id)}>Vínculos</button> : null}
+                      {canDeleteStation ? <button type="button" className="mini-button danger" onClick={() => removeStation(station.id)}>Excluir</button> : null}
                     </div>
                   </td>
                 </tr>
@@ -400,7 +423,7 @@ export default function FuelStationsPage() {
         </div>
       </div>
 
-      <div className="surface-panel panel-nested">
+      {isAdmin ? <div className="surface-panel panel-nested">
         <div className="panel-heading">
           <div>
             <h3 className="section-title">Vínculos de usuários {selectedStation ? `- ${selectedStation.name}` : ''}</h3>
@@ -412,7 +435,7 @@ export default function FuelStationsPage() {
             <option value="">Selecione um usuário</option>
             {users.map((user) => <option key={user.id} value={user.id}>{user.name} ({user.email})</option>)}
           </select>
-          <button type="button" className="app-button" onClick={createLink} disabled={!selectedStationId || !userId}>Vincular usuário</button>
+          {canCreateStation ? <button type="button" className="app-button" onClick={createLink} disabled={!selectedStationId || !userId}>Vincular usuário</button> : null}
         </div>
         <div className="table-wrap">
           <table className="data-table">
@@ -427,8 +450,8 @@ export default function FuelStationsPage() {
                   <td data-label="Status">{link.active ? 'Ativo' : 'Inativo'}</td>
                   <td data-label="Ações">
                     <div className="actions-inline">
-                      <button type="button" className="mini-button" onClick={() => toggleLink(link)}>{link.active ? 'Desativar' : 'Ativar'}</button>
-                      <button type="button" className="mini-button danger" onClick={() => removeLink(link.id)}>Remover</button>
+                      {canEditStation ? <button type="button" className="mini-button" onClick={() => toggleLink(link)}>{link.active ? 'Desativar' : 'Ativar'}</button> : null}
+                      {canDeleteStation ? <button type="button" className="mini-button danger" onClick={() => removeLink(link.id)}>Remover</button> : null}
                     </div>
                   </td>
                 </tr>
@@ -436,10 +459,10 @@ export default function FuelStationsPage() {
             </tbody>
           </table>
         </div>
-      </div>
+      </div> : null}
 
       <Modal
-        open={isModalOpen}
+        open={isModalOpen && (stationForm.id ? canEditStation : canCreateStation)}
         title={stationForm.id ? 'Editar posto de combustível' : 'Novo posto de combustível'}
         description="Cadastre ou atualize os dados institucionais do posto credenciado."
         onClose={closeModal}

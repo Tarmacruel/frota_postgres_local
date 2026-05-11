@@ -7,7 +7,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import require_fuel_supply_viewer, require_writer
+from app.api.deps import require_permission
 from app.db.session import get_db_session
 from app.models.user import User
 from app.schemas.fuel_supply import (
@@ -63,7 +63,7 @@ async def list_fuel_supplies(
     end_date: datetime | None = Query(default=None),
     only_anomalies: bool | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_fuel_supply_viewer),
+    current_user: User = Depends(require_permission("fuel_supplies", "view")),
 ):
     return await FuelSupplyService(db).list(
         page=page,
@@ -83,7 +83,7 @@ async def create_fuel_supply(
     data: FuelSupplyCreate = Depends(parse_create_form),
     receipt: UploadFile = File(...),
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_writer),
+    current_user: User = Depends(require_permission("fuel_supplies", "create")),
 ):
     return await FuelSupplyService(db).create(data, receipt, current_user)
 
@@ -93,7 +93,7 @@ async def consumption_report(
     start_date: datetime | None = Query(default=None),
     end_date: datetime | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_fuel_supply_viewer),
+    current_user: User = Depends(require_permission("fuel_supplies", "view")),
 ):
     return await FuelSupplyService(db).consumption_report(start_date=start_date, end_date=end_date)
 
@@ -103,7 +103,7 @@ async def anomalies_report(
     start_date: datetime | None = Query(default=None),
     end_date: datetime | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_fuel_supply_viewer),
+    current_user: User = Depends(require_permission("fuel_supplies", "view")),
 ):
     return await FuelSupplyService(db).anomalies_report(start_date=start_date, end_date=end_date)
 
@@ -112,7 +112,7 @@ async def anomalies_report(
 async def get_fuel_supply(
     supply_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_fuel_supply_viewer),
+    current_user: User = Depends(require_permission("fuel_supplies", "view")),
 ):
     return await FuelSupplyService(db).get(supply_id)
 
@@ -121,7 +121,7 @@ async def get_fuel_supply(
 async def get_fuel_supply_receipt(
     supply_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_fuel_supply_viewer),
+    current_user: User = Depends(require_permission("fuel_supplies", "view")),
 ) -> FileResponse:
     return await FuelSupplyService(db).get_receipt_file(supply_id)
 

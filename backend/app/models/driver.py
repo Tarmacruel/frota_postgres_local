@@ -2,9 +2,8 @@ from __future__ import annotations
 
 import enum
 from datetime import date, datetime
-from typing import Optional
 from uuid import UUID
-from sqlalchemy import Boolean, Date, DateTime, Enum, Index, String, text
+from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Index, String, text
 from sqlalchemy.dialects.postgresql import CITEXT, UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
@@ -24,12 +23,18 @@ class Driver(Base):
         Index("idx_drivers_documento", "documento"),
         Index("idx_drivers_nome", "nome_completo"),
         Index("idx_drivers_ativo", "ativo", postgresql_where=text("ativo = true")),
+        Index("idx_drivers_organization_id", "organization_id"),
         Index("uq_drivers_documento_active", "documento", unique=True, postgresql_where=text("ativo = true")),
     )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     nome_completo: Mapped[str] = mapped_column(String(150), nullable=False)
     documento: Mapped[str] = mapped_column(String(20), nullable=False)
+    organization_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("master_organizations.id", ondelete="RESTRICT", onupdate="CASCADE"),
+        nullable=True,
+    )
     contato = mapped_column(String(50), nullable=True)
     email = mapped_column(CITEXT(), nullable=True)
     cnh_categoria: Mapped[DriverLicenseCategory] = mapped_column(
@@ -41,7 +46,12 @@ class Driver(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
 
+    organization: Mapped["Organization | None"] = relationship()
     possessions: Mapped[list["VehiclePossession"]] = relationship(back_populates="driver")
     claims: Mapped[list["Claim"]] = relationship(back_populates="driver")
     fines: Mapped[list["Fine"]] = relationship(back_populates="driver")
     fuel_supplies: Mapped[list["FuelSupply"]] = relationship(back_populates="driver")
+
+    @property
+    def organization_name(self) -> str | None:
+        return self.organization.name if self.organization else None

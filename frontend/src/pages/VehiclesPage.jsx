@@ -218,7 +218,10 @@ function buildVehicleHistorySummary(item) {
 }
 
 export default function VehiclesPage() {
-  const { user, canWrite, canDelete, isAdmin } = useAuth()
+  const { user, canCreate, canEdit, canDeleteModule, isAdmin } = useAuth()
+  const canCreateVehicle = canCreate('vehicles')
+  const canEditVehicle = canEdit('vehicles')
+  const canDeleteVehicle = canDeleteModule('vehicles')
   const [searchParams, setSearchParams] = useSearchParams()
   const [vehicles, setVehicles] = useState([])
   const [form, setForm] = useState(initialForm)
@@ -471,6 +474,10 @@ export default function VehiclesPage() {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if ((editingId && !canEditVehicle) || (!editingId && !canCreateVehicle)) {
+      setError('Você não tem permissão para salvar veículos.')
+      return
+    }
 
     const isEditingLegacyWithoutLocation = Boolean(editingId) && !form.allocation_id && !vehicles.find((vehicle) => vehicle.id === editingId)?.current_location
     const touchedLocationSelection = Boolean(form.organization_id || form.department_id || form.allocation_id)
@@ -684,7 +691,7 @@ export default function VehiclesPage() {
           <p className="section-copy">Gerencie placa, chassi, tipo do veículo e lotação estruturada sem sair da consulta principal.</p>
         </div>
         <div className="actions-inline">
-          {canWrite ? <button className="app-button" type="button" onClick={openNewVehicleModal}>Novo veículo</button> : null}
+          {canCreateVehicle ? <button className="app-button" type="button" onClick={openNewVehicleModal}>Novo veículo</button> : null}
           <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
@@ -811,8 +818,8 @@ export default function VehiclesPage() {
                           {selectedVehicle?.id === vehicle.id ? 'Fechar histórico' : 'Histórico'}
                         </button>
                         {selectedVehicle?.id === vehicle.id ? <span className="focus-inline">em foco</span> : null}
-                        {canWrite ? <button type="button" className="mini-button" onClick={() => editVehicle(vehicle)}>Editar</button> : null}
-                        {canDelete ? <button type="button" className="mini-button danger" onClick={() => handleDelete(vehicle.id)}>Excluir</button> : null}
+                        {canEditVehicle ? <button type="button" className="mini-button" onClick={() => editVehicle(vehicle)}>Editar</button> : null}
+                        {canDeleteVehicle ? <button type="button" className="mini-button danger" onClick={() => handleDelete(vehicle.id)}>Excluir</button> : null}
                       </div>
                     </td>
                   </tr>

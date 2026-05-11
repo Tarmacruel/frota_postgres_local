@@ -6,7 +6,7 @@ from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
 from fastapi.exceptions import RequestValidationError
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import require_fuel_module_user, require_fuel_station_user, require_writer
+from app.api.deps import require_permission
 from app.db.session import get_db_session
 from app.models.fuel_supply_order import FuelSupplyOrderStatus
 from app.models.user import User
@@ -51,7 +51,7 @@ def parse_confirm_form(
 async def create_fuel_supply_order(
     data: FuelSupplyOrderCreate,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_writer),
+    current_user: User = Depends(require_permission("fuel_supply_orders", "create")),
 ):
     return await FuelSupplyOrderService(db).create_order(data, current_user)
 
@@ -66,7 +66,7 @@ async def list_fuel_supply_orders(
     fuel_station_id: UUID | None = Query(default=None),
     due_until: datetime | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_fuel_module_user),
+    current_user: User = Depends(require_permission("fuel_supply_orders", "view")),
 ):
     return await FuelSupplyOrderService(db).list(
         page=page,
@@ -84,7 +84,7 @@ async def list_fuel_supply_orders(
 async def get_fuel_supply_order(
     order_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_fuel_module_user),
+    current_user: User = Depends(require_permission("fuel_supply_orders", "view")),
 ):
     return await FuelSupplyOrderService(db).get_order(order_id, current_user=current_user)
 
@@ -95,7 +95,7 @@ async def confirm_fuel_supply_order(
     data: FuelSupplyOrderConfirm = Depends(parse_confirm_form),
     receipt: UploadFile = File(...),
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_fuel_station_user),
+    current_user: User = Depends(require_permission("fuel_supply_orders", "edit")),
 ):
     return await FuelSupplyOrderService(db).confirm_order(order_id, data, receipt, current_user)
 
@@ -105,7 +105,7 @@ async def cancel_fuel_supply_order(
     order_id: UUID,
     payload: FuelSupplyOrderCancel,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_writer),
+    current_user: User = Depends(require_permission("fuel_supply_orders", "edit")),
 ):
     return await FuelSupplyOrderService(db).cancel_order(order_id, payload, current_user)
 

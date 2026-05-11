@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.models.user import User
 from app.repositories.search_repository import SearchRepository
 
 
@@ -9,7 +10,7 @@ class SearchService:
         self.db = db
         self.search_repo = SearchRepository(db)
 
-    async def search(self, q: str, limit: int) -> list[dict]:
+    async def search(self, q: str, limit: int, current_user: User) -> list[dict]:
         term = q.strip()
         if not term:
             return []
@@ -17,9 +18,21 @@ class SearchService:
         search_term = f"%{term}%"
         per_group_limit = min(max(limit, 1), 20)
 
-        vehicles = await self.search_repo.search_vehicles(search_term, per_group_limit)
-        possessions = await self.search_repo.search_possessions(search_term, per_group_limit)
-        maintenances = await self.search_repo.search_maintenances(search_term, per_group_limit)
+        vehicles = (
+            await self.search_repo.search_vehicles(search_term, per_group_limit)
+            if self._can_view(current_user, "vehicles")
+            else []
+        )
+        possessions = (
+            await self.search_repo.search_possessions(search_term, per_group_limit)
+            if self._can_view(current_user, "possession")
+            else []
+        )
+        maintenances = (
+            await self.search_repo.search_maintenances(search_term, per_group_limit)
+            if self._can_view(current_user, "maintenance")
+            else []
+        )
 
         results = [
             *[self._serialize_vehicle(vehicle, department, possession) for vehicle, department, possession in vehicles],
@@ -113,3 +126,6 @@ class SearchService:
         if normalized in context_values:
             return 40
         return 10
+
+    def _can_view(self, current_user: User, module: str) -> bool:
+        return bool(current_user.permissions.get(module, {}).get("can_view"))

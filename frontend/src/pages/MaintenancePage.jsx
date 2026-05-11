@@ -37,7 +37,11 @@ function buildVehicleOption(vehicle) {
 }
 
 export default function MaintenancePage() {
-  const { canWrite, canDelete, isAdmin } = useAuth()
+  const { canCreate, canEdit, canDeleteModule, isAdmin } = useAuth()
+  const canCreateMaintenance = canCreate('maintenance')
+  const canEditMaintenance = canEdit('maintenance')
+  const canDeleteMaintenance = canDeleteModule('maintenance')
+  const canManageMaintenanceActions = canEditMaintenance || canDeleteMaintenance
   const [searchParams, setSearchParams] = useSearchParams()
   const [vehicles, setVehicles] = useState([])
   const [records, setRecords] = useState([])
@@ -242,7 +246,7 @@ export default function MaintenancePage() {
           <p className="section-copy">Acompanhe revisões concluídas e serviços ainda em aberto sem sair do painel principal.</p>
         </div>
         <div className="actions-inline">
-          {canWrite ? (
+          {canCreateMaintenance ? (
             <button className="app-button" type="button" onClick={() => setIsModalOpen(true)}>
               Nova manutenção
             </button>
@@ -326,17 +330,17 @@ export default function MaintenancePage() {
                 <th>Peças</th>
                 <th>Custo</th>
                 <th>Status</th>
-                {canWrite ? <th>Ações</th> : null}
+                {canManageMaintenanceActions ? <th>Ações</th> : null}
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan={canWrite ? 8 : 7} className="muted">Carregando manutenções...</td>
+                  <td colSpan={canManageMaintenanceActions ? 8 : 7} className="muted">Carregando manutenções...</td>
                 </tr>
               ) : filteredRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={canWrite ? 8 : 7}>
+                  <td colSpan={canManageMaintenanceActions ? 8 : 7}>
                     <div className="empty-state">Nenhum registro encontrado para os filtros atuais.</div>
                   </td>
                 </tr>
@@ -360,13 +364,15 @@ export default function MaintenancePage() {
                         {record.end_date ? 'CONCLUÍDA' : 'EM ANDAMENTO'}
                       </span>
                     </td>
-                    {canWrite ? (
+                    {canManageMaintenanceActions ? (
                       <td data-label="Ações">
                         <div className="actions-inline">
-                          <button type="button" className="mini-button" onClick={() => { setEditingRecord(record); setIsModalOpen(true) }}>
-                            Editar
-                          </button>
-                          {canDelete ? (
+                          {canEditMaintenance ? (
+                            <button type="button" className="mini-button" onClick={() => { setEditingRecord(record); setIsModalOpen(true) }}>
+                              Editar
+                            </button>
+                          ) : null}
+                          {canDeleteMaintenance ? (
                             <button type="button" className="mini-button danger" onClick={() => handleDelete(record.id)}>
                               Excluir
                             </button>

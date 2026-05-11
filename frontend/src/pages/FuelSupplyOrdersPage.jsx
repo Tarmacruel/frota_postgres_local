@@ -3,6 +3,7 @@ import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
 import FuelSupplyOrderConfirmForm from '../components/FuelSupplyOrderConfirmForm'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
+import { useAuth } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 import { previewFuelSupplyOrderDocument } from '../utils/fuelSupplyOrderDocument'
 
@@ -61,6 +62,8 @@ function getDeadlineMeta(order) {
 }
 
 export default function FuelSupplyOrdersPage() {
+  const { canEdit } = useAuth()
+  const canConfirmOrder = canEdit('fuel_supply_orders')
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -199,7 +202,7 @@ export default function FuelSupplyOrdersPage() {
                     <td data-label="Ações">
                       <div className="actions-inline">
                         <button className="mini-button" type="button" onClick={() => handlePreviewOrderDocument(order)}>Comprovante</button>
-                        <button className="app-button" type="button" onClick={() => setSelectedOrder(order)}>Confirmar abastecimento</button>
+                        {canConfirmOrder ? <button className="app-button" type="button" onClick={() => setSelectedOrder(order)}>Confirmar abastecimento</button> : null}
                       </div>
                     </td>
                   </tr>
@@ -212,7 +215,7 @@ export default function FuelSupplyOrdersPage() {
       </div>
 
       <Modal
-        open={Boolean(selectedOrder)}
+        open={Boolean(selectedOrder) && canConfirmOrder}
         onClose={() => setSelectedOrder(null)}
         title="Confirmar abastecimento"
         description="Informe os dados reais do abastecimento para concluir a ordem."

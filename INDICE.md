@@ -28,3 +28,5 @@
 | `DEV_SERVER_GUIDE.md` | Desenvolvimento |
 | `TROUBLESHOOTING.md` | Problemas comuns |
 | `SCRIPTS_MANIFEST.md` | Automacoes mantidas |
+| `docs\manual_sistema_frotas.md` | Manual completo de uso do sistema |
+| `output\doc\manual_sistema_frotas.pdf` | Manual completo em PDF |

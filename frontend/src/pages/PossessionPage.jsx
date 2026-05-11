@@ -103,7 +103,9 @@ function normalizeUploadList(fileList) {
 }
 
 export default function PossessionPage() {
-  const { canWrite, isAdmin } = useAuth()
+  const { canCreate, canEdit, isAdmin } = useAuth()
+  const canCreatePossession = canCreate('possession')
+  const canEditPossession = canEdit('possession')
   const [searchParams, setSearchParams] = useSearchParams()
   const [vehicles, setVehicles] = useState([])
   const [records, setRecords] = useState([])
@@ -508,6 +510,10 @@ export default function PossessionPage() {
   async function handleEndPossession(event) {
     event.preventDefault()
     if (!endingRecord) return
+    if (!canEditPossession) {
+      setError('Você não tem permissão para encerrar posses.')
+      return
+    }
 
     try {
       setEnding(true)
@@ -531,6 +537,10 @@ export default function PossessionPage() {
   async function handleEditPossession(event) {
     event.preventDefault()
     if (!editingRecord) return
+    if (!canEditPossession) {
+      setError('Você não tem permissão para editar posses.')
+      return
+    }
 
     try {
       setSavingEdit(true)
@@ -662,7 +672,7 @@ export default function PossessionPage() {
           <p className="section-copy">Controle quem está com cada veículo, anexe evidências e mantenha um histórico simples de transferências.</p>
         </div>
         <div className="actions-inline">
-          {canWrite ? (
+          {canCreatePossession ? (
             <button className="app-button" type="button" onClick={() => setIsCreateModalOpen(true)}>
               Nova posse
             </button>
@@ -816,12 +826,12 @@ export default function PossessionPage() {
                         <button type="button" className="mini-button" onClick={() => setTermRecord(record)}>
                           Termos
                         </button>
-                        {isAdmin ? (
+                        {canEditPossession ? (
                           <button type="button" className="mini-button" onClick={() => openEditModal(record)}>
                             Editar
                           </button>
                         ) : null}
-                        {record.is_active ? (
+                        {record.is_active && canEditPossession ? (
                           <button type="button" className="mini-button" onClick={() => openEndModal(record)}>
                             Encerrar
                           </button>

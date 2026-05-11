@@ -1,13 +1,17 @@
 import { useEffect, useMemo, useState } from 'react'
 import Modal from '../components/Modal'
+import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
+import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
+import { PERMISSION_ACTIONS, PERMISSION_MODULES, normalizePermissions } from '../utils/permissions'
 import { getRoleLabel } from '../utils/roles'
 
 const initialForm = {
   name: '',
   email: '',
+  organization_id: '',
   password: '',
   role: 'PADRAO',
 }
@@ -25,25 +29,41 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState(null)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('TODOS')
+  const [organizationFilter, setOrganizationFilter] = useState('TODAS')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [permissionsModalOpen, setPermissionsModalOpen] = useState(false)
+  const [permissionsUser, setPermissionsUser] = useState(null)
+  const [permissionsForm, setPermissionsForm] = useState(() => normalizePermissions())
+  const [permissionsLoading, setPermissionsLoading] = useState(false)
+  const [permissionsSaving, setPermissionsSaving] = useState(false)
+  const { organizations, loading: catalogLoading, error: catalogError } = useMasterDataCatalog()
+
+  const organizationOptions = organizations.map((organization) => ({
+    value: organization.id,
+    label: organization.name,
+  }))
 
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
       const term = search.trim().toLowerCase()
       const matchesSearch =
-        !term || [user.name, user.email, getRoleLabel(user.role)].some((value) => String(value).toLowerCase().includes(term))
+        !term || [user.name, user.email, user.organization_name, getRoleLabel(user.role)].some((value) => String(value).toLowerCase().includes(term))
       const matchesRole = roleFilter === 'TODOS' || user.role === roleFilter
-      return matchesSearch && matchesRole
+      const matchesOrganization =
+        organizationFilter === 'TODAS' ||
+        (organizationFilter === 'SEM_SECRETARIA' ? !user.organization_id : user.organization_id === organizationFilter)
+      return matchesSearch && matchesRole && matchesOrganization
     })
-  }, [users, search, roleFilter])
+  }, [users, search, roleFilter, organizationFilter])
 
   const exportColumns = [
     { header: 'Nome', value: (user) => user.name },
     { header: 'E-mail', value: (user) => user.email },
+    { header: 'Secretaria', value: (user) => user.organization_name || 'Não informada' },
     { header: 'Perfil', value: (user) => getRoleLabel(user.role) },
     { header: 'Senha', value: (user) => (user.must_change_password ? 'Troca pendente' : 'Regularizada') },
     { header: 'Criado em', value: (user) => formatDate(user.created_at) },
@@ -78,6 +98,7 @@ export default function UsersPage() {
     setForm({
       name: user.name,
       email: user.email,
+      organization_id: user.organization_id || '',
       password: '',
       role: user.role,
     })
@@ -90,8 +111,72 @@ export default function UsersPage() {
     setIsModalOpen(false)
   }
 
+  function closePermissionsModal() {
+    setPermissionsModalOpen(false)
+    setPermissionsUser(null)
+    setPermissionsForm(normalizePermissions())
+  }
+
+  async function openPermissionsModal(user) {
+    setPermissionsUser(user)
+    setPermissionsForm(normalizePermissions(user.permissions))
+    setPermissionsModalOpen(true)
+    try {
+      setPermissionsLoading(true)
+      setError('')
+      const { data } = await api.get(`/users/${user.id}/permissions`)
+      setPermissionsForm(normalizePermissions(data.permissions))
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Não foi possível carregar as permissões do usuário.'))
+    } finally {
+      setPermissionsLoading(false)
+    }
+  }
+
+  function togglePermission(moduleKey, field) {
+    setPermissionsForm((current) => ({
+      ...current,
+      [moduleKey]: {
+        ...current[moduleKey],
+        [field]: !current[moduleKey]?.[field],
+      },
+    }))
+  }
+
+  function setModulePermissions(moduleKey, value) {
+    setPermissionsForm((current) => ({
+      ...current,
+      [moduleKey]: PERMISSION_ACTIONS.reduce((flags, action) => {
+        flags[action.field] = value
+        return flags
+      }, {}),
+    }))
+  }
+
+  async function savePermissions() {
+    if (!permissionsUser) return
+    try {
+      setPermissionsSaving(true)
+      setError('')
+      setFeedback('')
+      await api.put(`/users/${permissionsUser.id}/permissions`, { permissions: permissionsForm })
+      setFeedback(`Permissões de ${permissionsUser.name} atualizadas com sucesso.`)
+      closePermissionsModal()
+      await loadUsers()
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Não foi possível salvar as permissões do usuário.'))
+    } finally {
+      setPermissionsSaving(false)
+    }
+  }
+
   async function handleSubmit(event) {
     event.preventDefault()
+    if (!form.organization_id) {
+      setError('Selecione a secretaria do usuário.')
+      return
+    }
+
     try {
       setSubmitting(true)
       setError('')
@@ -101,13 +186,14 @@ export default function UsersPage() {
         const payload = {
           name: form.name,
           email: form.email,
+          organization_id: form.organization_id,
           role: form.role,
         }
         if (form.password.trim()) payload.password = form.password
         await api.put(`/users/${editingUser.id}`, payload)
         setFeedback('Usuário atualizado com sucesso.')
       } else {
-        await api.post('/users', form)
+        await api.post('/users', { ...form, organization_id: form.organization_id })
         setFeedback('Usuário criado com sucesso.')
       }
 
@@ -151,6 +237,15 @@ export default function UsersPage() {
         rows: filteredUsers,
         filters: [
           { label: 'Perfil', value: roleFilter === 'TODOS' ? 'Todos os perfis' : getRoleLabel(roleFilter) },
+          {
+            label: 'Secretaria',
+            value:
+              organizationFilter === 'TODAS'
+                ? 'Todas as secretarias'
+                : organizationFilter === 'SEM_SECRETARIA'
+                  ? 'Não informada'
+                  : organizations.find((organization) => organization.id === organizationFilter)?.name || organizationFilter,
+          },
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
@@ -176,6 +271,15 @@ export default function UsersPage() {
         rows: filteredUsers,
         filters: [
           { label: 'Perfil', value: roleFilter === 'TODOS' ? 'Todos os perfis' : getRoleLabel(roleFilter) },
+          {
+            label: 'Secretaria',
+            value:
+              organizationFilter === 'TODAS'
+                ? 'Todas as secretarias'
+                : organizationFilter === 'SEM_SECRETARIA'
+                  ? 'Não informada'
+                  : organizations.find((organization) => organization.id === organizationFilter)?.name || organizationFilter,
+          },
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
@@ -188,6 +292,7 @@ export default function UsersPage() {
   function clearFilters() {
     setSearch('')
     setRoleFilter('TODOS')
+    setOrganizationFilter('TODAS')
   }
 
   return (
@@ -208,10 +313,17 @@ export default function UsersPage() {
         <div className="filter-inline">
           <input
             className="app-input"
-            placeholder="Buscar por nome, e-mail ou perfil"
+            placeholder="Buscar por nome, e-mail, secretaria ou perfil"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
+          <select className="app-select" value={organizationFilter} onChange={(event) => setOrganizationFilter(event.target.value)}>
+            <option value="TODAS">Todas as secretarias</option>
+            <option value="SEM_SECRETARIA">Sem secretaria</option>
+            {organizations.map((organization) => (
+              <option key={organization.id} value={organization.id}>{organization.name}</option>
+            ))}
+          </select>
           <select className="app-select" value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
             <option value="TODOS">Todos os perfis</option>
             {roleOptions.map((role) => (
@@ -246,6 +358,7 @@ export default function UsersPage() {
       </div>
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
+      {catalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
       <div className="surface-panel panel-nested">
@@ -255,6 +368,7 @@ export default function UsersPage() {
               <tr>
                 <th>Nome</th>
                 <th>E-mail</th>
+                <th>Secretaria</th>
                 <th>Perfil</th>
                 <th>Senha</th>
                 <th>Criado em</th>
@@ -265,11 +379,11 @@ export default function UsersPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="7" className="muted">Carregando usuários...</td>
+                  <td colSpan="8" className="muted">Carregando usuários...</td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan="7">
+                  <td colSpan="8">
                     <div className="empty-state">Nenhum usuário encontrado para os filtros aplicados.</div>
                   </td>
                 </tr>
@@ -283,6 +397,7 @@ export default function UsersPage() {
                       </div>
                     </td>
                     <td data-label="E-mail">{user.email}</td>
+                    <td data-label="Secretaria">{user.organization_name || 'Não informada'}</td>
                     <td data-label="Perfil">
                       <span className={`status-badge ${user.role === 'ADMIN' ? 'status-ATIVO' : user.role === 'PRODUCAO' ? 'status-PRODUCAO' : user.role === 'POSTO' ? 'status-POSTO' : 'status-INATIVO'}`}>
                         {getRoleLabel(user.role)}
@@ -298,6 +413,7 @@ export default function UsersPage() {
                     <td data-label="Ações">
                       <div className="actions-inline">
                         <button type="button" className="mini-button" onClick={() => openEditModal(user)}>Editar</button>
+                        <button type="button" className="mini-button" onClick={() => openPermissionsModal(user)}>Permissões</button>
                         <button type="button" className="mini-button danger" onClick={() => handleDelete(user)}>Excluir</button>
                       </div>
                     </td>
@@ -348,6 +464,17 @@ export default function UsersPage() {
             />
           </div>
           <div className="form-field modal-field-span">
+            <label>Secretaria</label>
+            <SearchableSelect
+              value={form.organization_id}
+              onChange={(value) => setForm({ ...form, organization_id: value })}
+              options={organizationOptions}
+              placeholder={catalogLoading ? 'Carregando secretarias...' : 'Selecione a secretaria'}
+              searchPlaceholder="Buscar secretaria"
+              disabled={catalogLoading || organizationOptions.length === 0}
+            />
+          </div>
+          <div className="form-field modal-field-span">
             <label htmlFor="user-role">Perfil</label>
             <select id="user-role" className="app-select" value={form.role} onChange={(event) => setForm({ ...form, role: event.target.value })}>
               {roleOptions.map((role) => (
@@ -362,6 +489,62 @@ export default function UsersPage() {
             <button className="ghost-button" type="button" onClick={closeModal}>Cancelar</button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={permissionsModalOpen}
+        title={permissionsUser ? `Permissões de ${permissionsUser.name}` : 'Permissões'}
+        description="Defina acesso por módulo e ação operacional."
+        onClose={closePermissionsModal}
+      >
+        {permissionsLoading ? (
+          <div className="empty-state">Carregando permissões...</div>
+        ) : (
+          <div className="stack">
+            <div className="table-wrap table-wrap-wide">
+              <table className="data-table data-table-wide">
+                <thead>
+                  <tr>
+                    <th>Módulo</th>
+                    {PERMISSION_ACTIONS.map((action) => <th key={action.key}>{action.label}</th>)}
+                    <th>Atalhos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {PERMISSION_MODULES.map((module) => (
+                    <tr key={module.key}>
+                      <td data-label="Módulo"><strong>{module.label}</strong></td>
+                      {PERMISSION_ACTIONS.map((action) => (
+                        <td key={`${module.key}-${action.field}`} data-label={action.label}>
+                          <label className="checkbox-field">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(permissionsForm[module.key]?.[action.field])}
+                              onChange={() => togglePermission(module.key, action.field)}
+                            />
+                            <span>{action.label}</span>
+                          </label>
+                        </td>
+                      ))}
+                      <td data-label="Atalhos">
+                        <div className="actions-inline">
+                          <button type="button" className="mini-button" onClick={() => setModulePermissions(module.key, true)}>Tudo</button>
+                          <button type="button" className="mini-button" onClick={() => setModulePermissions(module.key, false)}>Limpar</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="actions-inline modal-actions">
+              <button className="app-button" type="button" disabled={permissionsSaving} onClick={savePermissions}>
+                {permissionsSaving ? 'Salvando...' : 'Salvar permissões'}
+              </button>
+              <button className="ghost-button" type="button" onClick={closePermissionsModal}>Cancelar</button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )

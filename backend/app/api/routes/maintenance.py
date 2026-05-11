@@ -4,7 +4,7 @@ from datetime import datetime
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user_ready, require_admin, require_writer
+from app.api.deps import require_permission
 from app.db.session import get_db_session
 from app.models.user import User
 from app.schemas.auth import MessageOut
@@ -14,7 +14,7 @@ from app.services.maintenance_service import MaintenanceService
 router = APIRouter(prefix="/api/maintenance", tags=["Maintenance"])
 
 
-@router.get("", response_model=list[MaintenanceOut], dependencies=[Depends(get_current_user_ready)])
+@router.get("", response_model=list[MaintenanceOut], dependencies=[Depends(require_permission("maintenance", "view"))])
 async def list_maintenance(
     vehicle_id: UUID | None = Query(default=None),
     start: datetime | None = Query(default=None),
@@ -24,7 +24,7 @@ async def list_maintenance(
     return await MaintenanceService(db).list(vehicle_id=vehicle_id, start=start, end=end)
 
 
-@router.get("/paginated", response_model=MaintenanceListResponse, dependencies=[Depends(get_current_user_ready)])
+@router.get("/paginated", response_model=MaintenanceListResponse, dependencies=[Depends(require_permission("maintenance", "view"))])
 async def list_maintenance_paginated(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),
@@ -46,7 +46,7 @@ async def list_maintenance_paginated(
     )
 
 
-@router.get("/{record_id}", response_model=MaintenanceOut, dependencies=[Depends(get_current_user_ready)])
+@router.get("/{record_id}", response_model=MaintenanceOut, dependencies=[Depends(require_permission("maintenance", "view"))])
 async def get_maintenance(record_id: UUID, db: AsyncSession = Depends(get_db_session)):
     return await MaintenanceService(db).get(record_id)
 
@@ -55,7 +55,7 @@ async def get_maintenance(record_id: UUID, db: AsyncSession = Depends(get_db_ses
 async def create_maintenance(
     data: MaintenanceCreate,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_writer),
+    current_user: User = Depends(require_permission("maintenance", "create")),
 ):
     return await MaintenanceService(db).create(data, current_user)
 
@@ -65,7 +65,7 @@ async def update_maintenance(
     record_id: UUID,
     data: MaintenanceUpdate,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_writer),
+    current_user: User = Depends(require_permission("maintenance", "edit")),
 ):
     return await MaintenanceService(db).update(record_id, data, current_user)
 
@@ -74,7 +74,7 @@ async def update_maintenance(
 async def delete_maintenance(
     record_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("maintenance", "delete")),
 ):
     await MaintenanceService(db).delete(record_id, current_user)
     return {"message": "Removido"}

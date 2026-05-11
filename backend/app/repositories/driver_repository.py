@@ -3,8 +3,10 @@ from __future__ import annotations
 from uuid import UUID
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
 from app.models.claim import Claim
 from app.models.driver import Driver
+from app.models.master_data import Organization
 from app.models.possession import VehiclePossession
 
 
@@ -13,7 +15,7 @@ class DriverRepository:
         self.db = db
 
     async def get_by_id(self, driver_id: UUID) -> Driver | None:
-        result = await self.db.execute(select(Driver).where(Driver.id == driver_id))
+        result = await self.db.execute(select(Driver).options(joinedload(Driver.organization)).where(Driver.id == driver_id))
         return result.scalar_one_or_none()
 
     async def get_active_by_document(self, documento: str, *, exclude_id: UUID | None = None) -> Driver | None:
@@ -30,9 +32,10 @@ class DriverRepository:
         limit: int,
         search: str | None = None,
         active_only: bool | None = None,
+        organization_id: UUID | None = None,
     ) -> tuple[list[Driver], int]:
-        stmt = select(Driver)
-        count_stmt = select(func.count(Driver.id))
+        stmt = select(Driver).options(joinedload(Driver.organization)).outerjoin(Organization, Organization.id == Driver.organization_id)
+        count_stmt = select(func.count(Driver.id)).outerjoin(Organization, Organization.id == Driver.organization_id)
 
         if active_only is True:
             stmt = stmt.where(Driver.ativo.is_(True))
@@ -41,9 +44,13 @@ class DriverRepository:
             stmt = stmt.where(Driver.ativo.is_(False))
             count_stmt = count_stmt.where(Driver.ativo.is_(False))
 
+        if organization_id:
+            stmt = stmt.where(Driver.organization_id == organization_id)
+            count_stmt = count_stmt.where(Driver.organization_id == organization_id)
+
         if search:
             term = f"%{search.strip()}%"
-            filter_clause = or_(Driver.nome_completo.ilike(term), Driver.documento.ilike(term))
+            filter_clause = or_(Driver.nome_completo.ilike(term), Driver.documento.ilike(term), Organization.name.ilike(term))
             stmt = stmt.where(filter_clause)
             count_stmt = count_stmt.where(filter_clause)
 
@@ -53,10 +60,15 @@ class DriverRepository:
         return items, total
 
     async def list_active(self, *, search: str | None = None, limit: int = 100) -> list[Driver]:
-        stmt = select(Driver).where(Driver.ativo.is_(True))
+        stmt = (
+            select(Driver)
+            .options(joinedload(Driver.organization))
+            .outerjoin(Organization, Organization.id == Driver.organization_id)
+            .where(Driver.ativo.is_(True))
+        )
         if search:
             term = f"%{search.strip()}%"
-            stmt = stmt.where(or_(Driver.nome_completo.ilike(term), Driver.documento.ilike(term)))
+            stmt = stmt.where(or_(Driver.nome_completo.ilike(term), Driver.documento.ilike(term), Organization.name.ilike(term)))
         stmt = stmt.order_by(Driver.nome_completo.asc()).limit(limit)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())

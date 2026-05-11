@@ -1,17 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import api from '../api/client'
-import {
-  canAccessFuelSupplies,
-  canConfirmFuelOrders,
-  canDelete,
-  canManageCadastros,
-  canManageFuelSupplyOrders,
-  canWrite,
-  getRoleLabel,
-  isAdmin,
-  isFuelStation,
-  isPosto,
-} from '../utils/roles'
+import { hasPermission } from '../utils/permissions'
+import { getRoleLabel, isAdmin, isFuelStation, isPosto } from '../utils/roles'
 
 const AuthContext = createContext(null)
 
@@ -60,25 +50,34 @@ export function AuthProvider({ children }) {
     return await loadMe({ silent: true })
   }
 
-  const value = useMemo(() => ({
-    user,
-    loading,
-    login,
-    logout,
-    changePassword,
-    reload: loadMe,
-    mustChangePassword: Boolean(user?.must_change_password),
-    isAdmin: isAdmin(user?.role),
-    isPosto: isPosto(user?.role),
-    canWrite: canWrite(user?.role),
-    canDelete: canDelete(user?.role),
-    canManageCadastros: canManageCadastros(user?.role),
-    canAccessFuelSupplies: canAccessFuelSupplies(user?.role),
-    canManageFuelSupplyOrders: canManageFuelSupplyOrders(user?.role),
-    canConfirmFuelOrders: canConfirmFuelOrders(user?.role),
-    isFuelStation: isFuelStation(user?.role),
-    roleLabel: getRoleLabel(user?.role),
-  }), [user, loading])
+  const value = useMemo(() => {
+    const can = (module, action = 'view') => hasPermission(user, module, action)
+    const permissions = Object.values(user?.permissions || {})
+    return {
+      user,
+      loading,
+      login,
+      logout,
+      changePassword,
+      reload: loadMe,
+      mustChangePassword: Boolean(user?.must_change_password),
+      isAdmin: isAdmin(user?.role),
+      isPosto: isPosto(user?.role),
+      can,
+      canView: (module) => can(module, 'view'),
+      canCreate: (module) => can(module, 'create'),
+      canEdit: (module) => can(module, 'edit'),
+      canDeleteModule: (module) => can(module, 'delete'),
+      canWrite: permissions.some((flags) => flags.can_create || flags.can_edit),
+      canDelete: permissions.some((flags) => flags.can_delete),
+      canManageCadastros: can('master_data', 'view'),
+      canAccessFuelSupplies: can('fuel_supplies', 'view'),
+      canManageFuelSupplyOrders: can('fuel_supply_orders', 'view'),
+      canConfirmFuelOrders: can('fuel_supply_orders', 'edit'),
+      isFuelStation: isFuelStation(user?.role),
+      roleLabel: getRoleLabel(user?.role),
+    }
+  }, [user, loading])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

@@ -7,7 +7,7 @@ from app.api.deps import require_admin
 from app.db.session import get_db_session
 from app.models.user import User
 from app.schemas.auth import MessageOut
-from app.schemas.user import UserCreate, UserOut, UserUpdate
+from app.schemas.user import UserCreate, UserOut, UserPermissionsOut, UserPermissionsUpdate, UserUpdate
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
@@ -49,3 +49,22 @@ async def delete_user(
 ):
     await UserService(db).delete(user_id, current_user)
     return {"message": "Removido"}
+
+
+@router.get("/{user_id}/permissions", response_model=UserPermissionsOut)
+async def get_user_permissions(
+    user_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    _current_user: User = Depends(require_admin),
+):
+    return {"permissions": await UserService(db).get_permissions(user_id)}
+
+
+@router.put("/{user_id}/permissions", response_model=UserPermissionsOut)
+async def update_user_permissions(
+    user_id: UUID,
+    data: UserPermissionsUpdate,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_admin),
+):
+    return {"permissions": await UserService(db).update_permissions(user_id, data, current_user)}

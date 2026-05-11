@@ -3,10 +3,13 @@ from __future__ import annotations
 from uuid import UUID
 from jose import JWTError, jwt
 from fastapi import Cookie, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
+from app.core.permissions import action_to_column
 from app.db.session import get_db_session
 from app.models.user import User, UserRole
+from app.models.user_permission import UserPermission
 from app.repositories.user_repository import UserRepository
 
 
@@ -51,46 +54,23 @@ async def require_admin(current_user: User = Depends(get_current_user_ready)) ->
     return current_user
 
 
-async def require_writer(current_user: User = Depends(get_current_user_ready)) -> User:
-    if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso restrito a perfis com permissão de cadastro e edição",
+def require_permission(module: str, action: str):
+    permission_column = action_to_column(action)
+
+    async def dependency(
+        db: AsyncSession = Depends(get_db_session),
+        current_user: User = Depends(get_current_user_ready),
+    ) -> User:
+        result = await db.execute(
+            select(UserPermission).where(
+                UserPermission.user_id == current_user.id,
+                UserPermission.module == module,
+            )
         )
-    return current_user
+        permission = result.scalar_one_or_none()
+        if not permission or not getattr(permission, permission_column):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permissão insuficiente")
+        return current_user
 
+    return dependency
 
-async def require_fuel_station_user(current_user: User = Depends(get_current_user_ready)) -> User:
-    if current_user.role not in {UserRole.ADMIN, UserRole.POSTO}:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso restrito a administradores e usuários de posto",
-        )
-    return current_user
-
-
-async def require_fuel_module_user(current_user: User = Depends(get_current_user_ready)) -> User:
-    if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO, UserRole.POSTO}:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso restrito ao módulo de abastecimentos",
-        )
-    return current_user
-
-
-async def require_fuel_supply_viewer(current_user: User = Depends(get_current_user_ready)) -> User:
-    if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso restrito ao histórico de abastecimentos",
-        )
-    return current_user
-
-
-async def require_fuel_supply_confirmer(current_user: User = Depends(get_current_user_ready)) -> User:
-    if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO, UserRole.POSTO}:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso restrito a perfis com permissão de confirmação no módulo de abastecimentos",
-        )
-    return current_user

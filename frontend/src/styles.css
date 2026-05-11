@@ -1653,6 +1653,22 @@ button {
   font-weight: 700;
 }
 
+.map-action-cell {
+  min-width: 124px;
+  white-space: nowrap;
+}
+
+.map-button {
+  display: inline-flex;
+  width: max-content;
+  min-width: 96px;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+  white-space: nowrap;
+  text-decoration: none;
+}
+
 .mini-button.danger {
   color: var(--danger);
 }

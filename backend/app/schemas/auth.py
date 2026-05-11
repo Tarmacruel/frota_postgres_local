@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from uuid import UUID
-from pydantic import BaseModel, ConfigDict, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models.user import UserRole
+from app.schemas.user import PermissionFlags
 from app.schemas.common import normalize_email
 
 
@@ -41,6 +42,7 @@ class CurrentUserOut(BaseModel):
     email: str
     role: UserRole
     must_change_password: bool = False
+    permissions: dict[str, PermissionFlags] = Field(default_factory=dict)
 
     @field_validator("email")
     @classmethod

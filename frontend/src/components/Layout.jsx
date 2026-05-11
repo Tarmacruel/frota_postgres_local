@@ -16,7 +16,7 @@ function readStorage(key, fallback) {
 }
 
 export default function Layout() {
-  const { user, logout, changePassword, mustChangePassword, isAdmin, canManageCadastros, canAccessFuelSupplies, isPosto, roleLabel } = useAuth()
+  const { user, logout, changePassword, mustChangePassword, isAdmin, canView, roleLabel } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const passwordChangeRequired = Boolean(mustChangePassword)
@@ -33,17 +33,6 @@ export default function Layout() {
   const [unreadNotifications, setUnreadNotifications] = useState(0)
 
   const navSections = useMemo(() => {
-    if (isPosto) {
-      return [
-        {
-          title: 'Abastecimento',
-          items: [
-            { to: '/ordens-abastecimento', label: 'Ordens abertas', description: 'Confirmação das ordens pendentes', icon: 'maintenance' },
-          ],
-        },
-      ]
-    }
-
     const sections = [
       {
         title: 'Visao geral',
@@ -60,20 +49,38 @@ export default function Layout() {
           { to: '/manutencoes', label: 'Manutenções', description: 'Custos, serviços e oficina', icon: 'maintenance' },
           { to: '/sinistros', label: 'Sinistros', description: 'Ocorrências, BO e prejuízos', icon: 'audit' },
           { to: '/multas', label: 'Multas', description: 'Autos, vencimentos e pagamentos', icon: 'catalog' },
-          ...(canAccessFuelSupplies ? [{ to: '/abastecimentos', label: 'Abastecimentos', description: 'Ordens, histórico e alertas de consumo', icon: 'maintenance' }] : []),
+          ...(canView('fuel_supplies') ? [{ to: '/abastecimentos', label: 'Abastecimentos', description: 'Ordens, histórico e alertas de consumo', icon: 'maintenance' }] : []),
+          ...(canView('fuel_supply_orders') ? [{ to: '/ordens-abastecimento', label: 'Ordens abertas', description: 'Confirmação das ordens pendentes', icon: 'maintenance' }] : []),
         ],
       },
     ]
 
-    if (isAdmin || canManageCadastros) {
+    const moduleByRoute = {
+      '/vehicles': 'vehicles',
+      '/posses': 'possession',
+      '/condutores': 'drivers',
+      '/manutencoes': 'maintenance',
+      '/sinistros': 'claims',
+      '/multas': 'fines',
+      '/abastecimentos': 'fuel_supplies',
+      '/ordens-abastecimento': 'fuel_supply_orders',
+    }
+    sections[1].items = sections[1].items.filter((item) => canView(moduleByRoute[item.to]))
+    if (sections[1].items.length === 0) sections.splice(1, 1)
+
+    if (isAdmin || canView('master_data') || canView('fuel_stations') || canView('analytics')) {
       const managementItems = []
-      if (canManageCadastros) {
+      if (canView('master_data')) {
         managementItems.push({ to: '/cadastros', label: 'Cadastros', description: 'Órgãos, departamentos e lotações', icon: 'catalog' })
+      }
+      if (canView('fuel_stations')) {
+        managementItems.push({ to: '/postos', label: 'Postos', description: 'Cadastro de postos e vínculos', icon: 'catalog' })
+      }
+      if (canView('analytics')) {
+        managementItems.push({ to: '/analytics', label: 'Analytics', description: 'BI operacional da frota', icon: 'dashboard' })
       }
       if (isAdmin) {
         managementItems.push(
-          { to: '/postos', label: 'Postos', description: 'Cadastro de postos e vínculos', icon: 'catalog' },
-          { to: '/analytics', label: 'Analytics', description: 'BI operacional da frota', icon: 'dashboard' },
           { to: '/users', label: 'Usuários', description: 'Perfis e níveis de acesso', icon: 'users' },
           { to: '/auditoria', label: 'Auditoria', description: 'Rastreabilidade administrativa', icon: 'audit' },
         )
@@ -85,11 +92,11 @@ export default function Layout() {
     }
 
     return sections
-  }, [isAdmin, canManageCadastros, canAccessFuelSupplies, isPosto])
+  }, [isAdmin, canView])
 
   const mobileTabs = navSections.flatMap((section) => section.items).filter((item) =>
-    isPosto ? ['/ordens-abastecimento'].includes(item.to) : ['/', '/vehicles', '/manutencoes', '/condutores'].includes(item.to),
-  )
+    ['/', '/vehicles', '/manutencoes', '/condutores', '/ordens-abastecimento'].includes(item.to),
+  ).slice(0, 4)
 
   const currentItem =
     navSections

@@ -10,6 +10,7 @@ from app.schemas.common import PaginatedResponse, normalize_email
 class DriverBase(BaseModel):
     nome_completo: str = Field(min_length=3, max_length=150)
     documento: str = Field(min_length=5, max_length=20)
+    organization_id: UUID
     contato: str | None = Field(default=None, max_length=50)
     email: str | None = Field(default=None, max_length=100)
     cnh_categoria: DriverLicenseCategory
@@ -55,6 +56,7 @@ class DriverCreate(DriverBase):
 class DriverUpdate(BaseModel):
     nome_completo: str | None = Field(default=None, min_length=3, max_length=150)
     documento: str | None = Field(default=None, min_length=5, max_length=20)
+    organization_id: UUID | None = None
     contato: str | None = Field(default=None, max_length=50)
     email: str | None = Field(default=None, max_length=100)
     cnh_categoria: DriverLicenseCategory | None = None
@@ -104,6 +106,8 @@ class DriverOut(BaseModel):
     id: UUID
     nome_completo: str
     documento: str
+    organization_id: UUID | None
+    organization_name: str | None = None
     contato: str | None
     email: str | None
     cnh_categoria: DriverLicenseCategory

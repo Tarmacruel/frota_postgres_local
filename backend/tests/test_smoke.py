@@ -54,6 +54,7 @@ async def test_openapi_contains_new_routes(client):
     assert "/api/vehicles/{vehicle_id}/claims" in paths
     assert "/api/vehicles/{vehicle_id}/current-driver" in paths
     assert "/api/vehicles/{vehicle_id}/historico" in paths
+    assert "/api/users/{user_id}/permissions" in paths
 
     schemas = payload["components"]["schemas"]
     vehicle_update = schemas["VehicleUpdate"]
@@ -115,8 +116,39 @@ async def test_openapi_contains_new_routes(client):
 
     current_user = schemas["CurrentUserOut"]
     assert "must_change_password" in current_user["properties"]
+    assert "permissions" in current_user["properties"]
+
+    user_create = schemas["UserCreate"]
+    assert "organization_id" in user_create["properties"]
+    assert "organization_id" in user_create["required"]
+
+    user_update = schemas["UserUpdate"]
+    assert "organization_id" in user_update["properties"]
 
     user_out = schemas["UserOut"]
     assert "must_change_password" in user_out["properties"]
+    assert "organization_id" in user_out["properties"]
+    assert "organization_name" in user_out["properties"]
+    assert "permissions" in user_out["properties"]
+
+    permission_flags = schemas["PermissionFlags"]
+    assert {"can_view", "can_create", "can_edit", "can_delete"}.issubset(permission_flags["properties"])
+
+    user_permissions_update = schemas["UserPermissionsUpdate"]
+    assert "permissions" in user_permissions_update["properties"]
+
+    user_permissions_out = schemas["UserPermissionsOut"]
+    assert "permissions" in user_permissions_out["properties"]
+
+    driver_create = schemas["DriverCreate"]
+    assert "organization_id" in driver_create["properties"]
+    assert "organization_id" in driver_create["required"]
+
+    driver_update = schemas["DriverUpdate"]
+    assert "organization_id" in driver_update["properties"]
+
+    driver_out = schemas["DriverOut"]
+    assert "organization_id" in driver_out["properties"]
+    assert "organization_name" in driver_out["properties"]
 
     assert "/api/auth/change-password" in paths

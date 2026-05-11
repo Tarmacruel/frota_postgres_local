@@ -22,8 +22,8 @@ import VehiclesPage from './pages/VehiclesPage'
 import UnauthorizedPage from './pages/UnauthorizedPage'
 
 function HomeRoute() {
-  const { isPosto } = useAuth()
-  if (isPosto) return <Navigate to="/ordens-abastecimento" replace />
+  const { canView } = useAuth()
+  if (!canView('vehicles') && canView('fuel_supply_orders')) return <Navigate to="/ordens-abastecimento" replace />
   return <DashboardPage />
 }
 
@@ -49,7 +49,7 @@ export default function App() {
             <Route
               path="cadastros"
               element={(
-                <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO']}>
+                <ProtectedRoute permission={{ module: 'master_data', action: 'view' }}>
                   <CadastrosPage />
                 </ProtectedRoute>
               )}
@@ -57,7 +57,7 @@ export default function App() {
             <Route
               path="vehicles"
               element={(
-                <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO']}>
+                <ProtectedRoute permission={{ module: 'vehicles', action: 'view' }}>
                   <VehiclesPage />
                 </ProtectedRoute>
               )}
@@ -65,7 +65,7 @@ export default function App() {
             <Route
               path="posses"
               element={(
-                <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO']}>
+                <ProtectedRoute permission={{ module: 'possession', action: 'view' }}>
                   <PossessionPage />
                 </ProtectedRoute>
               )}
@@ -73,7 +73,7 @@ export default function App() {
             <Route
               path="condutores"
               element={(
-                <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO']}>
+                <ProtectedRoute permission={{ module: 'drivers', action: 'view' }}>
                   <DriversPage />
                 </ProtectedRoute>
               )}
@@ -81,7 +81,7 @@ export default function App() {
             <Route
               path="manutencoes"
               element={(
-                <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO']}>
+                <ProtectedRoute permission={{ module: 'maintenance', action: 'view' }}>
                   <MaintenancePage />
                 </ProtectedRoute>
               )}
@@ -89,7 +89,7 @@ export default function App() {
             <Route
               path="sinistros"
               element={(
-                <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO']}>
+                <ProtectedRoute permission={{ module: 'claims', action: 'view' }}>
                   <ClaimsPage />
                 </ProtectedRoute>
               )}
@@ -97,7 +97,7 @@ export default function App() {
             <Route
               path="multas"
               element={(
-                <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO']}>
+                <ProtectedRoute permission={{ module: 'fines', action: 'view' }}>
                   <FinesPage />
                 </ProtectedRoute>
               )}
@@ -105,7 +105,7 @@ export default function App() {
             <Route
               path="abastecimentos"
               element={(
-                <ProtectedRoute allowedRoles={['ADMIN', 'PRODUCAO']}>
+                <ProtectedRoute permission={{ module: 'fuel_supplies', action: 'view' }}>
                   <FuelSuppliesPage />
                 </ProtectedRoute>
               )}
@@ -113,7 +113,7 @@ export default function App() {
             <Route
               path="postos"
               element={(
-                <ProtectedRoute adminOnly>
+                <ProtectedRoute permission={{ module: 'fuel_stations', action: 'view' }}>
                   <FuelStationsPage />
                 </ProtectedRoute>
               )}
@@ -121,7 +121,7 @@ export default function App() {
             <Route
               path="ordens-abastecimento"
               element={
-                <ProtectedRoute allowedRoles={['POSTO']}>
+                <ProtectedRoute permission={{ module: 'fuel_supply_orders', action: 'view' }}>
                   <FuelSupplyOrdersPage />
                 </ProtectedRoute>
               }
@@ -137,8 +137,8 @@ export default function App() {
             <Route
               path="analytics"
               element={
-                <ProtectedRoute adminOnly>
-                    <AdminAnalyticsDashboard />
+                <ProtectedRoute permission={{ module: 'analytics', action: 'view' }}>
+                  <AdminAnalyticsDashboard />
                 </ProtectedRoute>
               }
             />

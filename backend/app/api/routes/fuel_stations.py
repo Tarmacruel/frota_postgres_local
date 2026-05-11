@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user_ready, require_admin
+from app.api.deps import require_admin, require_permission
 from app.db.session import get_db_session
 from app.models.user import User
 from app.schemas.auth import MessageOut
@@ -20,7 +20,7 @@ from app.services.fuel_station_service import FuelStationService
 router = APIRouter(prefix="/api/fuel-stations", tags=["FuelStations"])
 
 
-@router.get("", response_model=list[FuelStationOut], dependencies=[Depends(get_current_user_ready)])
+@router.get("", response_model=list[FuelStationOut], dependencies=[Depends(require_permission("fuel_stations", "view"))])
 async def list_fuel_stations(
     active_only: bool | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
@@ -32,7 +32,7 @@ async def list_fuel_stations(
 async def create_fuel_station(
     data: FuelStationCreate,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("fuel_stations", "create")),
 ):
     return await FuelStationService(db).create(data, current_user)
 
@@ -42,7 +42,7 @@ async def update_fuel_station(
     fuel_station_id: UUID,
     data: FuelStationUpdate,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("fuel_stations", "edit")),
 ):
     return await FuelStationService(db).update(fuel_station_id, data, current_user)
 
@@ -51,7 +51,7 @@ async def update_fuel_station(
 async def delete_fuel_station(
     fuel_station_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_permission("fuel_stations", "delete")),
 ):
     await FuelStationService(db).delete(fuel_station_id, current_user)
     return {"message": "Removido"}

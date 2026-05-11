@@ -12,7 +12,11 @@ function formatDate(value) {
 }
 
 export default function DashboardPage() {
-  const { user, isAdmin, canWrite } = useAuth()
+  const { user, isAdmin, canCreate, canView, canWrite } = useAuth()
+  const canViewVehicles = canView('vehicles')
+  const canViewMaintenance = canView('maintenance')
+  const canViewPossession = canView('possession')
+  const canCreateVehicle = canCreate('vehicles')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [vehicles, setVehicles] = useState([])
@@ -25,9 +29,9 @@ export default function DashboardPage() {
         setLoading(true)
         setError('')
         const [vehiclesResponse, maintenanceResponse, possessionResponse] = await Promise.all([
-          api.get('/vehicles', { params: { limit: VEHICLE_LIST_LIMIT } }),
-          api.get('/maintenance'),
-          api.get('/possession/active'),
+          canViewVehicles ? api.get('/vehicles', { params: { limit: VEHICLE_LIST_LIMIT } }) : Promise.resolve({ data: [] }),
+          canViewMaintenance ? api.get('/maintenance') : Promise.resolve({ data: [] }),
+          canViewPossession ? api.get('/possession/active') : Promise.resolve({ data: [] }),
         ])
         setVehicles(vehiclesResponse.data)
         setMaintenance(maintenanceResponse.data)
@@ -40,7 +44,7 @@ export default function DashboardPage() {
     }
 
     load()
-  }, [])
+  }, [canViewVehicles, canViewMaintenance, canViewPossession])
 
   const stats = useMemo(() => {
     const ativos = vehicles.filter((item) => item.status === 'ATIVO')
@@ -88,14 +92,19 @@ export default function DashboardPage() {
       cta: 'Abrir posses',
     },
     {
-      title: canWrite ? 'Cadastrar novo veículo' : 'Consultar base completa',
-      description: canWrite
+      title: canCreateVehicle ? 'Cadastrar novo veículo' : 'Consultar base completa',
+      description: canCreateVehicle
         ? 'Acesse o módulo principal da frota para cadastrar, editar e abrir históricos.'
         : 'Acesse a base consolidada para pesquisa, filtros e emissão de relatórios.',
       to: '/vehicles',
-      cta: canWrite ? 'Gerenciar frota' : 'Consultar frota',
+      cta: canCreateVehicle ? 'Gerenciar frota' : 'Consultar frota',
     },
-  ]
+  ].filter((item) => {
+    if (item.to.startsWith('/vehicles')) return canViewVehicles
+    if (item.to === '/manutencoes') return canViewMaintenance
+    if (item.to === '/posses') return canViewPossession
+    return true
+  })
 
   const adminActions = isAdmin
     ? [

@@ -9,6 +9,7 @@ import { masterDataAPI } from '../api/masterData'
 import { fuelSuppliesAPI } from '../api/fuelSupplies'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
+import { useAuth } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 import { downloadFuelSupplyOrderDocument, previewFuelSupplyOrderDocument } from '../utils/fuelSupplyOrderDocument'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
@@ -72,6 +73,10 @@ function asArray(payload) {
 }
 
 export default function FuelSuppliesPage() {
+  const { canCreate, canEdit, canView } = useAuth()
+  const canViewOrders = canView('fuel_supply_orders')
+  const canCreateOrder = canCreate('fuel_supply_orders')
+  const canEditOrder = canEdit('fuel_supply_orders')
   const [records, setRecords] = useState([])
   const [orders, setOrders] = useState([])
   const [vehicles, setVehicles] = useState([])
@@ -131,6 +136,11 @@ export default function FuelSuppliesPage() {
   }
 
   async function loadOrders() {
+    if (!canViewOrders) {
+      setOrders([])
+      setOrdersLoading(false)
+      return
+    }
     try {
       setOrdersLoading(true)
       setError('')
@@ -152,7 +162,7 @@ export default function FuelSuppliesPage() {
 
   useEffect(() => {
     loadOrders()
-  }, [orderFilters])
+  }, [orderFilters, canViewOrders])
 
   const filteredRecords = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -216,6 +226,10 @@ export default function FuelSuppliesPage() {
   }, [orderSearch, orderFilters, orders.length])
 
   async function handleCancelOrder(order) {
+    if (!canEditOrder) {
+      setError('Você não tem permissão para cancelar ordens de abastecimento.')
+      return
+    }
     if (!window.confirm(`Cancelar a ordem ${formatOrderNumber(order)}?`)) return
 
     const reason = window.prompt('Motivo do cancelamento (opcional):', '')
@@ -347,7 +361,7 @@ export default function FuelSuppliesPage() {
           <p className="section-copy">Emita ordens para os postos vinculados e acompanhe o histórico confirmado com comprovantes e alertas de consumo.</p>
         </div>
         <div className="actions-inline">
-          <button className="app-button" type="button" onClick={() => setIsOrderModalOpen(true)}>Nova ordem</button>
+          {canCreateOrder ? <button className="app-button" type="button" onClick={() => setIsOrderModalOpen(true)}>Nova ordem</button> : null}
           <button className="ghost-button" type="button" onClick={() => { loadOrders(); loadRecords() }}>Atualizar painel</button>
         </div>
       </div>
@@ -391,7 +405,7 @@ export default function FuelSuppliesPage() {
         </div>
       ) : null}
 
-      <div className="surface-panel panel-nested" style={{ marginBottom: 16 }}>
+      {canViewOrders ? <div className="surface-panel panel-nested" style={{ marginBottom: 16 }}>
         <div className="panel-heading">
           <div>
             <h3 className="section-title">Ordens de abastecimento</h3>
@@ -479,7 +493,7 @@ export default function FuelSuppliesPage() {
                       <button type="button" className="mini-button" onClick={() => handlePreviewOrderDocument(order)}>Comprovante</button>
                       <button type="button" className="mini-button" onClick={() => handleCopyPublicLink(order)}>Link público</button>
                       <button type="button" className="mini-button" onClick={() => handleDownloadOrderDocument(order)}>Baixar PDF</button>
-                      {order.status === 'OPEN' ? <button type="button" className="mini-button danger" onClick={() => handleCancelOrder(order)}>Cancelar</button> : null}
+                      {order.status === 'OPEN' && canEditOrder ? <button type="button" className="mini-button danger" onClick={() => handleCancelOrder(order)}>Cancelar</button> : null}
                     </div>
                   </td>
                 </tr>
@@ -488,7 +502,7 @@ export default function FuelSuppliesPage() {
           </table>
         </div>
         <Pagination currentPage={currentOrdersPage} totalPages={totalOrdersPages} onPageChange={setCurrentOrdersPage} />
-      </div>
+      </div> : null}
 
       <div className="surface-panel panel-nested">
         <div className="panel-heading">
@@ -548,7 +562,7 @@ export default function FuelSuppliesPage() {
         <Pagination currentPage={currentHistoryPage} totalPages={totalHistoryPages} onPageChange={setCurrentHistoryPage} />
       </div>
 
-      <Modal open={isOrderModalOpen} onClose={() => setIsOrderModalOpen(false)} title="Nova ordem de abastecimento" description="Emita a ordem para um posto credenciado executar o abastecimento.">
+      <Modal open={isOrderModalOpen && canCreateOrder} onClose={() => setIsOrderModalOpen(false)} title="Nova ordem de abastecimento" description="Emita a ordem para um posto credenciado executar o abastecimento.">
         <FuelSupplyOrderCreateForm
           vehicles={vehicles}
           drivers={drivers}

@@ -54,6 +54,15 @@ C:\Users\078364\OneDrive\BACKUPS\FROTAS
 powershell -NoProfile -ExecutionPolicy Bypass -File .\Diagnostico.ps1
 ```
 
+## Manual completo
+
+O manual de uso da versão atual fica em:
+
+```text
+docs\manual_sistema_frotas.md
+output\doc\manual_sistema_frotas.pdf
+```
+
 ## Scripts internos
 
 Os scripts operacionais ficam em `scripts\`. Para uso normal, prefira sempre `FROTA_Iniciar.bat`.

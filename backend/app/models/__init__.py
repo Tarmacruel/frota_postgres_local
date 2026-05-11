@@ -9,6 +9,7 @@ from app.models.fuel_supply_order import FuelSupplyOrder, FuelSupplyOrderStatus
 from app.models.fleet_analytics_snapshot import FleetAnalyticsSnapshot
 from app.models.master_data import Allocation, Department, Organization
 from app.models.user import User, UserRole
+from app.models.user_permission import UserPermission
 from app.models.vehicle import Vehicle, VehicleOwnershipType, VehicleStatus, VehicleType
 from app.models.location_history import LocationHistory
 from app.models.maintenance import MaintenanceRecord
@@ -36,6 +37,7 @@ __all__ = [
     "Allocation",
     "User",
     "UserRole",
+    "UserPermission",
     "Vehicle",
     "VehicleOwnershipType",
     "VehicleStatus",

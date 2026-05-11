@@ -23,7 +23,9 @@ const IMPORT_TEMPLATE_ROWS = [
 ]
 
 export default function CadastrosPage() {
-  const { canWrite, canDelete } = useAuth()
+  const { canCreate, canEdit, canDeleteModule } = useAuth()
+  const canWrite = canCreate('master_data') || canEdit('master_data')
+  const canDelete = canDeleteModule('master_data')
   const {
     organizations,
     departments,

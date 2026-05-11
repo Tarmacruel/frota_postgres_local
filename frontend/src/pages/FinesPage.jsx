@@ -49,7 +49,9 @@ function driverOption(driver) {
 }
 
 export default function FinesPage() {
-  const { canWrite } = useAuth()
+  const { canCreate, canEdit } = useAuth()
+  const canCreateFine = canCreate('fines')
+  const canEditFine = canEdit('fines')
   const [vehicles, setVehicles] = useState([])
   const [drivers, setDrivers] = useState([])
   const [records, setRecords] = useState([])
@@ -137,6 +139,10 @@ export default function FinesPage() {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if ((editingRecord && !canEditFine) || (!editingRecord && !canCreateFine)) {
+      setError('Você não tem permissão para salvar multa neste módulo.')
+      return
+    }
     try {
       setSubmitting(true)
       if (!form.vehicle_id) {
@@ -199,7 +205,7 @@ export default function FinesPage() {
           <p className="section-copy">Registre autos de infracao, acompanhe vencimentos e status de pagamento ou recurso.</p>
         </div>
         <div className="actions-inline">
-          {canWrite ? <button className="app-button" onClick={openCreate}>Nova multa</button> : null}
+          {canCreateFine ? <button className="app-button" onClick={openCreate}>Nova multa</button> : null}
           <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
@@ -225,9 +231,9 @@ export default function FinesPage() {
       <div className="surface-panel panel-nested">
         <div className="table-wrap table-wrap-wide">
           <table className="data-table data-table-wide">
-            <thead><tr><th>Veículo</th><th>Auto</th><th>Condutor</th><th>Infracao</th><th>Vencimento</th><th>Valor</th><th>Status</th>{canWrite ? <th>Ações</th> : null}</tr></thead>
+            <thead><tr><th>Veículo</th><th>Auto</th><th>Condutor</th><th>Infracao</th><th>Vencimento</th><th>Valor</th><th>Status</th>{canEditFine ? <th>Ações</th> : null}</tr></thead>
             <tbody>
-              {loading ? <tr><td colSpan={canWrite ? 8 : 7}>Carregando multas...</td></tr> : records.length === 0 ? <tr><td colSpan={canWrite ? 8 : 7}><div className="empty-state">Nenhuma multa encontrada.</div></td></tr> : records.map((record) => (
+              {loading ? <tr><td colSpan={canEditFine ? 8 : 7}>Carregando multas...</td></tr> : records.length === 0 ? <tr><td colSpan={canEditFine ? 8 : 7}><div className="empty-state">Nenhuma multa encontrada.</div></td></tr> : records.map((record) => (
                 <tr key={record.id}>
                   <td><strong>{record.vehicle_plate}</strong></td>
                   <td>{record.ticket_number}</td>
@@ -236,7 +242,7 @@ export default function FinesPage() {
                   <td>{formatDate(record.due_date)}</td>
                   <td>{new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(Number(record.amount || 0))}</td>
                   <td><span className="status-badge status-MANUTENCAO">{record.status}</span></td>
-                  {canWrite ? <td><button className="mini-button" onClick={() => openEdit(record)}>Editar</button></td> : null}
+                  {canEditFine ? <td><button className="mini-button" onClick={() => openEdit(record)}>Editar</button></td> : null}
                 </tr>
               ))}
             </tbody>

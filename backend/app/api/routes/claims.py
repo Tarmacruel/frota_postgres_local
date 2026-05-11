@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user_ready, require_writer
+from app.api.deps import require_permission
 from app.db.session import get_db_session
 from app.models.claim import ClaimStatus, ClaimType
 from app.schemas.claim import ClaimCreate, ClaimListResponse, ClaimOut, ClaimUpdate
@@ -12,7 +12,7 @@ from app.services.claim_service import ClaimService
 router = APIRouter(prefix="/api/claims", tags=["Claims"])
 
 
-@router.get("", response_model=ClaimListResponse, dependencies=[Depends(get_current_user_ready)])
+@router.get("", response_model=ClaimListResponse, dependencies=[Depends(require_permission("claims", "view"))])
 async def list_claims(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),
@@ -32,7 +32,7 @@ async def list_claims(
     )
 
 
-@router.get("/{claim_id}", response_model=ClaimOut, dependencies=[Depends(get_current_user_ready)])
+@router.get("/{claim_id}", response_model=ClaimOut, dependencies=[Depends(require_permission("claims", "view"))])
 async def get_claim(claim_id: UUID, db: AsyncSession = Depends(get_db_session)):
     return await ClaimService(db).get(claim_id)
 
@@ -41,7 +41,7 @@ async def get_claim(claim_id: UUID, db: AsyncSession = Depends(get_db_session)):
 async def create_claim(
     data: ClaimCreate,
     db: AsyncSession = Depends(get_db_session),
-    current_user=Depends(require_writer),
+    current_user=Depends(require_permission("claims", "create")),
 ):
     return await ClaimService(db).create(data, current_user)
 
@@ -51,6 +51,6 @@ async def update_claim(
     claim_id: UUID,
     data: ClaimUpdate,
     db: AsyncSession = Depends(get_db_session),
-    current_user=Depends(require_writer),
+    current_user=Depends(require_permission("claims", "edit")),
 ):
     return await ClaimService(db).update(claim_id, data, current_user)

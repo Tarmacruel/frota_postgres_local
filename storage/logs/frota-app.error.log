@@ -1,4 +1,5 @@
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
-INFO  [alembic.runtime.migration] Context impl PostgresqlImpl.
-INFO  [alembic.runtime.migration] Will assume transactional DDL.
-INFO  [alembic.runtime.migration] Will assume transactional DDL.
+Z:\FROTAS\frota_postgres_local\scripts\run-dev-server.ps1 : Falha na invoca‡Æo do m‚todo porque 
+[System.Management.Automation.PathInfo] nÆo cont‚m um m‚todo denominado 'Substring'.
+    + CategoryInfo          : InvalidOperation: (:) [run-dev-server.ps1], RuntimeException
+    + FullyQualifiedErrorId : MethodNotFound,run-dev-server.ps1
+ 

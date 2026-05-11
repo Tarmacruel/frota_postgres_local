@@ -18,7 +18,7 @@ function vehicleOption(vehicle) {
   }
 }
 
-export default function ClaimForm({ vehicles, initialData = null, onSuccess, onClose }) {
+export default function ClaimForm({ vehicles, initialData = null, onSuccess, onClose, canSubmit = true }) {
   const [form, setForm] = useState({
     vehicle_id: initialData?.vehicle_id || '',
     driver_id: initialData?.driver_id || '',
@@ -37,6 +37,10 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if (!canSubmit) {
+      setError('Você não tem permissão para salvar sinistros.')
+      return
+    }
     try {
       setSubmitting(true)
       setError('')
@@ -146,7 +150,7 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
       </div>
 
       <div className="actions-inline modal-actions">
-        <button className="app-button" type="submit" disabled={submitting || !form.vehicle_id}>
+        <button className="app-button" type="submit" disabled={submitting || !form.vehicle_id || !canSubmit}>
           {submitting ? 'Salvando...' : initialData?.id ? 'Atualizar sinistro' : 'Registrar sinistro'}
         </button>
         <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>
