@@ -41,6 +41,8 @@ const ownershipOptions = [
   { value: 'CEDIDO', label: 'Cedido' },
 ]
 
+const unassignedOrganizationFilter = 'SEM_SECRETARIA'
+
 const vehicleTypeOptions = [
   { value: 'SEDAN', label: 'Sedan' },
   { value: 'HATCH', label: 'Hatch' },
@@ -125,6 +127,10 @@ function buildVehicleLocationLabel(vehicle) {
   return vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação registrada'
 }
 
+function buildVehicleOrganizationLabel(vehicle) {
+  return vehicle.current_location?.organization_name || 'Sem secretaria'
+}
+
 function buildVehicleOption(vehicle) {
   const locationLabel = buildVehicleLocationLabel(vehicle)
   return {
@@ -137,10 +143,17 @@ function buildVehicleOption(vehicle) {
   }
 }
 
-function buildFilterSummary(statusFilter, ownershipFilter, locationFilter, search, locationOptions) {
+function buildFilterSummary(statusFilter, ownershipFilter, organizationFilter, locationFilter, search, organizationOptions, locationOptions) {
   const filters = []
   const statusLabel = statusOptions.find((option) => option.value === statusFilter)?.label
   if (statusLabel) filters.push({ label: 'Status', value: statusLabel })
+
+  if (organizationFilter !== 'TODOS') {
+    const organizationLabel = organizationFilter === unassignedOrganizationFilter
+      ? 'Sem secretaria'
+      : organizationOptions.find((option) => option.value === organizationFilter)?.label || organizationFilter
+    filters.push({ label: 'Secretaria', value: organizationLabel })
+  }
 
   if (ownershipFilter !== 'TODOS') {
     filters.push({ label: 'Tipo', value: getOwnershipLabel(ownershipFilter) })
@@ -229,6 +242,7 @@ export default function VehiclesPage() {
   const [selectedVehicle, setSelectedVehicle] = useState(null)
   const [editingId, setEditingId] = useState(null)
   const [search, setSearch] = useState('')
+  const [organizationFilter, setOrganizationFilter] = useState('TODOS')
   const [locationFilter, setLocationFilter] = useState('TODOS')
   const [ownershipFilter, setOwnershipFilter] = useState('TODOS')
   const [loading, setLoading] = useState(true)
@@ -254,6 +268,24 @@ export default function VehiclesPage() {
     label: organization.name,
     description: `${organization.departments.length} departamento(s)`,
   }))
+
+  const organizationFilterOptions = useMemo(() => {
+    const baseOptions = organizations
+      .map((organization) => ({
+        value: organization.id,
+        label: organization.name,
+        description: `${organization.departments.length} departamento(s)`,
+      }))
+      .sort((a, b) => a.label.localeCompare(b.label))
+    const hasUnassignedVehicles =
+      vehicles.some((vehicle) => !vehicle.current_location?.organization_id) || organizationFilter === unassignedOrganizationFilter
+
+    return [
+      { value: 'TODOS', label: 'Todas as secretarias' },
+      ...baseOptions,
+      ...(hasUnassignedVehicles ? [{ value: unassignedOrganizationFilter, label: 'Sem secretaria' }] : []),
+    ]
+  }, [organizationFilter, organizations, vehicles])
 
   const departmentOptions = (form.organization_id ? getDepartmentsByOrganization(form.organization_id) : []).map((department) => ({
     value: department.id,
@@ -297,6 +329,7 @@ export default function VehiclesPage() {
     { header: 'Tipo veículo', value: (vehicle) => getVehicleTypeLabel(vehicle.vehicle_type), align: 'center', width: 82 },
     { header: 'Tipo propriedade', value: (vehicle) => getOwnershipLabel(vehicle.ownership_type), align: 'center', width: 74, badgeColors: getOwnershipBadgeColors },
     { header: 'Status', value: (vehicle) => getStatusLabel(vehicle.status), align: 'center', width: 88, badgeColors: getStatusBadgeColors },
+    { header: 'Secretaria', value: (vehicle) => buildVehicleOrganizationLabel(vehicle), width: 106 },
     { header: 'Lotação atual', value: (vehicle) => buildVehicleLocationLabel(vehicle) },
     { header: 'Condutor atual', value: (vehicle) => vehicle.current_driver_name || '—' },
     { header: 'Atualizado em', value: (vehicle) => formatDate(vehicle.updated_at), align: 'center', width: 92 },
@@ -331,7 +364,7 @@ export default function VehiclesPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, locationFilter, ownershipFilter, statusFilter, selectedVehicle?.id, vehicles.length])
+  }, [search, organizationFilter, locationFilter, ownershipFilter, statusFilter, selectedVehicle?.id, vehicles.length])
 
   useEffect(() => {
     if (!focusVehicleId) {
@@ -358,6 +391,7 @@ export default function VehiclesPage() {
         vehicle.chassis_number,
         vehicle.brand,
         vehicle.model,
+        buildVehicleOrganizationLabel(vehicle),
         buildVehicleLocationLabel(vehicle),
         vehicle.current_driver_name,
         getOwnershipLabel(vehicle.ownership_type),
@@ -365,10 +399,14 @@ export default function VehiclesPage() {
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(term))
 
+    const vehicleOrganizationId = vehicle.current_location?.organization_id
+    const matchesOrganization =
+      organizationFilter === 'TODOS' ||
+      (organizationFilter === unassignedOrganizationFilter ? !vehicleOrganizationId : vehicleOrganizationId === organizationFilter)
     const matchesLocation = locationFilter === 'TODOS' || buildVehicleLocationLabel(vehicle) === locationFilter
     const matchesOwnership = ownershipFilter === 'TODOS' || vehicle.ownership_type === ownershipFilter
 
-    return matchesSearch && matchesLocation && matchesOwnership
+    return matchesSearch && matchesOrganization && matchesLocation && matchesOwnership
   })
 
   const filteredVehicles = selectedVehicle
@@ -463,6 +501,7 @@ export default function VehiclesPage() {
 
   function clearFilters() {
     setSearch('')
+    setOrganizationFilter('TODOS')
     setLocationFilter('TODOS')
     setOwnershipFilter('TODOS')
     clearHistoryFocus(false)
@@ -571,7 +610,7 @@ export default function VehiclesPage() {
         subtitle: 'Relatório dos veículos filtrados no painel operacional.',
         columns: exportColumns,
         rows: filteredVehicles,
-        filters: buildFilterSummary(statusFilter, ownershipFilter, locationFilter, search, locationOptions),
+        filters: buildFilterSummary(statusFilter, ownershipFilter, organizationFilter, locationFilter, search, organizationFilterOptions, locationOptions),
         summaryMetrics: vehicleReportMetrics,
         summaryChartItems: [
           { label: 'Ativos', value: visibleActiveVehicles, tone: 'green' },
@@ -603,7 +642,7 @@ export default function VehiclesPage() {
         sheetName: 'Veículos',
         columns: exportColumns,
         rows: filteredVehicles,
-        filters: buildFilterSummary(statusFilter, ownershipFilter, locationFilter, search, locationOptions),
+        filters: buildFilterSummary(statusFilter, ownershipFilter, organizationFilter, locationFilter, search, organizationFilterOptions, locationOptions),
       })
       setFeedback('Exportação em XLSX iniciada com sucesso.')
     } catch (err) {
@@ -714,9 +753,17 @@ export default function VehiclesPage() {
           <div className="filter-inline">
             <input
               className="app-input"
-              placeholder="Buscar por placa, chassi, marca, modelo, lotação ou condutor"
+              placeholder="Buscar por placa, chassi, marca, modelo, secretaria, lotação ou condutor"
               value={search}
               onChange={(event) => setSearch(event.target.value)}
+            />
+            <SearchableSelect
+              value={organizationFilter}
+              onChange={setOrganizationFilter}
+              options={organizationFilterOptions}
+              placeholder="Filtrar secretaria"
+              searchPlaceholder="Buscar secretaria"
+              disabled={catalogLoading && organizationFilterOptions.length <= 1}
             />
             <SearchableSelect
               value={locationFilter}
@@ -795,7 +842,7 @@ export default function VehiclesPage() {
                 <tr>
                   <td colSpan="11">
                     <div className="empty-state">
-                      Nenhum veículo encontrado para os filtros aplicados. Ajuste a busca, a lotação ou o tipo para revisar a base completa.
+                      Nenhum veículo encontrado para os filtros aplicados. Ajuste a busca, a secretaria, a lotação ou o tipo para revisar a base completa.
                     </div>
                   </td>
                 </tr>
