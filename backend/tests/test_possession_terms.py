@@ -11,9 +11,13 @@ from app.services.possession_service import PossessionService
 class FakePossessionRepository:
     def __init__(self, record=None):
         self.record = record
+        self.deleted = None
 
     async def has_validation_code(self, _validation_code):
         return False
+
+    async def get_by_id(self, _possession_id):
+        return self.record
 
     async def get_by_loan_term_validation_code(self, _validation_code):
         return self.record
@@ -21,11 +25,35 @@ class FakePossessionRepository:
     async def get_by_return_term_validation_code(self, _validation_code):
         return self.record
 
+    async def delete(self, record):
+        self.deleted = record
+
+
+class FakeAuditService:
+    def __init__(self):
+        self.records = []
+
+    async def record(self, **kwargs):
+        self.records.append(kwargs)
+
+
+class FakeDbSession:
+    def __init__(self):
+        self.committed = False
+        self.rolled_back = False
+
+    async def commit(self):
+        self.committed = True
+
+    async def rollback(self):
+        self.rolled_back = True
+
 
 def build_record(*, active=False):
     return SimpleNamespace(
         id=uuid4(),
         vehicle_id=uuid4(),
+        driver_id=None,
         vehicle=SimpleNamespace(plate="TOA5G07", brand="VW", model="Nova Track"),
         driver_name="Itamar Alves Rodrigues",
         driver_document="43098",
@@ -36,6 +64,13 @@ def build_record(*, active=False):
         end_odometer_km=None if active else 1940,
         observation="Sem avarias aparentes.",
         created_at=datetime(2026, 5, 2, 11, 10, tzinfo=timezone.utc),
+        is_active=active,
+        photo_path="possession_photos/legacy.jpg",
+        photos=[SimpleNamespace(photo_path="possession_photos/evidence.jpg")],
+        document_path="possession_documents/loan.pdf",
+        document_name="loan.pdf",
+        return_document_path=None if active else "possession_documents/return.pdf",
+        return_document_name=None if active else "return.pdf",
         loan_term_validation_code="TE-ABC123DEF456",
         return_term_validation_code="TD-ABC123DEF456",
     )
@@ -75,3 +110,30 @@ async def test_public_return_term_is_unavailable_until_possession_ends():
 
     assert exc.value.status_code == 404
     assert exc.value.detail == "Termo de devolucao ainda nao disponivel"
+
+
+@pytest.mark.asyncio
+async def test_delete_possession_records_audit_deletes_record_and_cleans_files():
+    db = FakeDbSession()
+    actor = SimpleNamespace(id=uuid4())
+    record = build_record(active=False)
+    repository = FakePossessionRepository(record)
+    audit = FakeAuditService()
+    cleaned_paths = []
+
+    service = PossessionService(db=db)
+    service.possessions = repository
+    service.audit = audit
+    service._cleanup_files = lambda paths: cleaned_paths.extend(paths)
+
+    await service.delete(record.id, actor)
+
+    assert repository.deleted is record
+    assert db.committed is True
+    assert db.rolled_back is False
+    assert audit.records[0]["action"] == "DELETE"
+    assert audit.records[0]["entity_type"] == "POSSESSION"
+    assert audit.records[0]["entity_id"] == record.id
+    assert audit.records[0]["details"]["driver_name"] == record.driver_name
+    assert audit.records[0]["details"]["is_active"] is False
+    assert len(cleaned_paths) == 4

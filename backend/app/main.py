@@ -9,6 +9,7 @@ from app.api.routes.analytics import router as analytics_router
 from app.api.routes.audit import router as audit_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.claims import router as claims_router
+from app.api.routes.data_imports import router as data_imports_router
 from app.api.routes.drivers import router as drivers_router
 from app.api.routes.fines import router as fines_router
 from app.api.routes.fuel_stations import router as fuel_stations_router
@@ -42,6 +43,7 @@ app.include_router(audit_router)
 app.include_router(admin_notifications_router)
 app.include_router(users_router)
 app.include_router(master_data_router)
+app.include_router(data_imports_router)
 app.include_router(drivers_router)
 app.include_router(vehicles_router)
 app.include_router(maintenance_router)

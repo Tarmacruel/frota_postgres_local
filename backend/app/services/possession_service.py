@@ -475,6 +475,53 @@ class PossessionService:
 
         return await self._get_by_id(possession.id, current_user)
 
+    async def delete(self, possession_id: UUID, current_user: User) -> None:
+        possession = await self.possessions.get_by_id(possession_id)
+        if not possession:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse nÃ£o encontrado")
+
+        stored_paths = self._collect_possession_file_paths(possession)
+        photo_count = (1 if possession.photo_path else 0) + len(possession.photos)
+        vehicle_label = possession.vehicle.plate if possession.vehicle else possession.vehicle_id
+
+        try:
+            await self.audit.record(
+                actor=current_user,
+                action="DELETE",
+                entity_type="POSSESSION",
+                entity_id=possession.id,
+                entity_label=f"{vehicle_label} - {possession.driver_name}",
+                details={
+                    "vehicle_id": str(possession.vehicle_id),
+                    "driver_id": str(possession.driver_id) if possession.driver_id else None,
+                    "driver_name": possession.driver_name,
+                    "driver_document": possession.driver_document,
+                    "driver_contact": possession.driver_contact,
+                    "start_date": possession.start_date.isoformat() if possession.start_date else None,
+                    "end_date": possession.end_date.isoformat() if possession.end_date else None,
+                    "observation": possession.observation,
+                    "start_odometer_km": possession.start_odometer_km,
+                    "end_odometer_km": possession.end_odometer_km,
+                    "kilometers_driven": self._calculate_kilometers_driven(possession.start_odometer_km, possession.end_odometer_km),
+                    "is_active": possession.is_active,
+                    "photo_count": photo_count,
+                    "loan_term_name": possession.document_name,
+                    "return_term_name": possession.return_document_name,
+                    "loan_term_validation_code": possession.loan_term_validation_code,
+                    "return_term_validation_code": possession.return_term_validation_code,
+                },
+            )
+            await self.possessions.delete(possession)
+            await self.db.commit()
+        except IntegrityError as exc:
+            await self.db.rollback()
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="NÃ£o foi possÃ­vel remover a posse") from exc
+        except Exception:
+            await self.db.rollback()
+            raise
+
+        self._cleanup_files(stored_paths)
+
     async def get_photo_file(self, possession_id: UUID, *, photo_id: UUID | None = None) -> FileResponse:
         record = await self.possessions.get_by_id(possession_id)
         if not record:
@@ -794,6 +841,17 @@ class PossessionService:
 
     def _resolve_document_path(self, relative_document_path: str) -> Path:
         return Path(settings.STORAGE_DIR) / Path(relative_document_path)
+
+    def _collect_possession_file_paths(self, possession: VehiclePossession) -> list[Path]:
+        paths: list[Path] = []
+        if possession.photo_path:
+            paths.append(self._resolve_photo_path(possession.photo_path))
+        paths.extend(self._resolve_photo_path(photo.photo_path) for photo in possession.photos if photo.photo_path)
+        if possession.document_path:
+            paths.append(self._resolve_document_path(possession.document_path))
+        if possession.return_document_path:
+            paths.append(self._resolve_document_path(possession.return_document_path))
+        return paths
 
     def _cleanup_file(self, absolute_path: Path | None) -> None:
         if not absolute_path:

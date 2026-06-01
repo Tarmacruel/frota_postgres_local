@@ -107,9 +107,10 @@ function normalizeUploadList(fileList) {
 }
 
 export default function PossessionPage() {
-  const { canCreate, canEdit, isAdmin } = useAuth()
+  const { canCreate, canEdit, canDeleteModule, isAdmin } = useAuth()
   const canCreatePossession = canCreate('possession')
   const canEditPossession = canEdit('possession')
+  const canDeletePossession = canDeleteModule('possession')
   const [searchParams, setSearchParams] = useSearchParams()
   const [vehicles, setVehicles] = useState([])
   const [records, setRecords] = useState([])
@@ -589,7 +590,7 @@ export default function PossessionPage() {
     event.preventDefault()
     if (!editingRecord) return
     if (!canEditPossession) {
-      setError('Você não tem permissão para editar posses.')
+      setError('Você não tem permissão para retificar posses.')
       return
     }
 
@@ -618,13 +619,33 @@ export default function PossessionPage() {
       })
 
       await possessionAPI.update(editingRecord.id, payload)
-      setFeedback('Registro de posse atualizado com justificativa e auditoria.')
+      setFeedback('Registro de posse retificado com justificativa e auditoria.')
       closeEditModal()
       await loadPossessions()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível atualizar a posse.'))
+      setError(getApiErrorMessage(err, 'Não foi possível retificar a posse.'))
     } finally {
       setSavingEdit(false)
+    }
+  }
+
+  async function handleDeletePossession(record) {
+    if (!record || !window.confirm(`Confirma a exclusão da posse de ${record.driver_name} no veículo ${record.vehicle_plate}?`)) return
+
+    try {
+      setError('')
+      setFeedback('')
+      await possessionAPI.remove(record.id)
+      if (editingRecord?.id === record.id) closeEditModal()
+      if (endingRecord?.id === record.id) closeEndModal()
+      if (photoRecord?.id === record.id) closePhotoModal()
+      if (termRecord?.id === record.id) closeTermModal()
+      if (locationRecord?.record?.id === record.id) closeLocationModal()
+      if (focusRecordId === record.id) clearFocus()
+      setFeedback('Posse excluída com sucesso.')
+      await loadPossessions()
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Não foi possível excluir a posse.'))
     }
   }
 
@@ -883,7 +904,12 @@ export default function PossessionPage() {
                         </button>
                         {canEditPossession ? (
                           <button type="button" className="mini-button" onClick={() => openEditModal(record)}>
-                            Editar
+                            Retificar
+                          </button>
+                        ) : null}
+                        {canDeletePossession ? (
+                          <button type="button" className="mini-button danger" onClick={() => handleDeletePossession(record)}>
+                            Excluir
                           </button>
                         ) : null}
                         {record.is_active && canEditPossession ? (
@@ -921,8 +947,8 @@ export default function PossessionPage() {
 
       <Modal
         open={Boolean(editingRecord)}
-        title="Editar posse"
-        description={editingRecord ? `Edição administrativa de ${editingRecord.driver_name} no veículo ${editingRecord.vehicle_plate}. A justificativa é obrigatória, entra na auditoria e também pode substituir termos e fotos complementares.` : ''}
+        title="Retificar posse"
+        description={editingRecord ? `Retificação administrativa de ${editingRecord.driver_name} no veículo ${editingRecord.vehicle_plate}. A justificativa é obrigatória, entra na auditoria e também pode substituir termos e fotos complementares.` : ''}
         onClose={closeEditModal}
       >
         <form onSubmit={handleEditPossession} className="form-grid modal-form-grid">
@@ -1015,12 +1041,12 @@ export default function PossessionPage() {
             />
           </div>
           <div className="form-field modal-field-span">
-            <label htmlFor="edit-possession-reason">Justificativa da edição</label>
+            <label htmlFor="edit-possession-reason">Justificativa da retificação</label>
             <textarea
               id="edit-possession-reason"
               className="app-textarea"
               rows="3"
-              placeholder="Explique por que este registro precisa ser corrigido."
+              placeholder="Explique por que este registro precisa ser retificado."
               value={editForm.edit_reason}
               onChange={(event) => setEditForm({ ...editForm, edit_reason: event.target.value })}
             />
@@ -1112,7 +1138,7 @@ export default function PossessionPage() {
           </div>
           <div className="actions-inline modal-actions">
             <button className="app-button" type="submit" disabled={savingEdit || !editForm.start_date || !editForm.edit_reason.trim()}>
-              {savingEdit ? 'Salvando...' : 'Salvar edição'}
+              {savingEdit ? 'Salvando...' : 'Salvar retificação'}
             </button>
             <button className="ghost-button" type="button" onClick={closeEditModal}>Cancelar</button>
           </div>

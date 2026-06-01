@@ -7,6 +7,7 @@ import AdminAnalyticsDashboard from './pages/AdminAnalyticsDashboard'
 import CadastrosPage from './pages/CadastrosPage'
 import ClaimsPage from './pages/ClaimsPage'
 import DashboardPage from './pages/DashboardPage'
+import DataImportsPage from './pages/DataImportsPage'
 import DriversPage from './pages/DriversPage'
 import FinesPage from './pages/FinesPage'
 import FuelSuppliesPage from './pages/FuelSuppliesPage'
@@ -139,6 +140,14 @@ export default function App() {
               element={
                 <ProtectedRoute permission={{ module: 'analytics', action: 'view' }}>
                   <AdminAnalyticsDashboard />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="importacao-dados"
+              element={
+                <ProtectedRoute permission={{ module: 'data_imports', action: 'view' }}>
+                  <DataImportsPage />
                 </ProtectedRoute>
               }
             />

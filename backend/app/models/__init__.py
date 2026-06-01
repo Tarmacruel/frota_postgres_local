@@ -1,6 +1,14 @@
 from app.models.admin_notification import AdminNotification
 from app.models.audit_log import AuditLog
 from app.models.claim import Claim, ClaimStatus, ClaimType
+from app.models.data_import import (
+    DataImportBatch,
+    DataImportBatchStatus,
+    DataImportEntityType,
+    DataImportRow,
+    DataImportRowStatus,
+    DataImportSuggestedAction,
+)
 from app.models.driver import Driver, DriverLicenseCategory
 from app.models.fine import Fine, FineStatus
 from app.models.fuel_station import FuelStation, FuelStationUser
@@ -22,6 +30,12 @@ __all__ = [
     "Claim",
     "ClaimStatus",
     "ClaimType",
+    "DataImportBatch",
+    "DataImportBatchStatus",
+    "DataImportEntityType",
+    "DataImportRow",
+    "DataImportRowStatus",
+    "DataImportSuggestedAction",
     "Driver",
     "DriverLicenseCategory",
     "Fine",

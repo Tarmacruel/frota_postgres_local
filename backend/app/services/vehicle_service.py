@@ -17,6 +17,21 @@ from app.repositories.vehicle_repository import VehicleRepository
 from app.schemas.common import PaginatedResponse, build_pagination
 from app.schemas.vehicle import VehicleCreate, VehicleUpdate
 
+VEHICLE_OPTIONAL_FIELDS = (
+    "renavam",
+    "year",
+    "prefix",
+    "patrimonio_numero_frota",
+    "color",
+    "fuel_type",
+    "tank_capacity_liters",
+    "transmission",
+    "city",
+    "state",
+    "registered_detran",
+    "engine_spec",
+)
+
 
 class VehicleService:
     def __init__(self, db: AsyncSession):
@@ -92,6 +107,8 @@ class VehicleService:
             ownership_type=data.ownership_type,
             status=data.status,
         )
+        for field in VEHICLE_OPTIONAL_FIELDS:
+            setattr(vehicle, field, self._normalize_optional_vehicle_value(field, getattr(data, field, None)))
         history = LocationHistory(
             allocation_id=allocation.id,
             department=allocation.display_name,
@@ -111,6 +128,7 @@ class VehicleService:
                     "chassis_number": vehicle.chassis_number,
                     "brand": vehicle.brand,
                     "model": vehicle.model,
+                    **{field: getattr(vehicle, field) for field in VEHICLE_OPTIONAL_FIELDS},
                     "vehicle_type": vehicle.vehicle_type.value,
                     "ownership_type": vehicle.ownership_type.value,
                     "status": vehicle.status.value,
@@ -136,6 +154,7 @@ class VehicleService:
             "chassis_number": vehicle.chassis_number,
             "brand": vehicle.brand,
             "model": vehicle.model,
+            **{field: getattr(vehicle, field) for field in VEHICLE_OPTIONAL_FIELDS},
             "vehicle_type": vehicle.vehicle_type.value,
             "ownership_type": vehicle.ownership_type.value,
             "status": vehicle.status.value,
@@ -163,6 +182,9 @@ class VehicleService:
                 vehicle.brand = data.brand.strip()
             if data.model is not None:
                 vehicle.model = data.model.strip()
+            for field in VEHICLE_OPTIONAL_FIELDS:
+                if getattr(data, field) is not None:
+                    setattr(vehicle, field, self._normalize_optional_vehicle_value(field, getattr(data, field)))
             if data.vehicle_type is not None:
                 vehicle.vehicle_type = data.vehicle_type
             if data.ownership_type is not None:
@@ -200,6 +222,7 @@ class VehicleService:
                         "chassis_number": vehicle.chassis_number,
                         "brand": vehicle.brand,
                         "model": vehicle.model,
+                        **{field: getattr(vehicle, field) for field in VEHICLE_OPTIONAL_FIELDS},
                         "vehicle_type": vehicle.vehicle_type.value,
                         "ownership_type": vehicle.ownership_type.value,
                         "status": vehicle.status.value,
@@ -237,6 +260,7 @@ class VehicleService:
                     "chassis_number": vehicle.chassis_number,
                     "brand": vehicle.brand,
                     "model": vehicle.model,
+                    **{field: getattr(vehicle, field) for field in VEHICLE_OPTIONAL_FIELDS},
                     "vehicle_type": vehicle.vehicle_type.value,
                     "ownership_type": vehicle.ownership_type.value,
                     "status": vehicle.status.value,
@@ -282,14 +306,41 @@ class VehicleService:
         normalized = chassis_number.strip().upper()
         return normalized or None
 
+    def _normalize_optional_vehicle_value(self, field: str, value):
+        if value is None:
+            return None
+        if field == "state":
+            normalized = str(value).strip().upper()
+            return normalized[:2] or None
+        if field == "tank_capacity_liters":
+            return float(value) if value is not None else None
+        if field == "registered_detran":
+            return bool(value) if value is not None else None
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
+        return value
+
     def _serialize_vehicle(self, vehicle: Vehicle, active_history: LocationHistory | None, possession) -> dict:
         current_location = self._serialize_location(active_history)
         return {
             "id": vehicle.id,
             "plate": vehicle.plate,
             "chassis_number": vehicle.chassis_number,
+            "renavam": vehicle.renavam,
             "brand": vehicle.brand,
             "model": vehicle.model,
+            "year": vehicle.year,
+            "prefix": vehicle.prefix,
+            "patrimonio_numero_frota": vehicle.patrimonio_numero_frota,
+            "color": vehicle.color,
+            "fuel_type": vehicle.fuel_type,
+            "tank_capacity_liters": vehicle.tank_capacity_liters,
+            "transmission": vehicle.transmission,
+            "city": vehicle.city,
+            "state": vehicle.state,
+            "registered_detran": vehicle.registered_detran,
+            "engine_spec": vehicle.engine_spec,
             "vehicle_type": vehicle.vehicle_type,
             "ownership_type": vehicle.ownership_type,
             "status": vehicle.status,

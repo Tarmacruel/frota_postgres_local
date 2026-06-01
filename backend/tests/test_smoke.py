@@ -21,6 +21,14 @@ async def test_openapi_contains_new_routes(client):
     paths = payload["paths"]
     assert "/api/claims" in paths
     assert "/api/claims/{claim_id}" in paths
+    assert "/api/data-imports" in paths
+    assert "/api/data-imports/upload" in paths
+    assert "/api/data-imports/{batch_id}" in paths
+    assert "/api/data-imports/{batch_id}/rows" in paths
+    assert "/api/data-imports/{batch_id}/rows/{row_id}" in paths
+    assert "/api/data-imports/{batch_id}/apply" in paths
+    assert "/api/data-imports/{batch_id}/export" in paths
+    assert "/api/data-imports/templates/{entity_type}" in paths
     assert "/api/drivers" in paths
     assert "/api/drivers/active" in paths
     assert "/api/drivers/{driver_id}" in paths
@@ -32,6 +40,7 @@ async def test_openapi_contains_new_routes(client):
     assert "/api/possession/active" in paths
     assert "/api/possession/paginated" in paths
     assert "/api/possession/{possession_id}" in paths
+    assert "delete" in paths["/api/possession/{possession_id}"]
     assert "/api/possession/{possession_id}/document" in paths
     assert "/api/possession/{possession_id}/documents/loan-term" in paths
     assert "/api/possession/{possession_id}/documents/return-term" in paths
@@ -60,6 +69,15 @@ async def test_openapi_contains_new_routes(client):
     vehicle_update = schemas["VehicleUpdate"]
     assert "edit_reason" in vehicle_update["properties"]
     assert "edit_reason" in vehicle_update["required"]
+    assert "renavam" in vehicle_update["properties"]
+    assert "fuel_type" in schemas["VehicleOut"]["properties"]
+
+    data_import_batch = schemas["DataImportBatchOut"]
+    assert "summary" in data_import_batch["properties"]
+    assert "official_extra_fields" in data_import_batch["properties"]
+    data_import_row = schemas["DataImportRowOut"]
+    assert "mapped_data" in data_import_row["properties"]
+    assert "triage_extra_data" in data_import_row["properties"]
 
     vehicle_history_event = schemas["VehicleHistoryEventOut"]
     assert "event_type" in vehicle_history_event["properties"]
@@ -143,6 +161,8 @@ async def test_openapi_contains_new_routes(client):
     driver_create = schemas["DriverCreate"]
     assert "organization_id" in driver_create["properties"]
     assert "organization_id" in driver_create["required"]
+    assert "cnh_numero" in driver_create["properties"]
+    assert "matricula" in driver_create["properties"]
 
     driver_update = schemas["DriverUpdate"]
     assert "organization_id" in driver_update["properties"]

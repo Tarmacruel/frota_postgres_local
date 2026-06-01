@@ -12,6 +12,17 @@ from app.schemas.common import PaginatedResponse, build_pagination
 from app.schemas.driver import DriverCreate, DriverUpdate
 from app.services.audit_service import AuditService
 
+DRIVER_IMPORT_FIELDS = (
+    "registro",
+    "matricula",
+    "cargo",
+    "cnh_numero",
+    "rg",
+    "data_nascimento",
+    "data_emissao_cnh",
+    "ultimo_abastecimento",
+)
+
 
 class DriverService:
     def __init__(self, db: AsyncSession):
@@ -63,6 +74,7 @@ class DriverService:
                 entity_label=driver.nome_completo,
                 details={
                     "documento": driver.documento,
+                    **{field: getattr(driver, field) for field in DRIVER_IMPORT_FIELDS},
                     "organization_id": str(driver.organization_id) if driver.organization_id else None,
                     "organization_name": driver.organization_name,
                     "contato": driver.contato,
@@ -157,6 +169,7 @@ class DriverService:
             "id": driver.id,
             "nome_completo": driver.nome_completo,
             "documento": driver.documento,
+            **{field: getattr(driver, field) for field in DRIVER_IMPORT_FIELDS},
             "organization_id": driver.organization_id,
             "organization_name": driver.organization_name,
             "contato": driver.contato,

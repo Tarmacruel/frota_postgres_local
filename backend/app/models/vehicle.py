@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 from uuid import UUID
-from sqlalchemy import DateTime, Enum, String, text
+from sqlalchemy import Boolean, DateTime, Enum, Float, String, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
@@ -41,8 +41,20 @@ class Vehicle(Base):
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     plate: Mapped[str] = mapped_column(String(20), nullable=False, unique=True, index=True)
     chassis_number = mapped_column(String(50), nullable=True, unique=True, index=True)
+    renavam = mapped_column(String(30), nullable=True, index=True)
     brand: Mapped[str] = mapped_column(String(50), nullable=False)
     model: Mapped[str] = mapped_column(String(50), nullable=False)
+    year = mapped_column(String(20), nullable=True)
+    prefix = mapped_column(String(80), nullable=True)
+    patrimonio_numero_frota = mapped_column(String(80), nullable=True)
+    color = mapped_column(String(40), nullable=True)
+    fuel_type = mapped_column(String(120), nullable=True)
+    tank_capacity_liters = mapped_column(Float, nullable=True)
+    transmission = mapped_column(String(40), nullable=True)
+    city = mapped_column(String(80), nullable=True)
+    state = mapped_column(String(2), nullable=True)
+    registered_detran = mapped_column(Boolean, nullable=True)
+    engine_spec = mapped_column(String(120), nullable=True)
     vehicle_type: Mapped[VehicleType] = mapped_column(
         Enum(VehicleType, name="vehicle_type"),
         nullable=False,

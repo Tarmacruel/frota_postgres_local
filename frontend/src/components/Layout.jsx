@@ -68,7 +68,7 @@ export default function Layout() {
     sections[1].items = sections[1].items.filter((item) => canView(moduleByRoute[item.to]))
     if (sections[1].items.length === 0) sections.splice(1, 1)
 
-    if (isAdmin || canView('master_data') || canView('fuel_stations') || canView('analytics')) {
+    if (isAdmin || canView('master_data') || canView('fuel_stations') || canView('analytics') || canView('data_imports')) {
       const managementItems = []
       if (canView('master_data')) {
         managementItems.push({ to: '/cadastros', label: 'Cadastros', description: 'Órgãos, departamentos e lotações', icon: 'catalog' })
@@ -78,6 +78,9 @@ export default function Layout() {
       }
       if (canView('analytics')) {
         managementItems.push({ to: '/analytics', label: 'Analytics', description: 'BI operacional da frota', icon: 'dashboard' })
+      }
+      if (canView('data_imports')) {
+        managementItems.push({ to: '/importacao-dados', label: 'Importar/Exportar', description: 'Triagem de dados externos', icon: 'catalog' })
       }
       if (isAdmin) {
         managementItems.push(

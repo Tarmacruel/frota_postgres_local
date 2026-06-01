@@ -11,6 +11,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_permission
 from app.db.session import get_db_session
 from app.models.user import User
+from app.schemas.auth import MessageOut
 from app.schemas.possession import (
     PossessionAdminUpdate,
     PossessionCreate,
@@ -315,6 +316,16 @@ async def update_possession(
         new_photos=new_photos or [],
         new_photo_metadata=photo_metadata,
     )
+
+
+@router.delete("/{possession_id}", response_model=MessageOut)
+async def delete_possession(
+    possession_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("possession", "delete")),
+):
+    await PossessionService(db).delete(possession_id, current_user)
+    return {"message": "Removido"}
 
 
 @public_router.get("/loan/{validation_code}", response_model=PossessionTermPublicOut)

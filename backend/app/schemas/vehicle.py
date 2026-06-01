@@ -20,8 +20,20 @@ class VehicleLocationOut(BaseModel):
 class VehicleCreate(BaseModel):
     plate: str = Field(min_length=5, max_length=20)
     chassis_number: str | None = Field(default=None, min_length=5, max_length=50)
+    renavam: str | None = Field(default=None, max_length=30)
     brand: str = Field(min_length=1, max_length=50)
     model: str = Field(min_length=1, max_length=50)
+    year: str | None = Field(default=None, max_length=20)
+    prefix: str | None = Field(default=None, max_length=80)
+    patrimonio_numero_frota: str | None = Field(default=None, max_length=80)
+    color: str | None = Field(default=None, max_length=40)
+    fuel_type: str | None = Field(default=None, max_length=120)
+    tank_capacity_liters: float | None = Field(default=None, ge=0)
+    transmission: str | None = Field(default=None, max_length=40)
+    city: str | None = Field(default=None, max_length=80)
+    state: str | None = Field(default=None, max_length=2)
+    registered_detran: bool | None = None
+    engine_spec: str | None = Field(default=None, max_length=120)
     vehicle_type: VehicleType
     ownership_type: VehicleOwnershipType = VehicleOwnershipType.PROPRIO
     status: VehicleStatus = VehicleStatus.ATIVO
@@ -31,8 +43,20 @@ class VehicleCreate(BaseModel):
 class VehicleUpdate(BaseModel):
     plate: str | None = Field(default=None, min_length=5, max_length=20)
     chassis_number: str | None = Field(default=None, min_length=5, max_length=50)
+    renavam: str | None = Field(default=None, max_length=30)
     brand: str | None = Field(default=None, min_length=1, max_length=50)
     model: str | None = Field(default=None, min_length=1, max_length=50)
+    year: str | None = Field(default=None, max_length=20)
+    prefix: str | None = Field(default=None, max_length=80)
+    patrimonio_numero_frota: str | None = Field(default=None, max_length=80)
+    color: str | None = Field(default=None, max_length=40)
+    fuel_type: str | None = Field(default=None, max_length=120)
+    tank_capacity_liters: float | None = Field(default=None, ge=0)
+    transmission: str | None = Field(default=None, max_length=40)
+    city: str | None = Field(default=None, max_length=80)
+    state: str | None = Field(default=None, max_length=2)
+    registered_detran: bool | None = None
+    engine_spec: str | None = Field(default=None, max_length=120)
     vehicle_type: VehicleType | None = None
     ownership_type: VehicleOwnershipType | None = None
     status: VehicleStatus | None = None
@@ -54,8 +78,20 @@ class VehicleOut(BaseModel):
     id: UUID
     plate: str
     chassis_number: str | None = None
+    renavam: str | None = None
     brand: str
     model: str
+    year: str | None = None
+    prefix: str | None = None
+    patrimonio_numero_frota: str | None = None
+    color: str | None = None
+    fuel_type: str | None = None
+    tank_capacity_liters: float | None = None
+    transmission: str | None = None
+    city: str | None = None
+    state: str | None = None
+    registered_detran: bool | None = None
+    engine_spec: str | None = None
     vehicle_type: VehicleType
     ownership_type: VehicleOwnershipType
     status: VehicleStatus

@@ -15,6 +15,7 @@ PERMISSION_MODULES = (
     "fuel_supply_orders",
     "fuel_stations",
     "analytics",
+    "data_imports",
 )
 
 
@@ -54,6 +55,7 @@ def default_permissions_for_role(role: str) -> dict[str, dict[str, bool]]:
             "master_data",
             "fuel_supplies",
             "fuel_supply_orders",
+            "data_imports",
         ):
             permissions[module].update(can_view=True, can_create=True, can_edit=True)
         permissions["fuel_stations"]["can_view"] = True
@@ -70,4 +72,3 @@ def action_to_column(action: str) -> str:
     if action not in PERMISSION_ACTIONS:
         raise ValueError(f"Acao de permissao desconhecida: {action}")
     return f"can_{action}"
-

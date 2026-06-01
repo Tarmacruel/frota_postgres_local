@@ -145,3 +145,6 @@ class PossessionRepository:
         await self.db.flush()
         await self.db.refresh(possession)
         return possession
+
+    async def delete(self, possession: VehiclePossession) -> None:
+        await self.db.delete(possession)

@@ -15,6 +15,10 @@ class DriverLicenseCategory(str, enum.Enum):
     C = "C"
     D = "D"
     E = "E"
+    AB = "AB"
+    AC = "AC"
+    AD = "AD"
+    AE = "AE"
 
 
 class Driver(Base):
@@ -30,6 +34,9 @@ class Driver(Base):
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     nome_completo: Mapped[str] = mapped_column(String(150), nullable=False)
     documento: Mapped[str] = mapped_column(String(20), nullable=False)
+    registro = mapped_column(String(30), nullable=True)
+    matricula = mapped_column(String(30), nullable=True)
+    cargo = mapped_column(String(120), nullable=True)
     organization_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("master_organizations.id", ondelete="RESTRICT", onupdate="CASCADE"),
@@ -37,11 +44,16 @@ class Driver(Base):
     )
     contato = mapped_column(String(50), nullable=True)
     email = mapped_column(CITEXT(), nullable=True)
+    cnh_numero = mapped_column(String(30), nullable=True, index=True)
     cnh_categoria: Mapped[DriverLicenseCategory] = mapped_column(
         Enum(DriverLicenseCategory, name="driver_license_category"),
         nullable=False,
     )
     cnh_validade = mapped_column(Date, nullable=True)
+    rg = mapped_column(String(30), nullable=True)
+    data_nascimento = mapped_column(Date, nullable=True)
+    data_emissao_cnh = mapped_column(Date, nullable=True)
+    ultimo_abastecimento = mapped_column(DateTime(timezone=True), nullable=True)
     ativo: Mapped[bool] = mapped_column(Boolean, nullable=False, server_default=text("true"))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
