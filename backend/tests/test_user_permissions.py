@@ -67,8 +67,8 @@ def test_default_permissions_preserve_current_roles():
     assert all(all(flags.values()) for flags in admin.values())
     assert producao["vehicles"]["can_create"] is True
     assert producao["vehicles"]["can_delete"] is False
-    assert producao["data_imports"]["can_view"] is True
-    assert producao["data_imports"]["can_edit"] is True
+    assert producao["data_imports"]["can_view"] is False
+    assert producao["data_imports"]["can_edit"] is False
     assert producao["data_imports"]["can_delete"] is False
     assert producao["fuel_supply_orders"]["can_edit"] is True
     assert posto["fuel_supply_orders"]["can_view"] is True

@@ -133,13 +133,13 @@ Fluxo administrativo:
 1. Abrir Abastecimentos.
 2. Clicar em Nova ordem.
 3. Selecionar veículo e posto.
-4. Informar contato do emissor, prazo, limites previstos e observações.
+4. Informar órgão solicitante, prazo, litros previstos e observações.
 5. Gerar comprovante institucional.
 6. Acompanhar confirmação ou cancelar ordem aberta quando necessário.
 
-O comprovante da ordem informa os contatos do emissor, do motorista e do posto, além do link de localização do posto quando houver latitude e longitude cadastradas.
+O comprovante da ordem informa os dados institucionais da autorização, o posto credenciado e o link de localização do posto quando houver latitude e longitude cadastradas.
 
-O operador de posto acessa apenas as ordens abertas vinculadas ao seu posto, visualiza os contatos necessários para atendimento e confirma o abastecimento com dados reais, odômetro, litros, data/hora e comprovante.
+O operador de posto acessa apenas as ordens abertas vinculadas ao seu posto e confirma o abastecimento com dados reais, odômetro, litros, valor total, tipo de combustível, eventuais aditivos, data/hora e comprovante.
 
 ![Ordens abertas do posto](../output/doc/assets/manual-sistema/13-ordens-posto.png)
 

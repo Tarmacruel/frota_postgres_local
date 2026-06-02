@@ -1,0 +1,28 @@
+
+============================================================
+           FROTA FRONTEND - Network Accessible              
+============================================================
+
+Starting Vite on port 3001...
+
+[LOCAL] LOCAL ACCESS (this machine):
+   http://localhost:3001
+
+[NETWORK] NETWORK ACCESS (other machines):
+   http://54.232.189.113:3001
+
+[INFO] Requires Backend running at http://localhost:8000
+
+[STOP] Press Ctrl+C to stop
+
+
+> frota-pmtf-frontend@1.0.0 dev
+> vite --host 0.0.0.0 --port 3001
+
+
+  [32m[1mVITE[22m v6.4.2[39m  [2mready in [0m[1m7824[22m[2m[0m ms[22m
+
+  [32m➜[39m  [1mLocal[22m:   [36mhttp://localhost:[1m3001[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://54.232.189.113:[1m3001[22m/[39m
+  [32m➜[39m  [1mNetwork[22m: [36mhttp://192.168.18.103:[1m3001[22m/[39m
+[2m[32m  ➜[39m[22m[2m  press [22m[1mh + enter[22m[2m to show help[22m

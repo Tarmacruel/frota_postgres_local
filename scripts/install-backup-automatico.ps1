@@ -3,6 +3,7 @@ param(
     [string]$TaskName = "FROTA Backup Automatico",
     [string]$RepoRoot = "\\sad61svr001\licitacao.1\FROTAS\frota_postgres_local",
     [string]$MirrorRoot = "C:\Users\078364\OneDrive\BACKUPS\FROTAS",
+    [string]$StorageRoot = "",
     [int]$RetentionCount = 10,
     [string]$TaskUser = [System.Security.Principal.WindowsIdentity]::GetCurrent().Name,
     [securestring]$TaskPassword
@@ -59,6 +60,7 @@ $arguments = @(
     "-File `"$runnerScript`"",
     "-BackupRoot `"storage\backups`"",
     "-MirrorRoot `"$MirrorRoot`"",
+    "-StorageRoot `"$StorageRoot`"",
     "-RetentionCount $RetentionCount"
 ) -join " "
 

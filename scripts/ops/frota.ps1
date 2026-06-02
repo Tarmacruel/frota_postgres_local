@@ -13,6 +13,8 @@ param(
         "Logs",
         "Backup",
         "BackupAuto",
+        "WatchdogInstall",
+        "WatchdogRun",
         "Migrate",
         "Update"
     )]
@@ -310,6 +312,8 @@ function Invoke-Action {
         "Logs" { Open-Logs }
         "Backup" { & $paths.BackupAutoScript }
         "BackupAuto" { & $paths.BackupAutoInstallScript }
+        "WatchdogInstall" { & $paths.WatchdogInstallScript }
+        "WatchdogRun" { & $paths.WatchdogScript }
         "Migrate" { Invoke-Migrations }
         "Update" {
             Set-Location $paths.Root
@@ -350,8 +354,10 @@ function Show-Menu {
     Write-Host "[8] Abrir logs"
     Write-Host "[9] Backup manual"
     Write-Host "[10] Configurar backup automatico"
-    Write-Host "[11] Aplicar migrations"
-    Write-Host "[12] Atualizar projeto"
+    Write-Host "[11] Configurar auto-retomada"
+    Write-Host "[12] Executar watchdog agora"
+    Write-Host "[13] Aplicar migrations"
+    Write-Host "[14] Atualizar projeto"
     Write-Host "[0] Sair"
     Write-Host ""
 
@@ -367,8 +373,10 @@ function Show-Menu {
         "8" { "Logs" }
         "9" { "Backup" }
         "10" { "BackupAuto" }
-        "11" { "Migrate" }
-        "12" { "Update" }
+        "11" { "WatchdogInstall" }
+        "12" { "WatchdogRun" }
+        "13" { "Migrate" }
+        "14" { "Update" }
         "0" { $null }
         default { "Invalid" }
     }

@@ -237,9 +237,9 @@ async def create_possession(
 async def get_possession_photo(
     possession_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    _current_user: User = Depends(require_permission("possession", "view")),
+    current_user: User = Depends(require_permission("possession", "view")),
 ) -> FileResponse:
-    return await PossessionService(db).get_photo_file(possession_id)
+    return await PossessionService(db).get_photo_file(possession_id, current_user=current_user)
 
 
 @router.get("/{possession_id}/photos/{photo_id}")
@@ -247,36 +247,36 @@ async def get_possession_photo_by_id(
     possession_id: UUID,
     photo_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    _current_user: User = Depends(require_permission("possession", "view")),
+    current_user: User = Depends(require_permission("possession", "view")),
 ) -> FileResponse:
-    return await PossessionService(db).get_photo_file(possession_id, photo_id=photo_id)
+    return await PossessionService(db).get_photo_file(possession_id, photo_id=photo_id, current_user=current_user)
 
 
 @router.get("/{possession_id}/document")
 async def get_possession_document(
     possession_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    _current_user: User = Depends(require_permission("possession", "view")),
+    current_user: User = Depends(require_permission("possession", "view")),
 ) -> FileResponse:
-    return await PossessionService(db).get_document_file(possession_id, document_kind="loan")
+    return await PossessionService(db).get_document_file(possession_id, document_kind="loan", current_user=current_user)
 
 
 @router.get("/{possession_id}/documents/loan-term")
 async def get_possession_loan_term_document(
     possession_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    _current_user: User = Depends(require_permission("possession", "view")),
+    current_user: User = Depends(require_permission("possession", "view")),
 ) -> FileResponse:
-    return await PossessionService(db).get_document_file(possession_id, document_kind="loan")
+    return await PossessionService(db).get_document_file(possession_id, document_kind="loan", current_user=current_user)
 
 
 @router.get("/{possession_id}/documents/return-term")
 async def get_possession_return_term_document(
     possession_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    _current_user: User = Depends(require_permission("possession", "view")),
+    current_user: User = Depends(require_permission("possession", "view")),
 ) -> FileResponse:
-    return await PossessionService(db).get_document_file(possession_id, document_kind="return")
+    return await PossessionService(db).get_document_file(possession_id, document_kind="return", current_user=current_user)
 
 
 @router.put("/{possession_id}/end", response_model=PossessionOut)

@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.organization_scope import production_scope_is_empty, scoped_organization_id
 from app.models.fine import Fine, FineStatus
 from app.models.user import User
 from app.repositories.driver_repository import DriverRepository
@@ -31,7 +32,12 @@ class FineService:
         organization_id: UUID | None = None,
         status_filter: FineStatus | None = None,
         search: str | None = None,
+        current_user: User | None = None,
     ) -> PaginatedResponse[dict]:
+        if production_scope_is_empty(current_user):
+            return PaginatedResponse[dict](data=[], pagination=build_pagination(page, limit, 0))
+
+        organization_id = scoped_organization_id(current_user, organization_id)
         items, total = await self.fines.list_paginated(
             page=page,
             limit=limit,
@@ -42,16 +48,18 @@ class FineService:
         )
         return PaginatedResponse[dict](data=[self._serialize(item) for item in items], pagination=build_pagination(page, limit, total))
 
-    async def get(self, fine_id: UUID) -> dict:
+    async def get(self, fine_id: UUID, current_user: User | None = None) -> dict:
         fine = await self.fines.get_by_id(fine_id)
         if not fine:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Multa não encontrada")
+        await self._ensure_vehicle_visible_to_user(fine.vehicle_id, current_user)
         return self._serialize(fine)
 
     async def create(self, data: FineCreate, current_user: User) -> dict:
         vehicle = await self.vehicles.get_by_id(data.vehicle_id)
         if not vehicle:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
+        await self._ensure_vehicle_visible_to_user(data.vehicle_id, current_user)
         if data.driver_id:
             driver = await self.drivers.get_by_id(data.driver_id)
             if not driver:
@@ -65,12 +73,14 @@ class FineService:
         except IntegrityError as exc:
             await self.db.rollback()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível registrar a multa") from exc
-        return await self.get(fine.id)
+        return await self.get(fine.id, current_user=current_user)
 
     async def update(self, fine_id: UUID, data: FineUpdate, current_user: User) -> dict:
         fine = await self.fines.get_by_id(fine_id)
         if not fine:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Multa não encontrada")
+
+        await self._ensure_vehicle_visible_to_user(fine.vehicle_id, current_user)
 
         payload = data.model_dump(exclude_unset=True)
         if "driver_id" in payload and payload["driver_id"]:
@@ -89,7 +99,16 @@ class FineService:
         except IntegrityError as exc:
             await self.db.rollback()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar a multa") from exc
-        return await self.get(fine.id)
+        return await self.get(fine.id, current_user=current_user)
+
+    async def _ensure_vehicle_visible_to_user(self, vehicle_id: UUID, current_user: User | None) -> None:
+        organization_id = scoped_organization_id(current_user)
+        if organization_id is None:
+            if production_scope_is_empty(current_user):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            return
+        if not await self.vehicles.is_vehicle_in_organization(vehicle_id, organization_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
 
     def _serialize(self, fine: Fine) -> dict:
         return {

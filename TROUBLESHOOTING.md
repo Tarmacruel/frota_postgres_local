@@ -56,6 +56,28 @@ Para consultar a tarefa:
 schtasks /Query /TN "FROTA Backup Automatico" /FO LIST /V
 ```
 
+## Auto-retomada
+
+Para instalar ou atualizar:
+
+```powershell
+.\Configurar_Auto_Retomada.bat
+```
+
+Execute como administrador se o instalador precisar configurar recuperacao dos servicos Windows.
+
+Para consultar a tarefa:
+
+```powershell
+schtasks /Query /TN "FROTA Watchdog" /FO LIST /V
+```
+
+Logs:
+
+```text
+C:\FROTAS\frota_runtime\storage\logs\frota-watchdog.log
+```
+
 ## Arquivos antigos
 
 Atalhos antigos foram removidos. Use `FROTA_Iniciar.bat` como entrada unica para operacoes do sistema.

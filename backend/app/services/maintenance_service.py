@@ -5,6 +5,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.organization_scope import production_scope_is_empty, scoped_organization_id
 from app.models.maintenance import MaintenanceRecord
 from app.models.user import User
 from app.repositories.maintenance_repository import MaintenanceRepository
@@ -26,14 +27,20 @@ class MaintenanceService:
         vehicle_id: UUID | None = None,
         start: datetime | None = None,
         end: datetime | None = None,
+        current_user: User | None = None,
     ) -> list[dict]:
-        records = await self.records.list(vehicle_id=vehicle_id, start=start, end=end)
+        if production_scope_is_empty(current_user):
+            return []
+
+        organization_id = scoped_organization_id(current_user)
+        records = await self.records.list(vehicle_id=vehicle_id, start=start, end=end, organization_id=organization_id)
         return [self._serialize(record) for record in records]
 
-    async def get(self, record_id: UUID) -> dict:
+    async def get(self, record_id: UUID, current_user: User | None = None) -> dict:
         record = await self.records.get_by_id(record_id)
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de manutenção não encontrado")
+        await self._ensure_vehicle_visible_to_user(record.vehicle_id, current_user)
         return self._serialize(record)
 
     async def list_paginated(
@@ -46,7 +53,12 @@ class MaintenanceService:
         end: datetime | None = None,
         only_open: bool | None = None,
         search: str | None = None,
+        current_user: User | None = None,
     ) -> PaginatedResponse[dict]:
+        if production_scope_is_empty(current_user):
+            return PaginatedResponse[dict](data=[], pagination=build_pagination(page, limit, 0))
+
+        organization_id = scoped_organization_id(current_user)
         records, total = await self.records.list_paginated(
             page=page,
             limit=limit,
@@ -55,11 +67,12 @@ class MaintenanceService:
             end=end,
             only_open=only_open,
             search=search,
+            organization_id=organization_id,
         )
         return PaginatedResponse[dict](data=[self._serialize(record) for record in records], pagination=build_pagination(page, limit, total))
 
     async def create(self, data: MaintenanceCreate, current_user: User) -> dict:
-        await self._ensure_vehicle_exists(data.vehicle_id)
+        await self._ensure_vehicle_exists(data.vehicle_id, current_user=current_user)
 
         record = MaintenanceRecord(
             vehicle_id=data.vehicle_id,
@@ -93,12 +106,14 @@ class MaintenanceService:
             await self.db.rollback()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível registrar a manutenção") from exc
 
-        return await self.get(record.id)
+        return await self.get(record.id, current_user=current_user)
 
     async def update(self, record_id: UUID, data: MaintenanceUpdate, current_user: User) -> dict:
         record = await self.records.get_by_id(record_id)
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de manutenção não encontrado")
+
+        await self._ensure_vehicle_visible_to_user(record.vehicle_id, current_user)
 
         payload = data.model_dump(exclude_unset=True)
         previous_values = {
@@ -137,12 +152,14 @@ class MaintenanceService:
             await self.db.rollback()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar a manutenção") from exc
 
-        return await self.get(record.id)
+        return await self.get(record.id, current_user=current_user)
 
     async def delete(self, record_id: UUID, current_user: User) -> None:
         record = await self.records.get_by_id(record_id)
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de manutenção não encontrado")
+
+        await self._ensure_vehicle_visible_to_user(record.vehicle_id, current_user)
 
         try:
             await self.audit.record(
@@ -164,10 +181,21 @@ class MaintenanceService:
             await self.db.rollback()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível remover a manutenção") from exc
 
-    async def _ensure_vehicle_exists(self, vehicle_id: UUID) -> None:
+    async def _ensure_vehicle_exists(self, vehicle_id: UUID, current_user: User | None = None) -> None:
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
+
+        await self._ensure_vehicle_visible_to_user(vehicle_id, current_user)
+
+    async def _ensure_vehicle_visible_to_user(self, vehicle_id: UUID, current_user: User | None) -> None:
+        organization_id = scoped_organization_id(current_user)
+        if organization_id is None:
+            if production_scope_is_empty(current_user):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            return
+        if not await self.vehicles.is_vehicle_in_organization(vehicle_id, organization_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
 
     def _serialize(self, record: MaintenanceRecord) -> dict:
         return {

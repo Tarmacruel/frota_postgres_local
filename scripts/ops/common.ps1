@@ -19,6 +19,8 @@ function Get-FrotaPaths {
         BackupScript            = Join-Path $root "scripts\backup-local.ps1"
         BackupAutoScript        = Join-Path $root "scripts\run-backup-automatico.ps1"
         BackupAutoInstallScript = Join-Path $root "scripts\install-backup-automatico.ps1"
+        WatchdogScript          = Join-Path $root "scripts\frota-watchdog.ps1"
+        WatchdogInstallScript   = Join-Path $root "scripts\install-frota-watchdog.ps1"
         RemoteSetupScript       = Join-Path $root "scripts\setup-remote-backend.ps1"
         AppPidFile              = Join-Path $root "storage\runtime\frota-app.pid"
         FrontendPidFile         = Join-Path $root "storage\runtime\frota-frontend.pid"

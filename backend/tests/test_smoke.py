@@ -65,6 +65,12 @@ async def test_openapi_contains_new_routes(client):
     assert "/api/vehicles/{vehicle_id}/historico" in paths
     assert "/api/users/{user_id}/permissions" in paths
 
+    vehicle_history_params = {
+        param["name"]
+        for param in paths["/api/vehicles/{vehicle_id}/historico"]["get"].get("parameters", [])
+    }
+    assert {"start_date", "end_date"}.issubset(vehicle_history_params)
+
     schemas = payload["components"]["schemas"]
     vehicle_update = schemas["VehicleUpdate"]
     assert "edit_reason" in vehicle_update["properties"]
@@ -85,7 +91,14 @@ async def test_openapi_contains_new_routes(client):
 
     fuel_supply_order_create = schemas["FuelSupplyOrderCreate"]
     assert "fuel_station_id" in fuel_supply_order_create["required"]
-    assert "requester_contact" in fuel_supply_order_create["properties"]
+    assert "driver_id" not in fuel_supply_order_create["properties"]
+    assert "requester_contact" not in fuel_supply_order_create["properties"]
+    assert "max_amount" not in fuel_supply_order_create["properties"]
+
+    fuel_supply = schemas["FuelSupplyOut"]
+    assert "fuel_type" in fuel_supply["properties"]
+    assert "additive_type" in fuel_supply["properties"]
+    assert "additive_quantity_liters" in fuel_supply["properties"]
 
     fuel_station = schemas["FuelStationOut"]
     assert "phone" in fuel_station["properties"]
@@ -108,12 +121,14 @@ async def test_openapi_contains_new_routes(client):
     public_fuel_supply_order = schemas["FuelSupplyOrderPublicOut"]
     assert "validation_code" in public_fuel_supply_order["properties"]
     assert "public_validation_path" in public_fuel_supply_order["properties"]
-    assert "driver_contact" in public_fuel_supply_order["properties"]
+    assert "driver_name" not in public_fuel_supply_order["properties"]
+    assert "driver_contact" not in public_fuel_supply_order["properties"]
     assert "fuel_station_phone" in public_fuel_supply_order["properties"]
     assert "fuel_station_latitude" in public_fuel_supply_order["properties"]
     assert "fuel_station_longitude" in public_fuel_supply_order["properties"]
     assert "fuel_station_maps_url" in public_fuel_supply_order["properties"]
-    assert "created_by_contact" in public_fuel_supply_order["properties"]
+    assert "created_by_contact" not in public_fuel_supply_order["properties"]
+    assert "max_amount" not in public_fuel_supply_order["properties"]
 
     possession = schemas["PossessionOut"]
     assert "loan_term_available" in possession["properties"]

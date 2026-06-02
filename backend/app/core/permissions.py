@@ -55,7 +55,6 @@ def default_permissions_for_role(role: str) -> dict[str, dict[str, bool]]:
             "master_data",
             "fuel_supplies",
             "fuel_supply_orders",
-            "data_imports",
         ):
             permissions[module].update(can_view=True, can_create=True, can_edit=True)
         permissions["fuel_stations"]["can_view"] = True

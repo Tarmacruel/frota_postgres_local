@@ -16,7 +16,7 @@ function readStorage(key, fallback) {
 }
 
 export default function Layout() {
-  const { user, logout, changePassword, mustChangePassword, isAdmin, canView, roleLabel } = useAuth()
+  const { user, logout, changePassword, mustChangePassword, isAdmin, isProduction, canView, roleLabel } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const passwordChangeRequired = Boolean(mustChangePassword)
@@ -68,7 +68,7 @@ export default function Layout() {
     sections[1].items = sections[1].items.filter((item) => canView(moduleByRoute[item.to]))
     if (sections[1].items.length === 0) sections.splice(1, 1)
 
-    if (isAdmin || canView('master_data') || canView('fuel_stations') || canView('analytics') || canView('data_imports')) {
+    if (isAdmin || canView('master_data') || canView('fuel_stations') || canView('analytics') || (!isProduction && canView('data_imports'))) {
       const managementItems = []
       if (canView('master_data')) {
         managementItems.push({ to: '/cadastros', label: 'Cadastros', description: 'Órgãos, departamentos e lotações', icon: 'catalog' })
@@ -79,7 +79,7 @@ export default function Layout() {
       if (canView('analytics')) {
         managementItems.push({ to: '/analytics', label: 'Analytics', description: 'BI operacional da frota', icon: 'dashboard' })
       }
-      if (canView('data_imports')) {
+      if (!isProduction && canView('data_imports')) {
         managementItems.push({ to: '/importacao-dados', label: 'Importar/Exportar', description: 'Triagem de dados externos', icon: 'catalog' })
       }
       if (isAdmin) {
@@ -95,7 +95,7 @@ export default function Layout() {
     }
 
     return sections
-  }, [isAdmin, canView])
+  }, [isAdmin, isProduction, canView])
 
   const mobileTabs = navSections.flatMap((section) => section.items).filter((item) =>
     ['/', '/vehicles', '/manutencoes', '/condutores', '/ordens-abastecimento'].includes(item.to),
@@ -109,6 +109,20 @@ export default function Layout() {
 
   useEffect(() => {
     setNavOpen(false)
+  }, [location.pathname])
+
+  useEffect(() => {
+    const resetScroll = () => {
+      window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
+      document.documentElement.scrollTop = 0
+      document.body.scrollTop = 0
+      document.querySelector('.app-main')?.scrollTo?.({ top: 0, left: 0, behavior: 'auto' })
+      document.querySelector('.content-shell')?.scrollTo?.({ top: 0, left: 0, behavior: 'auto' })
+    }
+
+    resetScroll()
+    const frame = window.requestAnimationFrame(resetScroll)
+    return () => window.cancelAnimationFrame(frame)
   }, [location.pathname])
 
   useEffect(() => {
@@ -224,7 +238,9 @@ export default function Layout() {
         key={item.to}
         to={item.to}
         end={item.to === '/'}
-        title={item.label}
+        title={item.description}
+        aria-label={`${item.label}. ${item.description}`}
+        data-tooltip={item.description}
         className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
       >
         <span className="nav-icon" aria-hidden="true">
@@ -232,7 +248,6 @@ export default function Layout() {
         </span>
         <span className="nav-text">
           <span className="nav-label">{item.label}</span>
-          <span className="nav-meta">{item.description}</span>
         </span>
       </NavLink>
     )

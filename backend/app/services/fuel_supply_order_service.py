@@ -6,11 +6,11 @@ from uuid import UUID, uuid4
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.organization_scope import ensure_organization_access, production_scope_is_empty, scoped_organization_id
 from app.core.config import settings
 from app.models.fuel_supply import FuelSupply
 from app.models.fuel_supply_order import FuelSupplyOrder, FuelSupplyOrderStatus
 from app.models.user import User, UserRole
-from app.repositories.driver_repository import DriverRepository
 from app.repositories.fuel_station_repository import FuelStationRepository
 from app.repositories.fuel_supply_order_repository import FuelSupplyOrderRepository
 from app.repositories.fuel_supply_repository import FuelSupplyRepository
@@ -37,7 +37,6 @@ class FuelSupplyOrderService:
         self.supplies = FuelSupplyRepository(db)
         self.fuel_stations = FuelStationRepository(db)
         self.vehicles = VehicleRepository(db)
-        self.drivers = DriverRepository(db)
         self.master_data = MasterDataRepository(db)
         self.audit = AuditService(db)
 
@@ -45,6 +44,10 @@ class FuelSupplyOrderService:
         await self._expire_overdue_orders()
 
         scoped_filters = dict(filters)
+        if production_scope_is_empty(current_user):
+            return PaginatedResponse[dict](data=[], pagination=build_pagination(page, limit, 0))
+
+        scoped_filters["organization_id"] = scoped_organization_id(current_user, scoped_filters.get("organization_id"))
         if current_user.role == UserRole.POSTO:
             station_ids = await self.fuel_stations.list_active_station_ids_for_user(current_user.id)
             if not station_ids:
@@ -71,15 +74,17 @@ class FuelSupplyOrderService:
         if not vehicle:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
-        if data.driver_id:
-            driver = await self.drivers.get_by_id(data.driver_id)
-            if not driver:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
-
+        await self._ensure_vehicle_visible_to_user(data.vehicle_id, current_user)
+        order_organization_id = scoped_organization_id(current_user, data.organization_id)
         if data.organization_id:
             organization = await self.master_data.get_organization(data.organization_id)
             if not organization:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Órgão/posto não encontrado")
+
+        if data.organization_id:
+            ensure_organization_access(current_user, data.organization_id)
+        elif production_scope_is_empty(current_user):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Orgao nao encontrado")
 
         station = await self.fuel_stations.get(data.fuel_station_id)
         if not station:
@@ -89,15 +94,12 @@ class FuelSupplyOrderService:
 
         order = FuelSupplyOrder(
             vehicle_id=data.vehicle_id,
-            driver_id=data.driver_id,
-            organization_id=data.organization_id,
+            organization_id=order_organization_id,
             fuel_station_id=data.fuel_station_id,
             validation_code=await self._generate_validation_code(),
             created_by_user_id=current_user.id,
             expires_at=data.expires_at,
             requested_liters=data.requested_liters,
-            max_amount=data.max_amount,
-            requester_contact=data.requester_contact,
             notes=data.notes,
             status=FuelSupplyOrderStatus.OPEN,
         )
@@ -117,7 +119,7 @@ class FuelSupplyOrderService:
             await self.db.rollback()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível criar a ordem de abastecimento") from exc
 
-        return await self.get_order(order.id)
+        return await self.get_order(order.id, current_user=current_user)
 
     async def get_order(self, order_id: UUID, *, current_user: User | None = None) -> dict:
         await self._expire_overdue_orders()
@@ -126,6 +128,8 @@ class FuelSupplyOrderService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento não encontrada")
         if current_user and current_user.role == UserRole.POSTO:
             await self._ensure_station_access(current_user=current_user, order=order)
+        if current_user:
+            await self._ensure_order_visible_to_user(order, current_user)
         return self._serialize_order(order)
 
     async def get_public_order(self, validation_code: str) -> dict:
@@ -144,6 +148,7 @@ class FuelSupplyOrderService:
         if not order:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento não encontrada")
 
+        await self._ensure_order_visible_to_user(order, current_user)
         if order.status == FuelSupplyOrderStatus.COMPLETED:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem já confirmada")
         if order.status == FuelSupplyOrderStatus.CANCELLED:
@@ -179,11 +184,6 @@ class FuelSupplyOrderService:
         if current_user.role == UserRole.POSTO:
             await self._ensure_station_access(current_user=current_user, order=order)
 
-        if data.driver_id:
-            driver = await self.drivers.get_by_id(data.driver_id)
-            if not driver:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
-
         receipt_payload = await self._read_and_validate_receipt(receipt)
         supplied_at = data.supplied_at or now
 
@@ -204,12 +204,15 @@ class FuelSupplyOrderService:
 
         supply = FuelSupply(
             vehicle_id=order.vehicle_id,
-            driver_id=data.driver_id or order.driver_id,
+            driver_id=order.driver_id,
             organization_id=order.organization_id,
             supplied_at=supplied_at,
             odometer_km=data.odometer_km,
             liters=data.liters,
             total_amount=data.total_amount,
+            fuel_type=data.fuel_type,
+            additive_type=data.additive_type,
+            additive_quantity_liters=data.additive_quantity_liters,
             fuel_station_id=station.id,
             fuel_station=station.name,
             notes=data.notes,
@@ -232,8 +235,6 @@ class FuelSupplyOrderService:
             order.status = FuelSupplyOrderStatus.COMPLETED
             order.confirmed_at = now
             order.confirmed_by_user_id = current_user.id
-            if data.driver_id:
-                order.driver_id = data.driver_id
 
             await self.audit.record(
                 actor=current_user,
@@ -246,6 +247,9 @@ class FuelSupplyOrderService:
                     "alerts": alerts,
                     "consumption_km_l": consumption_km_l,
                     "is_consumption_anomaly": is_anomaly,
+                    "fuel_type": supply.fuel_type,
+                    "additive_type": supply.additive_type,
+                    "additive_quantity_liters": supply.additive_quantity_liters,
                 },
             )
             await self.db.flush()
@@ -259,12 +263,13 @@ class FuelSupplyOrderService:
             self._cleanup_file(stored_receipt_path)
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Não foi possível armazenar o comprovante") from exc
 
-        return await self.get_order(order.id)
+        return await self.get_order(order.id, current_user=current_user)
 
     async def cancel_order(self, order_id: UUID, payload: FuelSupplyOrderCancel, current_user: User) -> dict:
         order = await self.orders.get_by_id(order_id)
         if not order:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento não encontrada")
+        await self._ensure_order_visible_to_user(order, current_user)
         if order.status == FuelSupplyOrderStatus.COMPLETED:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem já confirmada")
         if order.status == FuelSupplyOrderStatus.CANCELLED:
@@ -287,12 +292,31 @@ class FuelSupplyOrderService:
             details={"reason": payload.reason},
         )
         await self.db.commit()
-        return await self.get_order(order.id)
+        return await self.get_order(order.id, current_user=current_user)
 
     async def _expire_overdue_orders(self) -> None:
         expired = await self.orders.expire_overdue(reference_time=datetime.now(timezone.utc))
         if expired:
             await self.db.commit()
+
+    async def _ensure_order_visible_to_user(self, order: FuelSupplyOrder, current_user: User) -> None:
+        organization_id = scoped_organization_id(current_user)
+        if organization_id is None:
+            if production_scope_is_empty(current_user):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento nao encontrada")
+            return
+        if order.organization_id == organization_id:
+            return
+        await self._ensure_vehicle_visible_to_user(order.vehicle_id, current_user)
+
+    async def _ensure_vehicle_visible_to_user(self, vehicle_id: UUID, current_user: User | None) -> None:
+        organization_id = scoped_organization_id(current_user)
+        if organization_id is None:
+            if production_scope_is_empty(current_user):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            return
+        if not await self.vehicles.is_vehicle_in_organization(vehicle_id, organization_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
 
     async def _ensure_station_access(self, *, current_user: User, order: FuelSupplyOrder) -> None:
         if not order.fuel_station_id:
@@ -443,8 +467,6 @@ class FuelSupplyOrderService:
             "status": serialized["status"],
             "vehicle_plate": serialized["vehicle_plate"],
             "vehicle_description": serialized["vehicle_description"],
-            "driver_name": serialized["driver_name"],
-            "driver_contact": serialized["driver_contact"],
             "organization_name": serialized["organization_name"],
             "fuel_station_name": serialized["fuel_station_name"],
             "fuel_station_cnpj": serialized["fuel_station_cnpj"],
@@ -454,10 +476,8 @@ class FuelSupplyOrderService:
             "fuel_station_longitude": serialized["fuel_station_longitude"],
             "fuel_station_maps_url": serialized["fuel_station_maps_url"],
             "created_by_name": serialized["created_by_name"],
-            "created_by_contact": serialized["created_by_contact"],
             "confirmed_by_name": serialized["confirmed_by_name"],
             "requested_liters": serialized["requested_liters"],
-            "max_amount": serialized["max_amount"],
             "notes": serialized["notes"],
             "created_at": serialized["created_at"],
             "expires_at": serialized["expires_at"],

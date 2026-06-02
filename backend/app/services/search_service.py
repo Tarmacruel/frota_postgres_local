@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.organization_scope import production_scope_is_empty, scoped_organization_id
 from app.models.user import User
 from app.repositories.search_repository import SearchRepository
 
@@ -14,22 +15,25 @@ class SearchService:
         term = q.strip()
         if not term:
             return []
+        if production_scope_is_empty(current_user):
+            return []
 
         search_term = f"%{term}%"
         per_group_limit = min(max(limit, 1), 20)
+        organization_id = scoped_organization_id(current_user)
 
         vehicles = (
-            await self.search_repo.search_vehicles(search_term, per_group_limit)
+            await self.search_repo.search_vehicles(search_term, per_group_limit, organization_id=organization_id)
             if self._can_view(current_user, "vehicles")
             else []
         )
         possessions = (
-            await self.search_repo.search_possessions(search_term, per_group_limit)
+            await self.search_repo.search_possessions(search_term, per_group_limit, organization_id=organization_id)
             if self._can_view(current_user, "possession")
             else []
         )
         maintenances = (
-            await self.search_repo.search_maintenances(search_term, per_group_limit)
+            await self.search_repo.search_maintenances(search_term, per_group_limit, organization_id=organization_id)
             if self._can_view(current_user, "maintenance")
             else []
         )

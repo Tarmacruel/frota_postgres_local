@@ -25,21 +25,25 @@ public_router = APIRouter(prefix="/api/public/fuel-supply-orders", tags=["Public
 
 
 def parse_confirm_form(
-    driver_id: UUID | None = Form(default=None),
     supplied_at: datetime | None = Form(default=None),
     odometer_km: float = Form(...),
     liters: float = Form(...),
-    total_amount: float | None = Form(default=None),
+    total_amount: float = Form(...),
+    fuel_type: str = Form(...),
+    additive_type: str | None = Form(default=None),
+    additive_quantity_liters: float | None = Form(default=None),
     fuel_station: str | None = Form(default=None),
     notes: str | None = Form(default=None),
 ) -> FuelSupplyOrderConfirm:
     try:
         return FuelSupplyOrderConfirm(
-            driver_id=driver_id,
             supplied_at=supplied_at,
             odometer_km=odometer_km,
             liters=liters,
             total_amount=total_amount,
+            fuel_type=fuel_type,
+            additive_type=additive_type,
+            additive_quantity_liters=additive_quantity_liters,
             fuel_station=fuel_station,
             notes=notes,
         )

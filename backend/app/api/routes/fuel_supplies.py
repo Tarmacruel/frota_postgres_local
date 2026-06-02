@@ -30,7 +30,10 @@ def parse_create_form(
     fuel_station_id: UUID | None = Form(default=None),
     odometer_km: float = Form(...),
     liters: float = Form(...),
-    total_amount: float | None = Form(default=None),
+    total_amount: float = Form(...),
+    fuel_type: str = Form(...),
+    additive_type: str | None = Form(default=None),
+    additive_quantity_liters: float | None = Form(default=None),
     fuel_station: str | None = Form(default=None),
     notes: str | None = Form(default=None),
 ) -> FuelSupplyCreate:
@@ -44,6 +47,9 @@ def parse_create_form(
             odometer_km=odometer_km,
             liters=liters,
             total_amount=total_amount,
+            fuel_type=fuel_type,
+            additive_type=additive_type,
+            additive_quantity_liters=additive_quantity_liters,
             fuel_station=fuel_station,
             notes=notes,
         )
@@ -75,6 +81,7 @@ async def list_fuel_supplies(
         start_date=start_date,
         end_date=end_date,
         only_anomalies=only_anomalies,
+        current_user=current_user,
     )
 
 
@@ -95,7 +102,7 @@ async def consumption_report(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("fuel_supplies", "view")),
 ):
-    return await FuelSupplyService(db).consumption_report(start_date=start_date, end_date=end_date)
+    return await FuelSupplyService(db).consumption_report(start_date=start_date, end_date=end_date, current_user=current_user)
 
 
 @router.get("/reports/anomalies", response_model=list[FuelAnomalyReportItem])
@@ -105,7 +112,7 @@ async def anomalies_report(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("fuel_supplies", "view")),
 ):
-    return await FuelSupplyService(db).anomalies_report(start_date=start_date, end_date=end_date)
+    return await FuelSupplyService(db).anomalies_report(start_date=start_date, end_date=end_date, current_user=current_user)
 
 
 @router.get("/{supply_id}", response_model=FuelSupplyOut)
@@ -114,7 +121,7 @@ async def get_fuel_supply(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("fuel_supplies", "view")),
 ):
-    return await FuelSupplyService(db).get(supply_id)
+    return await FuelSupplyService(db).get(supply_id, current_user=current_user)
 
 
 @router.get("/{supply_id}/receipt")
@@ -123,5 +130,5 @@ async def get_fuel_supply_receipt(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("fuel_supplies", "view")),
 ) -> FileResponse:
-    return await FuelSupplyService(db).get_receipt_file(supply_id)
+    return await FuelSupplyService(db).get_receipt_file(supply_id, current_user=current_user)
 

@@ -34,6 +34,9 @@ class FuelSupply(Base):
     odometer_km: Mapped[float] = mapped_column(Float, nullable=False)
     liters: Mapped[float] = mapped_column(Float, nullable=False)
     total_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    fuel_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    additive_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    additive_quantity_liters: Mapped[float | None] = mapped_column(Float, nullable=True)
     fuel_station_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True),
         ForeignKey("fuel_stations.id", ondelete="SET NULL"),

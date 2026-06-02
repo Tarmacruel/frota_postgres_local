@@ -20,6 +20,7 @@ import {
   getOrderStatusLabel,
   resolvePublicValidationUrl,
 } from '../utils/fuelSupplyOrders'
+import { formatAdditiveDetails } from '../utils/fuelSupplyDetails'
 
 const ORDER_STATUS_OPTIONS = [
   { value: 'TODOS', label: 'Todas as situações' },
@@ -80,10 +81,9 @@ export default function FuelSuppliesPage() {
   const [records, setRecords] = useState([])
   const [orders, setOrders] = useState([])
   const [vehicles, setVehicles] = useState([])
-  const [drivers, setDrivers] = useState([])
   const [organizations, setOrganizations] = useState([])
   const [fuelStations, setFuelStations] = useState([])
-  const [filters, setFilters] = useState({ vehicle_id: '', driver_id: '', organization_id: '', fuel_station_id: '', only_anomalies: '' })
+  const [filters, setFilters] = useState({ vehicle_id: '', organization_id: '', fuel_station_id: '', only_anomalies: '' })
   const [orderFilters, setOrderFilters] = useState({ status: 'TODOS', organization_id: '', fuel_station_id: '' })
   const [search, setSearch] = useState('')
   const [orderSearch, setOrderSearch] = useState('')
@@ -99,14 +99,12 @@ export default function FuelSuppliesPage() {
   useEffect(() => {
     async function loadDependencies() {
       try {
-        const [vehiclesResponse, driversResponse, organizationsResponse, stationsResponse] = await Promise.all([
+        const [vehiclesResponse, organizationsResponse, stationsResponse] = await Promise.all([
           api.get('/vehicles', { params: { limit: VEHICLE_LIST_LIMIT } }),
-          api.get('/drivers'),
           masterDataAPI.listOrganizations(),
           fuelStationsAPI.list({ active_only: true }),
         ])
         setVehicles(asArray(vehiclesResponse.data))
-        setDrivers(asArray(driversResponse.data))
         setOrganizations(asArray(organizationsResponse.data))
         setFuelStations(asArray(stationsResponse.data))
       } catch (err) {
@@ -122,7 +120,6 @@ export default function FuelSuppliesPage() {
       setError('')
       const params = { limit: 100, page: 1 }
       if (filters.vehicle_id) params.vehicle_id = filters.vehicle_id
-      if (filters.driver_id) params.driver_id = filters.driver_id
       if (filters.organization_id) params.organization_id = filters.organization_id
       if (filters.fuel_station_id) params.fuel_station_id = filters.fuel_station_id
       if (filters.only_anomalies === 'true') params.only_anomalies = true
@@ -169,7 +166,7 @@ export default function FuelSuppliesPage() {
     const term = search.trim().toLowerCase()
     return records.filter((record) => {
       if (!term) return true
-      return [record.vehicle_plate, record.driver_name, record.organization_name, record.fuel_station_name, record.fuel_station, record.notes]
+      return [record.vehicle_plate, record.organization_name, record.fuel_station_name, record.fuel_station, record.fuel_type, record.additive_type, record.notes]
         .filter(Boolean)
         .some((value) => value.toLowerCase().includes(term))
     })
@@ -182,12 +179,9 @@ export default function FuelSuppliesPage() {
       return [
         order.request_number,
         order.vehicle_plate,
-        order.driver_name,
         order.organization_name,
         order.fuel_station_name,
         order.created_by_name,
-        order.created_by_contact,
-        order.driver_contact,
         order.fuel_station_phone,
         order.notes,
       ]
@@ -210,11 +204,8 @@ export default function FuelSuppliesPage() {
     { header: 'Localização posto', value: (order) => order.fuel_station_maps_url || buildOrderMapsUrl(order) || '-' },
     { header: 'Secretaria', value: (order) => order.organization_name || '-' },
     { header: 'Solicitante', value: (order) => order.created_by_name || '-' },
-    { header: 'Contato emissor', value: (order) => order.created_by_contact || '-' },
-    { header: 'Contato motorista', value: (order) => order.driver_contact || '-' },
     { header: 'Prazo', value: (order) => formatDate(order.expires_at) },
     { header: 'Litros previstos', value: (order) => order.requested_liters ?? '-' },
-    { header: 'Valor máximo', value: (order) => formatCurrency(order.max_amount) },
     { header: 'Código público', value: (order) => order.validation_code || '-' },
   ], [])
 
@@ -358,7 +349,7 @@ export default function FuelSuppliesPage() {
 
   function clearHistoryFilters() {
     setSearch('')
-    setFilters({ vehicle_id: '', driver_id: '', organization_id: '', fuel_station_id: '', only_anomalies: '' })
+    setFilters({ vehicle_id: '', organization_id: '', fuel_station_id: '', only_anomalies: '' })
   }
 
   function clearOrderFilters() {
@@ -431,7 +422,7 @@ export default function FuelSuppliesPage() {
         </div>
 
         <div className="filter-inline">
-          <input className="app-input" placeholder="Buscar ordem por placa, secretaria, posto, contato, solicitante ou observação" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} />
+          <input className="app-input" placeholder="Buscar ordem por placa, secretaria, posto, solicitante ou observação" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} />
           <select className="app-select" value={orderFilters.status} onChange={(event) => setOrderFilters((prev) => ({ ...prev, status: event.target.value }))}>
             {ORDER_STATUS_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
@@ -465,23 +456,19 @@ export default function FuelSuppliesPage() {
                 <th>Prazo</th>
                 <th>Solicitante</th>
                 <th>Litros previstos</th>
-                <th>Valor máximo</th>
                 <th>Ações</th>
               </tr>
             </thead>
             <tbody>
-              {ordersLoading ? <tr><td colSpan={9} className="muted">Carregando ordens...</td></tr> : null}
-              {!ordersLoading && paginatedOrders.length === 0 ? <tr><td colSpan={9}><div className="empty-state">Nenhuma ordem encontrada para os filtros aplicados.</div></td></tr> : null}
+              {ordersLoading ? <tr><td colSpan={8} className="muted">Carregando ordens...</td></tr> : null}
+              {!ordersLoading && paginatedOrders.length === 0 ? <tr><td colSpan={8}><div className="empty-state">Nenhuma ordem encontrada para os filtros aplicados.</div></td></tr> : null}
               {!ordersLoading && paginatedOrders.map((order) => (
                 <tr key={order.id}>
                   <td data-label="Ordem"><strong>{formatOrderNumber(order)}</strong></td>
                   <td data-label="Veículo">
                     <div className="stack">
                       <strong>{order.vehicle_plate || '-'}</strong>
-                      <span className="muted">
-                        Motorista: {order.driver_name || 'Não informado'}
-                        {order.driver_contact ? ` | ${order.driver_contact}` : ''}
-                      </span>
+                      <span className="muted">{order.organization_name || 'Sem secretaria informada'}</span>
                     </div>
                   </td>
                   <td data-label="Posto">
@@ -503,11 +490,9 @@ export default function FuelSuppliesPage() {
                     <div className="stack">
                       <strong>{order.created_by_name || '-'}</strong>
                       <span className="muted">{order.organization_name || 'Sem secretaria informada'}</span>
-                      <span className="muted">Contato: {order.created_by_contact || 'Não informado'}</span>
                     </div>
                   </td>
                   <td data-label="Litros previstos">{formatNumber(order.requested_liters)}</td>
-                  <td data-label="Valor máximo">{formatCurrency(order.max_amount)}</td>
                   <td data-label="Ações">
                     <div className="actions-inline">
                       <button type="button" className="mini-button" onClick={() => handlePreviewOrderDocument(order)}>Comprovante</button>
@@ -533,9 +518,8 @@ export default function FuelSuppliesPage() {
         </div>
 
         <div className="filter-inline" style={{ marginBottom: 12 }}>
-          <input className="app-input" placeholder="Buscar por placa, condutor, secretaria ou posto" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <input className="app-input" placeholder="Buscar por placa, secretaria, posto, combustível ou aditivo" value={search} onChange={(event) => setSearch(event.target.value)} />
           <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(buildVehicleOption)]} placeholder="Filtrar veículo" />
-          <SearchableSelect value={filters.driver_id} onChange={(value) => setFilters((prev) => ({ ...prev, driver_id: value }))} options={[{ value: '', label: 'Todos os condutores' }, ...drivers.map((driver) => ({ value: driver.id, label: driver.nome_completo }))]} placeholder="Filtrar condutor" />
           <SearchableSelect value={filters.organization_id} onChange={(value) => setFilters((prev) => ({ ...prev, organization_id: value }))} options={organizationFilterOptions} placeholder="Filtrar secretaria" />
           <SearchableSelect value={filters.fuel_station_id} onChange={(value) => setFilters((prev) => ({ ...prev, fuel_station_id: value }))} options={[{ value: '', label: 'Todos os postos' }, ...fuelStations.map(buildStationOption)]} placeholder="Filtrar posto" />
           <select className="app-input" value={filters.only_anomalies} onChange={(event) => setFilters((prev) => ({ ...prev, only_anomalies: event.target.value }))}>
@@ -551,26 +535,30 @@ export default function FuelSuppliesPage() {
               <tr>
                 <th>Veículo</th>
                 <th>Data</th>
-                <th>Condutor</th>
                 <th>Secretaria</th>
                 <th>Posto</th>
                 <th>Litros</th>
+                <th>Valor</th>
+                <th>Combustível</th>
+                <th>Aditivo</th>
                 <th>Km/l</th>
                 <th>Alerta</th>
                 <th>Comprovante</th>
               </tr>
             </thead>
             <tbody>
-              {historyLoading ? <tr><td colSpan={9} className="muted">Carregando abastecimentos...</td></tr> : null}
-              {!historyLoading && paginatedRecords.length === 0 ? <tr><td colSpan={9}><div className="empty-state">Nenhum abastecimento encontrado.</div></td></tr> : null}
+              {historyLoading ? <tr><td colSpan={11} className="muted">Carregando abastecimentos...</td></tr> : null}
+              {!historyLoading && paginatedRecords.length === 0 ? <tr><td colSpan={11}><div className="empty-state">Nenhum abastecimento encontrado.</div></td></tr> : null}
               {!historyLoading && paginatedRecords.map((record) => (
                 <tr key={record.id}>
                   <td data-label="Veículo">{record.vehicle_plate}</td>
                   <td data-label="Data">{formatDate(record.supplied_at)}</td>
-                  <td data-label="Condutor">{record.driver_name || '-'}</td>
                   <td data-label="Secretaria">{record.organization_name || '-'}</td>
                   <td data-label="Posto">{record.fuel_station_name || record.fuel_station || '-'}</td>
                   <td data-label="Litros">{formatNumber(record.liters)}</td>
+                  <td data-label="Valor">{formatCurrency(record.total_amount)}</td>
+                  <td data-label="Combustível">{record.fuel_type || '-'}</td>
+                  <td data-label="Aditivo">{formatAdditiveDetails(record, formatNumber)}</td>
                   <td data-label="Km/l">{formatNumber(record.consumption_km_l)}</td>
                   <td data-label="Alerta">{record.is_consumption_anomaly ? <span className="status-chip warning">Alerta</span> : '-'}</td>
                   <td data-label="Comprovante"><a className="link-inline" href={record.receipt_url} target="_blank" rel="noreferrer">Abrir</a></td>
@@ -585,7 +573,6 @@ export default function FuelSuppliesPage() {
       <Modal open={isOrderModalOpen && canCreateOrder} onClose={() => setIsOrderModalOpen(false)} title="Nova ordem de abastecimento" description="Emita a ordem para um posto credenciado executar o abastecimento.">
         <FuelSupplyOrderCreateForm
           vehicles={vehicles}
-          drivers={drivers}
           organizations={organizations}
           fuelStations={fuelStations}
           onClose={() => setIsOrderModalOpen(false)}

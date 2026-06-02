@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from uuid import UUID
-from sqlalchemy import and_, func, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.models.fuel_supply import FuelSupply
+from app.models.location_history import LocationHistory
+from app.models.master_data import Allocation, Department
 from app.models.vehicle import Vehicle
 
 
@@ -49,7 +51,7 @@ class FuelSupplyRepository:
         if driver_id:
             filters.append(FuelSupply.driver_id == driver_id)
         if organization_id:
-            filters.append(FuelSupply.organization_id == organization_id)
+            filters.append(self._organization_scope_clause(organization_id))
         if fuel_station_id:
             filters.append(FuelSupply.fuel_station_id == fuel_station_id)
         if start_date:
@@ -93,7 +95,12 @@ class FuelSupplyRepository:
         value = result.scalar_one_or_none()
         return float(value) if value is not None else None
 
-    async def list_consumption_report(self, start_date: datetime | None = None, end_date: datetime | None = None) -> list[dict]:
+    async def list_consumption_report(
+        self,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        organization_id: UUID | None = None,
+    ) -> list[dict]:
         stmt = (
             select(
                 FuelSupply.vehicle_id,
@@ -111,6 +118,8 @@ class FuelSupplyRepository:
             stmt = stmt.where(FuelSupply.supplied_at >= start_date)
         if end_date:
             stmt = stmt.where(FuelSupply.supplied_at <= end_date)
+        if organization_id:
+            stmt = stmt.where(self._organization_scope_clause(organization_id))
 
         rows = (await self.db.execute(stmt)).all()
         return [
@@ -125,7 +134,13 @@ class FuelSupplyRepository:
             for row in rows
         ]
 
-    async def list_anomalies(self, *, start_date: datetime | None = None, end_date: datetime | None = None) -> list[FuelSupply]:
+    async def list_anomalies(
+        self,
+        *,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        organization_id: UUID | None = None,
+    ) -> list[FuelSupply]:
         stmt = (
             select(FuelSupply)
             .options(joinedload(FuelSupply.vehicle))
@@ -136,5 +151,21 @@ class FuelSupplyRepository:
             stmt = stmt.where(FuelSupply.supplied_at >= start_date)
         if end_date:
             stmt = stmt.where(FuelSupply.supplied_at <= end_date)
+        if organization_id:
+            stmt = stmt.where(self._organization_scope_clause(organization_id))
 
         return list((await self.db.execute(stmt)).scalars().unique().all())
+
+    def _organization_scope_clause(self, organization_id: UUID):
+        vehicle_in_organization = (
+            select(LocationHistory.vehicle_id)
+            .join(Allocation, Allocation.id == LocationHistory.allocation_id)
+            .join(Department, Department.id == Allocation.department_id)
+            .where(
+                LocationHistory.vehicle_id == FuelSupply.vehicle_id,
+                LocationHistory.end_date.is_(None),
+                Department.organization_id == organization_id,
+            )
+            .exists()
+        )
+        return or_(FuelSupply.organization_id == organization_id, vehicle_in_organization)

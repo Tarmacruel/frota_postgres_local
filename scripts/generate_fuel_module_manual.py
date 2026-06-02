@@ -263,7 +263,9 @@ def checklist_table():
         [Paragraph("<b>Campo</b>", STYLES["Small"]), Paragraph("<b>Como preencher</b>", STYLES["Small"])],
         ["Odômetro real (km)", "Informar a quilometragem no momento do abastecimento."],
         ["Litros abastecidos", "Registrar a quantidade efetivamente fornecida no posto."],
-        ["Valor total (R$)", "Campo opcional para o valor final da nota ou cupom."],
+        ["Valor total abastecido (R$)", "Informar o valor final da nota ou cupom."],
+        ["Tipo de combustível", "Selecionar o combustível efetivamente abastecido."],
+        ["Aditivo", "Informar quando houver ARLA 32 ou outro aditivo."],
         ["Data/hora real", "Informar o instante real da operação, diferente do prazo de emissão."],
         ["Comprovante", "Anexar PDF, JPG, PNG ou WEBP com até 8 MB."],
         ["Observações", "Usar quando houver justificativas, divergências ou notas internas."],
@@ -405,9 +407,9 @@ def build_story():
             "5. Emissão da nova ordem",
             "Ao clicar em <b>Nova ordem</b>, o sistema abre a modal de emissão. "
             "O preenchimento mínimo envolve veículo, posto responsável e prazo limite. "
-            "Também é possível informar condutor, órgão solicitante, litros previstos, observações e o <b>valor máximo com máscara em real</b>.",
+            "Também é possível informar órgão solicitante, litros previstos e observações, sem exigir condutor, contato ou valor máximo autorizado.",
             "admin-nova-ordem-modal-1440.png",
-            "Figura 3 — Modal de emissão da ordem com máscara monetária em reais no valor máximo.",
+            "Figura 3 — Modal de emissão da ordem com os campos operacionais necessários para autorização.",
         )
     )
     story.append(Paragraph("Campos principais da emissão:", STYLES["CardTitle"]))
@@ -415,7 +417,7 @@ def build_story():
         "<b>Veículo</b>: unidade que será abastecida.",
         "<b>Posto</b>: posto credenciado que irá executar a operação.",
         "<b>Prazo limite</b>: data/hora de validade da autorização.",
-        "<b>Litros previstos</b> e <b>Valor máximo</b>: limites autorizados para controle operacional.",
+        "<b>Litros previstos</b>: referência operacional para o posto.",
         "<b>Observações</b>: instruções para posto e equipe solicitante.",
     ]
     story.append(

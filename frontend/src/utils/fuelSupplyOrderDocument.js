@@ -1,7 +1,6 @@
 import { officialBrand } from '../constants/officialBrand'
 import { formatDateTimeLabel, loadOptimizedLogo } from './exportData'
 import {
-  formatCurrencyBRL,
   formatOrderNumber,
   getOrderStatusLabel,
   resolvePublicValidationUrl,
@@ -268,8 +267,6 @@ async function buildDocument(order) {
 
   cursorY = addSection('Dados operacionais', [
     ['Veículo', order.vehicle_description || order.vehicle_plate || '-'],
-    ['Condutor', order.driver_name || 'Não informado'],
-    ['Contato do motorista', order.driver_contact || 'Não informado'],
     ['Órgão solicitante', order.organization_name || 'Não informado'],
     ['Posto credenciado', order.fuel_station_name || 'Não informado'],
     ['Endereço do posto', order.fuel_station_address || 'Não informado'],
@@ -277,13 +274,11 @@ async function buildDocument(order) {
     ['Telefone do posto', order.fuel_station_phone || 'Não informado'],
     ['Localização do posto', order.fuel_station_maps_url || 'Não informado'],
     ['Servidor emissor', order.created_by_name || 'Não informado'],
-    ['Contato do emissor', order.created_by_contact || 'Não informado'],
     ['Conclusão da ordem', order.confirmed_at ? formatDateTimeLabel(order.confirmed_at) : 'Pendente'],
   ], cursorY)
 
-  cursorY = addSection('Limites autorizados', [
+  cursorY = addSection('Controle autorizado', [
     ['Litros previstos', order.requested_liters ? `${formatNumber(order.requested_liters, 2)} L` : 'Não informado'],
-    ['Valor máximo autorizado', formatCurrencyBRL(order.max_amount)],
     ['Responsável pelo encerramento', order.confirmed_by_name || 'Não informado'],
   ], cursorY)
 

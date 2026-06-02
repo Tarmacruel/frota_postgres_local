@@ -2,10 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from uuid import UUID
-from sqlalchemy import and_, func, select, update
+from sqlalchemy import and_, func, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.models.fuel_supply_order import FuelSupplyOrder, FuelSupplyOrderStatus
+from app.models.location_history import LocationHistory
+from app.models.master_data import Allocation, Department
 
 
 class FuelSupplyOrderRepository:
@@ -73,7 +75,7 @@ class FuelSupplyOrderRepository:
         if status_filter:
             filters.append(FuelSupplyOrder.status == status_filter)
         if organization_id:
-            filters.append(FuelSupplyOrder.organization_id == organization_id)
+            filters.append(self._organization_scope_clause(organization_id))
         if vehicle_id:
             filters.append(FuelSupplyOrder.vehicle_id == vehicle_id)
         if fuel_station_id:
@@ -92,6 +94,20 @@ class FuelSupplyOrderRepository:
         total = int((await self.db.execute(count_stmt)).scalar_one())
         records = list((await self.db.execute(stmt)).scalars().unique().all())
         return records, total
+
+    def _organization_scope_clause(self, organization_id: UUID):
+        vehicle_in_organization = (
+            select(LocationHistory.vehicle_id)
+            .join(Allocation, Allocation.id == LocationHistory.allocation_id)
+            .join(Department, Department.id == Allocation.department_id)
+            .where(
+                LocationHistory.vehicle_id == FuelSupplyOrder.vehicle_id,
+                LocationHistory.end_date.is_(None),
+                Department.organization_id == organization_id,
+            )
+            .exists()
+        )
+        return or_(FuelSupplyOrder.organization_id == organization_id, vehicle_in_organization)
 
     async def expire_overdue(self, *, reference_time: datetime) -> int:
         result = await self.db.execute(

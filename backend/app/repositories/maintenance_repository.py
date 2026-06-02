@@ -5,7 +5,9 @@ from uuid import UUID
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
+from app.models.location_history import LocationHistory
 from app.models.maintenance import MaintenanceRecord
+from app.models.master_data import Allocation, Department
 
 
 class MaintenanceRepository:
@@ -25,6 +27,7 @@ class MaintenanceRepository:
         vehicle_id: UUID | None = None,
         start: datetime | None = None,
         end: datetime | None = None,
+        organization_id: UUID | None = None,
     ) -> list[MaintenanceRecord]:
         stmt = (
             select(MaintenanceRecord)
@@ -34,6 +37,8 @@ class MaintenanceRepository:
 
         if vehicle_id:
             stmt = stmt.where(MaintenanceRecord.vehicle_id == vehicle_id)
+        if organization_id:
+            stmt = self._filter_by_active_organization(stmt, organization_id)
         if start:
             stmt = stmt.where(func.coalesce(MaintenanceRecord.end_date, func.now()) >= start)
         if end:
@@ -52,6 +57,7 @@ class MaintenanceRepository:
         end: datetime | None = None,
         only_open: bool | None = None,
         search: str | None = None,
+        organization_id: UUID | None = None,
     ) -> tuple[list[MaintenanceRecord], int]:
         stmt = select(MaintenanceRecord).options(joinedload(MaintenanceRecord.vehicle))
         count_stmt = select(func.count(MaintenanceRecord.id))
@@ -59,6 +65,9 @@ class MaintenanceRepository:
         if vehicle_id:
             stmt = stmt.where(MaintenanceRecord.vehicle_id == vehicle_id)
             count_stmt = count_stmt.where(MaintenanceRecord.vehicle_id == vehicle_id)
+        if organization_id:
+            stmt = self._filter_by_active_organization(stmt, organization_id)
+            count_stmt = self._filter_by_active_organization(count_stmt, organization_id)
         if start:
             stmt = stmt.where(func.coalesce(MaintenanceRecord.end_date, func.now()) >= start)
             count_stmt = count_stmt.where(func.coalesce(MaintenanceRecord.end_date, func.now()) >= start)
@@ -84,6 +93,18 @@ class MaintenanceRepository:
         total = int((await self.db.execute(count_stmt)).scalar_one())
         items = list((await self.db.execute(stmt)).scalars().unique().all())
         return items, total
+
+    def _filter_by_active_organization(self, stmt, organization_id: UUID):
+        return (
+            stmt
+            .join(LocationHistory, LocationHistory.vehicle_id == MaintenanceRecord.vehicle_id)
+            .join(Allocation, Allocation.id == LocationHistory.allocation_id)
+            .join(Department, Department.id == Allocation.department_id)
+            .where(
+                LocationHistory.end_date.is_(None),
+                Department.organization_id == organization_id,
+            )
+        )
 
     async def create(self, record: MaintenanceRecord) -> MaintenanceRecord:
         self.db.add(record)

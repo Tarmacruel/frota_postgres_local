@@ -3,6 +3,7 @@ import SearchableSelect from './SearchableSelect'
 import { fuelSuppliesAPI } from '../api/fuelSupplies'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
+import { ADDITIVE_TYPE_OPTIONS, FUEL_TYPE_OPTIONS, resolveOptionValue } from '../utils/fuelSupplyDetails'
 
 const MAX_RECEIPT_SIZE_BYTES = 8 * 1024 * 1024
 const ALLOWED_RECEIPT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
@@ -44,7 +45,13 @@ export default function FuelSupplyForm({ vehicles, drivers, organizations, fuelS
     odometer_km: '',
     liters: '',
     total_amount: '',
+    fuel_type: '',
+    fuel_type_other: '',
     fuel_station_id: '',
+    additive_enabled: false,
+    additive_type: '',
+    additive_type_other: '',
+    additive_quantity_liters: '',
     notes: '',
   })
   const [receiptFile, setReceiptFile] = useState(null)
@@ -72,7 +79,7 @@ export default function FuelSupplyForm({ vehicles, drivers, organizations, fuelS
 
     if (file.size > MAX_RECEIPT_SIZE_BYTES) {
       setReceiptFile(null)
-      setReceiptError('Comprovante deve ter no maximo 8 MB.')
+      setReceiptError('Comprovante deve ter no máximo 8 MB.')
       if (receiptRef.current) receiptRef.current.value = ''
       return
     }
@@ -83,8 +90,27 @@ export default function FuelSupplyForm({ vehicles, drivers, organizations, fuelS
 
   async function handleSubmit(event) {
     event.preventDefault()
+    const fuelType = resolveOptionValue(form.fuel_type, form.fuel_type_other)
+    const additiveType = form.additive_enabled ? resolveOptionValue(form.additive_type, form.additive_type_other) : ''
+
     if (!form.vehicle_id) {
       setError('Selecione um veículo para registrar o abastecimento.')
+      return
+    }
+    if (!form.total_amount || Number(form.total_amount) <= 0) {
+      setError('Informe o valor total abastecido.')
+      return
+    }
+    if (!fuelType) {
+      setError('Informe o tipo de combustível abastecido.')
+      return
+    }
+    if (form.additive_enabled && !additiveType) {
+      setError('Informe o tipo de aditivo utilizado.')
+      return
+    }
+    if (form.additive_enabled && form.additive_quantity_liters && Number(form.additive_quantity_liters) <= 0) {
+      setError('Informe uma quantidade de aditivo maior que zero.')
       return
     }
     if (!receiptFile) {
@@ -102,8 +128,13 @@ export default function FuelSupplyForm({ vehicles, drivers, organizations, fuelS
       if (form.supplied_at) payload.append('supplied_at', new Date(form.supplied_at).toISOString())
       payload.append('odometer_km', String(Number(form.odometer_km)))
       payload.append('liters', String(Number(form.liters)))
-      if (form.total_amount) payload.append('total_amount', String(Number(form.total_amount)))
+      payload.append('total_amount', String(Number(form.total_amount)))
+      payload.append('fuel_type', fuelType)
       if (form.fuel_station_id) payload.append('fuel_station_id', form.fuel_station_id)
+      if (additiveType) payload.append('additive_type', additiveType)
+      if (form.additive_enabled && form.additive_quantity_liters) {
+        payload.append('additive_quantity_liters', String(Number(form.additive_quantity_liters)))
+      }
       if (form.notes) payload.append('notes', form.notes)
       payload.append('receipt', receiptFile, receiptFile.name)
 
@@ -146,13 +177,57 @@ export default function FuelSupplyForm({ vehicles, drivers, organizations, fuelS
         <input type="number" min="0" step="0.01" className="app-input" value={form.liters} onChange={(event) => setForm({ ...form, liters: event.target.value })} required />
       </div>
       <div className="form-field">
-        <label>Valor total (R$)</label>
-        <input type="number" min="0" step="0.01" className="app-input" value={form.total_amount} onChange={(event) => setForm({ ...form, total_amount: event.target.value })} />
+        <label>Valor total abastecido (R$)</label>
+        <input type="number" min="0" step="0.01" className="app-input" value={form.total_amount} onChange={(event) => setForm({ ...form, total_amount: event.target.value })} required />
       </div>
+      <div className="form-field">
+        <label>Tipo de combustível</label>
+        <select className="app-select" value={form.fuel_type} onChange={(event) => setForm({ ...form, fuel_type: event.target.value })} required>
+          <option value="">Selecione</option>
+          {FUEL_TYPE_OPTIONS.map((option) => (
+            <option key={option} value={option}>{option}</option>
+          ))}
+        </select>
+      </div>
+      {form.fuel_type === 'Outro' ? (
+        <div className="form-field modal-field-span">
+          <label>Outro combustível</label>
+          <input className="app-input" value={form.fuel_type_other} onChange={(event) => setForm({ ...form, fuel_type_other: event.target.value })} maxLength={80} required />
+        </div>
+      ) : null}
       <div className="form-field">
         <label>Posto</label>
         <SearchableSelect value={form.fuel_station_id} onChange={(value) => setForm({ ...form, fuel_station_id: value })} options={[{ value: '', label: 'Não informado' }, ...fuelStations.map(buildFuelStationOption)]} placeholder="Selecione o posto" searchPlaceholder="Buscar posto" />
       </div>
+      <div className="form-field">
+        <label className="checkbox-line">
+          <input type="checkbox" checked={form.additive_enabled} onChange={(event) => setForm({ ...form, additive_enabled: event.target.checked, additive_type: '', additive_type_other: '', additive_quantity_liters: '' })} />
+          <span>Houve aditivo</span>
+        </label>
+      </div>
+      {form.additive_enabled ? (
+        <>
+          <div className="form-field">
+            <label>Aditivo</label>
+            <select className="app-select" value={form.additive_type} onChange={(event) => setForm({ ...form, additive_type: event.target.value })} required>
+              <option value="">Selecione</option>
+              {ADDITIVE_TYPE_OPTIONS.map((option) => (
+                <option key={option} value={option}>{option}</option>
+              ))}
+            </select>
+          </div>
+          <div className="form-field">
+            <label>Quantidade do aditivo (L)</label>
+            <input type="number" min="0" step="0.01" className="app-input" value={form.additive_quantity_liters} onChange={(event) => setForm({ ...form, additive_quantity_liters: event.target.value })} />
+          </div>
+          {form.additive_type === 'Outro' ? (
+            <div className="form-field modal-field-span">
+              <label>Outro aditivo</label>
+              <input className="app-input" value={form.additive_type_other} onChange={(event) => setForm({ ...form, additive_type_other: event.target.value })} maxLength={80} required />
+            </div>
+          ) : null}
+        </>
+      ) : null}
 
       <div className="form-field modal-field-span">
         <label>Comprovante (obrigatório)</label>

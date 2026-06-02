@@ -2,6 +2,7 @@
 param(
     [string]$BackupRoot = "storage\backups",
     [string]$MirrorRoot = "",
+    [string]$StorageRoot = "",
     [int]$RetentionCount = 10
 )
 
@@ -110,6 +111,11 @@ $dbUser = $userInfo[0]
 $dbPassword = if ($userInfo.Count -gt 1) { $userInfo[1] } else { "" }
 $dbHost = $uri.Host
 $dbPort = if ($uri.Port -gt 0) { $uri.Port } else { 5432 }
+$storageRootValue = if (-not [string]::IsNullOrWhiteSpace($StorageRoot)) { $StorageRoot } else { Get-EnvValue -Path $envFile -Name "STORAGE_DIR" }
+if ([string]::IsNullOrWhiteSpace($storageRootValue)) {
+    $storageRootValue = Join-Path $backendRoot "storage"
+}
+$storageRootAbsolute = if ([System.IO.Path]::IsPathRooted($storageRootValue)) { $storageRootValue } else { Join-Path $backendRoot $storageRootValue }
 
 $backupRootAbsolute = if ([System.IO.Path]::IsPathRooted($BackupRoot)) { $BackupRoot } else { Join-Path $repoRoot $BackupRoot }
 Ensure-Directory -Path $backupRootAbsolute
@@ -134,6 +140,7 @@ try {
     $sqlPath = Join-Path $workDir "database.sql"
     $metaPath = Join-Path $workDir "metadata.json"
     $envBackupPath = Join-Path $workDir ".env.backup"
+    $storageBackupPath = Join-Path $workDir "storage"
     $mirrorArchivePath = $null
 
     Ensure-Directory -Path $workDir
@@ -164,6 +171,25 @@ try {
         Copy-Item -LiteralPath $envFile -Destination $envBackupPath -Force
     }
 
+    $storageIncluded = $false
+    if (Test-Path -LiteralPath $storageRootAbsolute) {
+        Write-Host "Copiando anexos e comprovantes..." -ForegroundColor Yellow
+        Ensure-Directory -Path $storageBackupPath
+        $robocopy = Get-Command robocopy.exe -ErrorAction SilentlyContinue
+        if (-not $robocopy) {
+            throw "robocopy.exe nao encontrado para copiar STORAGE_DIR."
+        }
+
+        & $robocopy.Source $storageRootAbsolute $storageBackupPath /E /R:2 /W:2 /XJ /NFL /NDL /NP | Out-Null
+        if ($LASTEXITCODE -ge 8) {
+            throw "Falha ao copiar STORAGE_DIR para o backup. Codigo robocopy: $LASTEXITCODE."
+        }
+        $storageIncluded = $true
+    }
+    else {
+        Write-Host "STORAGE_DIR nao encontrado; backup seguira apenas com banco e .env: $storageRootAbsolute" -ForegroundColor Yellow
+    }
+
     $metadata = [ordered]@{
         system = "Frota PMTF"
         generatedAt = (Get-Date).ToString("s")
@@ -177,6 +203,11 @@ try {
         files = [ordered]@{
             databaseSql = (Split-Path $sqlPath -Leaf)
             envBackup   = (Split-Path $envBackupPath -Leaf)
+            storage     = if ($storageIncluded) { "storage" } else { $null }
+        }
+        storage = [ordered]@{
+            source   = $storageRootAbsolute
+            included = $storageIncluded
         }
         mirror = if ($mirrorRootAbsolute) { $mirrorRootAbsolute } else { $null }
     } | ConvertTo-Json -Depth 5

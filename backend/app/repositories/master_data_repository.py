@@ -11,17 +11,22 @@ class MasterDataRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list_catalog(self) -> list[Organization]:
+    async def list_catalog(self, organization_id: UUID | None = None) -> list[Organization]:
         stmt = (
             select(Organization)
             .options(joinedload(Organization.departments).joinedload(Department.allocations))
             .order_by(Organization.name)
         )
+        if organization_id:
+            stmt = stmt.where(Organization.id == organization_id)
         result = await self.db.execute(stmt)
         return list(result.scalars().unique().all())
 
-    async def list_organizations(self) -> list[Organization]:
-        result = await self.db.execute(select(Organization).order_by(Organization.name))
+    async def list_organizations(self, organization_id: UUID | None = None) -> list[Organization]:
+        stmt = select(Organization).order_by(Organization.name)
+        if organization_id:
+            stmt = stmt.where(Organization.id == organization_id)
+        result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
     async def list_departments(self, organization_id: UUID | None = None) -> list[Department]:

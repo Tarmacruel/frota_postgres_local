@@ -19,12 +19,14 @@ O ambiente de desenvolvimento agora e operado pela Central Operacional.
 | Parar processos | Parar ambiente |
 | Ver portas/PIDs | Status |
 | Abrir logs | Abrir logs |
+| Auto-retomada | Configurar auto-retomada |
 
 ## Portas padrao
 
 ```text
 Backend:  8000
 Frontend: 3001
+Frontend watchdog: 3000
 Publicacao local: 80
 PostgreSQL: 5432
 ```
@@ -39,3 +41,13 @@ powershell -NoProfile -ExecutionPolicy Bypass -File .\scripts\run-frontend-dev.p
 ```
 
 O frontend usa polling no Vite para funcionar bem no repositorio em unidade de rede.
+
+## Auto-retomada
+
+Para producao com runtime local, use:
+
+```powershell
+.\Configurar_Auto_Retomada.bat
+```
+
+O instalador sincroniza `\\Sad61svr001\licitacao.1\FROTAS\frota_postgres_local` para `C:\FROTAS\frota_runtime` e agenda a tarefa `FROTA Watchdog`.

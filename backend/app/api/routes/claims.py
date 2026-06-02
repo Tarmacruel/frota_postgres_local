@@ -6,13 +6,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_permission
 from app.db.session import get_db_session
 from app.models.claim import ClaimStatus, ClaimType
+from app.models.user import User
 from app.schemas.claim import ClaimCreate, ClaimListResponse, ClaimOut, ClaimUpdate
 from app.services.claim_service import ClaimService
 
 router = APIRouter(prefix="/api/claims", tags=["Claims"])
 
 
-@router.get("", response_model=ClaimListResponse, dependencies=[Depends(require_permission("claims", "view"))])
+@router.get("", response_model=ClaimListResponse)
 async def list_claims(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),
@@ -22,6 +23,7 @@ async def list_claims(
     tipo: ClaimType | None = Query(default=None),
     search: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("claims", "view")),
 ):
     return await ClaimService(db).list(
         page=page,
@@ -31,12 +33,17 @@ async def list_claims(
         status_filter=status_filter,
         tipo=tipo,
         search=search,
+        current_user=current_user,
     )
 
 
-@router.get("/{claim_id}", response_model=ClaimOut, dependencies=[Depends(require_permission("claims", "view"))])
-async def get_claim(claim_id: UUID, db: AsyncSession = Depends(get_db_session)):
-    return await ClaimService(db).get(claim_id)
+@router.get("/{claim_id}", response_model=ClaimOut)
+async def get_claim(
+    claim_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("claims", "view")),
+):
+    return await ClaimService(db).get(claim_id, current_user=current_user)
 
 
 @router.post("", response_model=ClaimOut, status_code=status.HTTP_201_CREATED)

@@ -24,14 +24,20 @@ from app.services.master_data_service import MasterDataService
 router = APIRouter(prefix="/api/master-data", tags=["MasterData"])
 
 
-@router.get("/catalog", response_model=MasterDataCatalogOut, dependencies=[Depends(require_permission("master_data", "view"))])
-async def get_catalog(db: AsyncSession = Depends(get_db_session)):
-    return await MasterDataService(db).get_catalog()
+@router.get("/catalog", response_model=MasterDataCatalogOut)
+async def get_catalog(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("master_data", "view")),
+):
+    return await MasterDataService(db).get_catalog(current_user=current_user)
 
 
-@router.get("/organizations", response_model=list[OrganizationOut], dependencies=[Depends(require_permission("master_data", "view"))])
-async def list_organizations(db: AsyncSession = Depends(get_db_session)):
-    return await MasterDataService(db).list_organizations()
+@router.get("/organizations", response_model=list[OrganizationOut])
+async def list_organizations(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("master_data", "view")),
+):
+    return await MasterDataService(db).list_organizations(current_user=current_user)
 
 
 @router.post("/organizations", response_model=OrganizationOut, status_code=status.HTTP_201_CREATED)
@@ -63,12 +69,13 @@ async def delete_organization(
     return {"message": "Removido"}
 
 
-@router.get("/departments", response_model=list[DepartmentOut], dependencies=[Depends(require_permission("master_data", "view"))])
+@router.get("/departments", response_model=list[DepartmentOut])
 async def list_departments(
     organization_id: UUID | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("master_data", "view")),
 ):
-    return await MasterDataService(db).list_departments(organization_id=organization_id)
+    return await MasterDataService(db).list_departments(organization_id=organization_id, current_user=current_user)
 
 
 @router.post("/departments", response_model=DepartmentOut, status_code=status.HTTP_201_CREATED)
@@ -100,13 +107,14 @@ async def delete_department(
     return {"message": "Removido"}
 
 
-@router.get("/allocations", response_model=list[AllocationOut], dependencies=[Depends(require_permission("master_data", "view"))])
+@router.get("/allocations", response_model=list[AllocationOut])
 async def list_allocations(
     organization_id: UUID | None = Query(default=None),
     department_id: UUID | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("master_data", "view")),
 ):
-    return await MasterDataService(db).list_allocations(organization_id=organization_id, department_id=department_id)
+    return await MasterDataService(db).list_allocations(organization_id=organization_id, department_id=department_id, current_user=current_user)
 
 
 @router.post("/allocations", response_model=AllocationOut, status_code=status.HTTP_201_CREATED)

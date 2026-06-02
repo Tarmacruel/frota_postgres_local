@@ -3,7 +3,6 @@ import SearchableSelect from './SearchableSelect'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
-import { formatCurrencyInput, parseCurrencyInput } from '../utils/fuelSupplyOrders'
 
 function buildVehicleOption(vehicle) {
   const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
@@ -12,15 +11,6 @@ function buildVehicleOption(vehicle) {
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
     description: locationLabel,
     keywords: [vehicle.plate, vehicle.brand, vehicle.model, locationLabel].filter(Boolean).join(' '),
-  }
-}
-
-function buildDriverOption(driver) {
-  return {
-    value: driver.id,
-    label: driver.nome_completo,
-    description: driver.documento || 'Sem documento',
-    keywords: [driver.nome_completo, driver.documento, driver.contato].filter(Boolean).join(' '),
   }
 }
 
@@ -34,20 +24,17 @@ function buildFuelStationOption(station) {
 }
 
 function buildDefaultDeadline() {
-  const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000)
-  return toDateTimeLocalValue(tomorrow.toISOString())
+  const deadline = new Date(Date.now() + 48 * 60 * 60 * 1000)
+  return toDateTimeLocalValue(deadline.toISOString())
 }
 
-export default function FuelSupplyOrderCreateForm({ vehicles, drivers, organizations, fuelStations, onClose, onSuccess }) {
+export default function FuelSupplyOrderCreateForm({ vehicles, organizations, fuelStations, onClose, onSuccess }) {
   const [form, setForm] = useState({
     vehicle_id: '',
-    driver_id: '',
     organization_id: '',
     fuel_station_id: '',
-    requester_contact: '',
     expires_at: buildDefaultDeadline(),
     requested_liters: '',
-    max_amount: '',
     notes: '',
   })
   const [error, setError] = useState('')
@@ -69,11 +56,6 @@ export default function FuelSupplyOrderCreateForm({ vehicles, drivers, organizat
       return
     }
 
-    if (!form.requester_contact.trim()) {
-      setError('Informe o contato de quem está emitindo a ordem.')
-      return
-    }
-
     if (!form.expires_at) {
       setError('Informe o prazo limite da ordem.')
       return
@@ -86,17 +68,13 @@ export default function FuelSupplyOrderCreateForm({ vehicles, drivers, organizat
 
     try {
       setSubmitting(true)
-      const parsedMaxAmount = parseCurrencyInput(form.max_amount)
       const payload = {
         vehicle_id: form.vehicle_id,
         expires_at: new Date(form.expires_at).toISOString(),
         fuel_station_id: form.fuel_station_id,
-        requester_contact: form.requester_contact.trim(),
       }
-      if (form.driver_id) payload.driver_id = form.driver_id
       if (form.organization_id) payload.organization_id = form.organization_id
       if (form.requested_liters) payload.requested_liters = Number(form.requested_liters)
-      if (parsedMaxAmount !== null) payload.max_amount = parsedMaxAmount
       if (form.notes.trim()) payload.notes = form.notes.trim()
 
       const { data } = await fuelSupplyOrdersAPI.create(payload)
@@ -139,17 +117,6 @@ export default function FuelSupplyOrderCreateForm({ vehicles, drivers, organizat
       </div>
 
       <div className="form-field">
-        <label>Condutor</label>
-        <SearchableSelect
-          value={form.driver_id}
-          onChange={(value) => setForm((current) => ({ ...current, driver_id: value }))}
-          options={[{ value: '', label: 'Não informado' }, ...drivers.map(buildDriverOption)]}
-          placeholder="Selecione o condutor"
-          searchPlaceholder="Buscar condutor"
-        />
-      </div>
-
-      <div className="form-field">
         <label>Órgão solicitante</label>
         <SearchableSelect
           value={form.organization_id}
@@ -157,19 +124,6 @@ export default function FuelSupplyOrderCreateForm({ vehicles, drivers, organizat
           options={[{ value: '', label: 'Não informado' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))]}
           placeholder="Selecione o órgão"
           searchPlaceholder="Buscar órgão"
-        />
-      </div>
-
-      <div className="form-field">
-        <label>Contato do emissor</label>
-        <input
-          type="text"
-          className="app-input"
-          value={form.requester_contact}
-          onChange={(event) => setForm((current) => ({ ...current, requester_contact: event.target.value }))}
-          placeholder="Telefone ou ramal para contato"
-          maxLength={50}
-          required
         />
       </div>
 
@@ -193,18 +147,6 @@ export default function FuelSupplyOrderCreateForm({ vehicles, drivers, organizat
           className="app-input"
           value={form.requested_liters}
           onChange={(event) => setForm((current) => ({ ...current, requested_liters: event.target.value }))}
-        />
-      </div>
-
-      <div className="form-field">
-        <label>Valor máximo (R$)</label>
-        <input
-          type="text"
-          inputMode="numeric"
-          className="app-input"
-          value={form.max_amount}
-          onChange={(event) => setForm((current) => ({ ...current, max_amount: formatCurrencyInput(event.target.value) }))}
-          placeholder="R$ 0,00"
         />
       </div>
 

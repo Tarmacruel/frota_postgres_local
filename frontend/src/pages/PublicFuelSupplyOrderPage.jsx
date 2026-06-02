@@ -5,7 +5,6 @@ import { officialBrand } from '../constants/officialBrand'
 import { getApiErrorMessage } from '../utils/apiError'
 import { downloadFuelSupplyOrderDocument, previewFuelSupplyOrderDocument } from '../utils/fuelSupplyOrderDocument'
 import {
-  formatCurrencyBRL,
   formatOrderNumber,
   getOrderStatusClass,
   getOrderStatusLabel,
@@ -104,7 +103,6 @@ export default function PublicFuelSupplyOrderPage() {
                 <h2>Dados operacionais</h2>
                 <dl>
                   <div><dt>Veículo</dt><dd>{order.vehicle_description || order.vehicle_plate || '-'}</dd></div>
-                  <div><dt>Condutor</dt><dd>{order.driver_name || 'Não informado'}</dd></div>
                   <div><dt>Órgão solicitante</dt><dd>{order.organization_name || 'Não informado'}</dd></div>
                   <div><dt>Posto credenciado</dt><dd>{order.fuel_station_name || 'Não informado'}</dd></div>
                   <div><dt>Endereço do posto</dt><dd>{order.fuel_station_address || 'Não informado'}</dd></div>
@@ -125,13 +123,10 @@ export default function PublicFuelSupplyOrderPage() {
                 <h2>Controle institucional</h2>
                 <dl>
                   <div><dt>Servidor emissor</dt><dd>{order.created_by_name || 'Não informado'}</dd></div>
-                  <div><dt>Contato do emissor</dt><dd>{order.created_by_contact || 'Não informado'}</dd></div>
-                  <div><dt>Contato do condutor</dt><dd>{order.driver_contact || 'Não informado'}</dd></div>
                   <div><dt>Valida até</dt><dd>{formatDate(order.expires_at)}</dd></div>
                   <div><dt>Confirmada em</dt><dd>{formatDate(order.confirmed_at)}</dd></div>
                   <div><dt>Concluída por</dt><dd>{order.confirmed_by_name || 'Pendente'}</dd></div>
                   <div><dt>Litros previstos</dt><dd>{formatLiters(order.requested_liters)}</dd></div>
-                  <div><dt>Valor máximo</dt><dd>{formatCurrencyBRL(order.max_amount)}</dd></div>
                 </dl>
               </article>
             </section>

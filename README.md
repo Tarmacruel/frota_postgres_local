@@ -21,6 +21,7 @@ Ela concentra as tarefas do projeto:
 | Status | Mostra portas, PIDs e logs |
 | Backup manual | Gera backup local e copia no OneDrive |
 | Configurar backup automatico | Agenda backup 3x ao dia |
+| Configurar auto-retomada | Instala watchdog local para recuperar rede/app |
 
 ## URLs padrao
 
@@ -46,6 +47,20 @@ Destino espelhado:
 
 ```text
 C:\Users\078364\OneDrive\BACKUPS\FROTAS
+```
+
+## Auto-retomada
+
+```powershell
+.\Configurar_Auto_Retomada.bat
+```
+
+Execute como administrador para permitir configuracao de recuperacao dos servicos Cloudflared e PostgreSQL.
+
+O watchdog usa `C:\FROTAS\frota_runtime`, monitora backend `:8000`, frontend `:3000`, PostgreSQL e Cloudflared, e registra logs em:
+
+```text
+C:\FROTAS\frota_runtime\storage\logs\frota-watchdog.log
 ```
 
 ## Diagnostico

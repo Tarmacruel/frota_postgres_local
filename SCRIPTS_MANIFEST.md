@@ -9,6 +9,7 @@ Este projeto agora usa uma raiz minima e uma central operacional unica.
 | `FROTA_Iniciar.bat` | Abre a Central Operacional do FROTAS |
 | `Diagnostico.ps1` | Verifica saude basica do ambiente |
 | `Configurar_Backup_Automatico.bat` | Instala/atualiza o backup automatico |
+| `Configurar_Auto_Retomada.bat` | Instala/atualiza o watchdog de auto-retomada |
 
 ## Central Operacional
 
@@ -28,6 +29,8 @@ Acoes disponiveis:
 | Abrir logs | Abre `storage\logs` |
 | Backup manual | Gera backup local e copia no OneDrive |
 | Configurar backup automatico | Registra tarefa diaria 3x ao dia |
+| Configurar auto-retomada | Cria runtime local e tarefa `FROTA Watchdog` |
+| Executar watchdog agora | Roda uma verificacao manual do watchdog |
 | Aplicar migrations | Executa `alembic upgrade heads` |
 | Atualizar projeto | `git pull`, migrations e build |
 
@@ -43,6 +46,8 @@ Acoes disponiveis:
 | `scripts\backup-local.ps1` | Backup manual local/espelhado |
 | `scripts\run-backup-automatico.ps1` | Runner da tarefa agendada |
 | `scripts\install-backup-automatico.ps1` | Instalador da tarefa agendada |
+| `scripts\frota-watchdog.ps1` | Monitor e recuperador do app/tunel |
+| `scripts\install-frota-watchdog.ps1` | Instalador do runtime local e tarefa agendada |
 | `scripts\setup-remote-backend.ps1` | Setup para PostgreSQL remoto |
 
 ## Removidos

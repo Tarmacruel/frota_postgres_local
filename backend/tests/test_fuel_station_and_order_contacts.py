@@ -5,7 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from app.schemas.fuel_station import FuelStationCreate
-from app.schemas.fuel_supply import FuelSupplyOrderCreate
+from app.schemas.fuel_supply import FuelSupplyCreate, FuelSupplyOrderConfirm, FuelSupplyOrderCreate
 
 
 def test_fuel_station_contact_and_coordinates_are_normalized():
@@ -44,21 +44,69 @@ def test_fuel_station_rejects_coordinates_outside_valid_range(latitude, longitud
         )
 
 
-def test_fuel_supply_order_requester_contact_is_optional_and_normalized():
+def test_fuel_supply_order_create_omits_legacy_driver_contact_and_amount_fields():
+    assert "driver_id" not in FuelSupplyOrderCreate.model_fields
+    assert "requester_contact" not in FuelSupplyOrderCreate.model_fields
+    assert "max_amount" not in FuelSupplyOrderCreate.model_fields
+
     order = FuelSupplyOrderCreate(
         vehicle_id=uuid4(),
         fuel_station_id=uuid4(),
         expires_at=datetime.now(timezone.utc) + timedelta(hours=2),
-        requester_contact="  (73) 98888-0000  ",
+        notes="  Ordem sem condutor  ",
     )
 
-    assert order.requester_contact == "(73) 98888-0000"
+    assert order.notes == "Ordem sem condutor"
 
-    legacy_order = FuelSupplyOrderCreate(
+
+def test_fuel_supply_confirm_requires_amount_and_fuel_type_and_normalizes_additive():
+    confirmation = FuelSupplyOrderConfirm(
+        odometer_km=12345,
+        liters=40,
+        total_amount=260.5,
+        fuel_type="  Diesel S10  ",
+        additive_type="  ARLA 32  ",
+    )
+
+    assert confirmation.fuel_type == "Diesel S10"
+    assert confirmation.additive_type == "ARLA 32"
+    assert confirmation.additive_quantity_liters is None
+
+    with pytest.raises(ValidationError):
+        FuelSupplyOrderConfirm(
+            odometer_km=12345,
+            liters=40,
+            fuel_type="Diesel S10",
+        )
+
+    with pytest.raises(ValidationError):
+        FuelSupplyOrderConfirm(
+            odometer_km=12345,
+            liters=40,
+            total_amount=260.5,
+            fuel_type="  ",
+        )
+
+    with pytest.raises(ValidationError):
+        FuelSupplyOrderConfirm(
+            odometer_km=12345,
+            liters=40,
+            total_amount=260.5,
+            fuel_type="Diesel S10",
+            additive_quantity_liters=5,
+        )
+
+
+def test_fuel_supply_create_accepts_fuel_type_and_additive_quantity():
+    supply = FuelSupplyCreate(
         vehicle_id=uuid4(),
-        fuel_station_id=uuid4(),
-        expires_at=datetime.now(timezone.utc) + timedelta(hours=2),
-        requester_contact="  ",
+        odometer_km=12345,
+        liters=40,
+        total_amount=260.5,
+        fuel_type="Gasolina comum",
+        additive_type="Aditivo combustível",
+        additive_quantity_liters=1.5,
     )
 
-    assert legacy_order.requester_contact is None
+    assert supply.fuel_type == "Gasolina comum"
+    assert supply.additive_quantity_liters == 1.5

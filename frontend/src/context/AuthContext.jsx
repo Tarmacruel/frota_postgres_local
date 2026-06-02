@@ -62,6 +62,7 @@ export function AuthProvider({ children }) {
       reload: loadMe,
       mustChangePassword: Boolean(user?.must_change_password),
       isAdmin: isAdmin(user?.role),
+      isProduction: user?.role === 'PRODUCAO',
       isPosto: isPosto(user?.role),
       can,
       canView: (module) => can(module, 'view'),

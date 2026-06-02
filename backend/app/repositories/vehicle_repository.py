@@ -1,7 +1,8 @@
 from __future__ import annotations
 
+from datetime import datetime
 from uuid import UUID
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.models.location_history import LocationHistory
@@ -24,10 +25,18 @@ class VehicleRepository:
         result = await self.db.execute(select(Vehicle).where(Vehicle.plate == plate.upper()))
         return result.scalar_one_or_none()
 
-    async def list(self, skip: int = 0, limit: int = DEFAULT_VEHICLE_LIST_LIMIT, status: VehicleStatus | None = None) -> list[Vehicle]:
+    async def list(
+        self,
+        skip: int = 0,
+        limit: int = DEFAULT_VEHICLE_LIST_LIMIT,
+        status: VehicleStatus | None = None,
+        organization_id: UUID | None = None,
+    ) -> list[Vehicle]:
         stmt = select(Vehicle).offset(skip).limit(limit).order_by(Vehicle.created_at.desc())
         if status:
             stmt = stmt.where(Vehicle.status == status)
+        if organization_id:
+            stmt = self._filter_by_active_organization(stmt, organization_id)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
@@ -41,6 +50,7 @@ class VehicleRepository:
         search: str | None = None,
         sort: str = "created_at",
         order: str = "desc",
+        organization_id: UUID | None = None,
     ) -> tuple[list[Vehicle], int]:
         sort_map = {
             "created_at": Vehicle.created_at,
@@ -54,6 +64,9 @@ class VehicleRepository:
 
         stmt = select(Vehicle)
         count_stmt = select(func.count(Vehicle.id))
+        if organization_id:
+            stmt = self._filter_by_active_organization(stmt, organization_id)
+            count_stmt = self._filter_by_active_organization(count_stmt, organization_id)
         if status:
             stmt = stmt.where(Vehicle.status == status)
             count_stmt = count_stmt.where(Vehicle.status == status)
@@ -76,6 +89,33 @@ class VehicleRepository:
         items = list((await self.db.execute(stmt)).scalars().all())
         return items, total
 
+    async def is_vehicle_in_organization(self, vehicle_id: UUID, organization_id: UUID) -> bool:
+        stmt = (
+            select(Vehicle.id)
+            .join(LocationHistory, LocationHistory.vehicle_id == Vehicle.id)
+            .join(Allocation, Allocation.id == LocationHistory.allocation_id)
+            .join(Department, Department.id == Allocation.department_id)
+            .where(
+                Vehicle.id == vehicle_id,
+                LocationHistory.end_date.is_(None),
+                Department.organization_id == organization_id,
+            )
+        )
+        result = await self.db.execute(stmt)
+        return result.scalar_one_or_none() is not None
+
+    def _filter_by_active_organization(self, stmt, organization_id: UUID):
+        return (
+            stmt
+            .join(LocationHistory, LocationHistory.vehicle_id == Vehicle.id)
+            .join(Allocation, Allocation.id == LocationHistory.allocation_id)
+            .join(Department, Department.id == Allocation.department_id)
+            .where(
+                LocationHistory.end_date.is_(None),
+                Department.organization_id == organization_id,
+            )
+        )
+
     async def create(self, vehicle: Vehicle) -> Vehicle:
         self.db.add(vehicle)
         await self.db.flush()
@@ -94,13 +134,24 @@ class VehicleRepository:
         )
         return result.scalar_one_or_none()
 
-    async def list_history(self, vehicle_id: UUID) -> list[LocationHistory]:
-        result = await self.db.execute(
+    async def list_history(
+        self,
+        vehicle_id: UUID,
+        *,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+    ) -> list[LocationHistory]:
+        stmt = (
             select(LocationHistory)
             .options(joinedload(LocationHistory.allocation).joinedload(Allocation.department).joinedload(Department.organization))
             .where(LocationHistory.vehicle_id == vehicle_id)
             .order_by(LocationHistory.start_date.desc())
         )
+        if start_date:
+            stmt = stmt.where(or_(LocationHistory.end_date.is_(None), LocationHistory.end_date >= start_date))
+        if end_date:
+            stmt = stmt.where(LocationHistory.start_date <= end_date)
+        result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
     async def create_history(self, history: LocationHistory) -> LocationHistory:

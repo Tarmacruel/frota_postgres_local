@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.organization_scope import ensure_organization_access, production_scope_is_empty, scoped_organization_id
 from app.models.audit_log import AuditLog
 from app.models.location_history import LocationHistory
 from app.models.master_data import Allocation
@@ -40,8 +41,12 @@ class VehicleService:
         self.master_data = MasterDataRepository(db)
         self.audit = AuditService(db)
 
-    async def list(self, skip: int, limit: int, status_filter: VehicleStatus | None):
-        vehicles = await self.vehicles.list(skip=skip, limit=limit, status=status_filter)
+    async def list(self, skip: int, limit: int, status_filter: VehicleStatus | None, current_user: User | None = None):
+        if production_scope_is_empty(current_user):
+            return []
+
+        organization_id = scoped_organization_id(current_user)
+        vehicles = await self.vehicles.list(skip=skip, limit=limit, status=status_filter, organization_id=organization_id)
         items = []
         for vehicle in vehicles:
             active = await self.vehicles.get_active_history(vehicle.id)
@@ -59,7 +64,12 @@ class VehicleService:
         search: str | None = None,
         sort: str = "created_at",
         order: str = "desc",
+        current_user: User | None = None,
     ) -> PaginatedResponse[dict]:
+        if production_scope_is_empty(current_user):
+            return PaginatedResponse[dict](data=[], pagination=build_pagination(page, limit, 0))
+
+        organization_id = scoped_organization_id(current_user)
         vehicles, total = await self.vehicles.list_paginated(
             page=page,
             limit=limit,
@@ -68,6 +78,7 @@ class VehicleService:
             search=search,
             sort=sort,
             order=order,
+            organization_id=organization_id,
         )
         items = []
         for vehicle in vehicles:
@@ -76,12 +87,23 @@ class VehicleService:
             items.append(self._serialize_vehicle(vehicle, active, possession))
         return PaginatedResponse[dict](data=items, pagination=build_pagination(page, limit, total))
 
-    async def get_history(self, vehicle_id: UUID):
+    async def get_history(
+        self,
+        vehicle_id: UUID,
+        *,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        current_user: User | None = None,
+    ):
+        if start_date and end_date and start_date > end_date:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data inicial não pode ser maior que a data final")
+
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
-        history = await self.vehicles.list_history(vehicle_id)
-        audit_logs = await self._list_vehicle_audit_logs(vehicle_id)
+        await self._ensure_vehicle_visible_to_user(vehicle_id, current_user=current_user)
+        history = await self.vehicles.list_history(vehicle_id, start_date=start_date, end_date=end_date)
+        audit_logs = await self._list_vehicle_audit_logs(vehicle_id, start_date=start_date, end_date=end_date)
         events = [self._serialize_history(item) for item in history]
         events.extend(self._serialize_audit_event(item) for item in audit_logs)
         return sorted(events, key=lambda item: item["occurred_at"], reverse=True)
@@ -98,6 +120,7 @@ class VehicleService:
                 raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Chassi já cadastrado")
 
         allocation = await self._require_allocation(data.allocation_id)
+        ensure_organization_access(current_user, allocation.organization_id)
         vehicle = Vehicle(
             plate=data.plate.upper().strip(),
             chassis_number=chassis_number,
@@ -148,6 +171,7 @@ class VehicleService:
         if not vehicle:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
+        await self._ensure_vehicle_visible_to_user(vehicle_id, current_user=current_user)
         previous_active = await self.vehicles.get_active_history(vehicle.id)
         previous_values = {
             "plate": vehicle.plate,
@@ -194,6 +218,7 @@ class VehicleService:
 
             if data.allocation_id is not None:
                 allocation = await self._require_allocation(data.allocation_id)
+                ensure_organization_access(current_user, allocation.organization_id)
                 active = await self.vehicles.get_active_history(vehicle.id)
                 current_allocation_id = active.allocation_id if active else None
                 if current_allocation_id != allocation.id:
@@ -237,6 +262,7 @@ class VehicleService:
             await self.db.rollback()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar o veículo") from exc
 
+        await self._ensure_vehicle_visible_to_user(vehicle_id, current_user=current_user)
         active = await self.vehicles.get_active_history(vehicle.id)
         possession = await self.vehicles.get_active_possession(vehicle.id)
         return self._serialize_vehicle(vehicle, active, possession)
@@ -288,8 +314,23 @@ class VehicleService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lotação não encontrada")
         return allocation
 
-    async def _list_vehicle_audit_logs(self, vehicle_id: UUID) -> list[AuditLog]:
-        result = await self.db.execute(
+    async def _ensure_vehicle_visible_to_user(self, vehicle_id: UUID, current_user: User | None) -> None:
+        organization_id = scoped_organization_id(current_user)
+        if organization_id is None:
+            if production_scope_is_empty(current_user):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            return
+        if not await self.vehicles.is_vehicle_in_organization(vehicle_id, organization_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+
+    async def _list_vehicle_audit_logs(
+        self,
+        vehicle_id: UUID,
+        *,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+    ) -> list[AuditLog]:
+        stmt = (
             select(AuditLog)
             .where(
                 AuditLog.entity_type == "VEHICLE",
@@ -298,6 +339,11 @@ class VehicleService:
             )
             .order_by(AuditLog.created_at.desc())
         )
+        if start_date:
+            stmt = stmt.where(AuditLog.created_at >= start_date)
+        if end_date:
+            stmt = stmt.where(AuditLog.created_at <= end_date)
+        result = await self.db.execute(stmt)
         return list(result.scalars().all())
 
     def _normalize_chassis(self, chassis_number: str | None) -> str | None:

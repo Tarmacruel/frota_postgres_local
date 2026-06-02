@@ -9,11 +9,9 @@ from app.schemas.common import PaginatedResponse
 
 class FuelSupplyOrderCreate(BaseModel):
     vehicle_id: UUID
-    driver_id: UUID | None = None
     organization_id: UUID | None = None
     fuel_station_id: UUID | None = None
     requested_liters: float | None = Field(default=None, gt=0)
-    max_amount: float | None = Field(default=None, ge=0)
     notes: str | None = Field(default=None, max_length=4000)
 
     @field_validator("notes")
@@ -46,7 +44,6 @@ class FuelSupplyOrderOut(BaseModel):
     created_by_user_id: UUID
     confirmed_by_user_id: UUID | None
     requested_liters: float | None
-    max_amount: float | None
     notes: str | None
     confirmed_at: datetime | None
     created_at: datetime
@@ -54,6 +51,9 @@ class FuelSupplyOrderOut(BaseModel):
 
 
 class FuelSupplyOrderConfirmPayload(BaseModel):
+    fuel_type: str = Field(min_length=1, max_length=80)
+    additive_type: str | None = Field(default=None, max_length=80)
+    additive_quantity_liters: float | None = Field(default=None, gt=0)
     notes: str | None = Field(default=None, max_length=4000)
 
 

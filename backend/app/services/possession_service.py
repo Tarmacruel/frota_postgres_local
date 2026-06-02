@@ -9,6 +9,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
+from app.core.organization_scope import ensure_organization_access, production_scope_is_empty, scoped_organization_id
 from app.models.possession import VehiclePossession
 from app.models.possession_photo import VehiclePossessionPhoto
 from app.models.user import User, UserRole
@@ -51,7 +52,11 @@ class PossessionService:
         self.admin_notifications = AdminNotificationService(db)
 
     async def list(self, vehicle_id: UUID | None = None, active: bool | None = None, current_user: User | None = None) -> list[dict]:
-        records = await self.possessions.list(vehicle_id=vehicle_id, active=active)
+        if production_scope_is_empty(current_user):
+            return []
+
+        organization_id = scoped_organization_id(current_user)
+        records = await self.possessions.list(vehicle_id=vehicle_id, active=active, organization_id=organization_id)
         can_view_location = self._can_view_location(current_user)
         return [self._serialize(record, can_view_location=can_view_location) for record in records]
 
@@ -66,6 +71,10 @@ class PossessionService:
         search: str | None = None,
         current_user: User | None = None,
     ) -> PaginatedResponse[dict]:
+        if production_scope_is_empty(current_user):
+            return PaginatedResponse[dict](data=[], pagination=build_pagination(page, limit, 0))
+
+        organization_id = scoped_organization_id(current_user)
         records, total = await self.possessions.list_paginated(
             page=page,
             limit=limit,
@@ -73,6 +82,7 @@ class PossessionService:
             active=active,
             driver_id=driver_id,
             search=search,
+            organization_id=organization_id,
         )
         can_view_location = self._can_view_location(current_user)
         return PaginatedResponse[dict](
@@ -84,7 +94,7 @@ class PossessionService:
         return await self.list(active=True, current_user=current_user)
 
     async def get_current_driver(self, vehicle_id: UUID, current_user: User | None = None) -> dict:
-        await self._ensure_vehicle_exists(vehicle_id)
+        await self._ensure_vehicle_exists(vehicle_id, current_user=current_user)
         record = await self.possessions.get_active_by_vehicle(vehicle_id)
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nenhum condutor ativo encontrado para este veículo")
@@ -99,12 +109,13 @@ class PossessionService:
         loan_term_document: UploadFile | None,
         current_user: User,
     ) -> dict:
-        vehicle = await self._ensure_vehicle_exists(data.vehicle_id)
+        vehicle = await self._ensure_vehicle_exists(data.vehicle_id, current_user=current_user)
         selected_driver = await self._resolve_driver_snapshot(
             driver_id=data.driver_id,
             fallback_name=data.driver_name,
             fallback_document=data.driver_document,
             fallback_contact=data.driver_contact,
+            current_user=current_user,
         )
         photo_payloads = await self._read_and_validate_captured_photos(photos, photo_metadata, require_at_least_one=False)
         loan_term_payload = await self._read_and_validate_document(loan_term_document)
@@ -242,6 +253,7 @@ class PossessionService:
         possession = await self.possessions.get_by_id(possession_id)
         if not possession:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
+        await self._ensure_possession_visible_to_user(possession, current_user)
         if possession.end_date is not None:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Registro de posse já encerrado")
 
@@ -326,6 +338,7 @@ class PossessionService:
         if not possession:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
 
+        await self._ensure_possession_visible_to_user(possession, current_user)
         if data.end_date is not None and data.end_date < data.start_date:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data final não pode ser anterior ao início da posse")
 
@@ -334,6 +347,7 @@ class PossessionService:
             fallback_name=data.driver_name,
             fallback_document=data.driver_document,
             fallback_contact=data.driver_contact,
+            current_user=current_user,
         )
         period_changed = possession.start_date != data.start_date or possession.end_date != data.end_date
         if period_changed:
@@ -480,6 +494,7 @@ class PossessionService:
         if not possession:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse nÃ£o encontrado")
 
+        await self._ensure_possession_visible_to_user(possession, current_user)
         stored_paths = self._collect_possession_file_paths(possession)
         photo_count = (1 if possession.photo_path else 0) + len(possession.photos)
         vehicle_label = possession.vehicle.plate if possession.vehicle else possession.vehicle_id
@@ -522,11 +537,12 @@ class PossessionService:
 
         self._cleanup_files(stored_paths)
 
-    async def get_photo_file(self, possession_id: UUID, *, photo_id: UUID | None = None) -> FileResponse:
+    async def get_photo_file(self, possession_id: UUID, *, photo_id: UUID | None = None, current_user: User | None = None) -> FileResponse:
         record = await self.possessions.get_by_id(possession_id)
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
 
+        await self._ensure_possession_visible_to_user(record, current_user)
         if photo_id is None:
             if record.photo_path:
                 absolute_photo_path = self._resolve_photo_path(record.photo_path)
@@ -556,10 +572,11 @@ class PossessionService:
             },
         )
 
-    async def get_document_file(self, possession_id: UUID, *, document_kind: str = "loan") -> FileResponse:
+    async def get_document_file(self, possession_id: UUID, *, document_kind: str = "loan", current_user: User | None = None) -> FileResponse:
         record = await self.possessions.get_by_id(possession_id)
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
+        await self._ensure_possession_visible_to_user(record, current_user)
         if document_kind == "return":
             document_path = record.return_document_path
             document_name = record.return_document_name
@@ -612,14 +629,28 @@ class PossessionService:
         record = await self.possessions.get_by_id(possession_id)
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
+        await self._ensure_possession_visible_to_user(record, current_user)
         await self.db.refresh(record, attribute_names=["vehicle", "photos"])
         return self._serialize(record, can_view_location=self._can_view_location(current_user))
 
-    async def _ensure_vehicle_exists(self, vehicle_id: UUID) -> Vehicle:
+    async def _ensure_vehicle_exists(self, vehicle_id: UUID, current_user: User | None = None) -> Vehicle:
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
+        await self._ensure_vehicle_visible_to_user(vehicle_id, current_user)
         return vehicle
+
+    async def _ensure_vehicle_visible_to_user(self, vehicle_id: UUID, current_user: User | None) -> None:
+        organization_id = scoped_organization_id(current_user)
+        if organization_id is None:
+            if production_scope_is_empty(current_user):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            return
+        if not await self.vehicles.is_vehicle_in_organization(vehicle_id, organization_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+
+    async def _ensure_possession_visible_to_user(self, possession: VehiclePossession, current_user: User | None) -> None:
+        await self._ensure_vehicle_visible_to_user(possession.vehicle_id, current_user)
 
     async def _resolve_driver_snapshot(
         self,
@@ -628,6 +659,7 @@ class PossessionService:
         fallback_name: str,
         fallback_document: str | None,
         fallback_contact: str | None,
+        current_user: User | None = None,
     ) -> dict:
         if not driver_id:
             return {
@@ -640,6 +672,7 @@ class PossessionService:
         driver = await self.drivers.get_by_id(driver_id)
         if not driver:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor selecionado não encontrado")
+        ensure_organization_access(current_user, driver.organization_id)
         if not driver.ativo:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Condutor selecionado está inativo")
 

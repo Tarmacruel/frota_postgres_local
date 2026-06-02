@@ -14,17 +14,18 @@ from app.services.maintenance_service import MaintenanceService
 router = APIRouter(prefix="/api/maintenance", tags=["Maintenance"])
 
 
-@router.get("", response_model=list[MaintenanceOut], dependencies=[Depends(require_permission("maintenance", "view"))])
+@router.get("", response_model=list[MaintenanceOut])
 async def list_maintenance(
     vehicle_id: UUID | None = Query(default=None),
     start: datetime | None = Query(default=None),
     end: datetime | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("maintenance", "view")),
 ):
-    return await MaintenanceService(db).list(vehicle_id=vehicle_id, start=start, end=end)
+    return await MaintenanceService(db).list(vehicle_id=vehicle_id, start=start, end=end, current_user=current_user)
 
 
-@router.get("/paginated", response_model=MaintenanceListResponse, dependencies=[Depends(require_permission("maintenance", "view"))])
+@router.get("/paginated", response_model=MaintenanceListResponse)
 async def list_maintenance_paginated(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),
@@ -34,6 +35,7 @@ async def list_maintenance_paginated(
     only_open: bool | None = Query(default=None),
     search: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("maintenance", "view")),
 ):
     return await MaintenanceService(db).list_paginated(
         page=page,
@@ -43,12 +45,17 @@ async def list_maintenance_paginated(
         end=end,
         only_open=only_open,
         search=search,
+        current_user=current_user,
     )
 
 
-@router.get("/{record_id}", response_model=MaintenanceOut, dependencies=[Depends(require_permission("maintenance", "view"))])
-async def get_maintenance(record_id: UUID, db: AsyncSession = Depends(get_db_session)):
-    return await MaintenanceService(db).get(record_id)
+@router.get("/{record_id}", response_model=MaintenanceOut)
+async def get_maintenance(
+    record_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("maintenance", "view")),
+):
+    return await MaintenanceService(db).get(record_id, current_user=current_user)
 
 
 @router.post("", response_model=MaintenanceOut)

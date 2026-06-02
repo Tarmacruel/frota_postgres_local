@@ -2,6 +2,7 @@
 param(
     [string]$BackupRoot = "storage\backups",
     [string]$MirrorRoot = "C:\Users\078364\OneDrive\BACKUPS\FROTAS",
+    [string]$StorageRoot = "",
     [int]$RetentionCount = 10
 )
 
@@ -41,6 +42,7 @@ try {
     & $backupScript `
         -BackupRoot $BackupRoot `
         -MirrorRoot $MirrorRoot `
+        -StorageRoot $StorageRoot `
         -RetentionCount $RetentionCount
 
     Write-BackupLog -Message "Backup automatico concluido com sucesso."

@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.organization_scope import ensure_organization_access, production_scope_is_empty, scoped_organization_id
 from app.models.master_data import Allocation, Department, Organization
 from app.models.user import User
 from app.repositories.master_data_repository import MasterDataRepository
@@ -24,17 +25,32 @@ class MasterDataService:
         self.repo = MasterDataRepository(db)
         self.audit = AuditService(db)
 
-    async def get_catalog(self) -> dict:
-        organizations = await self.repo.list_catalog()
+    async def get_catalog(self, current_user: User | None = None) -> dict:
+        if production_scope_is_empty(current_user):
+            return {"organizations": []}
+        organizations = await self.repo.list_catalog(organization_id=scoped_organization_id(current_user))
         return {"organizations": organizations}
 
-    async def list_organizations(self) -> list[Organization]:
-        return await self.repo.list_organizations()
+    async def list_organizations(self, current_user: User | None = None) -> list[Organization]:
+        if production_scope_is_empty(current_user):
+            return []
+        return await self.repo.list_organizations(organization_id=scoped_organization_id(current_user))
 
-    async def list_departments(self, organization_id: UUID | None = None) -> list[Department]:
+    async def list_departments(self, organization_id: UUID | None = None, current_user: User | None = None) -> list[Department]:
+        if production_scope_is_empty(current_user):
+            return []
+        organization_id = scoped_organization_id(current_user, organization_id)
         return await self.repo.list_departments(organization_id=organization_id)
 
-    async def list_allocations(self, organization_id: UUID | None = None, department_id: UUID | None = None) -> list[Allocation]:
+    async def list_allocations(
+        self,
+        organization_id: UUID | None = None,
+        department_id: UUID | None = None,
+        current_user: User | None = None,
+    ) -> list[Allocation]:
+        if production_scope_is_empty(current_user):
+            return []
+        organization_id = scoped_organization_id(current_user, organization_id)
         return await self.repo.list_allocations(organization_id=organization_id, department_id=department_id)
 
     async def create_organization(self, data: OrganizationCreate, current_user: User) -> Organization:
@@ -60,9 +76,11 @@ class MasterDataService:
         if not organization:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Órgão não encontrado")
 
+        ensure_organization_access(current_user, organization.id)
         previous = organization.name
         organization.name = data.name.strip()
 
+        ensure_organization_access(current_user, organization.id)
         try:
             await self.audit.record(
                 actor=current_user,
@@ -84,6 +102,7 @@ class MasterDataService:
         organization = await self.repo.get_organization(organization_id)
         if not organization:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Órgão não encontrado")
+        ensure_organization_access(current_user, organization.id)
         try:
             await self.audit.record(
                 actor=current_user,
@@ -100,6 +119,7 @@ class MasterDataService:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível remover o órgão") from exc
 
     async def create_department(self, data: DepartmentCreate, current_user: User) -> Department:
+        ensure_organization_access(current_user, data.organization_id)
         parent = await self.repo.get_organization(data.organization_id)
         if not parent:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Órgão não encontrado")
@@ -130,10 +150,12 @@ class MasterDataService:
         if not parent:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Órgão não encontrado")
 
+        ensure_organization_access(current_user, parent.id)
         before = {"name": department.name, "organization": department.organization_name}
         department.organization_id = data.organization_id
         department.name = data.name.strip()
 
+        ensure_organization_access(current_user, department.organization_id)
         try:
             await self.audit.record(
                 actor=current_user,
@@ -158,6 +180,7 @@ class MasterDataService:
         department = await self.repo.get_department(department_id)
         if not department:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Departamento não encontrado")
+        ensure_organization_access(current_user, department.organization_id)
         try:
             await self.audit.record(
                 actor=current_user,
@@ -178,6 +201,7 @@ class MasterDataService:
         if not parent:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Departamento não encontrado")
 
+        ensure_organization_access(current_user, parent.organization_id)
         allocation = Allocation(department_id=data.department_id, name=data.name.strip())
         try:
             allocation = await self.repo.create_allocation(allocation)
@@ -208,6 +232,7 @@ class MasterDataService:
         if not parent:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Departamento não encontrado")
 
+        ensure_organization_access(current_user, parent.organization_id)
         before = {
             "organization": allocation.organization_name,
             "department": allocation.department_name,
@@ -216,6 +241,7 @@ class MasterDataService:
         allocation.department_id = data.department_id
         allocation.name = data.name.strip()
 
+        ensure_organization_access(current_user, allocation.organization_id)
         try:
             await self.audit.record(
                 actor=current_user,

@@ -112,9 +112,6 @@ export default function FuelSupplyOrdersPage() {
         order.vehicle_plate,
         order.organization_name,
         order.created_by_name,
-        order.created_by_contact,
-        order.driver_name,
-        order.driver_contact,
         order.fuel_station_name,
         order.fuel_station_phone,
         order.notes,
@@ -153,7 +150,7 @@ export default function FuelSupplyOrdersPage() {
         <div className="filter-inline">
           <input
             className="app-input"
-            placeholder="Buscar por placa, secretaria, solicitante, contato, condutor ou número"
+            placeholder="Buscar por placa, secretaria, solicitante, posto ou número"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -181,7 +178,7 @@ export default function FuelSupplyOrdersPage() {
                 <th>Posto</th>
                 <th>Solicitada em</th>
                 <th>Prazo</th>
-                <th>Condutor</th>
+                <th>Solicitante</th>
                 <th>Litros previstos</th>
                 <th>Ações</th>
               </tr>
@@ -216,12 +213,10 @@ export default function FuelSupplyOrdersPage() {
                       <div>{formatDate(pickDeadline(order))}</div>
                       <span className={`deadline-pill ${deadlineMeta.tone}`}>{deadlineMeta.label}</span>
                     </td>
-                    <td data-label="Condutor">
+                    <td data-label="Solicitante">
                       <div className="stack">
-                        <strong>{order.driver_name || 'Não informado'}</strong>
-                        <span className="muted">Contato motorista: {order.driver_contact || 'Não informado'}</span>
-                        <span className="muted">Emissor: {order.created_by_name || 'Não informado'}</span>
-                        <span className="muted">Contato emissor: {order.created_by_contact || 'Não informado'}</span>
+                        <strong>{order.created_by_name || 'Não informado'}</strong>
+                        <span className="muted">{order.organization_name || 'Sem secretaria informada'}</span>
                       </div>
                     </td>
                     <td data-label="Litros previstos">{formatNumber(order.requested_liters)}</td>

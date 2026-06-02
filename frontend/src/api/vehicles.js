@@ -8,5 +8,5 @@ export const vehiclesAPI = {
   create: (data) => api.post('/vehicles', data),
   update: (id, data) => api.put(`/vehicles/${id}`, data),
   remove: (id) => api.delete(`/vehicles/${id}`),
-  history: (id) => api.get(`/vehicles/${id}/historico`),
+  history: (id, params) => api.get(`/vehicles/${id}/historico`, { params }),
 }

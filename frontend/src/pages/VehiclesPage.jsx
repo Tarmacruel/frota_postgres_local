@@ -72,6 +72,31 @@ function formatDate(value) {
   return `${dateLabel} as ${timeLabel}`
 }
 
+function formatDateOnly(value) {
+  if (!value) return ''
+  return new Date(`${value}T00:00:00`).toLocaleDateString('pt-BR')
+}
+
+function buildHistoryPeriodLabel(filters) {
+  if (filters.start_date && filters.end_date) {
+    return `${formatDateOnly(filters.start_date)} a ${formatDateOnly(filters.end_date)}`
+  }
+  if (filters.start_date) return `A partir de ${formatDateOnly(filters.start_date)}`
+  if (filters.end_date) return `Até ${formatDateOnly(filters.end_date)}`
+  return 'Todo o histórico'
+}
+
+function buildHistoryPeriodParams(filters) {
+  const params = {}
+  if (filters.start_date) {
+    params.start_date = new Date(`${filters.start_date}T00:00:00`).toISOString()
+  }
+  if (filters.end_date) {
+    params.end_date = new Date(`${filters.end_date}T23:59:59.999`).toISOString()
+  }
+  return params
+}
+
 function formatPlate(value) {
   const normalized = String(value || '').trim().toUpperCase().replace(/[^A-Z0-9]/g, '')
   if (normalized.length === 7) {
@@ -267,6 +292,8 @@ export default function VehiclesPage() {
   const [form, setForm] = useState(initialForm)
   const [selectedHistory, setSelectedHistory] = useState([])
   const [selectedVehicle, setSelectedVehicle] = useState(null)
+  const [historyFilters, setHistoryFilters] = useState({ start_date: '', end_date: '' })
+  const [historyLoading, setHistoryLoading] = useState(false)
   const [editingId, setEditingId] = useState(null)
   const [search, setSearch] = useState('')
   const [organizationFilter, setOrganizationFilter] = useState('TODOS')
@@ -465,7 +492,7 @@ export default function VehiclesPage() {
   }
 
   async function loadHistory(id, options = {}) {
-    const { toggle = true, syncUrl = true } = options
+    const { toggle = true, syncUrl = true, filters = historyFilters } = options
 
     if (toggle && selectedVehicle?.id === id) {
       clearHistoryFocus(syncUrl)
@@ -474,7 +501,8 @@ export default function VehiclesPage() {
 
     try {
       setError('')
-      const { data } = await api.get(`/vehicles/${id}/historico`)
+      setHistoryLoading(true)
+      const { data } = await api.get(`/vehicles/${id}/historico`, { params: buildHistoryPeriodParams(filters) })
       const vehicle = vehicles.find((item) => item.id === id) || null
       setSelectedVehicle(vehicle)
       setSelectedHistory(data)
@@ -483,14 +511,38 @@ export default function VehiclesPage() {
       }
     } catch (err) {
       setError(getApiErrorMessage(err, 'Não foi possível carregar o histórico.'))
+    } finally {
+      setHistoryLoading(false)
     }
   }
 
   function clearHistoryFocus(syncUrl = true) {
     setSelectedVehicle(null)
     setSelectedHistory([])
+    setHistoryLoading(false)
     if (syncUrl) {
       patchSearchParams({ focus: null })
+    }
+  }
+
+  function validateHistoryPeriod() {
+    if (historyFilters.start_date && historyFilters.end_date && historyFilters.start_date > historyFilters.end_date) {
+      setError('A data inicial do período não pode ser maior que a data final.')
+      return false
+    }
+    return true
+  }
+
+  function applyHistoryPeriod() {
+    if (!selectedVehicle || !validateHistoryPeriod()) return
+    loadHistory(selectedVehicle.id, { toggle: false, syncUrl: false })
+  }
+
+  function clearHistoryPeriod() {
+    const hadFilters = Boolean(historyFilters.start_date || historyFilters.end_date)
+    setHistoryFilters({ start_date: '', end_date: '' })
+    if (selectedVehicle && hadFilters) {
+      loadHistory(selectedVehicle.id, { toggle: false, syncUrl: false, filters: { start_date: '', end_date: '' } })
     }
   }
 
@@ -704,6 +756,7 @@ export default function VehiclesPage() {
 
     const historyEditCount = selectedHistory.filter((item) => item.event_type === 'EDIT').length
     const historyMovementCount = selectedHistory.filter((item) => item.event_type === 'MOVEMENT').length
+    const historyPeriodLabel = buildHistoryPeriodLabel(historyFilters)
 
     try {
       setError('')
@@ -711,7 +764,7 @@ export default function VehiclesPage() {
       await previewRowsToPdf({
         title: `Frota PMTF - Histórico ${selectedVehicle.plate}`,
         fileName: `frota-pmtf-histórico-${selectedVehicle.plate.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-        subtitle: `Histórico de edições e movimentacoes do veículo ${selectedVehicle.plate} | ${selectedVehicle.brand} ${selectedVehicle.model}.`,
+        subtitle: `Histórico de edições e movimentacoes do veículo ${selectedVehicle.plate} | ${selectedVehicle.brand} ${selectedVehicle.model} | ${historyPeriodLabel}.`,
         columns: historyColumns,
         rows: selectedHistory,
         summaryMetrics: [
@@ -726,6 +779,7 @@ export default function VehiclesPage() {
           { label: 'Veículo', value: selectedVehicle.plate },
           { label: 'Tipo', value: getOwnershipLabel(selectedVehicle.ownership_type) },
           { label: 'Status', value: getStatusLabel(selectedVehicle.status) },
+          { label: 'Período', value: historyPeriodLabel },
         ],
         referenceLabel: selectedVehicle.updated_at ? `Referência dos dados: atualizado até ${formatDate(selectedVehicle.updated_at)}` : 'Histórico consolidado da frota municipal',
         responsibleSector: 'Secretaria Municipal de Administração | Departamento de Gestão da Frota',
@@ -946,7 +1000,40 @@ export default function VehiclesPage() {
             </div>
           ) : null}
         </div>
-        {selectedHistory.length > 0 ? (
+        {selectedVehicle ? (
+          <div className="history-filter-bar">
+            <div className="form-field">
+              <label>Início do período</label>
+              <input
+                type="date"
+                className="app-input"
+                value={historyFilters.start_date}
+                onChange={(event) => setHistoryFilters((current) => ({ ...current, start_date: event.target.value }))}
+              />
+            </div>
+            <div className="form-field">
+              <label>Fim do período</label>
+              <input
+                type="date"
+                className="app-input"
+                value={historyFilters.end_date}
+                onChange={(event) => setHistoryFilters((current) => ({ ...current, end_date: event.target.value }))}
+              />
+            </div>
+            <div className="history-filter-actions">
+              <button className="app-button" type="button" onClick={applyHistoryPeriod} disabled={historyLoading}>
+                Filtrar período
+              </button>
+              <button className="ghost-button" type="button" onClick={clearHistoryPeriod} disabled={historyLoading}>
+                Limpar período
+              </button>
+            </div>
+            <span className="muted">{buildHistoryPeriodLabel(historyFilters)} | {selectedHistory.length} evento(s)</span>
+          </div>
+        ) : null}
+        {historyLoading ? (
+          <div className="empty-state">Carregando histórico do veículo...</div>
+        ) : selectedHistory.length > 0 ? (
           <ul className="history-list history-grid">
             {selectedHistory.map((item) => (
               <li className="history-item" key={`${item.event_type}-${item.id}`}>
@@ -969,7 +1056,9 @@ export default function VehiclesPage() {
             ))}
           </ul>
         ) : (
-          <div className="empty-state">Ainda não há histórico carregado para exibição neste painel.</div>
+          <div className="empty-state">
+            {selectedVehicle ? 'Nenhum evento encontrado para o período selecionado.' : 'Ainda não há histórico carregado para exibição neste painel.'}
+          </div>
         )}
       </section>
 

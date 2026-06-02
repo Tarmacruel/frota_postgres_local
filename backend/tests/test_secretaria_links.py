@@ -70,6 +70,7 @@ class FakeUserRepository:
 class FakeDriverRepository:
     def __init__(self, driver=None):
         self.driver = driver
+        self.last_organization_id = None
 
     async def get_by_id(self, _driver_id):
         return self.driver
@@ -78,6 +79,7 @@ class FakeDriverRepository:
         return None
 
     async def list_paginated(self, *, page, limit, search=None, active_only=None, organization_id=None):
+        self.last_organization_id = organization_id
         return ([self.driver] if self.driver else [], 1 if self.driver else 0)
 
     async def create(self, driver):
@@ -86,6 +88,10 @@ class FakeDriverRepository:
         driver.updated_at = driver.created_at
         self.driver = driver
         return driver
+
+    async def list_active(self, *, search=None, limit=100, organization_id=None):
+        self.last_organization_id = organization_id
+        return [self.driver] if self.driver else []
 
 
 @pytest.mark.asyncio
@@ -182,3 +188,57 @@ async def test_driver_list_returns_secretaria_name():
 
     assert result.data[0]["organization_id"] == organization.id
     assert result.data[0]["organization_name"] == organization.name
+
+
+@pytest.mark.asyncio
+async def test_driver_list_for_producao_forces_user_secretaria():
+    organization = Organization(id=uuid4(), name="Secretaria de Educacao")
+    requested_organization_id = uuid4()
+    driver = Driver(
+        id=uuid4(),
+        nome_completo="Carlos Motorista",
+        documento="11122233344",
+        organization_id=organization.id,
+        cnh_categoria=DriverLicenseCategory.C,
+    )
+    driver.organization = organization
+    driver.ativo = True
+    driver.created_at = datetime.now(timezone.utc)
+    driver.updated_at = driver.created_at
+
+    service = DriverService(FakeSession())
+    service.drivers = FakeDriverRepository(driver)
+    current_user = SimpleNamespace(id=uuid4(), role=UserRole.PRODUCAO, organization_id=organization.id)
+
+    result = await service.list(
+        page=1,
+        limit=10,
+        organization_id=requested_organization_id,
+        current_user=current_user,
+    )
+
+    assert service.drivers.last_organization_id == organization.id
+    assert result.data[0]["organization_id"] == organization.id
+
+
+@pytest.mark.asyncio
+async def test_driver_get_for_producao_rejects_other_secretaria():
+    driver = Driver(
+        id=uuid4(),
+        nome_completo="Ana Motorista",
+        documento="55566677788",
+        organization_id=uuid4(),
+        cnh_categoria=DriverLicenseCategory.B,
+    )
+    driver.ativo = True
+    driver.created_at = datetime.now(timezone.utc)
+    driver.updated_at = driver.created_at
+
+    service = DriverService(FakeSession())
+    service.drivers = FakeDriverRepository(driver)
+    current_user = SimpleNamespace(id=uuid4(), role=UserRole.PRODUCAO, organization_id=uuid4())
+
+    with pytest.raises(HTTPException) as exc:
+        await service.get(driver.id, current_user=current_user)
+
+    assert exc.value.status_code == 404
