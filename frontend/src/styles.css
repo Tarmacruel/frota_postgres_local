@@ -3566,3 +3566,1821 @@ button {
     flex: 1 1 100%;
   }
 }
+
+.data-import-search-tab,
+.data-import-search-results,
+.data-import-search-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--data-import-gap);
+}
+
+.data-import-search-form {
+  display: grid;
+  grid-template-columns: minmax(180px, 240px) minmax(0, 1fr) auto;
+  align-items: end;
+  gap: var(--data-import-inner-gap);
+  margin-bottom: var(--data-import-gap);
+}
+
+.data-import-search-input {
+  min-width: 0;
+}
+
+.data-import-search-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--data-import-inner-gap);
+  padding: var(--data-import-panel-padding);
+  border: 1px solid rgba(30, 41, 59, 0.08);
+  border-radius: calc(var(--data-import-radius) - 4px);
+  background: rgba(255, 255, 255, 0.76);
+}
+
+.data-import-search-card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--data-import-inner-gap);
+}
+
+.data-import-search-card-header > div {
+  min-width: 0;
+}
+
+.data-import-search-card-header strong {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.data-import-search-fields {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--data-import-inner-gap);
+}
+
+.data-import-search-fields span,
+.data-import-search-alerts span {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+.data-import-search-fields strong {
+  display: block;
+  margin-bottom: 2px;
+  color: var(--ink-soft);
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.data-import-search-alerts {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  color: #8a4b14;
+  font-size: 0.82rem;
+}
+
+.payment-process-page {
+  --payment-process-gap: clamp(14px, 1.2vw, 22px);
+  --payment-process-inner-gap: clamp(10px, 0.9vw, 16px);
+  --payment-process-panel-padding: clamp(14px, 1.35vw, 24px);
+  --payment-process-radius: clamp(16px, 1.2vw, 22px);
+  display: grid;
+  gap: var(--payment-process-gap);
+}
+
+.payment-process-panel {
+  border-radius: var(--payment-process-radius);
+  padding: var(--payment-process-panel-padding);
+  margin-bottom: 0;
+}
+
+.payment-process-page .metrics-grid {
+  gap: var(--payment-process-gap);
+}
+
+.payment-process-import-form,
+.payment-process-filter-stack {
+  display: grid;
+  gap: var(--payment-process-inner-gap);
+}
+
+.payment-process-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--payment-process-inner-gap);
+  justify-content: flex-end;
+  align-items: center;
+}
+
+.payment-process-page .panel-metrics {
+  gap: var(--payment-process-inner-gap);
+  margin-bottom: var(--payment-process-gap);
+}
+
+.payment-process-table,
+.payment-process-import-table {
+  min-width: 860px;
+}
+
+.payment-process-table th,
+.payment-process-table td,
+.payment-process-import-table th,
+.payment-process-import-table td {
+  padding: clamp(12px, 1vw, 18px);
+  vertical-align: top;
+}
+
+.payment-process-table th:nth-child(1),
+.payment-process-table td:nth-child(1) {
+  min-width: 170px;
+}
+
+.payment-process-table th:nth-child(4),
+.payment-process-table td:nth-child(4),
+.payment-process-table th:nth-child(5),
+.payment-process-table td:nth-child(5) {
+  min-width: 240px;
+}
+
+.payment-process-table th:nth-child(10),
+.payment-process-table td:nth-child(10) {
+  min-width: 220px;
+}
+
+.alert-success {
+  color: var(--success);
+  background: color-mix(in srgb, var(--success) 12%, transparent);
+  border-color: color-mix(in srgb, var(--success) 18%, transparent);
+}
+
+.payment-workflow-page {
+  align-content: start;
+}
+
+.payment-workflow-heading,
+.payment-section-head,
+.payment-detail-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--payment-process-inner-gap);
+}
+
+.payment-workflow-heading {
+  flex-wrap: wrap;
+}
+
+.payment-workflow-tabs,
+.payment-detail-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.payment-workflow-metrics {
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.payment-workflow-metrics .metric-card strong {
+  font-size: clamp(1.05rem, 1.8vw, 1.45rem);
+  overflow-wrap: anywhere;
+}
+
+.payment-workflow-filter-grid {
+  grid-template-columns: repeat(6, minmax(140px, 1fr));
+  align-items: end;
+}
+
+.payment-workflow-filter-actions {
+  justify-content: flex-start;
+}
+
+.payment-workflow-import {
+  grid-template-columns: minmax(220px, 1fr) auto;
+  align-items: end;
+}
+
+.payment-import-result {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: var(--payment-process-inner-gap);
+}
+
+.payment-import-result span {
+  display: inline-flex;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: var(--chip-surface);
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.payment-workspace {
+  display: grid;
+  grid-template-columns: minmax(0, 1.45fr) minmax(360px, 0.75fr);
+  gap: var(--payment-process-gap);
+  align-items: start;
+}
+
+.payment-process-list-panel,
+.payment-detail-panel {
+  min-width: 0;
+}
+
+.payment-detail-panel {
+  position: sticky;
+  top: 12px;
+  display: grid;
+  gap: var(--payment-process-inner-gap);
+  max-height: calc(100vh - 32px);
+  overflow: auto;
+}
+
+.payment-workflow-table tbody tr {
+  cursor: pointer;
+}
+
+.payment-workflow-table tbody tr.is-selected {
+  background: color-mix(in srgb, var(--navy) 8%, transparent);
+}
+
+.payment-workflow-table th,
+.payment-workflow-table td {
+  white-space: normal;
+}
+
+.payment-alert-list {
+  display: grid;
+  gap: 8px;
+}
+
+.payment-alert-list span {
+  display: block;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--amber) 18%, transparent);
+  color: #8a4b14;
+  font-size: 0.88rem;
+  line-height: 1.45;
+}
+
+.payment-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--payment-process-inner-gap);
+}
+
+.payment-info-item {
+  min-width: 0;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-strong) 86%, transparent);
+}
+
+.payment-info-item span,
+.payment-info-item strong {
+  display: block;
+}
+
+.payment-info-item span {
+  margin-bottom: 4px;
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.payment-info-item strong {
+  color: var(--ink-strong);
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+.payment-reference-list,
+.payment-stage-box,
+.payment-checklist-list,
+.payment-history-list,
+.payment-contract-detail,
+.payment-amendment-form,
+.payment-process-form {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: var(--payment-process-inner-gap);
+}
+
+.payment-reference-list {
+  display: flex;
+  flex-wrap: wrap;
+}
+
+.payment-reference-list span {
+  padding: 8px 10px;
+  border-radius: 999px;
+  background: var(--chip-surface);
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.payment-checklist-row {
+  display: grid;
+  grid-template-columns: minmax(180px, 1fr) minmax(130px, 160px) minmax(160px, 1fr);
+  gap: 10px;
+  align-items: center;
+  padding: 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-strong) 88%, transparent);
+}
+
+.payment-checklist-row strong,
+.payment-checklist-row span {
+  display: block;
+}
+
+.payment-checklist-row span {
+  margin-top: 3px;
+  color: var(--ink-soft);
+  font-size: 0.82rem;
+}
+
+.payment-history-row,
+.payment-contract-row,
+.payment-supplier-row {
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-strong) 88%, transparent);
+}
+
+.payment-history-row {
+  padding: 12px;
+}
+
+.payment-history-row strong,
+.payment-history-row span,
+.payment-history-row small {
+  display: block;
+}
+
+.payment-history-row span,
+.payment-history-row small {
+  color: var(--ink-soft);
+  font-size: 0.84rem;
+}
+
+.payment-history-row p {
+  margin: 8px 0 0;
+  line-height: 1.5;
+}
+
+.payment-contract-list,
+.payment-supplier-list {
+  display: grid;
+  gap: 10px;
+}
+
+.payment-contract-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+  color: var(--ink-strong);
+  text-align: left;
+}
+
+.payment-contract-row.is-selected {
+  border-color: color-mix(in srgb, var(--navy) 35%, var(--line));
+  background: color-mix(in srgb, var(--navy) 8%, transparent);
+}
+
+.payment-contract-row strong,
+.payment-contract-row small,
+.payment-supplier-row strong,
+.payment-supplier-row small {
+  display: block;
+}
+
+.payment-contract-row small,
+.payment-supplier-row small {
+  margin-top: 3px;
+  color: var(--ink-soft);
+}
+
+.payment-supplier-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 12px;
+  align-items: center;
+  padding: 12px;
+}
+
+.payment-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: var(--payment-process-inner-gap);
+}
+
+.payment-form-grid.two {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.payment-process-form .app-textarea {
+  min-height: 92px;
+}
+
+.payment-process-delete-action,
+.payment-delete-confirm {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 42px;
+}
+
+.payment-delete-confirm {
+  min-width: 150px;
+}
+
+.payment-import-page {
+  display: grid;
+  grid-template-columns: minmax(280px, 0.9fr) minmax(280px, 1.1fr);
+  gap: var(--payment-process-gap);
+  align-items: start;
+}
+
+.payment-import-card,
+.payment-import-result-card {
+  min-width: 0;
+}
+
+.payment-import-result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+}
+
+.payment-form-section {
+  display: grid;
+  gap: var(--payment-process-inner-gap);
+  padding: 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-strong) 72%, transparent);
+}
+
+.payment-form-section h3 {
+  margin: 0;
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 900;
+  text-transform: uppercase;
+}
+
+.payment-status-actions {
+  padding: 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+  background: color-mix(in srgb, var(--surface-strong) 74%, transparent);
+}
+
+.payment-status-current {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-width: 0;
+}
+
+.payment-status-current span {
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.payment-status-current strong {
+  color: var(--navy);
+  overflow-wrap: anywhere;
+}
+
+.payment-status-button-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 7px;
+}
+
+.payment-stage-action {
+  justify-content: center;
+  width: 100%;
+  min-height: 30px;
+}
+
+.payment-contract-workspace {
+  grid-template-columns: minmax(0, 1.35fr) minmax(360px, 0.65fr);
+}
+
+.payment-contract-table {
+  min-width: 1120px;
+}
+
+.payment-contract-table tbody tr {
+  cursor: pointer;
+}
+
+.payment-contract-table tbody tr.is-selected {
+  background: color-mix(in srgb, var(--navy) 8%, transparent);
+}
+
+.payment-contract-table th,
+.payment-contract-table td {
+  white-space: normal;
+}
+
+.payment-contract-detail-panel {
+  min-height: 240px;
+}
+
+.payment-contract-form-drawer {
+  width: min(620px, calc(100vw - 18px));
+}
+
+.payment-management-page,
+.payment-management-main {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: var(--payment-process-gap);
+  min-width: 0;
+}
+
+.payment-management-main > *,
+.payment-management-page > * {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.payment-management-filters {
+  display: grid;
+  grid-template-columns: minmax(150px, 1.05fr) minmax(110px, 0.7fr) minmax(110px, 0.7fr) minmax(110px, 0.65fr) minmax(180px, 1fr);
+  gap: var(--payment-process-inner-gap);
+  align-items: end;
+}
+
+.payment-management-layout {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.28fr) minmax(0, 1fr);
+  gap: var(--payment-process-gap);
+  align-items: start;
+  min-width: 0;
+}
+
+.payment-management-sidebar {
+  position: sticky;
+  top: 12px;
+  max-height: calc(100vh - 24px);
+  overflow: auto;
+}
+
+.payment-management-ranking {
+  display: grid;
+  gap: 7px;
+}
+
+.payment-management-rank-row {
+  width: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 9px;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-strong) 88%, transparent);
+  color: var(--ink-strong);
+  text-align: left;
+  cursor: pointer;
+}
+
+.payment-management-rank-row:hover,
+.payment-management-rank-row.is-selected {
+  border-color: color-mix(in srgb, var(--navy) 38%, var(--line));
+  background: color-mix(in srgb, var(--navy) 8%, transparent);
+}
+
+.payment-management-rank-row strong,
+.payment-management-rank-row small,
+.payment-management-source strong,
+.payment-management-source span {
+  display: block;
+}
+
+.payment-management-rank-row small,
+.payment-management-source span {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+}
+
+.payment-management-contract-selector {
+  display: grid;
+  grid-template-columns: minmax(260px, 0.45fr) minmax(0, 1fr);
+  gap: var(--payment-process-inner-gap);
+  align-items: end;
+}
+
+.payment-management-source {
+  min-width: 0;
+  padding: 9px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-strong) 82%, transparent);
+}
+
+.payment-management-source strong {
+  color: var(--ink-strong);
+  overflow-wrap: anywhere;
+}
+
+.payment-management-kpis {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(132px, 1fr));
+  gap: var(--payment-process-inner-gap);
+}
+
+.payment-management-kpi {
+  min-height: 72px;
+  padding: 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--surface-strong) 90%, transparent);
+  color: var(--ink-strong);
+  text-align: left;
+  cursor: pointer;
+  box-shadow: inset 3px 0 0 color-mix(in srgb, var(--navy) 28%, var(--line));
+}
+
+.payment-management-kpi:hover {
+  transform: translateY(-1px);
+  border-color: color-mix(in srgb, var(--navy) 32%, var(--line));
+}
+
+.payment-management-kpi span,
+.payment-management-kpi strong {
+  display: block;
+}
+
+.payment-management-kpi span {
+  color: var(--ink-soft);
+  font-size: 0.74rem;
+  font-weight: 850;
+  text-transform: uppercase;
+}
+
+.payment-management-kpi strong {
+  margin-top: 6px;
+  font-size: 1.05rem;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.payment-management-kpi.tone-success {
+  box-shadow: inset 3px 0 0 #059669;
+}
+
+.payment-management-kpi.tone-warning {
+  box-shadow: inset 3px 0 0 #d97706;
+}
+
+.payment-management-kpi.tone-danger {
+  box-shadow: inset 3px 0 0 #dc2626;
+}
+
+.payment-management-charts {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--payment-process-gap);
+  min-width: 0;
+}
+
+.payment-management-chart {
+  min-width: 0;
+}
+
+.payment-management-chart .recharts-wrapper {
+  max-width: 100%;
+}
+
+.payment-management-table {
+  min-width: 760px;
+}
+
+.payment-management-table th,
+.payment-management-table td {
+  white-space: normal;
+}
+
+.payment-kpi-drawer {
+  width: min(680px, calc(100vw - 18px));
+}
+
+.payment-management-kpi-drawer-value {
+  display: grid;
+  gap: 4px;
+  padding: 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--navy) 7%, var(--surface-strong));
+}
+
+.payment-management-kpi-drawer-value span {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.payment-management-kpi-drawer-value strong {
+  color: var(--navy);
+  font-size: 1.24rem;
+  line-height: 1.15;
+  overflow-wrap: anywhere;
+}
+
+.modal-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.modal-description-tip {
+  display: none;
+}
+
+@media (max-width: 1180px) {
+  .payment-workflow-filter-grid {
+    grid-template-columns: repeat(3, minmax(160px, 1fr));
+  }
+
+  .payment-workspace {
+    grid-template-columns: 1fr;
+  }
+
+  .payment-import-page {
+    grid-template-columns: 1fr;
+  }
+
+  .payment-management-layout,
+  .payment-management-charts {
+    grid-template-columns: 1fr;
+  }
+
+  .payment-management-sidebar {
+    position: static;
+    max-height: none;
+  }
+
+  .payment-detail-panel {
+    position: static;
+    max-height: none;
+  }
+}
+
+@media (max-width: 900px) {
+  .data-import-search-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .data-import-search-card-header,
+  .payment-workflow-heading,
+  .payment-section-head,
+  .payment-detail-header,
+  .payment-workflow-import,
+  .payment-checklist-row,
+  .payment-contract-row,
+  .payment-supplier-row {
+    grid-template-columns: 1fr;
+    flex-direction: column;
+  }
+
+  .payment-process-page {
+    --payment-process-gap: 12px;
+    --payment-process-inner-gap: 8px;
+    --payment-process-panel-padding: 12px;
+    --payment-process-radius: 16px;
+  }
+
+  .payment-process-actions > * {
+    flex: 1 1 100%;
+  }
+
+  .payment-process-table,
+  .payment-process-table td,
+  .payment-process-import-table,
+  .payment-process-import-table td,
+  .payment-contract-table,
+  .payment-contract-table td,
+  .payment-management-table,
+  .payment-management-table td {
+    min-width: 0;
+    width: 100%;
+  }
+
+  .payment-workflow-filter-grid,
+  .payment-import-page,
+  .payment-management-filters,
+  .payment-management-contract-selector,
+  .payment-detail-grid,
+  .payment-status-button-grid,
+  .payment-form-grid.two {
+    grid-template-columns: 1fr;
+  }
+
+  .payment-workflow-import {
+    display: grid;
+  }
+
+  .payment-contract-row,
+  .payment-supplier-row {
+    justify-items: stretch;
+  }
+
+  .payment-workflow-heading .payment-process-actions,
+  .payment-workflow-import .payment-process-actions {
+    width: 100%;
+  }
+}
+
+@media (min-width: 900px) {
+  body.internal-app-active .app-shell {
+    gap: 6px;
+    padding: 6px;
+    font-size: 13px;
+  }
+
+  body.internal-app-active .app-shell,
+  body.internal-app-active .app-shell * {
+    letter-spacing: 0;
+  }
+
+  body.internal-app-active .app-shell .app-sidebar,
+  body.internal-app-active .app-shell .app-topbar,
+  body.internal-app-active .app-shell .surface-panel {
+    border-radius: 14px;
+    box-shadow: 0 10px 26px rgba(15, 37, 57, 0.08);
+  }
+
+  body.internal-app-active .app-shell .content-shell {
+    gap: 6px;
+  }
+
+  body.internal-app-active .app-shell .app-topbar {
+    min-height: 42px;
+    padding: 6px 8px;
+    gap: 6px;
+  }
+
+  body.internal-app-active .app-shell .topbar-kicker,
+  body.internal-app-active .app-shell .topbar-search-hint,
+  body.internal-app-active .app-shell .brand-subtitle,
+  body.internal-app-active .app-shell .account-meta span {
+    display: none;
+  }
+
+  body.internal-app-active .app-shell .page-title,
+  body.internal-app-active .app-shell .topbar-route-title {
+    font-size: 1rem;
+    line-height: 1.12;
+  }
+
+  body.internal-app-active .app-shell .topbar-leading,
+  body.internal-app-active .app-shell .topbar-actions {
+    gap: 6px;
+  }
+
+  body.internal-app-active .app-shell .topbar-search-trigger {
+    flex: 0 1 300px;
+    height: 32px;
+    max-width: 320px;
+    padding: 0 9px;
+    border-radius: 9px;
+    font-size: 0.78rem;
+  }
+
+  body.internal-app-active .app-shell .topbar-search-copy {
+    gap: 7px;
+  }
+
+  body.internal-app-active .app-shell .icon-button {
+    width: 32px;
+    height: 32px;
+    border-radius: 9px;
+  }
+
+  body.internal-app-active .app-shell .app-icon {
+    width: 16px;
+    height: 16px;
+  }
+
+  body.internal-app-active .app-shell .app-main {
+    padding-bottom: 0;
+  }
+
+  body.internal-app-active .app-shell .mobile-bottom-bar {
+    padding: 6px;
+    gap: 5px;
+    border-radius: 14px;
+  }
+
+  body.internal-app-active .app-shell .mobile-bottom-link {
+    padding: 6px 4px;
+    font-size: 0.72rem;
+  }
+
+  body.internal-app-active .app-shell .app-sidebar {
+    top: 6px;
+    left: 6px;
+    bottom: 6px;
+    width: min(236px, calc(100vw - 12px));
+    padding: 8px 6px 6px;
+    gap: 6px;
+  }
+
+  body.internal-app-active .app-shell .sidebar-head {
+    gap: 6px;
+  }
+
+  body.internal-app-active .app-shell .sidebar-scroll {
+    gap: 8px;
+  }
+
+  body.internal-app-active .app-shell .brand-block {
+    gap: 8px;
+  }
+
+  body.internal-app-active .app-shell .brand-mark {
+    width: 34px;
+    height: 34px;
+    border-radius: 10px;
+  }
+
+  body.internal-app-active .app-shell .brand-name {
+    font-size: 0.82rem;
+    line-height: 1.1;
+  }
+
+  body.internal-app-active .app-shell .nav-section {
+    gap: 4px;
+  }
+
+  body.internal-app-active .app-shell .nav-section-title {
+    padding: 0 4px;
+    font-size: 0.58rem;
+    letter-spacing: 0.12em;
+  }
+
+  body.internal-app-active .app-shell .nav-group {
+    gap: 3px;
+  }
+
+  body.internal-app-active .app-shell .nav-link {
+    min-height: 31px;
+    gap: 7px;
+    padding: 5px 7px;
+    border-radius: 9px;
+  }
+
+  body.internal-app-active .app-shell .nav-link::after {
+    max-width: 170px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    font-size: 0.7rem;
+    line-height: 1.2;
+  }
+
+  body.internal-app-active .app-shell .nav-icon {
+    width: 25px;
+    height: 25px;
+    border-radius: 7px;
+  }
+
+  body.internal-app-active .app-shell .nav-label {
+    font-size: 0.78rem;
+    line-height: 1.1;
+  }
+
+  body.internal-app-active .app-shell .account-card {
+    gap: 6px;
+    padding: 6px;
+    border-radius: 10px;
+  }
+
+  body.internal-app-active .app-shell .account-avatar {
+    width: 28px;
+    height: 28px;
+    border-radius: 8px;
+    font-size: 0.68rem;
+  }
+
+  body.internal-app-active .app-shell .account-meta strong {
+    font-size: 0.74rem;
+    line-height: 1.1;
+  }
+
+  body.internal-app-active .app-shell .surface-panel,
+  body.internal-app-active .app-shell .toolbar-card,
+  body.internal-app-active .app-shell .panel-nested,
+  body.internal-app-active .app-shell .metric-card,
+  body.internal-app-active .app-shell .hub-hero,
+  body.internal-app-active .app-shell .hub-action-card,
+  body.internal-app-active .app-shell .hub-side-card,
+  body.internal-app-active .app-shell .hub-urgent-item,
+  body.internal-app-active .app-shell .action-card,
+  body.internal-app-active .app-shell .evidence-shell,
+  body.internal-app-active .app-shell .evidence-meta-card {
+    padding: 8px;
+    border-radius: 12px;
+  }
+
+  body.internal-app-active .app-shell .panel-heading,
+  body.internal-app-active .app-shell .hub-layout,
+  body.internal-app-active .app-shell .hub-action-grid,
+  body.internal-app-active .app-shell .hub-secondary-grid,
+  body.internal-app-active .app-shell .hub-urgent-list,
+  body.internal-app-active .app-shell .hub-hero,
+  body.internal-app-active .app-shell .hub-hero-copy,
+  body.internal-app-active .app-shell .stack {
+    gap: 6px;
+  }
+
+  body.internal-app-active .app-shell .panel-heading {
+    margin-bottom: 6px;
+  }
+
+  body.internal-app-active .app-shell .section-title {
+    font-size: 0.96rem;
+    line-height: 1.15;
+  }
+
+  body.internal-app-active .app-shell .panel-title {
+    font-size: 1.18rem;
+    line-height: 1.1;
+  }
+
+  body.internal-app-active .app-shell p.section-copy,
+  body.internal-app-active .app-shell .panel-heading .section-copy,
+  body.internal-app-active .app-shell .metric-note,
+  body.internal-app-active .app-shell .hub-hero-copy p,
+  body.internal-app-active .app-shell .hub-action-card p,
+  body.internal-app-active .app-shell .hub-side-card p,
+  body.internal-app-active .app-shell .hub-urgent-item span,
+  body.internal-app-active .app-shell .action-card p,
+  body.internal-app-active .app-shell .table-focus-banner span,
+  body.internal-app-active .search-result-main span {
+    display: none;
+  }
+
+  body.internal-app-active .app-shell .metrics-grid {
+    gap: 6px;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  }
+
+  body.internal-app-active .app-shell .metric-card {
+    min-height: 56px;
+    gap: 2px;
+  }
+
+  body.internal-app-active .app-shell .metric-card span {
+    font-size: 0.72rem;
+    line-height: 1.1;
+  }
+
+  body.internal-app-active .app-shell .metric-card strong,
+  body.internal-app-active .app-shell .metric-value,
+  body.internal-app-active .app-shell .metric-inline strong {
+    margin-top: 0;
+    font-size: 1.14rem;
+    line-height: 1.05;
+  }
+
+  body.internal-app-active .app-shell .panel-metrics,
+  body.internal-app-active .app-shell .toolbar-row,
+  body.internal-app-active .app-shell .filter-row,
+  body.internal-app-active .app-shell .filter-inline,
+  body.internal-app-active .app-shell .actions-inline,
+  body.internal-app-active .app-shell .status-pills {
+    gap: 5px;
+  }
+
+  body.internal-app-active .app-shell .toolbar-card,
+  body.internal-app-active .app-shell .panel-nested,
+  body.internal-app-active .app-shell .panel-metrics,
+  body.internal-app-active .app-shell .table-focus-banner {
+    margin-bottom: 6px;
+  }
+
+  body.internal-app-active .app-shell .filter-inline > .app-input {
+    flex: 1 1 220px;
+  }
+
+  body.internal-app-active .app-shell .filter-inline > .app-select,
+  body.internal-app-active .app-shell .filter-inline > .searchable-select {
+    flex: 0 1 185px;
+  }
+
+  body.internal-app-active .app-shell .form-field {
+    gap: 3px;
+  }
+
+  body.internal-app-active .app-shell .form-field > span,
+  body.internal-app-active .app-shell .form-field > label,
+  body.internal-app-active .app-shell .form-field label,
+  body.internal-app-active .app-shell .analytics-filter-field > span {
+    font-size: 0.72rem;
+    line-height: 1.1;
+  }
+
+  body.internal-app-active .app-shell .app-input,
+  body.internal-app-active .app-shell .app-select,
+  body.internal-app-active .app-shell .searchable-select-trigger {
+    min-height: 30px;
+    padding: 6px 8px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+  }
+
+  body.internal-app-active .app-shell .app-textarea {
+    min-height: 62px;
+    padding: 7px 8px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    line-height: 1.25;
+  }
+
+  body.internal-app-active .app-shell .app-button,
+  body.internal-app-active .app-shell .secondary-button,
+  body.internal-app-active .app-shell .ghost-button,
+  body.internal-app-active .app-shell .mini-button {
+    min-height: 30px;
+    padding: 6px 9px;
+    border-radius: 8px;
+    font-size: 0.78rem;
+    line-height: 1.1;
+    box-shadow: none;
+  }
+
+  body.internal-app-active .app-shell .status-pill {
+    padding: 5px 8px;
+    font-size: 0.72rem;
+  }
+
+  body.internal-app-active .app-shell .status-badge,
+  body.internal-app-active .app-shell .ownership-badge,
+  body.internal-app-active .app-shell .deadline-pill,
+  body.internal-app-active .app-shell .focus-inline,
+  body.internal-app-active .search-result-status {
+    padding: 4px 7px;
+    font-size: 0.66rem;
+    line-height: 1.1;
+  }
+
+  body.internal-app-active .app-shell .metric-inline {
+    gap: 5px;
+    padding: 6px 8px;
+    border-radius: 8px;
+  }
+
+  body.internal-app-active .app-shell .metric-inline span {
+    font-size: 0.72rem;
+  }
+
+  body.internal-app-active .app-shell .table-wrap,
+  body.internal-app-active .app-shell .panel-nested .table-wrap {
+    border-radius: 10px;
+  }
+
+  body.internal-app-active .app-shell .data-table {
+    min-width: 700px;
+  }
+
+  body.internal-app-active .app-shell .data-table-wide {
+    min-width: 960px;
+  }
+
+  body.internal-app-active .app-shell .data-table th,
+  body.internal-app-active .app-shell .data-table td {
+    padding: 6px 8px;
+    font-size: 0.76rem;
+    line-height: 1.15;
+  }
+
+  body.internal-app-active .app-shell .data-table th {
+    font-size: 0.58rem;
+    letter-spacing: 0.05em;
+  }
+
+  body.internal-app-active .app-shell .alert,
+  body.internal-app-active .app-shell .empty-state {
+    padding: 8px 10px;
+    border-radius: 10px;
+    font-size: 0.78rem;
+    line-height: 1.25;
+  }
+
+  body.internal-app-active .app-shell .accordion-section {
+    border-radius: 10px;
+  }
+
+  body.internal-app-active .app-shell .accordion-summary {
+    padding: 7px 9px;
+  }
+
+  body.internal-app-active .app-shell .accordion-summary span {
+    gap: 0;
+  }
+
+  body.internal-app-active .app-shell .accordion-summary strong {
+    font-size: 0.82rem;
+    line-height: 1.1;
+  }
+
+  body.internal-app-active .app-shell .accordion-summary small {
+    display: none;
+  }
+
+  body.internal-app-active .app-shell .accordion-panel {
+    padding: 0 9px 9px;
+  }
+
+  body.internal-app-active .search-overlay-panel {
+    max-width: 760px;
+    border-radius: 14px;
+  }
+
+  body.internal-app-active .search-overlay-header {
+    gap: 8px;
+    padding: 8px;
+  }
+
+  body.internal-app-active .search-overlay-input {
+    height: 34px;
+    gap: 7px;
+    padding: 0 10px;
+    border-radius: 9px;
+  }
+
+  body.internal-app-active .search-overlay-input input {
+    font-size: 0.82rem;
+  }
+
+  body.internal-app-active .search-overlay-body {
+    padding: 6px 8px 8px;
+  }
+
+  body.internal-app-active .search-result-groups,
+  body.internal-app-active .search-result-group,
+  body.internal-app-active .search-result-list {
+    gap: 6px;
+  }
+
+  body.internal-app-active .search-result-item {
+    gap: 8px;
+    padding: 7px 9px;
+    border-radius: 10px;
+  }
+
+  body.internal-app-active .search-result-main strong {
+    font-size: 0.82rem;
+  }
+
+  body.internal-app-active .search-result-meta span {
+    font-size: 0.72rem;
+  }
+
+  body.internal-app-active .app-shell .analytics-filters-panel {
+    margin: 6px 0;
+    padding: 8px;
+    border-radius: 10px;
+  }
+
+  body.internal-app-active .app-shell .analytics-filters-top-row,
+  body.internal-app-active .app-shell .analytics-filters-grid,
+  body.internal-app-active .app-shell .analytics-filter-actions {
+    gap: 6px;
+  }
+
+  body.internal-app-active .app-shell .analytics-filters-grid {
+    grid-template-columns: repeat(3, minmax(140px, 1fr));
+  }
+
+  body.internal-app-active .app-shell .data-import-page {
+    --data-import-gap: 8px;
+    --data-import-inner-gap: 5px;
+    --data-import-panel-padding: 8px;
+    --data-import-radius: 10px;
+  }
+
+  body.internal-app-active .app-shell .data-import-page .data-table th,
+  body.internal-app-active .app-shell .data-import-page .data-table td {
+    padding: 6px 8px;
+    font-size: 0.74rem;
+  }
+
+  body.internal-app-active .app-shell .data-import-page .data-table-wide {
+    min-width: 1040px;
+  }
+
+  body.internal-app-active .app-shell .data-import-page .data-table-wide th:nth-child(4),
+  body.internal-app-active .app-shell .data-import-page .data-table-wide td:nth-child(4) {
+    min-width: 260px;
+  }
+
+  body.internal-app-active .app-shell .data-import-page .data-table-wide th:nth-child(5),
+  body.internal-app-active .app-shell .data-import-page .data-table-wide td:nth-child(5) {
+    min-width: 230px;
+  }
+
+  body.internal-app-active .app-shell .data-import-search-form {
+    grid-template-columns: minmax(150px, 200px) minmax(0, 1fr) auto;
+  }
+
+  body.internal-app-active .app-shell .data-import-search-fields {
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+  }
+
+  body.internal-app-active .app-shell .data-import-cell-stack {
+    gap: 2px;
+    line-height: 1.2;
+  }
+
+  body.internal-app-active .app-shell .payment-process-page {
+    --payment-process-gap: 8px;
+    --payment-process-inner-gap: 5px;
+    --payment-process-panel-padding: 8px;
+    --payment-process-radius: 10px;
+  }
+
+  body.internal-app-active .app-shell .payment-workflow-metrics {
+    grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
+  }
+
+  body.internal-app-active .app-shell .payment-workflow-metrics .metric-card strong {
+    font-size: 1.05rem;
+  }
+
+  body.internal-app-active .app-shell .payment-workflow-filter-grid {
+    grid-template-columns: repeat(6, minmax(110px, 1fr));
+  }
+
+  body.internal-app-active .app-shell .payment-workspace {
+    grid-template-columns: minmax(0, 1.5fr) minmax(300px, 0.72fr);
+    gap: 8px;
+  }
+
+  body.internal-app-active .app-shell .payment-import-page {
+    grid-template-columns: minmax(260px, 0.85fr) minmax(260px, 1.15fr);
+    gap: 8px;
+  }
+
+  body.internal-app-active .app-shell .payment-contract-workspace {
+    grid-template-columns: minmax(0, 1.35fr) minmax(300px, 0.65fr);
+  }
+
+  body.internal-app-active .app-shell .payment-management-filters {
+    grid-template-columns: minmax(140px, 1fr) minmax(96px, 0.65fr) minmax(96px, 0.65fr) minmax(96px, 0.6fr) minmax(160px, 1fr);
+  }
+
+  body.internal-app-active .app-shell .payment-management-layout {
+    grid-template-columns: minmax(220px, 0.26fr) minmax(0, 1fr);
+    gap: 8px;
+  }
+
+  body.internal-app-active .app-shell .payment-management-sidebar {
+    top: 6px;
+    max-height: calc(100vh - 12px);
+  }
+
+  body.internal-app-active .app-shell .payment-management-ranking {
+    gap: 5px;
+  }
+
+  body.internal-app-active .app-shell .payment-management-rank-row,
+  body.internal-app-active .app-shell .payment-management-source,
+  body.internal-app-active .app-shell .payment-management-kpi,
+  body.internal-app-active .app-shell .payment-management-kpi-drawer-value {
+    padding: 7px;
+    border-radius: 8px;
+  }
+
+  body.internal-app-active .app-shell .payment-management-rank-row {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  body.internal-app-active .app-shell .payment-management-rank-row .deadline-pill {
+    display: none;
+  }
+
+  body.internal-app-active .app-shell .payment-management-contract-selector {
+    grid-template-columns: minmax(230px, 0.42fr) minmax(0, 1fr);
+  }
+
+  body.internal-app-active .app-shell .payment-management-kpis {
+    grid-template-columns: repeat(auto-fit, minmax(116px, 1fr));
+    gap: 5px;
+  }
+
+  body.internal-app-active .app-shell .payment-management-kpi {
+    min-height: 58px;
+  }
+
+  body.internal-app-active .app-shell .payment-management-kpi span {
+    font-size: 0.66rem;
+  }
+
+  body.internal-app-active .app-shell .payment-management-kpi strong {
+    margin-top: 4px;
+    font-size: 0.92rem;
+  }
+
+  body.internal-app-active .app-shell .payment-management-charts {
+    gap: 8px;
+  }
+
+  body.internal-app-active .app-shell .payment-management-chart .recharts-responsive-container {
+    min-height: 210px;
+  }
+
+  body.internal-app-active .app-shell .payment-management-table {
+    min-width: 720px;
+  }
+
+  body.internal-app-active .app-shell .payment-detail-panel {
+    top: 6px;
+    max-height: calc(100vh - 12px);
+  }
+
+  body.internal-app-active .app-shell .payment-process-table,
+  body.internal-app-active .app-shell .payment-process-import-table,
+  body.internal-app-active .app-shell .payment-contract-table,
+  body.internal-app-active .app-shell .payment-management-table {
+    min-width: 980px;
+  }
+
+  body.internal-app-active .app-shell .payment-process-table th,
+  body.internal-app-active .app-shell .payment-process-table td,
+  body.internal-app-active .app-shell .payment-process-import-table th,
+  body.internal-app-active .app-shell .payment-process-import-table td,
+  body.internal-app-active .app-shell .payment-contract-table th,
+  body.internal-app-active .app-shell .payment-contract-table td,
+  body.internal-app-active .app-shell .payment-management-table th,
+  body.internal-app-active .app-shell .payment-management-table td,
+  body.internal-app-active .app-shell .payment-workflow-table th,
+  body.internal-app-active .app-shell .payment-workflow-table td {
+    padding: 6px 8px;
+    font-size: 0.74rem;
+    line-height: 1.15;
+  }
+
+  body.internal-app-active .app-shell .payment-process-table th:nth-child(1),
+  body.internal-app-active .app-shell .payment-process-table td:nth-child(1) {
+    min-width: 130px;
+  }
+
+  body.internal-app-active .app-shell .payment-process-table th:nth-child(4),
+  body.internal-app-active .app-shell .payment-process-table td:nth-child(4),
+  body.internal-app-active .app-shell .payment-process-table th:nth-child(5),
+  body.internal-app-active .app-shell .payment-process-table td:nth-child(5) {
+    min-width: 170px;
+  }
+
+  body.internal-app-active .app-shell .payment-process-table th:nth-child(10),
+  body.internal-app-active .app-shell .payment-process-table td:nth-child(10) {
+    min-width: 150px;
+  }
+
+  body.internal-app-active .app-shell .payment-detail-grid {
+    gap: 5px;
+  }
+
+  body.internal-app-active .app-shell .payment-info-item,
+  body.internal-app-active .app-shell .payment-checklist-row,
+  body.internal-app-active .app-shell .payment-history-row,
+  body.internal-app-active .app-shell .payment-form-section,
+  body.internal-app-active .app-shell .payment-status-actions,
+  body.internal-app-active .app-shell .payment-contract-row,
+  body.internal-app-active .app-shell .payment-supplier-row {
+    padding: 7px;
+    border-radius: 9px;
+  }
+
+  body.internal-app-active .app-shell .payment-checklist-row {
+    grid-template-columns: minmax(150px, 1fr) minmax(110px, 140px) minmax(130px, 1fr);
+    gap: 6px;
+  }
+
+  body.internal-app-active .app-shell .payment-contract-list,
+  body.internal-app-active .app-shell .payment-supplier-list,
+  body.internal-app-active .app-shell .payment-structured-form,
+  body.internal-app-active .app-shell .payment-alert-list {
+    gap: 5px;
+  }
+
+  body.internal-app-active .app-shell .payment-form-section h3,
+  body.internal-app-active .app-shell .payment-status-current span {
+    font-size: 0.68rem;
+  }
+
+  body.internal-app-active .app-shell .payment-status-button-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 5px;
+  }
+
+  body.internal-app-active .app-shell .payment-stage-action {
+    min-height: 26px;
+    padding: 4px 7px;
+    font-size: 0.7rem;
+  }
+
+  body.internal-app-active .app-shell .payment-alert-list span {
+    padding: 6px 8px;
+    border-radius: 8px;
+    font-size: 0.74rem;
+    line-height: 1.2;
+  }
+
+  body.internal-app-active .app-shell .payment-reference-list span,
+  body.internal-app-active .app-shell .payment-import-result span {
+    padding: 4px 7px;
+    font-size: 0.7rem;
+  }
+
+  body.internal-app-active .app-shell .payment-process-form .app-textarea {
+    min-height: 64px;
+  }
+
+  body.internal-app-active .searchable-select-panel {
+    gap: 5px;
+    padding: 6px;
+    border-radius: 10px;
+  }
+
+  body.internal-app-active .searchable-select-input-shell {
+    gap: 6px;
+    padding: 0 8px;
+    border-radius: 8px;
+  }
+
+  body.internal-app-active .searchable-select-input {
+    min-height: 28px;
+    font-size: 0.78rem;
+  }
+
+  body.internal-app-active .searchable-select-options {
+    min-height: 78px;
+    max-height: min(280px, 52vh);
+    gap: 3px;
+    padding-right: 4px;
+  }
+
+  body.internal-app-active .searchable-select-option {
+    gap: 0;
+    padding: 6px 8px;
+    border-radius: 8px;
+  }
+
+  body.internal-app-active .searchable-select-option strong {
+    font-size: 0.78rem;
+    line-height: 1.1;
+  }
+
+  body.internal-app-active .searchable-select-option span {
+    display: none;
+  }
+
+  body.internal-app-active .searchable-select-empty,
+  body.internal-app-active .searchable-select-clear {
+    font-size: 0.76rem;
+  }
+
+  body.internal-app-active .modal-backdrop {
+    padding: 12px;
+    backdrop-filter: blur(10px) saturate(115%);
+  }
+
+  body.internal-app-active .modal-shell {
+    width: min(860px, calc(100vw - 24px));
+    max-height: min(92vh, 760px);
+    max-height: min(92dvh, 760px);
+    padding: 12px;
+    border-radius: 12px;
+  }
+
+  body.internal-app-active .modal-header {
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  body.internal-app-active .modal-header .section-copy {
+    display: none;
+  }
+
+  body.internal-app-active .modal-title-row {
+    gap: 6px;
+  }
+
+  body.internal-app-active .modal-description-tip {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    flex: 0 0 auto;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    border: 1px solid var(--line);
+    background: var(--chip-surface);
+    color: var(--ink-soft);
+    font-size: 0.68rem;
+    font-weight: 800;
+    line-height: 1;
+    cursor: help;
+  }
+
+  body.internal-app-active .modal-body {
+    gap: 8px;
+  }
+
+  body.internal-app-active .modal-actions {
+    gap: 6px;
+    padding-top: 6px;
+  }
+}
+
+@media (min-width: 1180px) {
+  body.internal-app-active .app-shell {
+    grid-template-columns: 212px minmax(0, 1fr);
+    align-items: start;
+  }
+
+  body.internal-app-active .app-shell.sidebar-compact {
+    grid-template-columns: 58px minmax(0, 1fr);
+  }
+
+  body.internal-app-active .app-shell .app-sidebar {
+    position: sticky;
+    min-height: calc(100vh - 12px);
+    width: auto;
+    transform: none;
+  }
+
+  body.internal-app-active .app-shell .app-sidebar.is-compact .nav-link {
+    padding: 6px;
+  }
+
+  body.internal-app-active .app-shell .app-sidebar.is-compact .account-action {
+    margin-top: 2px;
+  }
+}
+
+.payment-workspace.payment-workspace-processes {
+  grid-template-columns: 1fr;
+}
+
+.payment-detail-drawer-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 3900;
+  display: flex;
+  justify-content: flex-end;
+  align-items: stretch;
+  padding: 8px;
+  background:
+    linear-gradient(90deg, rgba(12, 23, 39, 0.08), rgba(12, 23, 39, 0.24)),
+    rgba(12, 23, 39, 0.18);
+  backdrop-filter: blur(14px) saturate(135%);
+  -webkit-backdrop-filter: blur(14px) saturate(135%);
+  animation: paymentDrawerFade 160ms ease-out;
+}
+
+.payment-detail-drawer.payment-detail-panel {
+  position: relative;
+  top: auto;
+  width: min(560px, calc(100vw - 18px));
+  max-height: calc(100vh - 16px);
+  max-height: calc(100dvh - 16px);
+  margin: 0;
+  overflow: auto;
+  border-radius: 18px;
+  border: 1px solid color-mix(in srgb, var(--surface-strong) 55%, var(--line));
+  background: color-mix(in srgb, var(--surface-strong) 72%, transparent);
+  box-shadow:
+    -24px 0 70px rgba(9, 23, 37, 0.26),
+    inset 0 1px 0 rgba(255, 255, 255, 0.42);
+  backdrop-filter: blur(24px) saturate(165%);
+  -webkit-backdrop-filter: blur(24px) saturate(165%);
+  animation: paymentDrawerSlide 220ms cubic-bezier(0.2, 0.8, 0.2, 1);
+}
+
+.payment-detail-drawer.payment-contract-form-drawer {
+  width: min(640px, calc(100vw - 18px));
+}
+
+.payment-detail-drawer::before {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: 1px;
+  background: linear-gradient(180deg, transparent, rgba(255, 255, 255, 0.78), transparent);
+  pointer-events: none;
+}
+
+.payment-detail-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.payment-detail-close {
+  width: 30px;
+  height: 30px;
+  font-size: 1.1rem;
+  font-weight: 800;
+  line-height: 1;
+  color: var(--ink-soft);
+}
+
+.payment-detail-close:hover {
+  color: var(--navy);
+}
+
+@keyframes paymentDrawerFade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes paymentDrawerSlide {
+  from {
+    opacity: 0;
+    transform: translateX(36px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@media (min-width: 900px) {
+  body.internal-app-active .app-shell .payment-workspace.payment-workspace-processes {
+    grid-template-columns: 1fr;
+  }
+
+  body.internal-app-active .payment-detail-drawer-backdrop {
+    padding: 6px;
+  }
+
+  body.internal-app-active .payment-detail-drawer.payment-detail-panel {
+    width: min(520px, calc(100vw - 14px));
+    max-height: calc(100vh - 12px);
+    max-height: calc(100dvh - 12px);
+    padding: 8px;
+    border-radius: 12px;
+  }
+
+  body.internal-app-active .payment-detail-drawer.payment-contract-form-drawer {
+    width: min(620px, calc(100vw - 14px));
+  }
+
+  body.internal-app-active .payment-detail-drawer .payment-detail-header {
+    align-items: center;
+  }
+
+  body.internal-app-active .payment-detail-close {
+    width: 28px;
+    height: 28px;
+    font-size: 1rem;
+  }
+}
+
+@media (max-width: 720px) {
+  .payment-detail-drawer-backdrop {
+    padding: 6px;
+  }
+
+  .payment-detail-drawer.payment-detail-panel {
+    width: calc(100vw - 12px);
+    max-height: calc(100vh - 12px);
+    max-height: calc(100dvh - 12px);
+    border-radius: 14px;
+  }
+}

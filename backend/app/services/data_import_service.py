@@ -9,7 +9,7 @@ from pathlib import Path
 from uuid import UUID
 
 from fastapi import HTTPException, UploadFile, status
-from sqlalchemy import func, or_, select
+from sqlalchemy import Text, cast, func, or_, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
@@ -115,6 +115,7 @@ class DataImportService:
         row_status: DataImportRowStatus | None = None,
         has_conflict: bool | None = None,
         has_error: bool | None = None,
+        search: str | None = None,
     ) -> PaginatedResponse[dict]:
         await self._get_batch(batch_id)
         stmt = select(DataImportRow).where(DataImportRow.batch_id == batch_id)
@@ -129,6 +130,19 @@ class DataImportService:
         if has_error is True:
             stmt = stmt.where(func.json_array_length(DataImportRow.validation_errors) > 0)
             count_stmt = count_stmt.where(func.json_array_length(DataImportRow.validation_errors) > 0)
+        if search and search.strip():
+            term = f"%{search.strip()}%"
+            search_clause = or_(
+                cast(DataImportRow.row_number, Text).ilike(term),
+                DataImportRow.matched_by.ilike(term),
+                DataImportRow.manager_notes.ilike(term),
+                cast(DataImportRow.raw_data, Text).ilike(term),
+                cast(DataImportRow.mapped_data, Text).ilike(term),
+                cast(DataImportRow.official_extra_data, Text).ilike(term),
+                cast(DataImportRow.triage_extra_data, Text).ilike(term),
+            )
+            stmt = stmt.where(search_clause)
+            count_stmt = count_stmt.where(search_clause)
 
         stmt = stmt.order_by(DataImportRow.row_number.asc()).offset((page - 1) * limit).limit(limit)
         total = int((await self.db.execute(count_stmt)).scalar_one())

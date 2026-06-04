@@ -32,7 +32,14 @@ export default function Modal({ open, title, description, onClose, children, can
       >
         <header className="modal-header">
           <div>
-            <h3 className="section-title">{title}</h3>
+            <div className="modal-title-row">
+              <h3 className="section-title">{title}</h3>
+              {description ? (
+                <span className="modal-description-tip" tabIndex={0} title={description} aria-label={description}>
+                  i
+                </span>
+              ) : null}
+            </div>
             {description ? <p className="section-copy">{description}</p> : null}
           </div>
           {canClose ? <button type="button" className="ghost-button" onClick={onClose}>Fechar</button> : null}

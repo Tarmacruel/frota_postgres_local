@@ -16,6 +16,20 @@ from app.models.fuel_supply import FuelSupply
 from app.models.fuel_supply_order import FuelSupplyOrder, FuelSupplyOrderStatus
 from app.models.fleet_analytics_snapshot import FleetAnalyticsSnapshot
 from app.models.master_data import Allocation, Department, Organization
+from app.models.payment_process import (
+    PaymentChecklistStatus,
+    PaymentContract,
+    PaymentContractAmendment,
+    PaymentContractStatus,
+    PaymentProcess,
+    PaymentProcessChecklistItem,
+    PaymentProcessKind,
+    PaymentProcessReference,
+    PaymentProcessReferenceType,
+    PaymentProcessStage,
+    PaymentProcessStageEvent,
+    PaymentSupplier,
+)
 from app.models.user import User, UserRole
 from app.models.user_permission import UserPermission
 from app.models.vehicle import Vehicle, VehicleOwnershipType, VehicleStatus, VehicleType
@@ -49,6 +63,18 @@ __all__ = [
     "Organization",
     "Department",
     "Allocation",
+    "PaymentProcess",
+    "PaymentProcessChecklistItem",
+    "PaymentProcessKind",
+    "PaymentProcessReference",
+    "PaymentProcessReferenceType",
+    "PaymentProcessStage",
+    "PaymentProcessStageEvent",
+    "PaymentChecklistStatus",
+    "PaymentContract",
+    "PaymentContractAmendment",
+    "PaymentContractStatus",
+    "PaymentSupplier",
     "User",
     "UserRole",
     "UserPermission",

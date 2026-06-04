@@ -91,8 +91,10 @@ class UserService:
             user.name = payload["name"].strip()
         if payload.get("email") is not None:
             user.email = payload["email"].lower()
-        if payload.get("role") is not None:
-            user.role = payload["role"]
+        next_role = payload.get("role")
+        role_changed = next_role is not None and next_role != user.role
+        if next_role is not None:
+            user.role = next_role
         if "organization_id" in payload:
             organization = await self._require_organization(payload["organization_id"]) if payload["organization_id"] else None
             user.organization_id = organization.id if organization else None
@@ -102,6 +104,9 @@ class UserService:
             user.must_change_password = True
 
         try:
+            if role_changed:
+                await self._set_default_permissions_for_role(user)
+
             await self.audit.record(
                 actor=current_user,
                 action="UPDATE",
@@ -118,6 +123,7 @@ class UserService:
                         "role": user.role.value,
                         "must_change_password": user.must_change_password,
                         "password_changed": bool(payload.get("password")),
+                        "permissions_reset_to_role_defaults": role_changed,
                     },
                 },
             )
@@ -220,6 +226,22 @@ class UserService:
     def _add_default_permissions(self, user: User) -> None:
         for module, flags in default_permissions_for_role(user.role.value).items():
             self.db.add(UserPermission(user_id=user.id, module=module, **flags))
+
+    async def _set_default_permissions_for_role(self, user: User) -> None:
+        result = await self.db.execute(select(UserPermission).where(UserPermission.user_id == user.id))
+        entries_by_module = {entry.module: entry for entry in result.scalars().all()}
+        now = datetime.now(timezone.utc)
+
+        for module, flags in default_permissions_for_role(user.role.value).items():
+            entry = entries_by_module.get(module)
+            if not entry:
+                entry = UserPermission(user_id=user.id, module=module)
+                self.db.add(entry)
+            entry.can_view = flags["can_view"]
+            entry.can_create = flags["can_create"]
+            entry.can_edit = flags["can_edit"]
+            entry.can_delete = flags["can_delete"]
+            entry.updated_at = now
 
     def _complete_permissions(self, permissions: dict[str, dict[str, bool]]) -> dict[str, dict[str, bool]]:
         return self._normalize_permissions(permissions)

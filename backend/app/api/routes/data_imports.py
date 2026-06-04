@@ -55,6 +55,7 @@ async def list_data_import_rows(
     status_filter: DataImportRowStatus | None = Query(default=None, alias="status"),
     has_conflict: bool | None = Query(default=None),
     has_error: bool | None = Query(default=None),
+    search: str | None = Query(default=None, min_length=1, max_length=120),
     db: AsyncSession = Depends(get_db_session),
     _current_user: User = Depends(require_permission("data_imports", "view")),
 ):
@@ -65,6 +66,7 @@ async def list_data_import_rows(
         row_status=status_filter,
         has_conflict=has_conflict,
         has_error=has_error,
+        search=search,
     )
 
 

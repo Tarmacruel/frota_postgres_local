@@ -154,6 +154,8 @@ export default function SearchableSelect({
                       key={String(option.value)}
                       type="button"
                       className={`searchable-select-option${String(option.value) === String(value) ? ' is-selected' : ''}`}
+                      title={option.description || option.label}
+                      aria-label={option.description ? `${option.label}. ${option.description}` : option.label}
                       onClick={() => handleSelect(option.value)}
                     >
                       <strong>{option.label}</strong>

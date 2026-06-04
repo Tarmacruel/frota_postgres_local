@@ -18,6 +18,9 @@ from app.api.routes.fuel_supply_orders import public_router as public_fuel_suppl
 from app.api.routes.fuel_supply_orders import router as fuel_supply_orders_router
 from app.api.routes.maintenance import router as maintenance_router
 from app.api.routes.master_data import router as master_data_router
+from app.api.routes.payment_processes import contract_router as payment_contracts_router
+from app.api.routes.payment_processes import router as payment_processes_router
+from app.api.routes.payment_processes import supplier_router as payment_suppliers_router
 from app.api.routes.possession import public_router as public_possession_terms_router
 from app.api.routes.possession import router as possession_router
 from app.api.routes.search import router as search_router
@@ -55,6 +58,9 @@ app.include_router(fuel_supplies_router)
 app.include_router(fuel_stations_router)
 app.include_router(fuel_supply_orders_router)
 app.include_router(public_fuel_supply_orders_router)
+app.include_router(payment_processes_router)
+app.include_router(payment_suppliers_router)
+app.include_router(payment_contracts_router)
 app.include_router(search_router)
 app.include_router(analytics_router)
 

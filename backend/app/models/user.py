@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, text
 from sqlalchemy.dialects.postgresql import CITEXT, UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
-from app.core.permissions import blank_permissions
+from app.core.permissions import default_permissions_for_role
 from app.db.base import Base
 
 
@@ -48,7 +48,7 @@ class User(Base):
 
     @property
     def permissions(self) -> dict[str, dict[str, bool]]:
-        permissions = blank_permissions()
+        permissions = default_permissions_for_role(self.role.value if self.role else "")
         for entry in self.permission_entries:
             permissions[entry.module] = {
                 "can_view": entry.can_view,

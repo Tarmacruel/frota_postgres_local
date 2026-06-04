@@ -59,6 +59,12 @@ async def test_openapi_contains_new_routes(client):
     assert "/api/fuel-supply-orders/{order_id}/confirm" in paths
     assert "/api/fuel-supply-orders/{order_id}/cancel" in paths
     assert "/api/public/fuel-supply-orders/{validation_code}" in paths
+    assert "/api/payment-processes" in paths
+    assert "/api/payment-processes/import" in paths
+    assert "/api/payment-processes/template" in paths
+    assert "/api/payment-processes/export" in paths
+    assert "/api/payment-processes/{process_id}" in paths
+    assert "delete" in paths["/api/payment-processes/{process_id}"]
     assert "/api/vehicles/paginated" in paths
     assert "/api/vehicles/{vehicle_id}/claims" in paths
     assert "/api/vehicles/{vehicle_id}/current-driver" in paths
@@ -129,6 +135,17 @@ async def test_openapi_contains_new_routes(client):
     assert "fuel_station_maps_url" in public_fuel_supply_order["properties"]
     assert "created_by_contact" not in public_fuel_supply_order["properties"]
     assert "max_amount" not in public_fuel_supply_order["properties"]
+
+    payment_process = schemas["PaymentProcessOut"]
+    assert "kind" in payment_process["properties"]
+    assert "contract_balance" in payment_process["properties"]
+    assert "location" in payment_process["properties"]
+    payment_process_delete = schemas["PaymentProcessDelete"]
+    assert "reason" in payment_process_delete["properties"]
+    assert "reason" in payment_process_delete["required"]
+    payment_process_import = schemas["PaymentProcessImportOut"]
+    assert "total_rows" in payment_process_import["properties"]
+    assert "rows" in payment_process_import["properties"]
 
     possession = schemas["PossessionOut"]
     assert "loan_term_available" in possession["properties"]

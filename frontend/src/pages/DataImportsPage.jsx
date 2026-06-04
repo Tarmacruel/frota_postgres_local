@@ -17,6 +17,12 @@ const rowStatusOptions = [
   { value: 'ERROR', label: 'Com erro' },
 ]
 
+const searchTypeOptions = [
+  { value: 'ALL', label: 'Veículos e condutores' },
+  { value: 'VEHICLE', label: 'Somente veículos' },
+  { value: 'DRIVER', label: 'Somente condutores' },
+]
+
 const vehicleTypeOptions = [
   { value: 'SEDAN', label: 'Sedan' },
   { value: 'HATCH', label: 'Hatch' },
@@ -194,6 +200,37 @@ function staticOptionsForField(key) {
   return null
 }
 
+function formatOfficialStatus(item, entityType) {
+  if (entityType === 'DRIVER') return item.ativo ? 'ATIVO' : 'INATIVO'
+  return item.status || '-'
+}
+
+function officialResultTitle(item, entityType) {
+  if (entityType === 'DRIVER') return item.nome_completo || 'Condutor sem nome'
+  return [item.plate, item.brand, item.model].filter(Boolean).join(' - ') || 'Veículo sem identificação'
+}
+
+function officialResultFields(item, entityType) {
+  if (entityType === 'DRIVER') {
+    return [
+      ['CPF/documento', item.documento],
+      ['CNH', item.cnh_numero],
+      ['Categoria', item.cnh_categoria],
+      ['Secretaria', item.organization_name],
+      ['Contato', item.contato],
+      ['E-mail', item.email],
+    ]
+  }
+  return [
+    ['Placa', item.plate],
+    ['Chassi', item.chassis_number],
+    ['Renavam', item.renavam],
+    ['Marca', item.brand],
+    ['Modelo', item.model],
+    ['Lotação atual', item.current_department],
+  ]
+}
+
 export default function DataImportsPage() {
   const [batches, setBatches] = useState([])
   const [selectedBatch, setSelectedBatch] = useState(null)
@@ -201,6 +238,13 @@ export default function DataImportsPage() {
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
   const [rowStatus, setRowStatus] = useState('')
   const [activeTab, setActiveTab] = useState('review')
+  const [searchTerm, setSearchTerm] = useState('')
+  const [searchType, setSearchType] = useState('ALL')
+  const [searchLoading, setSearchLoading] = useState(false)
+  const [lastSearch, setLastSearch] = useState('')
+  const [officialSearchResults, setOfficialSearchResults] = useState({ vehicles: [], drivers: [] })
+  const [importSearchRows, setImportSearchRows] = useState([])
+  const [importSearchTotal, setImportSearchTotal] = useState(0)
   const [uploadFile, setUploadFile] = useState(null)
   const [loading, setLoading] = useState(true)
   const [rowsLoading, setRowsLoading] = useState(false)
@@ -246,6 +290,11 @@ export default function DataImportsPage() {
     erros: (row.validation_errors || []).join('; '),
   })), [rows])
 
+  const officialSearchTotal = officialSearchResults.vehicles.length + officialSearchResults.drivers.length
+  const canSearchVehicles = searchType === 'ALL' || searchType === 'VEHICLE'
+  const canSearchDrivers = searchType === 'ALL' || searchType === 'DRIVER'
+  const canSearchSelectedBatch = selectedBatch && (searchType === 'ALL' || selectedBatch.entity_type === searchType)
+
   async function loadBatches(selectId = selectedBatch?.id) {
     try {
       setLoading(true)
@@ -280,6 +329,45 @@ export default function DataImportsPage() {
       setError(getApiErrorMessage(err, 'Não foi possível carregar as linhas do lote.'))
     } finally {
       setRowsLoading(false)
+    }
+  }
+
+  async function searchRecords(event) {
+    event.preventDefault()
+    const term = searchTerm.trim()
+    if (!term) {
+      setError('Informe placa, chassi, nome, CPF, CNH ou outro identificador para buscar.')
+      return
+    }
+
+    try {
+      setSearchLoading(true)
+      setError('')
+      setFeedback('')
+
+      const [vehiclesResponse, driversResponse, importRowsResponse] = await Promise.all([
+        canSearchVehicles
+          ? api.get('/vehicles/paginated', { params: { page: 1, limit: 10, search: term } })
+          : Promise.resolve({ data: { data: [] } }),
+        canSearchDrivers
+          ? api.get('/drivers', { params: { page: 1, limit: 10, search: term } })
+          : Promise.resolve({ data: { data: [] } }),
+        canSearchSelectedBatch
+          ? dataImportsAPI.rows(selectedBatch.id, { page: 1, limit: 25, search: term })
+          : Promise.resolve({ data: { data: [], pagination: { total: 0 } } }),
+      ])
+
+      setOfficialSearchResults({
+        vehicles: vehiclesResponse.data?.data || [],
+        drivers: driversResponse.data?.data || [],
+      })
+      setImportSearchRows(importRowsResponse.data?.data || [])
+      setImportSearchTotal(importRowsResponse.data?.pagination?.total || 0)
+      setLastSearch(term)
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Não foi possível pesquisar os registros.'))
+    } finally {
+      setSearchLoading(false)
     }
   }
 
@@ -455,6 +543,60 @@ export default function DataImportsPage() {
     } else {
       await exportRowsToXlsx(options)
     }
+  }
+
+  function renderOfficialResult(item, entityType) {
+    const fields = officialResultFields(item, entityType).filter(([, value]) => value !== null && value !== undefined && value !== '')
+    return (
+      <article className="data-import-search-card" key={`${entityType}-${item.id}`}>
+        <div className="data-import-search-card-header">
+          <div>
+            <span className="eyebrow">{entityType === 'DRIVER' ? 'Condutor oficial' : 'Veículo oficial'}</span>
+            <strong>{officialResultTitle(item, entityType)}</strong>
+          </div>
+          <span className={`status-badge status-${formatOfficialStatus(item, entityType) === 'ATIVO' ? 'ATIVO' : 'MANUTENCAO'}`}>
+            {formatOfficialStatus(item, entityType)}
+          </span>
+        </div>
+        <div className="data-import-search-fields">
+          {fields.map(([label, value]) => (
+            <span key={label}><strong>{label}</strong>{String(value)}</span>
+          ))}
+        </div>
+      </article>
+    )
+  }
+
+  function renderImportSearchRow(row) {
+    const mappedPreview = Object.entries(row.mapped_data || {}).slice(0, 8)
+    return (
+      <article className="data-import-search-card" key={row.id}>
+        <div className="data-import-search-card-header">
+          <div>
+            <span className="eyebrow">Linha {row.row_number} do lote</span>
+            <strong>{actionLabel(row.suggested_action)} {row.matched_by ? `por ${row.matched_by}` : 'sem match'}</strong>
+          </div>
+          <span className={`status-badge status-${row.status === 'APPROVED' || row.status === 'APPLIED' ? 'ATIVO' : row.status === 'ERROR' || row.status === 'REJECTED' ? 'INATIVO' : 'MANUTENCAO'}`}>
+            {statusLabel(row.status)}
+          </span>
+        </div>
+        <div className="data-import-search-fields">
+          {mappedPreview.map(([key, value]) => (
+            <span key={key}><strong>{formatFieldLabel(key)}</strong>{String(value || '-')}</span>
+          ))}
+        </div>
+        {(row.conflicts?.length || row.validation_errors?.length) ? (
+          <div className="data-import-search-alerts">
+            {[...(row.conflicts || []), ...(row.validation_errors || [])].slice(0, 4).map((item) => <span key={item}>{item}</span>)}
+          </div>
+        ) : null}
+        <div className="actions-inline">
+          <button type="button" className="mini-button" onClick={() => openEditRow(row)}>Ajustar linha</button>
+          <button type="button" className="mini-button" onClick={() => updateRowStatus(row, 'APPROVED')}>Aprovar</button>
+          <button type="button" className="mini-button danger" onClick={() => updateRowStatus(row, 'REJECTED')}>Reprovar</button>
+        </div>
+      </article>
+    )
   }
 
   function renderDraftField(section, key, value) {
@@ -721,13 +863,90 @@ export default function DataImportsPage() {
           <div className="data-import-tabs">
             <div className="status-pills">
               <button type="button" className={`status-pill ${activeTab === 'review' ? 'active' : ''}`} onClick={() => setActiveTab('review')}>Revisão</button>
+              <button type="button" className={`status-pill ${activeTab === 'search' ? 'active' : ''}`} onClick={() => setActiveTab('search')}>Busca</button>
               <button type="button" className={`status-pill ${activeTab === 'fields' ? 'active' : ''}`} onClick={() => setActiveTab('fields')}>Campos extras</button>
               <button type="button" className={`status-pill ${activeTab === 'exports' ? 'active' : ''}`} onClick={() => setActiveTab('exports')}>Exportar</button>
             </div>
           </div>
 
-          {!selectedBatch ? (
+          {!selectedBatch && activeTab !== 'search' ? (
             <div className="empty-state">Selecione ou envie um lote para iniciar a revisão.</div>
+          ) : activeTab === 'search' ? (
+            <div className="data-import-search-tab">
+              <form className="data-import-search-form" onSubmit={searchRecords}>
+                <label className="form-field">
+                  <span>Tipo de registro</span>
+                  <select className="app-select" value={searchType} onChange={(event) => setSearchType(event.target.value)}>
+                    {searchTypeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+                  </select>
+                </label>
+                <label className="form-field data-import-search-input">
+                  <span>Buscar por placa, chassi, nome, CPF ou CNH</span>
+                  <input
+                    className="app-input"
+                    type="search"
+                    value={searchTerm}
+                    onChange={(event) => setSearchTerm(event.target.value)}
+                    placeholder="Digite ao menos um identificador"
+                  />
+                </label>
+                <button type="submit" className="app-button" disabled={searchLoading}>
+                  {searchLoading ? 'Buscando...' : 'Buscar registro'}
+                </button>
+              </form>
+
+              {lastSearch ? (
+                <div className="panel-metrics">
+                  <span className="metric-inline"><strong>{officialSearchTotal}</strong><span>oficiais</span></span>
+                  <span className="metric-inline"><strong>{importSearchTotal}</strong><span>no lote</span></span>
+                  <span className="metric-inline"><strong>{lastSearch}</strong><span>termo pesquisado</span></span>
+                </div>
+              ) : null}
+
+              <div className="data-import-detail-stack data-import-search-results">
+                <article className="evidence-meta-card">
+                  <strong>Cadastro oficial atual</strong>
+                  <p className="section-copy">Resultados já integrados ao sistema, respeitando as permissões do usuário.</p>
+                  {searchLoading ? (
+                    <div className="empty-state">Buscando na base oficial...</div>
+                  ) : !lastSearch ? (
+                    <div className="empty-state">Informe um termo para consultar veículos e condutores oficiais.</div>
+                  ) : officialSearchTotal === 0 ? (
+                    <div className="empty-state">Nenhum registro oficial encontrado.</div>
+                  ) : (
+                    <div className="data-import-search-list">
+                      {officialSearchResults.vehicles.map((item) => renderOfficialResult(item, 'VEHICLE'))}
+                      {officialSearchResults.drivers.map((item) => renderOfficialResult(item, 'DRIVER'))}
+                    </div>
+                  )}
+                </article>
+
+                <article className="evidence-meta-card">
+                  <strong>Linhas do lote selecionado</strong>
+                  <p className="section-copy">Resultados encontrados nos dados em triagem do lote atual.</p>
+                  {!selectedBatch ? (
+                    <div className="empty-state">Selecione um lote para pesquisar nas linhas importadas.</div>
+                  ) : !canSearchSelectedBatch ? (
+                    <div className="empty-state">O lote selecionado é de {entityLabel(selectedBatch.entity_type).toLowerCase()} e não corresponde ao tipo escolhido.</div>
+                  ) : searchLoading ? (
+                    <div className="empty-state">Buscando nas linhas analisadas...</div>
+                  ) : !lastSearch ? (
+                    <div className="empty-state">Informe um termo para consultar o lote selecionado.</div>
+                  ) : importSearchRows.length === 0 ? (
+                    <div className="empty-state">Nenhuma linha do lote encontrada.</div>
+                  ) : (
+                    <>
+                      <div className="data-import-search-list">
+                        {importSearchRows.map((row) => renderImportSearchRow(row))}
+                      </div>
+                      {importSearchTotal > importSearchRows.length ? (
+                        <p className="section-copy">Mostrando {importSearchRows.length} de {importSearchTotal} linha(s) encontradas.</p>
+                      ) : null}
+                    </>
+                  )}
+                </article>
+              </div>
+            </div>
           ) : activeTab === 'review' ? (
             <>
               <div className="data-import-review-toolbar">

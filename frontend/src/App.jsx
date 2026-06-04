@@ -15,6 +15,7 @@ import FuelStationsPage from './pages/FuelStationsPage'
 import FuelSupplyOrdersPage from './pages/FuelSupplyOrdersPage'
 import LoginPage from './pages/LoginPage'
 import MaintenancePage from './pages/MaintenancePage'
+import PaymentProcessesPage from './pages/PaymentProcessesPage'
 import PossessionPage from './pages/PossessionPage'
 import PublicFuelSupplyOrderPage from './pages/PublicFuelSupplyOrderPage'
 import PublicPossessionTermPage from './pages/PublicPossessionTermPage'
@@ -124,6 +125,14 @@ export default function App() {
               element={
                 <ProtectedRoute permission={{ module: 'fuel_supply_orders', action: 'view' }}>
                   <FuelSupplyOrdersPage />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="processos-pagamento"
+              element={
+                <ProtectedRoute permission={{ module: 'payment_processes', action: 'view' }}>
+                  <PaymentProcessesPage />
                 </ProtectedRoute>
               }
             />

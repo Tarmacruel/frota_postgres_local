@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { officialBrand } from '../constants/officialBrand'
 import { useAuth } from '../context/AuthContext'
@@ -16,10 +16,11 @@ function readStorage(key, fallback) {
 }
 
 export default function Layout() {
-  const { user, logout, changePassword, mustChangePassword, isAdmin, isProduction, canView, roleLabel } = useAuth()
+  const { user, logout, changePassword, mustChangePassword, isAdmin, canView, roleLabel } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const passwordChangeRequired = Boolean(mustChangePassword)
+  const mainRef = useRef(null)
 
   const [navOpen, setNavOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -32,25 +33,31 @@ export default function Layout() {
   const [adminNotifications, setAdminNotifications] = useState([])
   const [unreadNotifications, setUnreadNotifications] = useState(0)
 
+  useEffect(() => {
+    if (typeof document === 'undefined') return undefined
+    document.body.classList.add('internal-app-active')
+    return () => document.body.classList.remove('internal-app-active')
+  }, [])
+
   const navSections = useMemo(() => {
     const sections = [
       {
         title: 'Visao geral',
         items: [
-          { to: '/', label: 'Início', description: 'Hub operacional da frota', icon: 'dashboard' },
+          { to: '/', label: 'Início', description: 'Resumo', icon: 'dashboard' },
         ],
       },
       {
         title: 'Operacional',
         items: [
-          { to: '/vehicles', label: 'Veículos', description: 'Cadastro, consulta e histórico', icon: 'vehicles' },
-          { to: '/posses', label: 'Posses', description: 'Posse, alocação e responsáveis', icon: 'drivers' },
-          { to: '/condutores', label: 'Condutores', description: 'Base reutilizável de motoristas', icon: 'users' },
-          { to: '/manutencoes', label: 'Manutenções', description: 'Custos, serviços e oficina', icon: 'maintenance' },
-          { to: '/sinistros', label: 'Sinistros', description: 'Ocorrências, BO e prejuízos', icon: 'audit' },
-          { to: '/multas', label: 'Multas', description: 'Autos, vencimentos e pagamentos', icon: 'catalog' },
-          ...(canView('fuel_supplies') ? [{ to: '/abastecimentos', label: 'Abastecimentos', description: 'Ordens, histórico e alertas de consumo', icon: 'maintenance' }] : []),
-          ...(canView('fuel_supply_orders') ? [{ to: '/ordens-abastecimento', label: 'Ordens abertas', description: 'Confirmação das ordens pendentes', icon: 'maintenance' }] : []),
+          { to: '/vehicles', label: 'Veículos', description: 'Frota', icon: 'vehicles' },
+          { to: '/posses', label: 'Posses', description: 'Responsáveis', icon: 'drivers' },
+          { to: '/condutores', label: 'Condutores', description: 'Motoristas', icon: 'users' },
+          { to: '/manutencoes', label: 'Manutenções', description: 'Custos', icon: 'maintenance' },
+          { to: '/sinistros', label: 'Sinistros', description: 'Ocorrências', icon: 'audit' },
+          { to: '/multas', label: 'Multas', description: 'Autos', icon: 'catalog' },
+          ...(canView('fuel_supplies') ? [{ to: '/abastecimentos', label: 'Abastecimentos', description: 'Consumo', icon: 'maintenance' }] : []),
+          ...(canView('fuel_supply_orders') ? [{ to: '/ordens-abastecimento', label: 'Ordens abertas', description: 'Pendentes', icon: 'maintenance' }] : []),
         ],
       },
     ]
@@ -68,24 +75,27 @@ export default function Layout() {
     sections[1].items = sections[1].items.filter((item) => canView(moduleByRoute[item.to]))
     if (sections[1].items.length === 0) sections.splice(1, 1)
 
-    if (isAdmin || canView('master_data') || canView('fuel_stations') || canView('analytics') || (!isProduction && canView('data_imports'))) {
+    if (isAdmin || canView('master_data') || canView('fuel_stations') || canView('payment_processes') || canView('analytics') || canView('data_imports')) {
       const managementItems = []
       if (canView('master_data')) {
-        managementItems.push({ to: '/cadastros', label: 'Cadastros', description: 'Órgãos, departamentos e lotações', icon: 'catalog' })
+        managementItems.push({ to: '/cadastros', label: 'Cadastros', description: 'Lotação', icon: 'catalog' })
       }
       if (canView('fuel_stations')) {
-        managementItems.push({ to: '/postos', label: 'Postos', description: 'Cadastro de postos e vínculos', icon: 'catalog' })
+        managementItems.push({ to: '/postos', label: 'Postos', description: 'Credenciados', icon: 'catalog' })
+      }
+      if (canView('payment_processes')) {
+        managementItems.push({ to: '/processos-pagamento', label: 'Processos de pagamento', description: 'Pagamentos', icon: 'catalog' })
       }
       if (canView('analytics')) {
-        managementItems.push({ to: '/analytics', label: 'Analytics', description: 'BI operacional da frota', icon: 'dashboard' })
+        managementItems.push({ to: '/analytics', label: 'Analytics', description: 'BI', icon: 'dashboard' })
       }
-      if (!isProduction && canView('data_imports')) {
-        managementItems.push({ to: '/importacao-dados', label: 'Importar/Exportar', description: 'Triagem de dados externos', icon: 'catalog' })
+      if (canView('data_imports')) {
+        managementItems.push({ to: '/importacao-dados', label: 'Importar/Exportar', description: 'Importação', icon: 'catalog' })
       }
       if (isAdmin) {
         managementItems.push(
-          { to: '/users', label: 'Usuários', description: 'Perfis e níveis de acesso', icon: 'users' },
-          { to: '/auditoria', label: 'Auditoria', description: 'Rastreabilidade administrativa', icon: 'audit' },
+          { to: '/users', label: 'Usuários', description: 'Perfis', icon: 'users' },
+          { to: '/auditoria', label: 'Auditoria', description: 'Logs', icon: 'audit' },
         )
       }
       sections.push({
@@ -95,7 +105,7 @@ export default function Layout() {
     }
 
     return sections
-  }, [isAdmin, isProduction, canView])
+  }, [isAdmin, canView])
 
   const mobileTabs = navSections.flatMap((section) => section.items).filter((item) =>
     ['/', '/vehicles', '/manutencoes', '/condutores', '/ordens-abastecimento'].includes(item.to),
@@ -116,6 +126,7 @@ export default function Layout() {
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
       document.documentElement.scrollTop = 0
       document.body.scrollTop = 0
+      mainRef.current?.scrollTo?.({ top: 0, left: 0, behavior: 'auto' })
       document.querySelector('.app-main')?.scrollTo?.({ top: 0, left: 0, behavior: 'auto' })
       document.querySelector('.content-shell')?.scrollTo?.({ top: 0, left: 0, behavior: 'auto' })
     }
@@ -331,7 +342,7 @@ export default function Layout() {
             >
               <span className="topbar-search-copy">
                 <AppIcon name="search" className="app-icon" />
-                <span>Buscar veículo, posse ou manutenção</span>
+                <span>Busca global</span>
               </span>
               <span className="topbar-search-hint">Ctrl K</span>
             </button>
@@ -355,7 +366,7 @@ export default function Layout() {
           </div>
         </header>
 
-        <main className="app-main">
+        <main className="app-main" ref={mainRef}>
           {passwordChangeRequired ? (
             <div className="surface-panel">
               <div className="empty-state">Altere sua senha provisória para continuar usando o sistema.</div>
