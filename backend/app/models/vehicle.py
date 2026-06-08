@@ -55,6 +55,8 @@ class Vehicle(Base):
     state = mapped_column(String(2), nullable=True)
     registered_detran = mapped_column(Boolean, nullable=True)
     engine_spec = mapped_column(String(120), nullable=True)
+    is_provisional = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
+    provisional_source = mapped_column(String(255), nullable=True)
     vehicle_type: Mapped[VehicleType] = mapped_column(
         Enum(VehicleType, name="vehicle_type"),
         nullable=False,

@@ -10,7 +10,7 @@ from app.models.data_import import (
     DataImportSuggestedAction,
 )
 from app.models.driver import Driver, DriverLicenseCategory
-from app.models.fine import Fine, FineStatus
+from app.models.fine import Fine, FineInfraction, FineStatus
 from app.models.fuel_station import FuelStation, FuelStationUser
 from app.models.fuel_supply import FuelSupply
 from app.models.fuel_supply_order import FuelSupplyOrder, FuelSupplyOrderStatus
@@ -53,6 +53,7 @@ __all__ = [
     "Driver",
     "DriverLicenseCategory",
     "Fine",
+    "FineInfraction",
     "FineStatus",
     "FuelStation",
     "FuelStationUser",

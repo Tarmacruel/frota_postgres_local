@@ -4,6 +4,7 @@ import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
 import { dataImportsAPI } from '../api/dataImports'
+import { finesAPI } from '../api/fines'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
@@ -21,6 +22,7 @@ const searchTypeOptions = [
   { value: 'ALL', label: 'Veículos e condutores' },
   { value: 'VEHICLE', label: 'Somente veículos' },
   { value: 'DRIVER', label: 'Somente condutores' },
+  { value: 'FINE', label: 'Somente multas' },
 ]
 
 const vehicleTypeOptions = [
@@ -88,19 +90,40 @@ const fieldLabels = {
   data_nascimento: 'Data de nascimento',
   data_emissao_cnh: 'Data de emissão da CNH',
   ultimo_abastecimento: 'Último abastecimento',
+  vehicle_id: 'Ve?culo',
+  infraction_type_id: 'Enquadramento',
+  ticket_number: 'N?mero do auto',
+  infraction_date: 'Data da infra??o',
+  infraction_time: 'Hora da infra??o',
+  amount: 'Valor',
+  description: 'Descri??o',
+  location: 'Local',
+  communication_number: 'C.I.',
+  sent_date: 'Data de envio',
+  process_number: 'Processo',
+  source_status: 'Situa??o original',
+  imported_driver_name: 'Motorista informado',
+  notes: 'Observa??es',
+  provisional_vehicle: 'Ve?culo provis?rio',
+  provisional_infraction: 'Enquadramento provis?rio',
 }
 
 const vehicleMappedFields = ['plate', 'chassis_number', 'brand', 'model', 'vehicle_type', 'ownership_type', 'status', 'allocation_id']
 const driverMappedFields = ['nome_completo', 'documento', 'organization_id', 'contato', 'email', 'cnh_categoria', 'cnh_validade', 'ativo']
+const fineMappedFields = ['vehicle_id', 'infraction_type_id', 'ticket_number', 'infraction_date', 'amount', 'description', 'location', 'status', 'provisional_vehicle', 'provisional_infraction']
 const vehicleOfficialFields = ['year', 'prefix', 'patrimonio_numero_frota', 'renavam', 'color', 'fuel_type', 'tank_capacity_liters', 'transmission', 'city', 'state', 'registered_detran', 'engine_spec']
 const driverOfficialFields = ['registro', 'matricula', 'cargo', 'cnh_numero', 'rg', 'data_nascimento', 'data_emissao_cnh', 'ultimo_abastecimento']
-const dateFields = new Set(['cnh_validade', 'data_nascimento', 'data_emissao_cnh'])
+const fineOfficialFields = ['infraction_time', 'communication_number', 'sent_date', 'process_number', 'source_status', 'imported_driver_name', 'notes']
+const fineStatusOptions = ['PENDENTE', 'PAGA', 'RECURSO', 'DEFERIDA'].map((value) => ({ value, label: value }))
+const dateFields = new Set(['cnh_validade', 'data_nascimento', 'data_emissao_cnh', 'infraction_date', 'sent_date'])
+const timeFields = new Set(['infraction_time'])
 const datetimeFields = new Set(['ultimo_abastecimento'])
 const booleanFields = new Set(['ativo', 'registered_detran'])
-const numberFields = new Set(['tank_capacity_liters'])
+const numberFields = new Set(['tank_capacity_liters', 'amount'])
 const requiredFields = {
   VEHICLE: new Set(['plate', 'brand', 'model', 'vehicle_type', 'ownership_type', 'status', 'allocation_id']),
   DRIVER: new Set(['nome_completo', 'documento', 'organization_id', 'cnh_categoria']),
+  FINE: new Set(['ticket_number', 'infraction_date', 'amount']),
 }
 
 function formatDate(value) {
@@ -123,7 +146,9 @@ function statusLabel(value) {
 }
 
 function entityLabel(value) {
-  return value === 'DRIVER' ? 'Condutores' : 'Veículos'
+  if (value === 'DRIVER') return 'Condutores'
+  if (value === 'FINE') return 'Multas'
+  return 'Ve?culos'
 }
 
 function actionLabel(value) {
@@ -170,9 +195,9 @@ function cleanDraftObject(values) {
 function orderedKeys(values, section, entityType) {
   const currentKeys = Object.keys(values || {})
   const baseOrder = section === 'mapped'
-    ? entityType === 'DRIVER' ? driverMappedFields : vehicleMappedFields
+    ? entityType === 'FINE' ? fineMappedFields : entityType === 'DRIVER' ? driverMappedFields : vehicleMappedFields
     : section === 'official'
-      ? entityType === 'DRIVER' ? driverOfficialFields : vehicleOfficialFields
+      ? entityType === 'FINE' ? fineOfficialFields : entityType === 'DRIVER' ? driverOfficialFields : vehicleOfficialFields
       : []
   return [...new Set([...baseOrder, ...currentKeys])]
 }
@@ -192,10 +217,10 @@ function ensureSelectedOption(options, value, fallbackLabel) {
   return [{ value, label: fallbackLabel, description: String(value) }, ...options]
 }
 
-function staticOptionsForField(key) {
+function staticOptionsForField(key, entityType) {
   if (key === 'vehicle_type') return vehicleTypeOptions
   if (key === 'ownership_type') return ownershipOptions
-  if (key === 'status') return vehicleStatusOptions
+  if (key === 'status') return entityType === 'FINE' ? fineStatusOptions : vehicleStatusOptions
   if (key === 'cnh_categoria') return driverCategoryOptions
   return null
 }
@@ -254,6 +279,8 @@ export default function DataImportsPage() {
   const [feedback, setFeedback] = useState('')
   const [editingRow, setEditingRow] = useState(null)
   const [editDraft, setEditDraft] = useState({ mapped: {}, official: {}, triage: {}, notes: '' })
+  const [vehicleSelectItems, setVehicleSelectItems] = useState([])
+  const [fineInfractionItems, setFineInfractionItems] = useState([])
   const {
     organizations,
     allocations,
@@ -278,6 +305,20 @@ export default function DataImportsPage() {
     description: `${allocation.organization_name || ''}${allocation.department_name ? ` / ${allocation.department_name}` : ''}`,
     keywords: `${allocation.display_name || ''} ${allocation.name || ''} ${allocation.organization_name || ''} ${allocation.department_name || ''}`,
   })), [allocations])
+
+  const vehicleOptions = useMemo(() => vehicleSelectItems.map((vehicle) => ({
+    value: vehicle.id,
+    label: `${vehicle.plate}${vehicle.is_provisional ? ' (provisório)' : ''} . ${vehicle.brand} ${vehicle.model}`,
+    description: vehicle.current_location?.display_name || vehicle.current_department || vehicle.renavam || '',
+    keywords: [vehicle.plate, vehicle.renavam, vehicle.brand, vehicle.model].filter(Boolean).join(' '),
+  })), [vehicleSelectItems])
+
+  const fineInfractionOptions = useMemo(() => fineInfractionItems.map((item) => ({
+    value: item.id,
+    label: `${item.code}/${item.desdobramento} . ${item.description}`,
+    description: [item.ctb_article, item.severity, item.default_amount ? `R$ ${item.default_amount}` : null].filter(Boolean).join(' | '),
+    keywords: [item.code, item.desdobramento, item.description, item.ctb_article].filter(Boolean).join(' '),
+  })), [fineInfractionItems])
 
   const selectedRowsForExport = useMemo(() => rows.map((row) => ({
     linha: row.row_number,
@@ -373,6 +414,23 @@ export default function DataImportsPage() {
 
   useEffect(() => {
     loadBatches()
+  }, [])
+
+  useEffect(() => {
+    async function loadFineDraftCatalogs() {
+      try {
+        const [vehiclesResponse, infractionsResponse] = await Promise.all([
+          api.get('/vehicles', { params: { limit: 5000 } }),
+          finesAPI.listInfractions({ limit: 500, active_only: true }),
+        ])
+        setVehicleSelectItems(Array.isArray(vehiclesResponse.data) ? vehiclesResponse.data : [])
+        setFineInfractionItems(infractionsResponse.data || [])
+      } catch {
+        setVehicleSelectItems([])
+        setFineInfractionItems([])
+      }
+    }
+    loadFineDraftCatalogs()
   }, [])
 
   useEffect(() => {
@@ -607,6 +665,42 @@ export default function DataImportsPage() {
     const fieldClassName = `form-field data-import-edit-field${isRequired ? ' is-required' : ''}`
     const normalizedValue = normalizeInputValue(value)
 
+    if (entityType === 'FINE' && key === 'vehicle_id') {
+      return (
+        <div className={fieldClassName} key={`${section}-${key}`}>
+          <label>{label}</label>
+          <SearchableSelect
+            value={normalizedValue}
+            onChange={(nextValue) => updateDraftField(section, key, nextValue || null)}
+            options={ensureSelectedOption(vehicleOptions, normalizedValue, 'Veículo não encontrado')}
+            placeholder="Selecione o veículo"
+            searchPlaceholder="Buscar placa, RENAVAM ou modelo"
+            emptyLabel="Nenhum veículo encontrado."
+            allowClear
+            clearLabel="Limpar veículo"
+          />
+        </div>
+      )
+    }
+
+    if (entityType === 'FINE' && key === 'infraction_type_id') {
+      return (
+        <div className={fieldClassName} key={`${section}-${key}`}>
+          <label>{label}</label>
+          <SearchableSelect
+            value={normalizedValue}
+            onChange={(nextValue) => updateDraftField(section, key, nextValue || null)}
+            options={ensureSelectedOption(fineInfractionOptions, normalizedValue, 'Enquadramento não encontrado')}
+            placeholder="Selecione o enquadramento"
+            searchPlaceholder="Buscar código, artigo ou descrição"
+            emptyLabel="Nenhum enquadramento encontrado."
+            allowClear
+            clearLabel="Limpar enquadramento"
+          />
+        </div>
+      )
+    }
+
     if (key === 'allocation_id') {
       return (
         <div className={fieldClassName} key={`${section}-${key}`}>
@@ -664,7 +758,7 @@ export default function DataImportsPage() {
       )
     }
 
-    const staticOptions = staticOptionsForField(key)
+    const staticOptions = staticOptionsForField(key, entityType)
     if (staticOptions) {
       return (
         <div className={fieldClassName} key={`${section}-${key}`}>
@@ -708,6 +802,21 @@ export default function DataImportsPage() {
             className="app-input"
             type="date"
             value={dateInputValue(normalizedValue)}
+            onChange={(event) => updateDraftField(section, key, event.target.value || null)}
+          />
+        </div>
+      )
+    }
+
+    if (timeFields.has(key)) {
+      return (
+        <div className={fieldClassName} key={`${section}-${key}`}>
+          <label htmlFor={fieldId}>{label}</label>
+          <input
+            id={fieldId}
+            className="app-input"
+            type="time"
+            value={String(normalizedValue || '').slice(0, 5)}
             onChange={(event) => updateDraftField(section, key, event.target.value || null)}
           />
         </div>
@@ -824,6 +933,7 @@ export default function DataImportsPage() {
             </button>
             <button type="button" className="secondary-button" onClick={() => downloadUrl(dataImportsAPI.templateUrl('VEHICLE'))}>Modelo veículos</button>
             <button type="button" className="secondary-button" onClick={() => downloadUrl(dataImportsAPI.templateUrl('DRIVER'))}>Modelo condutores</button>
+            <button type="button" className="secondary-button" onClick={() => downloadUrl(dataImportsAPI.templateUrl('FINE'))}>Modelo multas</button>
           </div>
         </form>
       </section>

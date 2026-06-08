@@ -31,6 +31,8 @@ VEHICLE_OPTIONAL_FIELDS = (
     "state",
     "registered_detran",
     "engine_spec",
+    "is_provisional",
+    "provisional_source",
 )
 
 
@@ -387,6 +389,8 @@ class VehicleService:
             "state": vehicle.state,
             "registered_detran": vehicle.registered_detran,
             "engine_spec": vehicle.engine_spec,
+            "is_provisional": vehicle.is_provisional,
+            "provisional_source": vehicle.provisional_source,
             "vehicle_type": vehicle.vehicle_type,
             "ownership_type": vehicle.ownership_type,
             "status": vehicle.status,

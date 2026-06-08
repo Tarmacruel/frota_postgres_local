@@ -34,6 +34,8 @@ class VehicleCreate(BaseModel):
     state: str | None = Field(default=None, max_length=2)
     registered_detran: bool | None = None
     engine_spec: str | None = Field(default=None, max_length=120)
+    is_provisional: bool = False
+    provisional_source: str | None = Field(default=None, max_length=255)
     vehicle_type: VehicleType
     ownership_type: VehicleOwnershipType = VehicleOwnershipType.PROPRIO
     status: VehicleStatus = VehicleStatus.ATIVO
@@ -57,6 +59,8 @@ class VehicleUpdate(BaseModel):
     state: str | None = Field(default=None, max_length=2)
     registered_detran: bool | None = None
     engine_spec: str | None = Field(default=None, max_length=120)
+    is_provisional: bool | None = None
+    provisional_source: str | None = Field(default=None, max_length=255)
     vehicle_type: VehicleType | None = None
     ownership_type: VehicleOwnershipType | None = None
     status: VehicleStatus | None = None
@@ -92,6 +96,8 @@ class VehicleOut(BaseModel):
     state: str | None = None
     registered_detran: bool | None = None
     engine_spec: str | None = None
+    is_provisional: bool = False
+    provisional_source: str | None = None
     vehicle_type: VehicleType
     ownership_type: VehicleOwnershipType
     status: VehicleStatus

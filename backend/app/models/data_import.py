@@ -12,6 +12,7 @@ from app.db.base import Base
 class DataImportEntityType(str, enum.Enum):
     VEHICLE = "VEHICLE"
     DRIVER = "DRIVER"
+    FINE = "FINE"
 
 
 class DataImportBatchStatus(str, enum.Enum):

@@ -1,10 +1,12 @@
 from __future__ import annotations
 
 import csv
+import hashlib
 import io
 import re
 import unicodedata
 from datetime import date, datetime, time, timedelta, timezone
+from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 
@@ -24,6 +26,7 @@ from app.models.data_import import (
     DataImportSuggestedAction,
 )
 from app.models.driver import Driver, DriverLicenseCategory
+from app.models.fine import Fine, FineInfraction, FineStatus
 from app.models.location_history import LocationHistory
 from app.models.master_data import Allocation, Department, Organization
 from app.models.user import User
@@ -88,6 +91,27 @@ DRIVER_OFFICIAL_EXTRA_FIELDS = [
     "ultimo_abastecimento",
 ]
 DRIVER_TRIAGE_EXTRA_COLUMNS = ["Unidade", "Subunidade", "Lotação Condutor"]
+
+FINE_IMPORTABLE_FIELDS = [
+    "vehicle_id",
+    "infraction_type_id",
+    "ticket_number",
+    "infraction_date",
+    "amount",
+    "description",
+    "location",
+    "status",
+]
+FINE_OFFICIAL_EXTRA_FIELDS = [
+    "infraction_time",
+    "communication_number",
+    "sent_date",
+    "process_number",
+    "source_status",
+    "imported_driver_name",
+    "notes",
+]
+FINE_TRIAGE_EXTRA_COLUMNS = ["RENAVAM", "VINCULO", "MODELO", "SECRETARIA", "TIPO"]
 
 
 class DataImportService:
@@ -178,9 +202,9 @@ class DataImportService:
             source_filename=filename,
             header_row_index=header_index + 1,
             detected_columns=header,
-            importable_fields=VEHICLE_IMPORTABLE_FIELDS if entity_type == DataImportEntityType.VEHICLE else DRIVER_IMPORTABLE_FIELDS,
-            official_extra_fields=VEHICLE_OFFICIAL_EXTRA_FIELDS if entity_type == DataImportEntityType.VEHICLE else DRIVER_OFFICIAL_EXTRA_FIELDS,
-            triage_extra_fields=VEHICLE_TRIAGE_EXTRA_COLUMNS if entity_type == DataImportEntityType.VEHICLE else DRIVER_TRIAGE_EXTRA_COLUMNS,
+            importable_fields=self._importable_fields(entity_type),
+            official_extra_fields=self._official_extra_fields(entity_type),
+            triage_extra_fields=self._triage_extra_fields(entity_type),
             summary=self._build_summary(mapped_rows),
             created_by_id=current_user.id,
         )
@@ -313,6 +337,8 @@ class DataImportService:
             if entity_type == DataImportEntityType.VEHICLE
             else ["Nome", "CPF", "Unidade", "Telefone", "Celular", "Email", "Categoria", "Vencimento", "Status", "Registro", "Matricula", "Cargo", "CNH", "RG", "Data Nascimento", "Data Emissão CNH", "Ultimo Abastecimento"]
         )
+        if entity_type == DataImportEntityType.FINE:
+            fields = ["PLACA", "RENAVAM", "VINCULO", "MODELO", "SECRETARIA", "A. INFRA??O", "TIPO DA INFRA??O", "DATA ", "HORA", "LOCAL", "C.I.", "ENVIADO", "PROCESSO", "V.MULTA", "SITUA??O", "TIPO", "MOTORISTA", "OBS"]
         buffer = io.StringIO()
         writer = csv.writer(buffer, delimiter=";")
         writer.writerow(fields)
@@ -338,9 +364,13 @@ class DataImportService:
             normalized = {self._norm_key(value) for value in values if value}
             vehicle_score = len(normalized & {self._norm_key(value) for value in ("Placa", "Chassi", "Marca", "Modelo", "Tipo Frota")})
             driver_score = len(normalized & {self._norm_key(value) for value in ("Nome", "CPF", "CNH", "Categoria", "Vencimento")})
-            score = max(vehicle_score, driver_score)
+            fine_score = len(normalized & {self._norm_key(value) for value in ("Placa", "A. Infração", "Tipo da Infração", "Data", "V.Multa")})
+            score = max(vehicle_score, driver_score, fine_score)
             if score and (best is None or score > best[0]):
-                entity = DataImportEntityType.VEHICLE if vehicle_score >= driver_score else DataImportEntityType.DRIVER
+                if fine_score >= vehicle_score and fine_score >= driver_score:
+                    entity = DataImportEntityType.FINE
+                else:
+                    entity = DataImportEntityType.VEHICLE if vehicle_score >= driver_score else DataImportEntityType.DRIVER
                 best = (score, entity, index, values)
         if not best or best[0] < 3:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nao foi possivel detectar o cabecalho do relatorio")
@@ -363,6 +393,8 @@ class DataImportService:
     async def _build_analysis_context(self) -> dict:
         vehicles = list((await self.db.execute(select(Vehicle))).scalars().all())
         drivers = list((await self.db.execute(select(Driver))).scalars().all())
+        fines = list((await self.db.execute(select(Fine))).scalars().all())
+        infractions = list((await self.db.execute(select(FineInfraction))).scalars().all())
         allocations = list(
             (
                 await self.db.execute(
@@ -377,21 +409,44 @@ class DataImportService:
         return {
             "vehicles_by_plate": {self._norm_key(vehicle.plate): vehicle for vehicle in vehicles if vehicle.plate},
             "vehicles_by_chassis": {self._norm_key(vehicle.chassis_number): vehicle for vehicle in vehicles if vehicle.chassis_number},
+            "vehicles_by_renavam": {self._digits(vehicle.renavam): vehicle for vehicle in vehicles if vehicle.renavam},
             "drivers_by_document": {self._digits(driver.documento): driver for driver in drivers if driver.documento},
             "drivers_by_cnh": {self._digits(driver.cnh_numero): driver for driver in drivers if driver.cnh_numero},
+            "drivers_by_name": {self._norm_lookup(driver.nome_completo): driver for driver in drivers if driver.nome_completo},
+            "fines_by_ticket_vehicle": {
+                f"{self._norm_key(fine.ticket_number)}|{fine.vehicle_id}": fine
+                for fine in fines
+                if fine.ticket_number and fine.vehicle_id
+            },
+            "infractions_by_code": {
+                f"{self._norm_key(infraction.code)}|{self._norm_key(infraction.desdobramento)}": infraction
+                for infraction in infractions
+                if infraction.code
+            },
+            "infractions_by_description": {
+                self._normalize_infraction_description(infraction.description): infraction
+                for infraction in infractions
+                if infraction.description
+            },
+            "infractions": infractions,
             "allocations": self._allocation_lookup(allocations),
             "organizations": self._organization_lookup(organizations),
         }
 
     def _build_key_counts(self, entity_type: DataImportEntityType, raw_records: list[tuple[int, dict]]) -> dict:
-        keys = {"primary": {}, "secondary": {}}
+        keys = {"primary": {}, "secondary": {}, "fine_signatures": {}}
         for _row_number, raw in raw_records:
             if entity_type == DataImportEntityType.VEHICLE:
                 primary = self._norm_key(raw.get("Placa"))
                 secondary = self._norm_key(raw.get("Chassi"))
-            else:
+            elif entity_type == DataImportEntityType.DRIVER:
                 primary = self._digits(raw.get("CPF"))
                 secondary = self._digits(raw.get("CNH"))
+            else:
+                primary = self._fine_duplicate_key(raw)
+                secondary = self._norm_key(raw.get("A. INFRAÇÃO"))
+                if primary:
+                    keys["fine_signatures"].setdefault(primary, set()).add(self._fine_signature(raw))
             keys["primary"][primary] = keys["primary"].get(primary, 0) + (1 if primary else 0)
             keys["secondary"][secondary] = keys["secondary"].get(secondary, 0) + (1 if secondary else 0)
         return keys
@@ -400,12 +455,15 @@ class DataImportService:
         if entity_type == DataImportEntityType.VEHICLE:
             mapped, official_extra, triage_extra, errors, conflicts = self._map_vehicle(raw, key_counts, context)
             matched, matched_by = self._match_vehicle(mapped, context)
-        else:
+        elif entity_type == DataImportEntityType.DRIVER:
             mapped, official_extra, triage_extra, errors, conflicts = self._map_driver(raw, key_counts, context)
             matched, matched_by = self._match_driver(mapped, official_extra, context)
+        else:
+            mapped, official_extra, triage_extra, errors, conflicts = self._map_fine(raw, key_counts, context)
+            matched, matched_by = self._match_fine(mapped, context)
 
         action = DataImportSuggestedAction.UPDATE if matched else DataImportSuggestedAction.CREATE
-        if errors:
+        if errors or any("duplicidade conflitante" in conflict.lower() for conflict in conflicts):
             action = DataImportSuggestedAction.REVIEW
         return {
             "row_number": row_number,
@@ -509,6 +567,82 @@ class DataImportService:
         triage_extra = {column: raw.get(column) for column in DRIVER_TRIAGE_EXTRA_COLUMNS if self._present(raw.get(column))}
         return mapped, official_extra, triage_extra, errors, conflicts
 
+    def _map_fine(self, raw: dict, key_counts: dict, context: dict) -> tuple[dict, dict, dict, list[str], list[str]]:
+        errors = []
+        conflicts = []
+        plate = self._normalize_plate(self._raw_value(raw, "PLACA"))
+        renavam = self._normalize_text(self._raw_value(raw, "RENAVAM"), uppercase=True)
+        ticket_number = self._normalize_text(self._raw_value(raw, "A. INFRAÇÃO", "AUTO", "AUTO INFRAÇÃO"), uppercase=True)
+        description = self._normalize_text(self._raw_value(raw, "TIPO DA INFRAÇÃO", "DESCRIÇÃO"), uppercase=True)
+        infraction_date = self._parse_date(self._raw_value(raw, "DATA", "DATA "))
+        amount = self._parse_money(self._raw_value(raw, "V.MULTA", "VALOR", "VALOR MULTA"))
+        source_status = self._normalize_text(self._raw_value(raw, "SITUAÇÃO"), uppercase=True)
+
+        vehicle = self._match_import_vehicle(plate, renavam, context)
+        infraction = self._match_import_infraction(raw, description, context)
+        driver = self._match_import_driver(self._raw_value(raw, "MOTORISTA"), context)
+
+        mapped = {
+            "ticket_number": ticket_number,
+            "infraction_date": infraction_date,
+            "amount": amount,
+            "description": description or (infraction.description if infraction else "INFRAÇÃO NÃO INFORMADA NA IMPORTAÇÃO"),
+            "location": self._normalize_text(self._raw_value(raw, "LOCAL"), uppercase=True),
+            "status": self._map_fine_status(source_status),
+        }
+        if vehicle:
+            mapped["vehicle_id"] = str(vehicle.id)
+        elif plate:
+            mapped["provisional_vehicle"] = {
+                "plate": plate,
+                "renavam": renavam,
+                "model": self._normalize_text(self._raw_value(raw, "MODELO"), uppercase=True) or "IMPORTADO",
+                "ownership_type": self._map_import_vehicle_ownership(self._raw_value(raw, "VINCULO")),
+                "vehicle_type": self._map_vehicle_type(self._raw_value(raw, "TIPO"), conflicts),
+                "organization_name": self._normalize_text(self._raw_value(raw, "SECRETARIA"), uppercase=True),
+            }
+            conflicts.append("Veiculo nao encontrado; sera criado como provisório ao aplicar")
+
+        if infraction:
+            mapped["infraction_type_id"] = str(infraction.id)
+        else:
+            provisional_description = description or "INFRAÇÃO NÃO INFORMADA NA IMPORTAÇÃO"
+            mapped["provisional_infraction"] = {
+                "description": provisional_description,
+                "source": "Importacao de multas",
+            }
+            conflicts.append("Enquadramento nao encontrado; sera criado como provisório ao aplicar")
+
+        if driver:
+            mapped["driver_id"] = str(driver.id)
+
+        for field in ("ticket_number", "infraction_date", "amount"):
+            if not mapped.get(field):
+                errors.append(f"Campo obrigatorio ausente: {field}")
+        if not vehicle and not plate:
+            errors.append("Campo obrigatorio ausente: plate")
+
+        duplicate_key = self._fine_duplicate_key(raw)
+        if duplicate_key and key_counts["primary"].get(duplicate_key, 0) > 1:
+            signatures = key_counts.get("fine_signatures", {}).get(duplicate_key, set())
+            if len(signatures) > 1:
+                conflicts.append("Duplicidade conflitante no arquivo; revise antes de aprovar")
+            else:
+                conflicts.append("Duplicidade exata no arquivo; aplicar uma linha atualizara a mesma multa")
+
+        official_extra = {
+            "infraction_time": self._parse_time(self._raw_value(raw, "HORA")),
+            "communication_number": self._normalize_text(self._raw_value(raw, "C.I.", "CI"), uppercase=True),
+            "sent_date": self._parse_date(self._raw_value(raw, "ENVIADO")),
+            "process_number": self._normalize_text(self._raw_value(raw, "PROCESSO"), uppercase=True),
+            "source_status": source_status,
+            "imported_driver_name": self._normalize_text(self._raw_value(raw, "MOTORISTA"), uppercase=True),
+            "notes": self._normalize_text(self._raw_value(raw, "OBS"), uppercase=True),
+        }
+        official_extra = {key: value for key, value in official_extra.items() if value is not None}
+        triage_extra = {column: self._raw_value(raw, column) for column in FINE_TRIAGE_EXTRA_COLUMNS if self._present(self._raw_value(raw, column))}
+        return mapped, official_extra, triage_extra, errors, conflicts
+
     async def _apply_row(self, batch: DataImportBatch, row: DataImportRow, current_user: User) -> dict:
         errors = self._apply_validation_errors(batch.entity_type, row.mapped_data)
         if errors:
@@ -516,7 +650,9 @@ class DataImportService:
 
         if batch.entity_type == DataImportEntityType.VEHICLE:
             return await self._apply_vehicle_row(row, current_user)
-        return await self._apply_driver_row(row, current_user)
+        if batch.entity_type == DataImportEntityType.DRIVER:
+            return await self._apply_driver_row(row, current_user)
+        return await self._apply_fine_row(row, current_user)
 
     async def _apply_vehicle_row(self, row: DataImportRow, current_user: User) -> dict:
         data = {**row.mapped_data, **row.official_extra_data}
@@ -588,6 +724,53 @@ class DataImportService:
         await self.db.flush()
         return {"action": action, "entity_id": str(driver.id), "label": driver.nome_completo}
 
+    async def _apply_fine_row(self, row: DataImportRow, current_user: User) -> dict:
+        data = {**row.mapped_data, **row.official_extra_data}
+        vehicle = await self._find_or_create_fine_vehicle(data)
+        infraction = await self._find_or_create_fine_infraction(data)
+        fine = await self._find_fine_for_apply(data, vehicle.id)
+        action = "UPDATE" if fine else "CREATE"
+
+        payload = {
+            "vehicle_id": vehicle.id,
+            "driver_id": UUID(str(data["driver_id"])) if data.get("driver_id") else None,
+            "infraction_type_id": infraction.id,
+            "ticket_number": data["ticket_number"],
+            "infraction_date": self._date_from_iso(data["infraction_date"]),
+            "infraction_time": self._time_from_iso(data.get("infraction_time")),
+            "due_date": self._date_from_iso(data.get("due_date")),
+            "amount": Decimal(str(data["amount"])),
+            "description": data.get("description") or infraction.description,
+            "location": data.get("location"),
+            "status": FineStatus(data.get("status") or FineStatus.PENDENTE.value),
+            "communication_number": data.get("communication_number"),
+            "sent_date": self._date_from_iso(data.get("sent_date")),
+            "process_number": data.get("process_number"),
+            "source_status": data.get("source_status"),
+            "imported_driver_name": data.get("imported_driver_name"),
+            "notes": data.get("notes"),
+            "source_import_row_id": row.id,
+        }
+
+        if fine is None:
+            fine = Fine(created_by=current_user.id, **payload)
+            self.db.add(fine)
+        else:
+            for field, value in payload.items():
+                setattr(fine, field, value)
+
+        await self.db.flush()
+        await self.audit.record(
+            actor=current_user,
+            action="CREATE" if action == "CREATE" else "UPDATE",
+            entity_type="FINE",
+            entity_id=fine.id,
+            entity_label=f"{vehicle.plate} - {fine.ticket_number}",
+            details={"event": "DATA_IMPORT", "row_id": str(row.id), "action": action, "data": data},
+        )
+        await self.db.flush()
+        return {"action": action, "entity_id": str(fine.id), "label": f"{vehicle.plate} - {fine.ticket_number}"}
+
     def _assign_vehicle_extra(self, vehicle: Vehicle, data: dict) -> None:
         for field in VEHICLE_OFFICIAL_EXTRA_FIELDS:
             if field not in data:
@@ -623,8 +806,18 @@ class DataImportService:
         return payload
 
     def _apply_validation_errors(self, entity_type: DataImportEntityType, data: dict) -> list[str]:
-        required = ("plate", "brand", "model", "vehicle_type", "ownership_type", "status", "allocation_id") if entity_type == DataImportEntityType.VEHICLE else ("nome_completo", "documento", "organization_id", "cnh_categoria")
-        return [f"Campo obrigatorio ausente: {field}" for field in required if not data.get(field)]
+        if entity_type == DataImportEntityType.VEHICLE:
+            required = ("plate", "brand", "model", "vehicle_type", "ownership_type", "status", "allocation_id")
+            return [f"Campo obrigatorio ausente: {field}" for field in required if not data.get(field)]
+        if entity_type == DataImportEntityType.DRIVER:
+            required = ("nome_completo", "documento", "organization_id", "cnh_categoria")
+            return [f"Campo obrigatorio ausente: {field}" for field in required if not data.get(field)]
+        errors = [f"Campo obrigatorio ausente: {field}" for field in ("ticket_number", "infraction_date", "amount") if not data.get(field)]
+        if not data.get("vehicle_id") and not data.get("provisional_vehicle"):
+            errors.append("Campo obrigatorio ausente: vehicle_id")
+        if not data.get("infraction_type_id") and not data.get("provisional_infraction"):
+            errors.append("Campo obrigatorio ausente: infraction_type_id")
+        return errors
 
     async def _find_vehicle_for_apply(self, data: dict) -> Vehicle | None:
         if data.get("plate"):
@@ -643,6 +836,81 @@ class DataImportService:
         if data.get("cnh_numero"):
             return (await self.db.execute(select(Driver).where(Driver.cnh_numero == data["cnh_numero"]))).scalar_one_or_none()
         return None
+
+    async def _find_fine_for_apply(self, data: dict, vehicle_id: UUID) -> Fine | None:
+        if not data.get("ticket_number"):
+            return None
+        return (
+            await self.db.execute(
+                select(Fine).where(Fine.ticket_number == data["ticket_number"], Fine.vehicle_id == vehicle_id)
+            )
+        ).scalar_one_or_none()
+
+    async def _find_or_create_fine_vehicle(self, data: dict) -> Vehicle:
+        if data.get("vehicle_id"):
+            vehicle = (await self.db.execute(select(Vehicle).where(Vehicle.id == UUID(str(data["vehicle_id"]))))).scalar_one_or_none()
+            if vehicle:
+                return vehicle
+
+        provisional = data.get("provisional_vehicle") or {}
+        plate = self._normalize_plate(provisional.get("plate"))
+        if not plate:
+            raise ValueError("Veiculo provisório sem placa")
+        existing = (await self.db.execute(select(Vehicle).where(Vehicle.plate == plate))).scalar_one_or_none()
+        if existing:
+            return existing
+
+        model_text = provisional.get("model") or "IMPORTADO"
+        brand, model = self._split_import_vehicle_model(model_text)
+        vehicle = Vehicle(
+            plate=plate,
+            renavam=provisional.get("renavam"),
+            brand=brand,
+            model=model,
+            vehicle_type=VehicleType(provisional.get("vehicle_type") or VehicleType.SEDAN.value),
+            ownership_type=VehicleOwnershipType(provisional.get("ownership_type") or VehicleOwnershipType.PROPRIO.value),
+            status=VehicleStatus.ATIVO,
+            is_provisional=True,
+            provisional_source="Importacao de multas",
+        )
+        self.db.add(vehicle)
+        await self.db.flush()
+        return vehicle
+
+    async def _find_or_create_fine_infraction(self, data: dict) -> FineInfraction:
+        if data.get("infraction_type_id"):
+            infraction = (
+                await self.db.execute(select(FineInfraction).where(FineInfraction.id == UUID(str(data["infraction_type_id"]))))
+            ).scalar_one_or_none()
+            if infraction:
+                return infraction
+
+        provisional = data.get("provisional_infraction") or {}
+        description = provisional.get("description") or data.get("description") or "INFRAÇÃO NÃO INFORMADA NA IMPORTAÇÃO"
+        normalized = self._normalize_infraction_description(description)
+        existing = (
+            await self.db.execute(
+                select(FineInfraction).where(FineInfraction.normalized_description == normalized).order_by(FineInfraction.is_provisional.asc())
+            )
+        ).scalars().first()
+        if existing:
+            return existing
+
+        code_hash = hashlib.sha1(normalized.encode("utf-8")).hexdigest()[:10].upper()
+        infraction = FineInfraction(
+            code=f"PROV-{code_hash}",
+            desdobramento="0",
+            description=description,
+            normalized_description=normalized,
+            default_amount=Decimal(str(data["amount"])) if data.get("amount") else None,
+            is_active=True,
+            is_official=False,
+            is_provisional=True,
+            source=provisional.get("source") or "Importacao de multas",
+        )
+        self.db.add(infraction)
+        await self.db.flush()
+        return infraction
 
     async def _get_active_vehicle_history(self, vehicle_id: UUID) -> LocationHistory | None:
         return (
@@ -674,6 +942,71 @@ class DataImportService:
             if match:
                 return match, "cnh_numero"
         return None, None
+
+    def _match_fine(self, mapped: dict, context: dict):
+        vehicle_id = mapped.get("vehicle_id")
+        ticket_number = mapped.get("ticket_number")
+        if vehicle_id and ticket_number:
+            match = context["fines_by_ticket_vehicle"].get(f"{self._norm_key(ticket_number)}|{vehicle_id}")
+            if match:
+                return match, "ticket_number_vehicle"
+        return None, None
+
+    def _match_import_vehicle(self, plate: str | None, renavam: str | None, context: dict) -> Vehicle | None:
+        if plate:
+            match = context["vehicles_by_plate"].get(self._norm_key(plate))
+            if match:
+                return match
+        if renavam:
+            return context["vehicles_by_renavam"].get(self._digits(renavam))
+        return None
+
+    def _match_import_driver(self, value, context: dict) -> Driver | None:
+        name = self._normalize_text(value, uppercase=True)
+        if not name:
+            return None
+        ignored = {"MOTORISTA NAO IDENTIFICADO", "MOTORISTA NÃO IDENTIFICADO"}
+        if name in ignored or "MULTA ORIGINARIA" in name:
+            return None
+        return context["drivers_by_name"].get(self._norm_lookup(name))
+
+    def _match_import_infraction(self, raw: dict, description: str | None, context: dict) -> FineInfraction | None:
+        code = self._normalize_text(self._raw_value(raw, "CODIGO", "CÓDIGO", "CODIGO INFRACAO", "CÓDIGO INFRAÇÃO"), uppercase=True)
+        desdobramento = self._normalize_text(self._raw_value(raw, "DESDOBRAMENTO", "DESDOB"), uppercase=True) or "0"
+        if code:
+            match = context["infractions_by_code"].get(f"{self._norm_key(code)}|{self._norm_key(desdobramento)}")
+            if match:
+                return match
+            for key, infraction in context["infractions_by_code"].items():
+                if key.startswith(f"{self._norm_key(code)}|"):
+                    return infraction
+
+        normalized = self._normalize_infraction_description(description)
+        if not normalized:
+            return None
+        aliases = (
+            ("TRANS VELOC SUP ATE 20", "VELOCIDADE SUPERIOR MAXIMA PERMITIDA EM ATE 20"),
+            ("TRANS VELOC SUP 20", "VELOCIDADE SUPERIOR MAXIMA PERMITIDA EM ATE 20"),
+            ("VELOCIDADE SUP 20 ATE 50", "VELOCIDADE SUPERIOR MAXIMA PERMITIDA EM MAIS DE 20 ATE 50"),
+            ("VELOCIDADE SUP ATE 50", "VELOCIDADE SUPERIOR MAXIMA PERMITIDA EM MAIS DE 20 ATE 50"),
+            ("TRANS VELOC SUP 50", "VELOCIDADE SUPERIOR MAXIMA PERMITIDA EM MAIS DE 50"),
+            ("AVANCAR O SINAL VERMELHO", "AVANCAR O SINAL VERMELHO"),
+            ("AVANCAR SINAL VERMELHO", "AVANCAR O SINAL VERMELHO"),
+            ("CONDUTOR SEM CINTO", "DEIXAR O CONDUTOR DE USAR O CINTO SEGURANCA"),
+            ("PASSAGEIRO SEM CINTO", "DEIXAR O PASSAGEIRO DE USAR O CINTO SEGURANCA"),
+        )
+        candidates = [normalized]
+        for source, target in aliases:
+            if source in normalized:
+                candidates.append(target)
+        for candidate in candidates:
+            exact = context["infractions_by_description"].get(candidate)
+            if exact:
+                return exact
+            for key, infraction in context["infractions_by_description"].items():
+                if candidate in key or key in candidate:
+                    return infraction
+        return None
 
     def _allocation_lookup(self, allocations: list[Allocation]) -> dict[str, UUID]:
         lookup = {}
@@ -804,6 +1137,14 @@ class DataImportService:
         normalized = str(value or "").strip()
         return normalized.upper() not in MISSING_VALUES
 
+    def _raw_value(self, raw: dict, *headers: str):
+        normalized_raw = {self._norm_key(key): value for key, value in raw.items()}
+        for header in headers:
+            key = self._norm_key(header)
+            if key in normalized_raw:
+                return normalized_raw[key]
+        return None
+
     def _normalize_text(self, value, *, uppercase: bool = False) -> str | None:
         if not self._present(value):
             return None
@@ -861,6 +1202,21 @@ class DataImportService:
         except ValueError:
             return None
 
+    def _parse_money(self, value) -> float | None:
+        if not self._present(value):
+            return None
+        if isinstance(value, (int, float, Decimal)):
+            return float(value)
+        text = re.sub(r"[^0-9,.-]+", "", str(value))
+        if "," in text and "." in text:
+            text = text.replace(".", "").replace(",", ".")
+        else:
+            text = text.replace(",", ".")
+        try:
+            return float(text)
+        except ValueError:
+            return None
+
     def _parse_bool(self, value) -> bool | None:
         if not self._present(value):
             return None
@@ -878,6 +1234,21 @@ class DataImportService:
     def _parse_datetime(self, value) -> str | None:
         parsed = self._parse_datetime_object(value)
         return parsed.isoformat() if parsed else None
+
+    def _parse_time(self, value) -> str | None:
+        if not self._present(value):
+            return None
+        if isinstance(value, time):
+            return value.isoformat(timespec="minutes")
+        if isinstance(value, datetime):
+            return value.time().isoformat(timespec="minutes")
+        text = str(value).strip()
+        for fmt in ("%H:%M:%S", "%H:%M"):
+            try:
+                return datetime.strptime(text, fmt).time().isoformat(timespec="minutes")
+            except ValueError:
+                continue
+        return None
 
     def _parse_datetime_object(self, value) -> datetime | None:
         if not self._present(value):
@@ -905,11 +1276,84 @@ class DataImportService:
             return None
         return date.fromisoformat(str(value)[:10])
 
+    def _time_from_iso(self, value) -> time | None:
+        if not value:
+            return None
+        return time.fromisoformat(str(value)[:8])
+
     def _datetime_from_iso(self, value) -> datetime | None:
         if not value:
             return None
         parsed = datetime.fromisoformat(str(value))
         return parsed.replace(tzinfo=parsed.tzinfo or timezone.utc)
+
+    def _map_fine_status(self, value) -> str:
+        text = self._normalize_text(value, uppercase=True)
+        if text in {"PAGA", "PAGO"}:
+            return FineStatus.PAGA.value
+        if text == "DEFERIDA":
+            return FineStatus.DEFERIDA.value
+        if text == "RECURSO":
+            return FineStatus.RECURSO.value
+        return FineStatus.PENDENTE.value
+
+    def _map_import_vehicle_ownership(self, value) -> str:
+        text = self._normalize_text(value, uppercase=True)
+        if text and any(token in text for token in ("LOCALIZA", "LOCA", "LOCADO")):
+            return VehicleOwnershipType.LOCADO.value
+        if text and any(token in text for token in ("SESAB", "CEDID", "CONVENIO", "CONVÊNIO")):
+            return VehicleOwnershipType.CEDIDO.value
+        return VehicleOwnershipType.PROPRIO.value
+
+    def _normalize_infraction_description(self, value) -> str:
+        text = self._strip_accents(str(value or "").upper())
+        return re.sub(r"[^A-Z0-9]+", " ", text).strip()
+
+    def _fine_duplicate_key(self, raw: dict) -> str:
+        ticket = self._norm_key(self._raw_value(raw, "A. INFRAÇÃO", "AUTO", "AUTO INFRAÇÃO"))
+        plate = self._norm_key(self._raw_value(raw, "PLACA"))
+        date_value = self._parse_date(self._raw_value(raw, "DATA", "DATA ")) or ""
+        return "|".join(value for value in (ticket, plate, date_value) if value)
+
+    def _fine_signature(self, raw: dict) -> str:
+        values = [
+            self._fine_duplicate_key(raw),
+            self._norm_key(self._raw_value(raw, "TIPO DA INFRAÇÃO")),
+            str(self._parse_money(self._raw_value(raw, "V.MULTA", "VALOR", "VALOR MULTA")) or ""),
+            self._norm_key(self._raw_value(raw, "SITUAÇÃO")),
+        ]
+        return "|".join(values)
+
+    def _split_import_vehicle_model(self, model_text: str) -> tuple[str, str]:
+        text = self._normalize_text(model_text, uppercase=True) or "IMPORTADO"
+        if "/" in text:
+            brand, model = text.split("/", 1)
+            return brand.strip() or "IMPORTADO", model.strip() or text
+        parts = text.split(maxsplit=1)
+        if len(parts) == 2:
+            return parts[0], parts[1]
+        return "IMPORTADO", text
+
+    def _importable_fields(self, entity_type: DataImportEntityType) -> list[str]:
+        if entity_type == DataImportEntityType.VEHICLE:
+            return VEHICLE_IMPORTABLE_FIELDS
+        if entity_type == DataImportEntityType.DRIVER:
+            return DRIVER_IMPORTABLE_FIELDS
+        return FINE_IMPORTABLE_FIELDS
+
+    def _official_extra_fields(self, entity_type: DataImportEntityType) -> list[str]:
+        if entity_type == DataImportEntityType.VEHICLE:
+            return VEHICLE_OFFICIAL_EXTRA_FIELDS
+        if entity_type == DataImportEntityType.DRIVER:
+            return DRIVER_OFFICIAL_EXTRA_FIELDS
+        return FINE_OFFICIAL_EXTRA_FIELDS
+
+    def _triage_extra_fields(self, entity_type: DataImportEntityType) -> list[str]:
+        if entity_type == DataImportEntityType.VEHICLE:
+            return VEHICLE_TRIAGE_EXTRA_COLUMNS
+        if entity_type == DataImportEntityType.DRIVER:
+            return DRIVER_TRIAGE_EXTRA_COLUMNS
+        return FINE_TRIAGE_EXTRA_COLUMNS
 
     def _map_vehicle_type(self, value, conflicts: list[str]) -> str:
         text = self._normalize_text(value, uppercase=True)
