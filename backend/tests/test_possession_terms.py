@@ -109,7 +109,7 @@ async def test_public_return_term_is_unavailable_until_possession_ends():
         await service.get_public_term("TD-ABC123DEF456", term_type="return")
 
     assert exc.value.status_code == 404
-    assert exc.value.detail == "Termo de devolucao ainda nao disponivel"
+    assert exc.value.detail == "Termo de devolução ainda não disponível"
 
 
 @pytest.mark.asyncio

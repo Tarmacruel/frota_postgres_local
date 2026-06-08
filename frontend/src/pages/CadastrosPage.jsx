@@ -479,7 +479,7 @@ export default function CadastrosPage() {
     try {
       await exportRowsToXlsx({
         fileName: 'modelo-importacao-cadastros',
-        sheetName: 'Modelo de importacao',
+        sheetName: 'Modelo de importação',
         columns: IMPORT_TEMPLATE_COLUMNS,
         rows: IMPORT_TEMPLATE_ROWS,
         filters: ['Campos obrigatórios: órgão, departamento e lotação'],
@@ -498,7 +498,7 @@ export default function CadastrosPage() {
           <p className="section-copy">Cadastre bases auxiliares para padronizar lotações, veículos e registros de multas.</p>
         </div>
         <div className="actions-inline">
-          <button className="ghost-button cadastros-toolbar-btn" type="button" onClick={resetForms}>Limpar formularios</button>
+          <button className="ghost-button cadastros-toolbar-btn" type="button" onClick={resetForms}>Limpar formulários</button>
           <button className="ghost-button cadastros-toolbar-btn" type="button" onClick={() => setAdvancedFilterOpen(true)}>Filtros avançados</button>
           <button className="ghost-button cadastros-toolbar-btn" type="button" onClick={handleDownloadCsvTemplate}>Baixar modelo CSV</button>
           <button className="ghost-button cadastros-toolbar-btn" type="button" onClick={handleDownloadXlsxTemplate}>Baixar modelo XLSX</button>

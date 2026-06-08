@@ -184,7 +184,7 @@ export default function DriversPage() {
     await previewRowsToPdf({
       title: 'Frota PMTF - Condutores cadastrados',
       fileName: 'frota-pmtf-condutores-cadastrados',
-      subtitle: 'Relatório da pagina atual dos condutores cadastrados.',
+      subtitle: 'Relatório da página atual dos condutores cadastrados.',
       columns: exportColumns,
       rows: records,
       filters: [
@@ -344,11 +344,11 @@ export default function DriversPage() {
       <Modal
         open={isModalOpen}
         title={editingRecord ? 'Editar condutor' : 'Novo condutor'}
-        description="Agrupe os dados em blocos simples para manter o cadastro mais limpo e escalavel."
+        description="Agrupe os dados em blocos simples para manter o cadastro mais limpo e escalável."
         onClose={closeModal}
       >
         <form onSubmit={handleSubmit} className="stack">
-          <AccordionSection title="Dados básicos" subtitle="Identificacao e contato" open>
+          <AccordionSection title="Dados básicos" subtitle="Identificação e contato" open>
             <div className="form-grid modal-form-grid">
               <div className="form-field">
                 <label htmlFor="driver-name">Nome completo</label>

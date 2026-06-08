@@ -314,7 +314,7 @@ class PossessionService:
             self._cleanup_file(stored_return_term_path)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="NÃ£o foi possÃ­vel armazenar o termo de devoluÃ§Ã£o da posse",
+                detail="Não foi possível armazenar o termo de devolução da posse",
             ) from exc
         except Exception:
             await self.db.rollback()
@@ -492,7 +492,7 @@ class PossessionService:
     async def delete(self, possession_id: UUID, current_user: User) -> None:
         possession = await self.possessions.get_by_id(possession_id)
         if not possession:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse nÃ£o encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
 
         await self._ensure_possession_visible_to_user(possession, current_user)
         stored_paths = self._collect_possession_file_paths(possession)
@@ -530,7 +530,7 @@ class PossessionService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="NÃ£o foi possÃ­vel remover a posse") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível remover a posse") from exc
         except Exception:
             await self.db.rollback()
             raise
@@ -581,12 +581,12 @@ class PossessionService:
             document_path = record.return_document_path
             document_name = record.return_document_name
             document_mime_type = record.return_document_mime_type
-            missing_detail = "Nenhum termo de devolucao encontrado para esta posse"
+            missing_detail = "Nenhum termo de devolução encontrado para esta posse"
         else:
             document_path = record.document_path
             document_name = record.document_name
             document_mime_type = record.document_mime_type
-            missing_detail = "Nenhum termo de emprestimo encontrado para esta posse"
+            missing_detail = "Nenhum termo de empréstimo encontrado para esta posse"
 
         if not document_path:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=missing_detail)
@@ -610,18 +610,18 @@ class PossessionService:
     async def get_public_term(self, validation_code: str, *, term_type: str) -> dict:
         normalized_code = (validation_code or "").strip().upper()
         if not normalized_code:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Termo publico nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Termo público não encontrado")
 
         if term_type == "return":
             record = await self.possessions.get_by_return_term_validation_code(normalized_code)
             if not record:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Termo publico nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Termo público não encontrado")
             if record.end_date is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Termo de devolucao ainda nao disponivel")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Termo de devolução ainda não disponível")
         else:
             record = await self.possessions.get_by_loan_term_validation_code(normalized_code)
             if not record:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Termo publico nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Termo público não encontrado")
 
         return self._serialize_public_term(record, term_type=term_type)
 
@@ -644,10 +644,10 @@ class PossessionService:
         organization_id = scoped_organization_id(current_user)
         if organization_id is None:
             if production_scope_is_empty(current_user):
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
             return
         if not await self.vehicles.is_vehicle_in_organization(vehicle_id, organization_id):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
     async def _ensure_possession_visible_to_user(self, possession: VehiclePossession, current_user: User | None) -> None:
         await self._ensure_vehicle_visible_to_user(possession.vehicle_id, current_user)
@@ -698,7 +698,7 @@ class PossessionService:
             if self._periods_overlap(start_date, end_date, record.start_date, record.end_date):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail="Período informado se sobrepoe a outro registro de posse deste veículo",
+                    detail="Período informado se sobrepõe a outro registro de posse deste veículo",
                 )
 
     async def _read_and_validate_captured_photos(
@@ -824,7 +824,7 @@ class PossessionService:
                 return candidate
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="Nao foi possivel gerar o codigo publico do termo",
+            detail="Não foi possível gerar o código público do termo",
         )
 
     async def _store_photo_payloads(

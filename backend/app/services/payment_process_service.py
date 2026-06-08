@@ -82,7 +82,7 @@ TEMPLATE_HEADERS = [
 
 TEMPLATE_HEADERS = [
     "Tipo Processo",
-    "Numero do Processo",
+    "Número do Processo",
     "Sistema",
     "Status",
     "Etapa",
@@ -90,8 +90,8 @@ TEMPLATE_HEADERS = [
     "NF",
     "Tipo Nota",
     "Unidade",
-    "Emissao NF",
-    "Competencia",
+    "Emissão NF",
+    "Competência",
     "Vencimento",
     "Tipo",
     "Valor",
@@ -107,21 +107,21 @@ TEMPLATE_HEADERS = [
     "Saldo Restante",
     "Empenho",
     "Data Empenho",
-    "Liquidacao",
-    "Data Liquidacao",
+    "Liquidação",
+    "Data Liquidação",
     "Ordem Pagamento",
     "Data Ordem Pagamento",
     "Data Pagamento",
-    "Responsavel Etapa",
-    "Localizacao",
-    "Observacoes",
+    "Responsável Etapa",
+    "Localização",
+    "Observações",
 ]
 
 STAGE_LABELS = {
     PaymentProcessStage.ASSEMBLY: "Montagem",
-    PaymentProcessStage.REVIEW: "Conferencia",
+    PaymentProcessStage.REVIEW: "Conferência",
     PaymentProcessStage.COMMITMENT: "Empenho",
-    PaymentProcessStage.LIQUIDATION: "Liquidacao",
+    PaymentProcessStage.LIQUIDATION: "Liquidação",
     PaymentProcessStage.PAYMENT: "Pagamento",
     PaymentProcessStage.PAID: "Pago",
     PaymentProcessStage.ARCHIVED: "Arquivado",
@@ -139,10 +139,10 @@ STAGE_ORDER = [
 ]
 TERMINAL_STAGES = {PaymentProcessStage.CANCELLED, PaymentProcessStage.RETURNED}
 CHECKLIST_DEFAULTS = {
-    PaymentProcessStage.ASSEMBLY: ["Fatura/NF identificada", "Contrato vinculado", "Competencia informada"],
-    PaymentProcessStage.REVIEW: ["Dados conferidos", "Atesto registrado", "Pendencias justificadas"],
+    PaymentProcessStage.ASSEMBLY: ["Fatura/NF identificada", "Contrato vinculado", "Competência informada"],
+    PaymentProcessStage.REVIEW: ["Dados conferidos", "Atesto registrado", "Pendências justificadas"],
     PaymentProcessStage.COMMITMENT: ["Empenho informado"],
-    PaymentProcessStage.LIQUIDATION: ["Liquidacao informada"],
+    PaymentProcessStage.LIQUIDATION: ["Liquidação informada"],
     PaymentProcessStage.PAYMENT: ["Ordem de pagamento informada", "Vencimento acompanhado"],
     PaymentProcessStage.PAID: ["Pagamento registrado"],
     PaymentProcessStage.ARCHIVED: ["Processo arquivado"],
@@ -198,7 +198,7 @@ class PaymentProcessService:
     async def get(self, process_id: UUID, *, current_user: User) -> dict:
         record = await self.repository.get_by_id(process_id)
         if not record:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processo de pagamento nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processo de pagamento não encontrado")
         self._ensure_process_visible(record, current_user)
         return self._serialize(record)
 
@@ -233,14 +233,14 @@ class PaymentProcessService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel criar o processo") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível criar o processo") from exc
 
         return await self.get(record.id, current_user=current_user)
 
     async def update(self, process_id: UUID, data: PaymentProcessUpdate, current_user: User) -> dict:
         record = await self.repository.get_by_id(process_id)
         if not record:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processo de pagamento nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processo de pagamento não encontrado")
         self._ensure_process_visible(record, current_user)
 
         payload = data.model_dump(exclude_unset=True)
@@ -274,14 +274,14 @@ class PaymentProcessService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar o processo") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar o processo") from exc
 
         return await self.get(record.id, current_user=current_user)
 
     async def delete(self, process_id: UUID, data: PaymentProcessDelete, current_user: User) -> dict:
         record = await self.repository.get_by_id(process_id)
         if not record:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processo de pagamento nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processo de pagamento não encontrado")
         self._ensure_process_visible(record, current_user)
 
         details = self._delete_audit_details(record, reason=data.reason)
@@ -301,14 +301,14 @@ class PaymentProcessService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel excluir o processo") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível excluir o processo") from exc
 
-        return {"message": "Processo de pagamento excluido"}
+        return {"message": "Processo de pagamento excluído"}
 
     async def change_stage(self, process_id: UUID, data: PaymentProcessStageUpdate, current_user: User) -> dict:
         record = await self.repository.get_by_id(process_id)
         if not record:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processo de pagamento nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processo de pagamento não encontrado")
         self._ensure_process_visible(record, current_user)
 
         previous_stage = record.stage
@@ -340,14 +340,14 @@ class PaymentProcessService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel avancar a etapa") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível avançar a etapa") from exc
 
         return await self.get(record.id, current_user=current_user)
 
     async def update_checklist(self, process_id: UUID, data: PaymentProcessChecklistUpdate, current_user: User) -> dict:
         record = await self.repository.get_by_id(process_id)
         if not record:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processo de pagamento nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processo de pagamento não encontrado")
         self._ensure_process_visible(record, current_user)
 
         await self.db.execute(delete(PaymentProcessChecklistItem).where(PaymentProcessChecklistItem.process_id == record.id))
@@ -381,7 +381,7 @@ class PaymentProcessService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar o checklist") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar o checklist") from exc
 
         return await self.get(record.id, current_user=current_user)
 
@@ -443,7 +443,7 @@ class PaymentProcessService:
     async def get_supplier(self, supplier_id: UUID) -> dict:
         supplier = await self.repository.get_supplier(supplier_id)
         if not supplier:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fornecedor nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fornecedor não encontrado")
         return self._serialize_supplier(supplier)
 
     async def create_supplier(self, data: PaymentSupplierCreate, current_user: User) -> dict:
@@ -466,13 +466,13 @@ class PaymentProcessService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Fornecedor ja cadastrado") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Fornecedor já cadastrado") from exc
         return self._serialize_supplier(supplier)
 
     async def update_supplier(self, supplier_id: UUID, data: PaymentSupplierUpdate, current_user: User) -> dict:
         supplier = await self.repository.get_supplier(supplier_id)
         if not supplier:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fornecedor nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fornecedor não encontrado")
         payload = data.model_dump(exclude_unset=True)
         if "name" in payload and payload["name"] is not None:
             supplier.name = self._normalize_business_name(payload["name"])
@@ -487,13 +487,13 @@ class PaymentProcessService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar o fornecedor") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar o fornecedor") from exc
         return self._serialize_supplier(supplier)
 
     async def delete_supplier(self, supplier_id: UUID, current_user: User) -> dict:
         supplier = await self.repository.get_supplier(supplier_id)
         if not supplier:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fornecedor nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fornecedor não encontrado")
         supplier.active = False
         supplier.updated_at = datetime.now(timezone.utc)
         await self.audit.record(actor=current_user, action="DISABLE", entity_type="PAYMENT_SUPPLIER", entity_id=supplier.id, entity_label=supplier.name, details={})
@@ -515,13 +515,13 @@ class PaymentProcessService:
     async def get_contract(self, contract_id: UUID) -> dict:
         contract = await self.repository.get_contract(contract_id)
         if not contract:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
         return await self._serialize_contract(contract)
 
     async def create_contract(self, data: PaymentContractCreate, current_user: User) -> dict:
         supplier = await self.repository.get_supplier(data.supplier_id)
         if not supplier:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fornecedor nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fornecedor não encontrado")
         contract = PaymentContract(**data.model_dump())
         contract.number = self._normalize_identifier(contract.number)
         if contract.value_updated is None and contract.value_initial is not None:
@@ -539,18 +539,18 @@ class PaymentProcessService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Contrato ja cadastrado para este fornecedor") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Contrato já cadastrado para este fornecedor") from exc
         return await self.get_contract(contract.id)
 
     async def update_contract(self, contract_id: UUID, data: PaymentContractUpdate, current_user: User) -> dict:
         contract = await self.repository.get_contract(contract_id)
         if not contract:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
         payload = data.model_dump(exclude_unset=True)
         if "supplier_id" in payload and payload["supplier_id"]:
             supplier = await self.repository.get_supplier(payload["supplier_id"])
             if not supplier:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fornecedor nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fornecedor não encontrado")
         for field, value in payload.items():
             if field == "number" and value is not None:
                 value = self._normalize_identifier(value)
@@ -563,13 +563,13 @@ class PaymentProcessService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar o contrato") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar o contrato") from exc
         return await self.get_contract(contract.id)
 
     async def delete_contract(self, contract_id: UUID, current_user: User) -> dict:
         contract = await self.repository.get_contract(contract_id)
         if not contract:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
         contract.status = PaymentContractStatus.CANCELLED
         contract.updated_at = datetime.now(timezone.utc)
         await self.audit.record(actor=current_user, action="CANCEL", entity_type="PAYMENT_CONTRACT", entity_id=contract.id, entity_label=contract.number, details={})
@@ -579,7 +579,7 @@ class PaymentProcessService:
     async def create_contract_amendment(self, contract_id: UUID, data: PaymentContractAmendmentCreate, current_user: User) -> dict:
         contract = await self.repository.get_contract(contract_id)
         if not contract:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
         amendment = PaymentContractAmendment(contract_id=contract.id, **data.model_dump())
         if amendment.value_delta is not None:
             base = contract.value_updated if contract.value_updated is not None else contract.value_initial or Decimal("0")
@@ -600,7 +600,7 @@ class PaymentProcessService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel adicionar o aditivo") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível adicionar o aditivo") from exc
         return await self.get_contract(contract.id)
 
     async def contract_management(
@@ -611,7 +611,7 @@ class PaymentProcessService:
     ) -> dict:
         contract = await self.repository.get_contract(contract_id)
         if not contract:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
         horizon = self._normalize_horizon(horizon_months)
         return await self._build_contract_management(contract, horizon_months=horizon, include_related=True)
 
@@ -685,7 +685,7 @@ class PaymentProcessService:
 
         if load_workbook is None:
             await upload.close()
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Leitura XLSX indisponivel")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Leitura XLSX indisponível")
 
         content = await upload.read()
         await upload.close()
@@ -698,7 +698,7 @@ class PaymentProcessService:
         if len(parsed_rows) > MAX_IMPORT_ROWS:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail=f"Importacao limitada a {MAX_IMPORT_ROWS} registros por arquivo",
+                detail=f"Importação limitada a {MAX_IMPORT_ROWS} registros por arquivo",
             )
 
         organizations = await self._organization_lookup()
@@ -777,7 +777,7 @@ class PaymentProcessService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel importar a planilha") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível importar a planilha") from exc
 
         return {
             "total_rows": len(parsed_rows),
@@ -870,11 +870,11 @@ class PaymentProcessService:
             headers=TEMPLATE_HEADERS,
             rows=[
                 [
-                    "Combustivel",
+                    "Combustível",
                     "PMTF-PR-00000/2026",
                     "IGOV",
                     "EM ANALISE",
-                    "Conferencia",
+                    "Conferência",
                     "2721579",
                     "45154",
                     "Consumo combustivel",
@@ -882,13 +882,13 @@ class PaymentProcessService:
                     date.today(),
                     date.today().replace(day=1),
                     date.today(),
-                    "Composta Combustivel",
+                    "Composta Combustível",
                     0,
                     "POSTO L J",
                     "",
                     "2-914-2025",
                     "Fornecimento",
-                    "Fornecimento de combustiveis",
+                    "Fornecimento de combustíveis",
                     date.today().replace(month=1, day=1),
                     date.today().replace(month=12, day=31),
                     0,
@@ -913,7 +913,7 @@ class PaymentProcessService:
         try:
             workbook = load_workbook(io.BytesIO(content), data_only=True)
         except (InvalidFileException, OSError, ValueError) as exc:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Planilha XLSX invalida") from exc
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Planilha XLSX inválida") from exc
 
         parsed_rows: list[dict] = []
         for sheet in workbook.worksheets:
@@ -931,7 +931,7 @@ class PaymentProcessService:
 
                 validation_error = None
                 if not data.get("process_number"):
-                    validation_error = "Linha sem numero do processo"
+                    validation_error = "Linha sem número do processo"
                 parsed_rows.append(
                     {
                         "sheet": sheet.title,
@@ -1124,15 +1124,15 @@ class PaymentProcessService:
         scoped_org_id = scoped_organization_id(current_user)
         if scoped_org_id is None:
             if production_scope_is_empty(current_user):
-                data["scope_error"] = "Usuario de producao sem orgao vinculado"
+                data["scope_error"] = "Usuário de produção sem órgão vinculado"
             return data
 
         row_org_id = data.get("organization_id")
         if is_production_user(current_user) and row_org_id is None:
-            data["scope_error"] = "Linha sem orgao reconhecido para usuario de producao"
+            data["scope_error"] = "Linha sem órgão reconhecido para usuário de produção"
             return data
         if row_org_id and row_org_id != scoped_org_id:
-            data["scope_error"] = "Linha pertence a outro orgao"
+            data["scope_error"] = "Linha pertence a outro órgão"
             return data
         data["organization_id"] = scoped_org_id
         return data
@@ -1327,7 +1327,7 @@ class PaymentProcessService:
         if prepared.get("supplier_id"):
             supplier = await self.repository.get_supplier(prepared["supplier_id"])
             if not supplier:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fornecedor nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fornecedor não encontrado")
             prepared["supplier_name"] = supplier.name
         elif prepared.get("supplier_name"):
             supplier = await self._get_or_create_supplier(
@@ -1342,7 +1342,7 @@ class PaymentProcessService:
         if prepared.get("contract_id"):
             contract = await self.repository.get_contract(prepared["contract_id"])
             if not contract:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
             prepared["contract_number"] = contract.number
             prepared["supplier_id"] = contract.supplier_id
             prepared["supplier_name"] = contract.supplier.name if contract.supplier else prepared.get("supplier_name")
@@ -1418,7 +1418,7 @@ class PaymentProcessService:
     async def _get_or_create_supplier(self, name: str | None, *, cnpj: str | None, current_user: User) -> PaymentSupplier:
         normalized_name = self._normalize_business_name(name)
         if not normalized_name:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fornecedor invalido")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Fornecedor inválido")
         digits = self._digits(cnpj)
         supplier = await self.repository.get_supplier_by_cnpj(digits) if digits else None
         if supplier is None:
@@ -1465,7 +1465,7 @@ class PaymentProcessService:
     ) -> PaymentContract:
         normalized_number = self._normalize_identifier(number)
         if not normalized_number:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Contrato invalido")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Contrato inválido")
         contract = await self.repository.get_contract_by_supplier_number(supplier.id, normalized_number)
         normalized_kind = kind if isinstance(kind, PaymentProcessKind) else self._kind_from_value(kind) or PaymentProcessKind.FUEL
         if contract:
@@ -1577,17 +1577,17 @@ class PaymentProcessService:
     def _process_alerts(self, item: PaymentProcess) -> list[str]:
         alerts: list[str] = []
         if not item.supplier_id and not item.supplier_name:
-            alerts.append("Fornecedor nao vinculado.")
+            alerts.append("Fornecedor não vinculado.")
         if not item.contract_id and not item.contract_number:
-            alerts.append("Contrato nao vinculado.")
+            alerts.append("Contrato não vinculado.")
         if not item.competence_month:
-            alerts.append("Competencia nao informada.")
+            alerts.append("Competência não informada.")
         if not item.billing_number and not item.invoice_number:
-            alerts.append("Fatura ou NF nao informada.")
+            alerts.append("Fatura ou NF não informada.")
         if item.amount is None:
-            alerts.append("Valor do processo nao informado.")
+            alerts.append("Valor do processo não informado.")
         if not item.due_date and item.stage not in {PaymentProcessStage.PAID, PaymentProcessStage.ARCHIVED, PaymentProcessStage.CANCELLED}:
-            alerts.append("Vencimento nao informado.")
+            alerts.append("Vencimento não informado.")
 
         current_pending = [
             checklist_item.item_label
@@ -1599,18 +1599,18 @@ class PaymentProcessService:
 
         rank = self._stage_rank(item.stage)
         if rank >= self._stage_rank(PaymentProcessStage.COMMITMENT) and not item.commitment_number:
-            alerts.append("Empenho nao informado.")
+            alerts.append("Empenho não informado.")
         if rank >= self._stage_rank(PaymentProcessStage.LIQUIDATION) and not item.liquidation_number:
-            alerts.append("Liquidacao nao informada.")
+            alerts.append("Liquidação não informada.")
         if rank >= self._stage_rank(PaymentProcessStage.PAYMENT) and not item.payment_order_number:
-            alerts.append("Ordem de pagamento nao informada.")
+            alerts.append("Ordem de pagamento não informada.")
         if item.stage in {PaymentProcessStage.PAID, PaymentProcessStage.ARCHIVED} and not item.paid_at:
-            alerts.append("Data de pagamento nao informada.")
+            alerts.append("Data de pagamento não informada.")
 
         contract = item.contract
         if contract:
             if contract.status != PaymentContractStatus.ACTIVE:
-                alerts.append("Contrato nao esta ativo.")
+                alerts.append("Contrato não está ativo.")
             if contract.valid_until and contract.valid_until < date.today():
                 alerts.append("Contrato vencido.")
             balance = self._contract_balance_from_loaded(contract)
@@ -1635,7 +1635,7 @@ class PaymentProcessService:
         available_balance = effective_value - totals["consumed_amount"] if effective_value is not None else None
         alerts = []
         if contract.status != PaymentContractStatus.ACTIVE:
-            alerts.append("Contrato nao esta ativo.")
+            alerts.append("Contrato não está ativo.")
         if contract.valid_until and contract.valid_until < date.today():
             alerts.append("Contrato vencido.")
         if available_balance is not None and available_balance < Decimal("0"):
@@ -1798,9 +1798,9 @@ class PaymentProcessService:
                 operations.append(row)
             if fuel_rows:
                 source_quality = (
-                    "Combustivel cruzado por CNPJ do fornecedor e posto."
+                    "Combustível cruzado por CNPJ do fornecedor e posto."
                     if contract.supplier and contract.supplier.cnpj
-                    else "Combustivel cruzado por nome normalizado do fornecedor/posto."
+                    else "Combustível cruzado por nome normalizado do fornecedor/posto."
                 )
         elif contract_kind == PaymentProcessKind.MAINTENANCE:
             maintenance_rows = await self.repository.list_maintenance_operations_for_organizations(
@@ -1816,7 +1816,7 @@ class PaymentProcessService:
                 history[month]["records_count"] += 1
                 operations.append(row)
             if maintenance_rows:
-                source_quality = "Manutencao simplificada por historico operacional dos orgaos relacionados."
+                source_quality = "Manutenção simplificada por histórico operacional dos órgãos relacionados."
 
         monthly_history = [self._serialize_management_month(item) for item in history.values()]
         forecast_values = self._forecast_values(monthly_history, contract_kind)
@@ -1826,7 +1826,7 @@ class PaymentProcessService:
         monthly_projection = self._build_projection(current_month, horizon_months, contract_data["available_balance"], average)
         alerts = list(contract_data.get("alerts") or [])
         if not forecast_values:
-            alerts.append("Historico insuficiente para previsao mensal consistente.")
+            alerts.append("Histórico insuficiente para previsão mensal consistente.")
         if contract_data["available_balance"] is not None and contract_data["available_balance"] < Decimal("0"):
             alerts.append("Saldo contratual ja esta negativo.")
 
@@ -1862,7 +1862,7 @@ class PaymentProcessService:
                 "value": contract_data["available_balance"],
                 "formatted": self._format_money(contract_data["available_balance"]),
                 "tone": "danger" if contract_data["available_balance"] is not None and contract_data["available_balance"] < 0 else "success",
-                "formula": "Valor efetivo do contrato - processos vinculados nao devolvidos/cancelados.",
+                "formula": "Valor efetivo do contrato - processos vinculados não devolvidos/cancelados.",
                 "source": "Processos de pagamento vinculados ao contrato.",
                 "detail_type": "processes",
             },
@@ -1893,7 +1893,7 @@ class PaymentProcessService:
                 "formatted": self._format_money(contract_data["pending_amount"]),
                 "tone": "warning",
                 "formula": "Consumido - Pago.",
-                "source": "Processos em aberto ou ainda nao pagos.",
+                "source": "Processos em aberto ou ainda não pagos.",
                 "detail_type": "processes",
             },
             {
@@ -1903,7 +1903,7 @@ class PaymentProcessService:
                 "formatted": self._format_money(average),
                 "tone": "neutral",
                 "formula": "Media dos meses com consumo no horizonte selecionado.",
-                "source": "Processos financeiros e historico operacional quando disponivel.",
+                "source": "Processos financeiros e histórico operacional quando disponível.",
                 "detail_type": "operations",
             },
             {
@@ -1911,19 +1911,19 @@ class PaymentProcessService:
                 "label": "Fim do saldo",
                 "value": depletion_label,
                 "formatted": depletion_label,
-                "tone": "danger" if depletion_label not in {"Sem previsao", "Sem saldo definido"} else "neutral",
-                "formula": "Saldo disponivel / media mensal de consumo.",
-                "source": "Saldo calculado e media mensal.",
+                "tone": "danger" if depletion_label not in {"Sem previsão", "Sem saldo definido"} else "neutral",
+                "formula": "Saldo disponível / média mensal de consumo.",
+                "source": "Saldo calculado e média mensal.",
                 "detail_type": "projection",
             },
             {
                 "key": "monthly_variation",
-                "label": "Variacao mensal",
+                "label": "Variação mensal",
                 "value": variation,
                 "formatted": self._format_percentage(variation),
                 "tone": "warning" if variation is not None and variation > 0 else "neutral",
-                "formula": "Comparacao entre os dois ultimos meses do horizonte.",
-                "source": "Serie historica mensal.",
+                "formula": "Comparação entre os dois últimos meses do horizonte.",
+                "source": "Série histórica mensal.",
                 "detail_type": "projection",
             },
             {
@@ -1932,8 +1932,8 @@ class PaymentProcessService:
                 "value": len(alerts),
                 "formatted": str(len(alerts)),
                 "tone": "danger" if alerts else "success",
-                "formula": "Alertas de saldo, vigencia, status e qualidade da previsao.",
-                "source": "Regras do modulo de pagamentos.",
+                "formula": "Alertas de saldo, vigência, status e qualidade da previsão.",
+                "source": "Regras do módulo de pagamentos.",
                 "detail_type": "alerts",
             },
         ]
@@ -1986,7 +1986,7 @@ class PaymentProcessService:
         if balance < 0:
             return date.today(), "Saldo negativo"
         if average <= 0:
-            return None, "Sem previsao"
+            return None, "Sem previsão"
         months_until = int((balance / average).to_integral_value(rounding=ROUND_FLOOR)) + 1
         projected = self._add_months(date.today().replace(day=1), months_until)
         label = self._month_label(projected)
@@ -2045,10 +2045,10 @@ class PaymentProcessService:
                     {
                         "id": item.id,
                         "kind": "maintenance",
-                        "label": item.vehicle.plate if item.vehicle else "Manutencao",
+                        "label": item.vehicle.plate if item.vehicle else "Manutenção",
                         "date": item.start_date,
                         "amount": item.total_cost,
-                        "status": "Aberta" if not item.end_date else "Concluida",
+                        "status": "Aberta" if not item.end_date else "Concluída",
                         "detail": item.service_description,
                     }
                 )
@@ -2153,10 +2153,10 @@ class PaymentProcessService:
         organization_id = scoped_organization_id(current_user)
         if organization_id is None:
             if production_scope_is_empty(current_user):
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processo de pagamento nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processo de pagamento não encontrado")
             return
         if record.organization_id != organization_id:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processo de pagamento nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processo de pagamento não encontrado")
 
     def _manual_import_key(self, data: dict) -> str:
         stable = self._build_import_key(data)
@@ -2219,7 +2219,7 @@ class PaymentProcessService:
 
     def _build_workbook_bytes(self, *, headers: list[str], rows: list[list], sheet_name: str) -> bytes:
         if Workbook is None:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Geracao XLSX indisponivel")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Geração XLSX indisponível")
         workbook = Workbook()
         sheet = workbook.active
         sheet.title = sheet_name
@@ -2343,4 +2343,4 @@ class PaymentProcessService:
 
     def _kind_label(self, kind: PaymentProcessKind | str | None) -> str:
         value = kind.value if isinstance(kind, PaymentProcessKind) else str(kind or "")
-        return "Manutencao" if value == PaymentProcessKind.MAINTENANCE.value else "Combustivel"
+        return "Manutenção" if value == PaymentProcessKind.MAINTENANCE.value else "Combustível"

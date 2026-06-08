@@ -84,7 +84,7 @@ class FuelSupplyOrderService:
         if data.organization_id:
             ensure_organization_access(current_user, data.organization_id)
         elif production_scope_is_empty(current_user):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Orgao nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Órgão não encontrado")
 
         station = await self.fuel_stations.get(data.fuel_station_id)
         if not station:
@@ -303,7 +303,7 @@ class FuelSupplyOrderService:
         organization_id = scoped_organization_id(current_user)
         if organization_id is None:
             if production_scope_is_empty(current_user):
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento nao encontrada")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento não encontrada")
             return
         if order.organization_id == organization_id:
             return
@@ -313,10 +313,10 @@ class FuelSupplyOrderService:
         organization_id = scoped_organization_id(current_user)
         if organization_id is None:
             if production_scope_is_empty(current_user):
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
             return
         if not await self.vehicles.is_vehicle_in_organization(vehicle_id, organization_id):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
     async def _ensure_station_access(self, *, current_user: User, order: FuelSupplyOrder) -> None:
         if not order.fuel_station_id:

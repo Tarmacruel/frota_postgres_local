@@ -102,7 +102,7 @@ export default function AdvancedFilters({ filters, organizations = [], loading =
           </label>
         </div>
 
-        <div className="analytics-filter-actions" role="group" aria-label="Ações de analytics">
+        <div className="analytics-filter-actions" role="group" aria-label="Ações de análise">
           <button type="button" className="app-button" onClick={onRefresh} disabled={loading}>
             {loading ? 'Atualizando...' : '🔄 Atualizar'}
           </button>

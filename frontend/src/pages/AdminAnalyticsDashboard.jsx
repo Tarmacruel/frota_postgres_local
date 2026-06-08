@@ -78,8 +78,8 @@ export default function AdminAnalyticsDashboard() {
       if (failed.length > 0) {
         const firstError = failed[0]
         const message = firstError.status === 'rejected'
-          ? getApiErrorMessage(firstError.reason, 'Parte dos dados de analytics não pôde ser carregada.')
-          : 'Parte dos dados de analytics não pôde ser carregada.'
+          ? getApiErrorMessage(firstError.reason, 'Parte dos dados de análises não pôde ser carregada.')
+          : 'Parte dos dados de análises não pôde ser carregada.'
         setError(message)
       }
 
@@ -112,7 +112,7 @@ export default function AdminAnalyticsDashboard() {
 
   return (
     <div className="surface-panel">
-      <h2 className="section-title">Analytics Administrativo</h2>
+      <h2 className="section-title">Análises administrativas</h2>
       <p className="section-copy">Comparações por categoria de veículo, com KPIs e alertas acionáveis.</p>
 
       <AdvancedFilters

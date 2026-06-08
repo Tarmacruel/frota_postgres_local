@@ -24,9 +24,9 @@ const PAGE_SIZE = 25
 const stageOptions = [
   { value: '', label: 'Todas' },
   { value: 'ASSEMBLY', label: 'Montagem' },
-  { value: 'REVIEW', label: 'Conferencia' },
+  { value: 'REVIEW', label: 'Conferência' },
   { value: 'COMMITMENT', label: 'Empenho' },
-  { value: 'LIQUIDATION', label: 'Liquidacao' },
+  { value: 'LIQUIDATION', label: 'Liquidação' },
   { value: 'PAYMENT', label: 'Pagamento' },
   { value: 'PAID', label: 'Pago' },
   { value: 'ARCHIVED', label: 'Arquivado' },
@@ -47,21 +47,21 @@ const quickStageOptions = stageOptions.filter((option) => [
 
 const kindOptions = [
   { value: '', label: 'Todos' },
-  { value: 'FUEL', label: 'Combustiveis' },
-  { value: 'MAINTENANCE', label: 'Manutencao' },
+  { value: 'FUEL', label: 'Combustíveis' },
+  { value: 'MAINTENANCE', label: 'Manutenção' },
 ]
 
 const checklistStatusOptions = [
   { value: 'PENDING', label: 'Pendente' },
-  { value: 'DONE', label: 'Concluido' },
+  { value: 'DONE', label: 'Concluído' },
   { value: 'WAIVED', label: 'Dispensado' },
 ]
 
 const referenceLabels = {
   FUEL_SUPPLY: 'Abastecimento',
   FUEL_SUPPLY_ORDER: 'Ordem',
-  MAINTENANCE: 'Manutencao',
-  VEHICLE: 'Veiculo',
+  MAINTENANCE: 'Manutenção',
+  VEHICLE: 'Veículo',
   SERVICE_ORDER: 'OS',
   INVOICE: 'NF/Fatura',
   OTHER: 'Outro',
@@ -194,8 +194,8 @@ function stageLabel(stage) {
 }
 
 function kindLabel(kind) {
-  if (kind === 'MAINTENANCE') return 'Manutencao'
-  return 'Combustivel'
+  if (kind === 'MAINTENANCE') return 'Manutenção'
+  return 'Combustível'
 }
 
 function statusTone(value) {
@@ -261,7 +261,7 @@ export default function PaymentProcessesPage() {
     { header: 'Fornecedor', value: (row) => row.supplier_name || '-' },
     { header: 'Contrato', value: (row) => row.contract_number || '-' },
     { header: 'NF/Fatura', value: (row) => `${row.invoice_number || '-'} / ${row.billing_number || '-'}` },
-    { header: 'Competencia', value: (row) => formatDate(row.competence_month) },
+    { header: 'Competência', value: (row) => formatDate(row.competence_month) },
     { header: 'Vencimento', value: (row) => formatDate(row.due_date) },
     { header: 'Valor', value: (row) => formatCurrency(row.amount), align: 'right', width: 68 },
     { header: 'Alertas', value: (row) => String(row.alerts?.length || 0), align: 'center', width: 42 },
@@ -285,7 +285,7 @@ export default function PaymentProcessesPage() {
       filters.stage ? { label: 'Etapa', value: stageLabel(filters.stage) } : null,
       filters.supplier_id ? { label: 'Fornecedor', value: supplier?.name || filters.supplier_id } : null,
       filters.contract_id ? { label: 'Contrato', value: contract?.number || filters.contract_id } : null,
-      filters.competence_month ? { label: 'Competencia', value: formatMonthLabel(filters.competence_month) } : null,
+      filters.competence_month ? { label: 'Competência', value: formatMonthLabel(filters.competence_month) } : null,
       filters.due_from ? { label: 'Vencimento inicial', value: formatDate(filters.due_from) } : null,
       filters.due_to ? { label: 'Vencimento final', value: formatDate(filters.due_to) } : null,
       filters.search ? { label: 'Busca', value: filters.search } : null,
@@ -314,7 +314,7 @@ export default function PaymentProcessesPage() {
       setSuppliers(supplierResponse.data || [])
       setContracts(contractResponse.data || [])
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar fornecedores e contratos.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar fornecedores e contratos.'))
     }
   }
 
@@ -339,7 +339,7 @@ export default function PaymentProcessesPage() {
         setSelectedProcess(null)
       }
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar os processos de pagamento.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar os processos de pagamento.'))
       setRecords([])
     } finally {
       setLoading(false)
@@ -377,7 +377,7 @@ export default function PaymentProcessesPage() {
       setSelectedProcess(data)
       setDetailTab('summary')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel abrir o processo.'))
+      setError(getApiErrorMessage(err, 'Não foi possível abrir o processo.'))
     }
   }
 
@@ -395,11 +395,11 @@ export default function PaymentProcessesPage() {
     try {
       const { data } = await paymentProcessesAPI.import(uploadFile)
       setImportResult(data)
-      setFeedback(`Importacao concluida: ${data.created} criado(s), ${data.updated} atualizado(s), ${data.skipped} ignorado(s), ${data.errors} erro(s).`)
+      setFeedback(`Importação concluída: ${data.created} criado(s), ${data.updated} atualizado(s), ${data.skipped} ignorado(s), ${data.errors} erro(s).`)
       setUploadFile(null)
       await refreshAll({ keepSelected: false })
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel importar a planilha.'))
+      setError(getApiErrorMessage(err, 'Não foi possível importar a planilha.'))
     } finally {
       setUploading(false)
     }
@@ -418,19 +418,19 @@ export default function PaymentProcessesPage() {
       await previewRowsToPdf({
         title: 'Processos de pagamento',
         fileName: 'processos-pagamento.pdf',
-        subtitle: 'Relatorio dos processos filtrados no workflow financeiro de manutencao e combustiveis.',
+        subtitle: 'Relatório dos processos filtrados no workflow financeiro de manutenção e combustíveis.',
         columns: reportColumns,
         rows,
         filters: reportFilters,
         summaryMetrics: reportMetrics,
-        referenceLabel: `Total filtrado para o relatorio: ${rows.length} processo(s).`,
-        responsibleSector: 'Secretaria Municipal de Administracao | Departamento de Gestao da Frota',
-        generatedBy: user?.name || user?.email || 'Usuario autenticado',
+        referenceLabel: `Total filtrado para o relatório: ${rows.length} processo(s).`,
+        responsibleSector: 'Secretaria Municipal de Administração | Departamento de Gestão da Frota',
+        generatedBy: user?.name || user?.email || 'Usuário autenticado',
         orientation: 'landscape',
       })
-      setFeedback(rows.length ? 'Pre-visualizacao do PDF aberta em nova guia.' : 'Relatorio PDF gerado sem registros para os filtros atuais.')
+      setFeedback(rows.length ? 'Pré-visualização do PDF aberta em nova guia.' : 'Relatório PDF gerado sem registros para os filtros atuais.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o relatorio PDF.'))
+      setError(getApiErrorMessage(err, 'Não foi possível gerar o relatório PDF.'))
     } finally {
       setReporting(false)
     }
@@ -513,7 +513,7 @@ export default function PaymentProcessesPage() {
       await refreshAll({ keepSelected: false })
       setSelectedProcess(savedProcess)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o processo.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar o processo.'))
     } finally {
       setSavingProcess(false)
     }
@@ -528,7 +528,7 @@ export default function PaymentProcessesPage() {
       setFeedback('Etapa atualizada.')
       await refreshAll()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel atualizar a etapa.'))
+      setError(getApiErrorMessage(err, 'Não foi possível atualizar a etapa.'))
     }
   }
 
@@ -550,7 +550,7 @@ export default function PaymentProcessesPage() {
       setFeedback('Checklist atualizado.')
       await refreshAll()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel atualizar o checklist.'))
+      setError(getApiErrorMessage(err, 'Não foi possível atualizar o checklist.'))
     }
   }
 
@@ -575,7 +575,7 @@ export default function PaymentProcessesPage() {
 
     const reason = deleteProcessReason.trim()
     if (reason.length < 8) {
-      setError('Informe uma justificativa de exclusao com pelo menos 8 caracteres.')
+      setError('Informe uma justificativa de exclusão com pelo menos 8 caracteres.')
       return
     }
 
@@ -588,10 +588,10 @@ export default function PaymentProcessesPage() {
       setDeleteProcessModalOpen(false)
       setDeleteProcessTarget(null)
       setDeleteProcessReason('')
-      setFeedback('Processo excluido com justificativa registrada na auditoria.')
+      setFeedback('Processo excluído com justificativa registrada na auditoria.')
       await refreshAll({ keepSelected: false })
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel excluir o processo.'))
+      setError(getApiErrorMessage(err, 'Não foi possível excluir o processo.'))
     } finally {
       setDeletingProcess(false)
     }
@@ -612,7 +612,7 @@ export default function PaymentProcessesPage() {
       setEditingSupplierId('')
       await refreshAll()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o fornecedor.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar o fornecedor.'))
     }
   }
 
@@ -622,7 +622,7 @@ export default function PaymentProcessesPage() {
       setFeedback('Fornecedor inativado.')
       await refreshAll()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel inativar o fornecedor.'))
+      setError(getApiErrorMessage(err, 'Não foi possível inativar o fornecedor.'))
     }
   }
 
@@ -650,7 +650,7 @@ export default function PaymentProcessesPage() {
       setContractDrawerOpen(false)
       await refreshAll()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o contrato.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar o contrato.'))
     }
   }
 
@@ -660,7 +660,7 @@ export default function PaymentProcessesPage() {
       setFeedback('Contrato cancelado.')
       await refreshAll()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel cancelar o contrato.'))
+      setError(getApiErrorMessage(err, 'Não foi possível cancelar o contrato.'))
     }
   }
 
@@ -678,7 +678,7 @@ export default function PaymentProcessesPage() {
       setFeedback('Aditivo registrado.')
       await refreshAll()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel registrar o aditivo.'))
+      setError(getApiErrorMessage(err, 'Não foi possível registrar o aditivo.'))
     }
   }
 
@@ -719,11 +719,11 @@ export default function PaymentProcessesPage() {
       <section className="panel-heading payment-workflow-heading">
         <div>
           <h1 className="section-title">Processos de pagamento</h1>
-          <p className="section-copy">Workflow financeiro de combustiveis e manutencao por fatura, contrato, etapa e pendencia.</p>
+          <p className="section-copy">Workflow financeiro de combustíveis e manutenção por fatura, contrato, etapa e pendência.</p>
         </div>
         <div className="payment-process-actions">
           {canManage ? <button className="app-button" type="button" onClick={openCreateProcess}>Novo processo</button> : null}
-          <button type="button" className="secondary-button" onClick={previewPdfReport} disabled={reporting}>{reporting ? 'Gerando PDF...' : 'Relatorio PDF'}</button>
+          <button type="button" className="secondary-button" onClick={previewPdfReport} disabled={reporting}>{reporting ? 'Gerando PDF...' : 'Relatório PDF'}</button>
           <button type="button" className="secondary-button" onClick={exportCurrent}>Exportar XLSX</button>
         </div>
       </section>
@@ -731,11 +731,11 @@ export default function PaymentProcessesPage() {
       {error ? <div className="alert alert-error">{error}</div> : null}
       {feedback ? <div className="alert alert-success">{feedback}</div> : null}
 
-      <section className="payment-workflow-tabs" aria-label="Modos do modulo">
+      <section className="payment-workflow-tabs" aria-label="Modos do módulo">
         {[
           { value: 'processes', label: 'Processos' },
           { value: 'imports', label: 'Importacao' },
-          { value: 'contractManagement', label: 'Gestao do contrato' },
+          { value: 'contractManagement', label: 'Gestão do contrato' },
           { value: 'contracts', label: 'Contratos' },
           { value: 'suppliers', label: 'Fornecedores' },
         ].map((tab) => (
@@ -780,7 +780,7 @@ export default function PaymentProcessesPage() {
                   {visibleContracts.map((contract) => <option key={contract.id} value={contract.id}>{contract.number}</option>)}
                 </select>
               </Field>
-              <Field label="Competencia">
+              <Field label="Competência">
                 <input className="app-input" type="month" value={filters.competence_month} onChange={(event) => updateFilter({ competence_month: event.target.value })} />
               </Field>
               <Field label="Busca">
@@ -806,7 +806,7 @@ export default function PaymentProcessesPage() {
                       <th>Etapa</th>
                       <th>Fornecedor / contrato</th>
                       <th>NF / fatura</th>
-                      <th>Competencia</th>
+                      <th>Competência</th>
                       <th>Vencimento</th>
                       <th>Valor</th>
                       <th>Alertas</th>
@@ -823,7 +823,7 @@ export default function PaymentProcessesPage() {
                         <td data-label="Etapa"><span className={`status-badge status-${statusTone(item.stage)}`}>{item.stage_label || stageLabel(item.stage)}</span><br /><span className="muted">{item.stage_owner || '-'}</span></td>
                         <td data-label="Fornecedor / contrato"><strong>{item.supplier_name || '-'}</strong><br /><span className="muted">{item.contract_number || '-'}</span></td>
                         <td data-label="NF / fatura"><strong>{item.invoice_number || '-'}</strong><br /><span className="muted">{item.billing_number || '-'}</span></td>
-                        <td data-label="Competencia">{formatDate(item.competence_month)}</td>
+                        <td data-label="Competência">{formatDate(item.competence_month)}</td>
                         <td data-label="Vencimento">{formatDate(item.due_date)}</td>
                         <td data-label="Valor">{formatCurrency(item.amount)}</td>
                         <td data-label="Alertas">{item.alerts?.length ? <span className="deadline-pill warning">{item.alerts.length}</span> : <span className="deadline-pill success">0</span>}</td>
@@ -912,11 +912,11 @@ export default function PaymentProcessesPage() {
       <Modal
         open={processModalOpen}
         title={editingProcessId ? 'Editar processo' : 'Novo processo'}
-        description="Registre a fatura/NF que sera acompanhada no fluxo financeiro."
+        description="Registre a fatura/NF que será acompanhada no fluxo financeiro."
         onClose={() => setProcessModalOpen(false)}
       >
         <form className="payment-process-form payment-structured-form" onSubmit={saveProcess}>
-          <FormSection title="Identificacao">
+          <FormSection title="Identificação">
             <div className="payment-form-grid">
               <Field label="Processo">
                 <input className="app-input" value={processForm.process_number} onChange={(event) => setProcessForm((current) => ({ ...current, process_number: event.target.value }))} required />
@@ -954,10 +954,10 @@ export default function PaymentProcessesPage() {
               <Field label="Fatura">
                 <input className="app-input" value={processForm.billing_number} onChange={(event) => setProcessForm((current) => ({ ...current, billing_number: event.target.value }))} />
               </Field>
-              <Field label="Emissao">
+              <Field label="Emissão">
                 <input className="app-input" type="date" value={processForm.issue_date} onChange={(event) => setProcessForm((current) => ({ ...current, issue_date: event.target.value }))} />
               </Field>
-              <Field label="Competencia">
+              <Field label="Competência">
                 <input className="app-input" type="month" value={processForm.competence_month} onChange={(event) => setProcessForm((current) => ({ ...current, competence_month: event.target.value }))} />
               </Field>
               <Field label="Vencimento">
@@ -974,7 +974,7 @@ export default function PaymentProcessesPage() {
               <Field label="Empenho">
                 <input className="app-input" value={processForm.commitment_number} onChange={(event) => setProcessForm((current) => ({ ...current, commitment_number: event.target.value }))} />
               </Field>
-              <Field label="Liquidacao">
+              <Field label="Liquidação">
                 <input className="app-input" value={processForm.liquidation_number} onChange={(event) => setProcessForm((current) => ({ ...current, liquidation_number: event.target.value }))} />
               </Field>
               <Field label="Ordem pagamento">
@@ -986,12 +986,12 @@ export default function PaymentProcessesPage() {
             </div>
           </FormSection>
 
-          <FormSection title="Observacoes">
+          <FormSection title="Observações">
             <div className="payment-form-grid two">
-              <Field label="Responsavel">
+              <Field label="Responsável">
                 <input className="app-input" value={processForm.stage_owner} onChange={(event) => setProcessForm((current) => ({ ...current, stage_owner: event.target.value }))} />
               </Field>
-              <Field label="Localizacao">
+              <Field label="Localização">
                 <input className="app-input" value={processForm.location} onChange={(event) => setProcessForm((current) => ({ ...current, location: event.target.value }))} />
               </Field>
             </div>
@@ -1009,17 +1009,17 @@ export default function PaymentProcessesPage() {
       <Modal
         open={deleteProcessModalOpen}
         title="Excluir processo"
-        description="A exclusao remove o processo da fila e registra a justificativa na trilha de auditoria."
+        description="A exclusão remove o processo da fila e registra a justificativa na trilha de auditoria."
         onClose={closeDeleteProcessModal}
         canClose={!deletingProcess}
       >
         <form className="payment-process-form payment-delete-form" onSubmit={confirmDeleteProcess}>
           <div className="alert alert-info">
             {deleteProcessTarget ? (
-              <>Processo <strong>{deleteProcessTarget.process_number}</strong> sera removido definitivamente.</>
-            ) : 'Selecione um processo para exclusao.'}
+              <>Processo <strong>{deleteProcessTarget.process_number}</strong> será removido definitivamente.</>
+            ) : 'Selecione um processo para exclusão.'}
           </div>
-          <Field label="Justificativa da exclusao">
+          <Field label="Justificativa da exclusão">
             <textarea
               className="app-textarea"
               rows="4"
@@ -1028,7 +1028,7 @@ export default function PaymentProcessesPage() {
               minLength={8}
               maxLength={500}
               required
-              placeholder="Ex.: cadastro duplicado na importacao de junho."
+              placeholder="Ex.: cadastro duplicado na importação de junho."
               disabled={deletingProcess}
             />
           </Field>
@@ -1141,7 +1141,7 @@ function ProcessDetail({
             { value: 'summary', label: 'Resumo' },
             { value: 'finance', label: 'Financeiro' },
             { value: 'checklist', label: 'Checklist' },
-            { value: 'history', label: 'Historico' },
+            { value: 'history', label: 'Histórico' },
           ].map((tab) => (
             <button key={tab.value} type="button" className={`status-pill ${detailTab === tab.value ? 'active' : ''}`} onClick={() => setDetailTab(tab.value)}>
               {tab.label}
@@ -1155,10 +1155,10 @@ function ProcessDetail({
             <Info label="Contrato" value={process.contract_number} />
             <Info label="Unidade" value={process.organization_name || process.unit_name} />
             <Info label="NF / Fatura" value={`${process.invoice_number || '-'} / ${process.billing_number || '-'}`} />
-            <Info label="Competencia" value={formatDate(process.competence_month)} />
+            <Info label="Competência" value={formatDate(process.competence_month)} />
             <Info label="Vencimento" value={formatDate(process.due_date)} />
-            <Info label="Localizacao" value={process.location} />
-            <Info label="Responsavel" value={process.stage_owner} />
+            <Info label="Localização" value={process.location} />
+            <Info label="Responsável" value={process.stage_owner} />
             {process.references?.length ? (
               <div className="payment-reference-list">
                 {process.references.map((reference) => (
@@ -1178,7 +1178,7 @@ function ProcessDetail({
             <Info label="Valor" value={formatCurrency(process.amount)} />
             <Info label="Saldo importado" value={formatCurrency(process.contract_balance)} />
             <Info label="Empenho" value={`${process.commitment_number || '-'} . ${formatDate(process.commitment_date)}`} />
-            <Info label="Liquidacao" value={`${process.liquidation_number || '-'} . ${formatDate(process.liquidation_date)}`} />
+            <Info label="Liquidação" value={`${process.liquidation_number || '-'} . ${formatDate(process.liquidation_date)}`} />
             <Info label="Ordem pagamento" value={`${process.payment_order_number || '-'} . ${formatDate(process.payment_order_date)}`} />
             <Info label="Pago em" value={formatDate(process.paid_at)} />
             {canManage ? (
@@ -1219,7 +1219,7 @@ function ProcessDetail({
                 <select className="app-select" value={item.status} onChange={(event) => updateChecklistDraft(index, { status: event.target.value })} disabled={!canManage}>
                   {checklistStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
-                <input className="app-input" value={item.notes || ''} onChange={(event) => updateChecklistDraft(index, { notes: event.target.value })} placeholder="Observacao" disabled={!canManage} />
+                <input className="app-input" value={item.notes || ''} onChange={(event) => updateChecklistDraft(index, { notes: event.target.value })} placeholder="Observação" disabled={!canManage} />
               </div>
             ))}
             {canManage ? <button className="app-button" type="button" onClick={saveChecklist}>Salvar checklist</button> : null}
@@ -1265,7 +1265,7 @@ function ImportsView({
       <div className="toolbar-card payment-process-panel payment-import-card">
         <div className="payment-section-head">
           <div>
-            <h2 className="section-title">Importacao XLSX</h2>
+            <h2 className="section-title">Importação XLSX</h2>
             <p className="section-copy">Atualize processos historicos ou novas faturas por planilha.</p>
           </div>
           <button type="button" className="secondary-button" onClick={() => downloadUrl(paymentProcessesAPI.templateUrl())}>
@@ -1291,7 +1291,7 @@ function ImportsView({
       <div className="toolbar-card payment-process-panel payment-import-result-card">
         <div className="payment-section-head">
           <h2 className="section-title">Resultado</h2>
-          <span className="muted">{importResult ? `${importResult.total_rows} linha(s)` : 'Aguardando importacao'}</span>
+          <span className="muted">{importResult ? `${importResult.total_rows} linha(s)` : 'Aguardando importação'}</span>
         </div>
         {importResult ? (
           <div className="payment-import-result payment-import-result-grid">
@@ -1302,7 +1302,7 @@ function ImportsView({
             <span>{importResult.errors} erros</span>
           </div>
         ) : (
-          <div className="empty-state">Nenhuma importacao executada nesta sessao.</div>
+          <div className="empty-state">Nenhuma importação executada nesta sessão.</div>
         )}
       </div>
     </section>
@@ -1352,7 +1352,7 @@ function ContractManagementView({ contracts, suppliers }) {
         })
         if (active) setSummary(data)
       } catch (err) {
-        if (active) setError(getApiErrorMessage(err, 'Nao foi possivel carregar a gestao dos contratos.'))
+        if (active) setError(getApiErrorMessage(err, 'Não foi possível carregar a gestão dos contratos.'))
       } finally {
         if (active) setLoadingSummary(false)
       }
@@ -1379,7 +1379,7 @@ function ContractManagementView({ contracts, suppliers }) {
           setSelectedKpi(null)
         }
       } catch (err) {
-        if (active) setError(getApiErrorMessage(err, 'Nao foi possivel carregar a analise do contrato.'))
+        if (active) setError(getApiErrorMessage(err, 'Não foi possível carregar a análise do contrato.'))
       } finally {
         if (active) setLoadingDetail(false)
       }
@@ -1493,11 +1493,11 @@ function ContractManagementView({ contracts, suppliers }) {
             </Field>
             <div className="payment-management-source">
               <strong>{detail?.contract?.supplier_name || 'Selecione um contrato'}</strong>
-              <span>{detail?.source_quality || 'Aguardando dados da analise.'}</span>
+              <span>{detail?.source_quality || 'Aguardando dados da análise.'}</span>
             </div>
           </div>
 
-          {loadingDetail ? <div className="toolbar-card payment-process-panel empty-state">Carregando analise do contrato...</div> : null}
+          {loadingDetail ? <div className="toolbar-card payment-process-panel empty-state">Carregando análise do contrato...</div> : null}
           {!loadingDetail && !detail ? <div className="toolbar-card payment-process-panel empty-state">Selecione um contrato para visualizar a gestao.</div> : null}
 
           {detail ? (
@@ -1514,7 +1514,7 @@ function ContractManagementView({ contracts, suppliers }) {
               <div className="payment-management-charts">
                 <section className="toolbar-card payment-process-panel payment-management-chart">
                   <div className="payment-section-head">
-                    <h2 className="section-title">Historico x projecao</h2>
+                    <h2 className="section-title">Histórico x projeção</h2>
                     <span className="muted">{detail.projected_depletion_label}</span>
                   </div>
                   <ResponsiveContainer width="100%" height={250}>
@@ -1546,7 +1546,7 @@ function ContractManagementView({ contracts, suppliers }) {
                       <Bar dataKey="paid_amount" name="Pago" stackId="financeiro" fill="#059669" radius={[4, 4, 0, 0]} />
                       <Bar dataKey="pending_amount" name="Pendente" stackId="financeiro" fill="#d97706" />
                       <Bar dataKey="operational_amount" name="Operacional" fill="#64748b" />
-                      <Bar dataKey="maintenance_amount" name="Manutencao" fill="#dc2626" />
+                      <Bar dataKey="maintenance_amount" name="Manutenção" fill="#dc2626" />
                     </BarChart>
                   </ResponsiveContainer>
                 </section>
@@ -1670,7 +1670,7 @@ function KpiDrawer({ kpi, detail, rows, onClose }) {
           <Info label="Fonte" value={kpi.source} />
           <Info label="Qualidade" value={detail?.source_quality} />
           <Info label="Media mensal" value={formatCurrency(detail?.average_monthly_consumption)} />
-          <Info label="Variacao" value={formatPercent(detail?.monthly_variation_percentage)} />
+          <Info label="Variação" value={formatPercent(detail?.monthly_variation_percentage)} />
           <Info label="Fim do saldo" value={detail?.projected_depletion_label} />
         </div>
 
@@ -1715,7 +1715,7 @@ function ContractsView({
               <thead>
                 <tr>
                   <th>Fornecedor</th>
-                  <th>Numero</th>
+                  <th>Número</th>
                   <th>Status</th>
                   <th>Vigencia</th>
                   <th>Atualizado</th>
@@ -1731,7 +1731,7 @@ function ContractsView({
                 ) : contracts.map((contract) => (
                   <tr key={contract.id} className={selectedContract?.id === contract.id ? 'is-selected' : ''} onClick={() => setSelectedContract(contract)}>
                     <td data-label="Fornecedor"><strong>{contract.supplier_name || '-'}</strong><br /><span className="muted">{kindLabel(contract.kind)}</span></td>
-                    <td data-label="Numero"><strong>{contract.number}</strong><br /><span className="muted">{contract.contract_type || '-'}</span></td>
+                    <td data-label="Número"><strong>{contract.number}</strong><br /><span className="muted">{contract.contract_type || '-'}</span></td>
                     <td data-label="Status"><span className={`status-badge status-${statusTone(contract.status)}`}>{contract.status}</span></td>
                     <td data-label="Vigencia">{formatDate(contract.valid_from)} a {formatDate(contract.valid_until)}</td>
                     <td data-label="Atualizado">{formatCurrency(contract.value_updated)}</td>
@@ -1794,12 +1794,12 @@ function ContractsView({
                     <h3 className="section-title">Novo aditivo</h3>
                     <div className="payment-form-grid two">
                       <Field label="Tipo"><input className="app-input" value={amendmentForm.amendment_type} onChange={(event) => setAmendmentForm((current) => ({ ...current, amendment_type: event.target.value }))} /></Field>
-                      <Field label="Numero"><input className="app-input" value={amendmentForm.number} onChange={(event) => setAmendmentForm((current) => ({ ...current, number: event.target.value }))} /></Field>
+                      <Field label="Número"><input className="app-input" value={amendmentForm.number} onChange={(event) => setAmendmentForm((current) => ({ ...current, number: event.target.value }))} /></Field>
                       <Field label="Assinatura"><input className="app-input" type="date" value={amendmentForm.signed_at} onChange={(event) => setAmendmentForm((current) => ({ ...current, signed_at: event.target.value }))} /></Field>
                       <Field label="Delta valor"><input className="app-input" type="number" step="0.01" value={amendmentForm.value_delta} onChange={(event) => setAmendmentForm((current) => ({ ...current, value_delta: event.target.value }))} /></Field>
-                      <Field label="Nova vigencia"><input className="app-input" type="date" value={amendmentForm.valid_until} onChange={(event) => setAmendmentForm((current) => ({ ...current, valid_until: event.target.value }))} /></Field>
+                      <Field label="Nova vigência"><input className="app-input" type="date" value={amendmentForm.valid_until} onChange={(event) => setAmendmentForm((current) => ({ ...current, valid_until: event.target.value }))} /></Field>
                     </div>
-                    <Field label="Observacao">
+                    <Field label="Observação">
                       <textarea className="app-textarea" value={amendmentForm.notes} onChange={(event) => setAmendmentForm((current) => ({ ...current, notes: event.target.value }))} />
                     </Field>
                     <button className="secondary-button" type="submit">Registrar aditivo</button>
@@ -1867,7 +1867,7 @@ function ContractFormDrawer({
       >
         <div className="payment-detail-header">
           <div>
-            <span className="muted">Gestao de contratos</span>
+            <span className="muted">Gestão de contratos</span>
             <h2 id="payment-contract-form-title" className="section-title">{editingContractId ? 'Editar contrato' : 'Novo contrato'}</h2>
           </div>
           <button type="button" className="icon-button payment-detail-close" aria-label="Fechar contrato" onClick={onClose}>
@@ -1884,7 +1884,7 @@ function ContractFormDrawer({
               </select>
             </Field>
             <div className="payment-form-grid two">
-              <Field label="Numero">
+              <Field label="Número">
                 <input className="app-input" value={contractForm.number} onChange={(event) => setContractForm((current) => ({ ...current, number: event.target.value }))} required disabled={!canManage} />
               </Field>
               <Field label="Tipo">
@@ -1927,13 +1927,13 @@ function ContractFormDrawer({
                   step="0.01"
                   value={contractForm.imported_balance}
                   disabled
-                  title="Campo legado da importacao. O saldo vivo agora e calculado automaticamente pelos processos vinculados."
+                  title="Campo legado da importação. O saldo vivo agora e calculado automaticamente pelos processos vinculados."
                 />
               </Field>
             </div>
           </FormSection>
 
-          <FormSection title="Objeto e observacoes">
+          <FormSection title="Objeto e observações">
             <Field label="Objeto">
               <textarea className="app-textarea" value={contractForm.object_description} onChange={(event) => setContractForm((current) => ({ ...current, object_description: event.target.value }))} disabled={!canManage} />
             </Field>
@@ -1973,7 +1973,7 @@ function SuppliersView({
             <div key={supplier.id} className="payment-supplier-row">
               <span>
                 <strong>{supplier.name}</strong>
-                <small>{supplier.cnpj || 'CNPJ nao informado'}</small>
+                <small>{supplier.cnpj || 'CNPJ não informado'}</small>
               </span>
               <span className={`status-badge status-${statusTone(supplier.active ? 'ACTIVE' : 'CANCELLED')}`}>{supplier.active ? 'Ativo' : 'Inativo'}</span>
               <div className="actions-inline">
@@ -1994,7 +1994,7 @@ function SuppliersView({
           <Field label="CNPJ">
             <input className="app-input" value={supplierForm.cnpj} onChange={(event) => setSupplierForm((current) => ({ ...current, cnpj: event.target.value }))} disabled={!canManage} />
           </Field>
-          <Field label="Observacoes">
+          <Field label="Observações">
             <textarea className="app-textarea" value={supplierForm.notes} onChange={(event) => setSupplierForm((current) => ({ ...current, notes: event.target.value }))} disabled={!canManage} />
           </Field>
           {canManage ? (

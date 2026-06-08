@@ -424,7 +424,7 @@ export default function PossessionPage() {
 
     if (nextFile.size > MAX_DOCUMENT_SIZE_BYTES) {
       setEditDocumentFile(null)
-      setEditDocumentError('O documento precisa ter no maximo 12 MB.')
+      setEditDocumentError('O documento precisa ter no máximo 12 MB.')
       if (editDocumentInputRef.current) {
         editDocumentInputRef.current.value = ''
       }
@@ -462,7 +462,7 @@ export default function PossessionPage() {
 
     if (nextFile.size > MAX_DOCUMENT_SIZE_BYTES) {
       setEditReturnDocumentFile(null)
-      setEditReturnDocumentError('O termo de devolução precisa ter no maximo 12 MB.')
+      setEditReturnDocumentError('O termo de devolução precisa ter no máximo 12 MB.')
       if (editReturnDocumentInputRef.current) {
         editReturnDocumentInputRef.current.value = ''
       }
@@ -500,7 +500,7 @@ export default function PossessionPage() {
 
     if (nextFile.size > MAX_DOCUMENT_SIZE_BYTES) {
       setEndReturnDocumentFile(null)
-      setEndReturnDocumentError('O termo de devolução precisa ter no maximo 12 MB.')
+      setEndReturnDocumentError('O termo de devolução precisa ter no máximo 12 MB.')
       if (endReturnDocumentInputRef.current) {
         endReturnDocumentInputRef.current.value = ''
       }
@@ -540,7 +540,7 @@ export default function PossessionPage() {
     const oversized = selectedFiles.find((file) => file.size > MAX_PHOTO_SIZE_BYTES)
     if (oversized) {
       setEditPhotoFiles([])
-      setEditPhotoError('Cada foto adicional deve ter no maximo 8 MB.')
+      setEditPhotoError('Cada foto adicional deve ter no máximo 8 MB.')
       if (editPhotoInputRef.current) {
         editPhotoInputRef.current.value = ''
       }

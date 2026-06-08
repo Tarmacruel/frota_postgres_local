@@ -122,7 +122,7 @@ export default function LoginPage() {
             </form>
 
             <div className="login-demo-block">
-              <strong>Orientacoes de acesso</strong>
+              <strong>Orientações de acesso</strong>
               <div className="alert alert-info">
                 {accessNotes.map((note) => (
                   <div key={note}>{note}</div>

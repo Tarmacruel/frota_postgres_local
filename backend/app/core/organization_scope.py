@@ -26,4 +26,4 @@ def ensure_organization_access(current_user: User | None, organization_id: UUID 
         return
     current_organization_id = getattr(current_user, "organization_id", None)
     if current_organization_id is None or organization_id != current_organization_id:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro nao encontrado")
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro não encontrado")

@@ -461,7 +461,7 @@ class AnalyticsService:
                         "variance_percentage": round(tco_var, 2),
                         "severity": "HIGH" if abs(tco_var) >= 50 else "MEDIUM",
                         "message": (
-                            f"TCO por km de {row.vehicle_type} está {abs(tco_var):.1f}% fora do benchmark "
+                            f"TCO por km de {row.vehicle_type} está {abs(tco_var):.1f}% fora da referência "
                             f"de mercado ({(row.market_benchmark_tco or 0):.2f}/km)."
                         ),
                         "recommended_action": "Revisar plano de custos e manutenção",
@@ -602,7 +602,7 @@ class AnalyticsService:
             )
 
         pdf_text = io.StringIO()
-        pdf_text.write("Relatório de Analytics da Frota\n")
+        pdf_text.write("Relatório de Análises da Frota\n")
         pdf_text.write(f"Período: últimos {period_days} dias\n")
         pdf_text.write(f"Gerado em: {timestamp.isoformat()}\n\n")
         for item in insights:

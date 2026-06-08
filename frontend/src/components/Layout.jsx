@@ -87,7 +87,7 @@ export default function Layout() {
         managementItems.push({ to: '/processos-pagamento', label: 'Processos de pagamento', description: 'Pagamentos', icon: 'catalog' })
       }
       if (canView('analytics')) {
-        managementItems.push({ to: '/analytics', label: 'Analytics', description: 'BI', icon: 'dashboard' })
+        managementItems.push({ to: '/analytics', label: 'Análises', description: 'BI', icon: 'dashboard' })
       }
       if (canView('data_imports')) {
         managementItems.push({ to: '/importacao-dados', label: 'Importar/Exportar', description: 'Importação', icon: 'catalog' })
@@ -307,7 +307,7 @@ export default function Layout() {
             <button type="button" className="icon-button account-action" aria-label="Alterar senha" onClick={() => setPasswordModalOpen(true)}>
               <AppIcon name="users" className="app-icon" />
             </button>
-            <button type="button" className="icon-button account-action" aria-label="Encerrar sessao" onClick={handleLogout}>
+            <button type="button" className="icon-button account-action" aria-label="Encerrar sessão" onClick={handleLogout}>
               <AppIcon name="logout" className="app-icon" />
             </button>
           </div>
@@ -377,7 +377,7 @@ export default function Layout() {
         </main>
       </div>
 
-      <nav className="mobile-bottom-bar" aria-label="Navegação mobile">
+      <nav className="mobile-bottom-bar" aria-label="Navegação móvel">
         {mobileTabs.map((item) => (
           <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({ isActive }) => `mobile-bottom-link${isActive ? ' active' : ''}`}>
             <AppIcon name={item.icon} className="app-icon" />

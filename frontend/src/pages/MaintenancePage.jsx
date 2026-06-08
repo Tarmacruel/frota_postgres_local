@@ -128,7 +128,7 @@ export default function MaintenancePage() {
       try {
         await loadVehicles()
       } catch (err) {
-        setError(getApiErrorMessage(err, 'Não foi possível carregar a frota para o formulario.'))
+        setError(getApiErrorMessage(err, 'Não foi possível carregar a frota para o formulário.'))
       }
     }
     loadPage()

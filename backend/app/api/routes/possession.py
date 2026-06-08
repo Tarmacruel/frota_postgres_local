@@ -166,7 +166,7 @@ async def parse_possession_end_request(request: Request) -> tuple[PossessionUpda
         if payload is None:
             payload = {}
         if not isinstance(payload, dict):
-            _raise_form_error("body", "Dados de encerramento da posse em formato invÃ¡lido.")
+            _raise_form_error("body", "Dados de encerramento da posse em formato inválido.")
 
     try:
         return PossessionUpdate.model_validate(payload), return_term_document

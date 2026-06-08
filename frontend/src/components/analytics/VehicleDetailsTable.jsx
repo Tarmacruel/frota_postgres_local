@@ -65,7 +65,7 @@ export default function VehicleDetailsTable({ efficiencyRows = [], tcoRows = [] 
                       <td colSpan={5}>
                         Média categoria consumo: {Number(row.category_average || 0).toFixed(2)} L/100km •
                         Desvio consumo: {Number(row.variance_percentage || 0).toFixed(2)}% •
-                        Benchmark TCO: R$ {Number(row.tco?.market_benchmark || 0).toFixed(2)}
+                        Referência TCO: R$ {Number(row.tco?.market_benchmark || 0).toFixed(2)}
                       </td>
                     </tr>
                   ) : null}

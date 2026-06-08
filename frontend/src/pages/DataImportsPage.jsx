@@ -90,22 +90,22 @@ const fieldLabels = {
   data_nascimento: 'Data de nascimento',
   data_emissao_cnh: 'Data de emissão da CNH',
   ultimo_abastecimento: 'Último abastecimento',
-  vehicle_id: 'Ve?culo',
+  vehicle_id: 'Veículo',
   infraction_type_id: 'Enquadramento',
-  ticket_number: 'N?mero do auto',
-  infraction_date: 'Data da infra??o',
-  infraction_time: 'Hora da infra??o',
+  ticket_number: 'Número do auto',
+  infraction_date: 'Data da infração',
+  infraction_time: 'Hora da infração',
   amount: 'Valor',
-  description: 'Descri??o',
+  description: 'Descrição',
   location: 'Local',
   communication_number: 'C.I.',
   sent_date: 'Data de envio',
   process_number: 'Processo',
-  source_status: 'Situa??o original',
+  source_status: 'Situação original',
   imported_driver_name: 'Motorista informado',
-  notes: 'Observa??es',
-  provisional_vehicle: 'Ve?culo provis?rio',
-  provisional_infraction: 'Enquadramento provis?rio',
+  notes: 'Observações',
+  provisional_vehicle: 'Veículo provisório',
+  provisional_infraction: 'Enquadramento provisório',
 }
 
 const vehicleMappedFields = ['plate', 'chassis_number', 'brand', 'model', 'vehicle_type', 'ownership_type', 'status', 'allocation_id']
@@ -148,7 +148,7 @@ function statusLabel(value) {
 function entityLabel(value) {
   if (value === 'DRIVER') return 'Condutores'
   if (value === 'FINE') return 'Multas'
-  return 'Ve?culos'
+  return 'Veículos'
 }
 
 function actionLabel(value) {

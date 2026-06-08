@@ -81,7 +81,7 @@ async def root():
 async def frontend_app(full_path: str):
     reserved_prefixes = ("api", "docs", "redoc", "openapi.json")
     if full_path == "" or any(full_path == prefix or full_path.startswith(f"{prefix}/") for prefix in reserved_prefixes):
-        raise HTTPException(status_code=404, detail="Not Found")
+        raise HTTPException(status_code=404, detail="Não encontrado")
 
     requested_path = FRONTEND_DIST / full_path
     if requested_path.is_file():
@@ -90,4 +90,4 @@ async def frontend_app(full_path: str):
     if FRONTEND_INDEX.is_file():
         return FileResponse(FRONTEND_INDEX)
 
-    raise HTTPException(status_code=404, detail="Not Found")
+    raise HTTPException(status_code=404, detail="Não encontrado")

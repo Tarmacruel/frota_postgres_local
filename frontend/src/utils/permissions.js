@@ -10,7 +10,7 @@ export const PERMISSION_MODULES = [
   { key: 'fuel_supply_orders', label: 'Ordens de abastecimento' },
   { key: 'fuel_stations', label: 'Postos' },
   { key: 'payment_processes', label: 'Processos de pagamento' },
-  { key: 'analytics', label: 'Analytics' },
+  { key: 'analytics', label: 'Análises' },
   { key: 'data_imports', label: 'Importação/Exportação' },
 ]
 

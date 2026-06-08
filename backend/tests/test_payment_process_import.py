@@ -157,7 +157,7 @@ class FakeDeletePaymentProcessRepository:
 def test_parses_real_payment_process_workbook():
     path = ROOT / "storage" / "CONTROLE DE PROCESSOS DE PAGAMENTO 2025 .xlsx"
     if not path.exists():
-        pytest.skip("Planilha real de processos de pagamento nao encontrada em storage")
+        pytest.skip("Planilha real de processos de pagamento não encontrada em storage")
 
     service = PaymentProcessService(db=None)
     rows = service._parse_workbook(path.read_bytes(), path.name)
@@ -218,9 +218,9 @@ def test_process_alerts_warn_without_blocking_missing_financial_steps():
 
     alerts = service._process_alerts(process)
 
-    assert "Fornecedor nao vinculado." in alerts
-    assert "Ordem de pagamento nao informada." in alerts
-    assert "Contrato nao esta ativo." in alerts
+    assert "Fornecedor não vinculado." in alerts
+    assert "Ordem de pagamento não informada." in alerts
+    assert "Contrato não está ativo." in alerts
     assert "Processos vinculados excedem o saldo do contrato." in alerts
 
 
@@ -280,7 +280,7 @@ async def test_import_xlsx_creates_updates_skips_duplicates_and_reports_errors(m
         {"sheet": "L J", "row_number": 7, "data": create_data, "validation_error": None},
         {"sheet": "PRIME", "row_number": 8, "data": update_data, "validation_error": None},
         {"sheet": "L J", "row_number": 9, "data": create_data, "validation_error": None},
-        {"sheet": "PRIME", "row_number": 10, "data": {"process_number": None}, "validation_error": "Linha sem numero do processo"},
+        {"sheet": "PRIME", "row_number": 10, "data": {"process_number": None}, "validation_error": "Linha sem número do processo"},
     ]
 
     monkeypatch.setattr(service, "_parse_workbook", lambda _content, _filename: parsed_rows)
@@ -341,13 +341,13 @@ async def test_delete_payment_process_requires_reason_records_audit_and_removes(
     service.repository = FakeDeletePaymentProcessRepository(record)
     actor = SimpleNamespace(id=uuid4(), role=UserRole.ADMIN)
 
-    result = await service.delete(process_id, PaymentProcessDelete(reason="Cadastro duplicado na importacao"), actor)
+    result = await service.delete(process_id, PaymentProcessDelete(reason="Cadastro duplicado na importação"), actor)
 
-    assert result == {"message": "Processo de pagamento excluido"}
+    assert result == {"message": "Processo de pagamento excluído"}
     assert service.repository.deleted is record
     assert service.db.committed is True
     assert service.audit.records[0]["action"] == "DELETE"
     assert service.audit.records[0]["entity_type"] == "PAYMENT_PROCESS"
     assert service.audit.records[0]["entity_id"] == process_id
-    assert service.audit.records[0]["details"]["reason"] == "Cadastro duplicado na importacao"
+    assert service.audit.records[0]["details"]["reason"] == "Cadastro duplicado na importação"
     assert service.audit.records[0]["details"]["amount"] == "150.00"

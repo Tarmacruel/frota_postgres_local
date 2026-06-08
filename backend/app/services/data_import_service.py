@@ -182,13 +182,13 @@ class DataImportService:
         content = await upload.read()
         await upload.close()
         if not content:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Arquivo de importacao vazio")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Arquivo de importação vazio")
 
         parsed_rows = self._read_upload_rows(content, suffix)
         entity_type, header_index, header = self._detect_header(parsed_rows)
         raw_records = self._build_raw_records(parsed_rows, header_index, header)
         if not raw_records:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Arquivo nao possui linhas de dados")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Arquivo não possui linhas de dados")
 
         analysis_context = await self._build_analysis_context()
         key_counts = self._build_key_counts(entity_type, raw_records)
@@ -294,7 +294,7 @@ class DataImportService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel aplicar o lote de importacao") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível aplicar o lote de importação") from exc
 
         return {"batch_id": batch.id, "created": created, "updated": updated, "errors": errors, "skipped": skipped, "applied_at": now}
 
@@ -333,12 +333,12 @@ class DataImportService:
 
     def export_template_csv(self, entity_type: DataImportEntityType) -> tuple[str, str]:
         fields = (
-            ["Placa", "Chassi", "Marca", "Modelo", "Tipo", "Tipo Frota", "Status", "Unidade", "Subunidade", "Ano", "Prefixo", "Patrimônio/Núm. Frota", "Renavam", "Cor", "Combustível", "Capacidade", "Transmissao", "Cidade Veículo", "Estado Veículo", "Registrado no DETRAN", "Motorização"]
+            ["Placa", "Chassi", "Marca", "Modelo", "Tipo", "Tipo Frota", "Status", "Unidade", "Subunidade", "Ano", "Prefixo", "Patrimônio/Núm. Frota", "Renavam", "Cor", "Combustível", "Capacidade", "Transmissão", "Cidade Veículo", "Estado Veículo", "Registrado no DETRAN", "Motorização"]
             if entity_type == DataImportEntityType.VEHICLE
-            else ["Nome", "CPF", "Unidade", "Telefone", "Celular", "Email", "Categoria", "Vencimento", "Status", "Registro", "Matricula", "Cargo", "CNH", "RG", "Data Nascimento", "Data Emissão CNH", "Ultimo Abastecimento"]
+            else ["Nome", "CPF", "Unidade", "Telefone", "Celular", "E-mail", "Categoria", "Vencimento", "Status", "Registro", "Matrícula", "Cargo", "CNH", "RG", "Data Nascimento", "Data Emissão CNH", "Último Abastecimento"]
         )
         if entity_type == DataImportEntityType.FINE:
-            fields = ["PLACA", "RENAVAM", "VINCULO", "MODELO", "SECRETARIA", "A. INFRA??O", "TIPO DA INFRA??O", "DATA ", "HORA", "LOCAL", "C.I.", "ENVIADO", "PROCESSO", "V.MULTA", "SITUA??O", "TIPO", "MOTORISTA", "OBS"]
+            fields = ["PLACA", "RENAVAM", "VÍNCULO", "MODELO", "SECRETARIA", "A. INFRAÇÃO", "TIPO DA INFRAÇÃO", "DATA ", "HORA", "LOCAL", "C.I.", "ENVIADO", "PROCESSO", "V.MULTA", "SITUAÇÃO", "TIPO", "MOTORISTA", "OBS"]
         buffer = io.StringIO()
         writer = csv.writer(buffer, delimiter=";")
         writer.writerow(fields)
@@ -352,7 +352,7 @@ class DataImportService:
             return [list(row) for row in csv.reader(io.StringIO(text), dialect)]
 
         if load_workbook is None:
-            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Leitura XLSX indisponivel")
+            raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Leitura XLSX indisponível")
         workbook = load_workbook(io.BytesIO(content), read_only=True, data_only=True)
         sheet = workbook.active
         return [[cell for cell in row] for row in sheet.iter_rows(values_only=True)]
@@ -373,7 +373,7 @@ class DataImportService:
                     entity = DataImportEntityType.VEHICLE if vehicle_score >= driver_score else DataImportEntityType.DRIVER
                 best = (score, entity, index, values)
         if not best or best[0] < 3:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nao foi possivel detectar o cabecalho do relatorio")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Não foi possível detectar o cabeçalho do relatório")
         return best[1], best[2], best[3]
 
     def _build_raw_records(self, rows: list[list], header_index: int, header: list[str]) -> list[tuple[int, dict]]:
@@ -499,9 +499,9 @@ class DataImportService:
 
         for field in ("plate", "brand", "model", "vehicle_type", "ownership_type", "status"):
             if not mapped.get(field):
-                errors.append(f"Campo obrigatorio ausente: {field}")
+                errors.append(f"Campo obrigatório ausente: {field}")
         if not mapped.get("allocation_id"):
-            errors.append("Lotacao nao encontrada; selecione uma lotacao antes de aprovar")
+            errors.append("Lotação não encontrada; selecione uma lotação antes de aprovar")
         if plate and key_counts["primary"].get(self._norm_key(plate), 0) > 1:
             conflicts.append("Placa duplicada no arquivo")
         if chassis and key_counts["secondary"].get(self._norm_key(chassis), 0) > 1:
@@ -515,7 +515,7 @@ class DataImportService:
             "color": self._normalize_text(raw.get("Cor"), uppercase=True),
             "fuel_type": self._normalize_text(raw.get("Combustível"), uppercase=True),
             "tank_capacity_liters": self._parse_float(raw.get("Capacidade")),
-            "transmission": self._normalize_text(raw.get("Transmissao"), uppercase=True),
+            "transmission": self._normalize_text(self._raw_value(raw, "Transmissão", "Transmissao"), uppercase=True),
             "city": self._normalize_text(raw.get("Cidade Veículo"), uppercase=True),
             "state": self._normalize_state(raw.get("Estado Veículo")),
             "registered_detran": self._parse_bool(raw.get("Registrado no DETRAN")),
@@ -533,7 +533,7 @@ class DataImportService:
             "nome_completo": self._normalize_text(raw.get("Nome"), uppercase=True),
             "documento": document,
             "contato": self._best_contact(raw.get("Celular"), raw.get("Telefone")),
-            "email": self._normalize_email(raw.get("Email")),
+            "email": self._normalize_email(self._raw_value(raw, "E-mail", "Email")),
             "cnh_categoria": self._map_driver_category(raw.get("Categoria")),
             "cnh_validade": self._parse_date(raw.get("Vencimento")),
             "ativo": self._map_active(raw.get("Status")),
@@ -544,9 +544,9 @@ class DataImportService:
 
         for field in ("nome_completo", "documento", "cnh_categoria"):
             if not mapped.get(field):
-                errors.append(f"Campo obrigatorio ausente: {field}")
+                errors.append(f"Campo obrigatório ausente: {field}")
         if not mapped.get("organization_id"):
-            errors.append("Secretaria nao encontrada; selecione uma secretaria antes de aprovar")
+            errors.append("Secretaria não encontrada; selecione uma secretaria antes de aprovar")
         if document and key_counts["primary"].get(self._digits(document), 0) > 1:
             conflicts.append("CPF duplicado no arquivo")
         cnh_numero = self._normalize_text(raw.get("CNH"), uppercase=True)
@@ -555,13 +555,13 @@ class DataImportService:
 
         official_extra = {
             "registro": self._normalize_text(raw.get("Registro"), uppercase=True),
-            "matricula": self._normalize_text(raw.get("Matricula"), uppercase=True),
+            "matricula": self._normalize_text(self._raw_value(raw, "Matrícula", "Matricula"), uppercase=True),
             "cargo": self._normalize_text(raw.get("Cargo"), uppercase=True),
             "cnh_numero": cnh_numero,
             "rg": self._normalize_text(raw.get("RG"), uppercase=True),
             "data_nascimento": self._parse_date(raw.get("Data Nascimento")),
             "data_emissao_cnh": self._parse_date(raw.get("Data Emissão CNH")),
-            "ultimo_abastecimento": self._parse_datetime(raw.get("Ultimo Abastecimento")),
+            "ultimo_abastecimento": self._parse_datetime(self._raw_value(raw, "Último Abastecimento", "Ultimo Abastecimento")),
         }
         official_extra = {key: value for key, value in official_extra.items() if value is not None}
         triage_extra = {column: raw.get(column) for column in DRIVER_TRIAGE_EXTRA_COLUMNS if self._present(raw.get(column))}
@@ -601,7 +601,7 @@ class DataImportService:
                 "vehicle_type": self._map_vehicle_type(self._raw_value(raw, "TIPO"), conflicts),
                 "organization_name": self._normalize_text(self._raw_value(raw, "SECRETARIA"), uppercase=True),
             }
-            conflicts.append("Veiculo nao encontrado; sera criado como provisório ao aplicar")
+            conflicts.append("Veículo não encontrado; será criado como provisório ao aplicar")
 
         if infraction:
             mapped["infraction_type_id"] = str(infraction.id)
@@ -609,18 +609,18 @@ class DataImportService:
             provisional_description = description or "INFRAÇÃO NÃO INFORMADA NA IMPORTAÇÃO"
             mapped["provisional_infraction"] = {
                 "description": provisional_description,
-                "source": "Importacao de multas",
+                "source": "Importação de multas",
             }
-            conflicts.append("Enquadramento nao encontrado; sera criado como provisório ao aplicar")
+            conflicts.append("Enquadramento não encontrado; será criado como provisório ao aplicar")
 
         if driver:
             mapped["driver_id"] = str(driver.id)
 
         for field in ("ticket_number", "infraction_date", "amount"):
             if not mapped.get(field):
-                errors.append(f"Campo obrigatorio ausente: {field}")
+                errors.append(f"Campo obrigatório ausente: {field}")
         if not vehicle and not plate:
-            errors.append("Campo obrigatorio ausente: plate")
+            errors.append("Campo obrigatório ausente: plate")
 
         duplicate_key = self._fine_duplicate_key(raw)
         if duplicate_key and key_counts["primary"].get(duplicate_key, 0) > 1:
@@ -673,7 +673,7 @@ class DataImportService:
             self._assign_vehicle_extra(vehicle, data)
             self.db.add(vehicle)
             await self.db.flush()
-            self.db.add(LocationHistory(vehicle_id=vehicle.id, allocation_id=allocation_id, department="Importacao de dados"))
+            self.db.add(LocationHistory(vehicle_id=vehicle.id, allocation_id=allocation_id, department="Importação de dados"))
         else:
             for field in ("plate", "chassis_number", "brand", "model"):
                 if data.get(field):
@@ -686,7 +686,7 @@ class DataImportService:
             if not active or active.allocation_id != allocation_id:
                 if active:
                     active.end_date = datetime.now(timezone.utc)
-                self.db.add(LocationHistory(vehicle_id=vehicle.id, allocation_id=allocation_id, department="Importacao de dados"))
+                self.db.add(LocationHistory(vehicle_id=vehicle.id, allocation_id=allocation_id, department="Importação de dados"))
 
         await self.audit.record(
             actor=current_user,
@@ -808,15 +808,15 @@ class DataImportService:
     def _apply_validation_errors(self, entity_type: DataImportEntityType, data: dict) -> list[str]:
         if entity_type == DataImportEntityType.VEHICLE:
             required = ("plate", "brand", "model", "vehicle_type", "ownership_type", "status", "allocation_id")
-            return [f"Campo obrigatorio ausente: {field}" for field in required if not data.get(field)]
+            return [f"Campo obrigatório ausente: {field}" for field in required if not data.get(field)]
         if entity_type == DataImportEntityType.DRIVER:
             required = ("nome_completo", "documento", "organization_id", "cnh_categoria")
-            return [f"Campo obrigatorio ausente: {field}" for field in required if not data.get(field)]
-        errors = [f"Campo obrigatorio ausente: {field}" for field in ("ticket_number", "infraction_date", "amount") if not data.get(field)]
+            return [f"Campo obrigatório ausente: {field}" for field in required if not data.get(field)]
+        errors = [f"Campo obrigatório ausente: {field}" for field in ("ticket_number", "infraction_date", "amount") if not data.get(field)]
         if not data.get("vehicle_id") and not data.get("provisional_vehicle"):
-            errors.append("Campo obrigatorio ausente: vehicle_id")
+            errors.append("Campo obrigatório ausente: vehicle_id")
         if not data.get("infraction_type_id") and not data.get("provisional_infraction"):
-            errors.append("Campo obrigatorio ausente: infraction_type_id")
+            errors.append("Campo obrigatório ausente: infraction_type_id")
         return errors
 
     async def _find_vehicle_for_apply(self, data: dict) -> Vehicle | None:
@@ -855,7 +855,7 @@ class DataImportService:
         provisional = data.get("provisional_vehicle") or {}
         plate = self._normalize_plate(provisional.get("plate"))
         if not plate:
-            raise ValueError("Veiculo provisório sem placa")
+            raise ValueError("Veículo provisório sem placa")
         existing = (await self.db.execute(select(Vehicle).where(Vehicle.plate == plate))).scalar_one_or_none()
         if existing:
             return existing
@@ -871,7 +871,7 @@ class DataImportService:
             ownership_type=VehicleOwnershipType(provisional.get("ownership_type") or VehicleOwnershipType.PROPRIO.value),
             status=VehicleStatus.ATIVO,
             is_provisional=True,
-            provisional_source="Importacao de multas",
+            provisional_source="Importação de multas",
         )
         self.db.add(vehicle)
         await self.db.flush()
@@ -906,7 +906,7 @@ class DataImportService:
             is_active=True,
             is_official=False,
             is_provisional=True,
-            source=provisional.get("source") or "Importacao de multas",
+            source=provisional.get("source") or "Importação de multas",
         )
         self.db.add(infraction)
         await self.db.flush()
@@ -1068,7 +1068,7 @@ class DataImportService:
             stmt = stmt.options(selectinload(DataImportBatch.rows))
         batch = (await self.db.execute(stmt)).scalar_one_or_none()
         if not batch:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lote de importacao nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lote de importação não encontrado")
         return batch
 
     async def _get_row(self, batch_id: UUID, row_id: UUID) -> DataImportRow:
@@ -1076,7 +1076,7 @@ class DataImportService:
             await self.db.execute(select(DataImportRow).where(DataImportRow.batch_id == batch_id, DataImportRow.id == row_id))
         ).scalar_one_or_none()
         if not row:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Linha de importacao nao encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Linha de importação não encontrada")
         return row
 
     def _serialize_batch(self, batch: DataImportBatch) -> dict:
@@ -1385,7 +1385,7 @@ class DataImportService:
             return VehicleType.SEDAN.value
         result = mapping.get(text)
         if not result:
-            conflicts.append(f"Tipo de veiculo externo sem mapeamento exato: {text}")
+            conflicts.append(f"Tipo de veículo externo sem mapeamento exato: {text}")
             return VehicleType.SEDAN.value
         return result
 

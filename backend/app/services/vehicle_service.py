@@ -320,10 +320,10 @@ class VehicleService:
         organization_id = scoped_organization_id(current_user)
         if organization_id is None:
             if production_scope_is_empty(current_user):
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
             return
         if not await self.vehicles.is_vehicle_in_organization(vehicle_id, organization_id):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
     async def _list_vehicle_audit_logs(
         self,
@@ -420,7 +420,7 @@ class VehicleService:
             "event_type": "MOVEMENT",
             "action": None,
             "occurred_at": history.start_date,
-            "title": "Movimentacao de lotação",
+            "title": "Movimentação de lotação",
             "actor_name": None,
             "justification": history.justification,
             "allocation_id": history.allocation_id,

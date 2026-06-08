@@ -18,7 +18,7 @@ from app.schemas.analytics import (
 )
 from app.services.analytics_service import AnalyticsService
 
-router = APIRouter(prefix="/api/analytics", tags=["Analytics"])
+router = APIRouter(prefix="/api/analytics", tags=["Análises"])
 EMPTY_ORGANIZATION_ID = UUID("00000000-0000-0000-0000-000000000000")
 
 

@@ -69,7 +69,7 @@ export default function DashboardPage() {
     { label: 'Veículos ativos', value: stats.ativos, note: 'Disponíveis para uso imediato.' },
     { label: 'Em manutenção', value: stats.manutencao, note: 'Demandam retorno operacional.' },
     { label: 'Sem condutor', value: stats.semCondutor, note: 'Precisam de responsável definido.' },
-    { label: 'Pendencias abertas', value: stats.manutencoesAbertas, note: 'Chamados de oficina em andamento.' },
+    { label: 'Pendências abertas', value: stats.manutencoesAbertas, note: 'Chamados de oficina em andamento.' },
   ]
 
   const primaryActions = [
@@ -138,7 +138,7 @@ export default function DashboardPage() {
 
         <div className="actions-inline">
           <button type="button" className="secondary-button" onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}>
-            Ver pendencias
+            Ver pendências
           </button>
           <Link to="/vehicles" className="app-button">
             Abrir operação
@@ -174,7 +174,7 @@ export default function DashboardPage() {
 
         <section className="hub-secondary-grid">
           <article className="hub-side-card">
-            <strong>Leitura rapida do dia</strong>
+            <strong>Leitura rápida do dia</strong>
             <p>Hoje a base tem {loading ? '--' : stats.total} veículos, {loading ? '--' : stats.possesAtivas} posses ativas e {loading ? '--' : stats.inativos} registros inativos.</p>
             <div className="panel-metrics" style={{ marginBottom: 0 }}>
               <div className="metric-inline">
@@ -192,7 +192,7 @@ export default function DashboardPage() {
             <strong>Atalhos do perfil {user?.role || '-'}</strong>
             <p>
               {canWrite
-                ? 'Seu perfil pode cadastrar e atualizar dados operacionais. Use o topo para busca global e a barra mobile para acessar os módulos principais.'
+                ? 'Seu perfil pode cadastrar e atualizar dados operacionais. Use o topo para busca global e a barra móvel para acessar os módulos principais.'
                 : 'Seu perfil está em modo consulta. Use filtros, busca global e exportações para localizar e compartilhar informações rapidamente.'}
             </p>
           </article>
@@ -203,14 +203,14 @@ export default function DashboardPage() {
         <section className="surface-panel" style={{ padding: 0, boxShadow: 'none', background: 'transparent', border: '0' }}>
           <div className="panel-heading">
             <div>
-              <h3 className="section-title">Pendencias e históricos recentes</h3>
+              <h3 className="section-title">Pendências e históricos recentes</h3>
               <p className="section-copy">Os itens em aberto ficam reunidos aqui para encurtar o caminho entre leitura e ação.</p>
             </div>
           </div>
 
           <div className="hub-urgent-list">
             {loading ? (
-              <div className="empty-state">Carregando pendencias operacionais...</div>
+              <div className="empty-state">Carregando pendências operacionais...</div>
             ) : stats.manutencoesPendentes.length === 0 ? (
               <div className="empty-state">Nenhuma manutenção aberta no momento. A frota está sem chamados pendentes de oficina.</div>
             ) : (

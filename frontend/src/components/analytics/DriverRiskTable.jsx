@@ -21,7 +21,7 @@ export default function DriverRiskTable({ rows = [] }) {
 
   return (
     <section className="surface-panel">
-      <h3 className="section-title">Score de risco de condutores</h3>
+      <h3 className="section-title">Pontuação de risco de condutores</h3>
       <div className="table-wrap">
         <table className="data-table">
           <thead>
@@ -30,7 +30,7 @@ export default function DriverRiskTable({ rows = [] }) {
               <th>Multas</th>
               <th>Sinistros</th>
               <th>Anomalias</th>
-              <th>Score</th>
+              <th>Pontuação</th>
             </tr>
           </thead>
           <tbody>

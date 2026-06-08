@@ -232,7 +232,7 @@ async function buildPdfDocument({
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8.5)
     doc.setTextColor(107, 114, 128)
-    doc.text(`Emissao: ${formatDateTimeLabel(generatedAt)}`, pageWidth - marginX, headerTop + 14, { align: 'right' })
+    doc.text(`Emissão: ${formatDateTimeLabel(generatedAt)}`, pageWidth - marginX, headerTop + 14, { align: 'right' })
     doc.text(`Ref: ${reportLabel}`, pageWidth - marginX, headerTop + 29, { align: 'right' })
 
     doc.setDrawColor(221, 221, 221)

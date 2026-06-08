@@ -130,7 +130,7 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
       </div>
 
       <div className="form-field">
-        <label htmlFor="claim-bo">Boletim de ocorrencia</label>
+        <label htmlFor="claim-bo">Boletim de ocorrência</label>
         <input id="claim-bo" className="app-input" value={form.boletim_ocorrencia} onChange={(event) => setForm({ ...form, boletim_ocorrencia: event.target.value })} />
       </div>
 
@@ -145,7 +145,7 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
       </div>
 
       <div className="form-field modal-field-span">
-        <label htmlFor="claim-attachments">Anexos (URLs ou referencias, uma por linha)</label>
+        <label htmlFor="claim-attachments">Anexos (URLs ou referências, uma por linha)</label>
         <textarea id="claim-attachments" className="app-textarea" rows="3" value={form.anexos} onChange={(event) => setForm({ ...form, anexos: event.target.value })} />
       </div>
 

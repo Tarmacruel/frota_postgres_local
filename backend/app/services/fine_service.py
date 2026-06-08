@@ -55,21 +55,21 @@ class FineService:
     async def get(self, fine_id: UUID, current_user: User | None = None) -> dict:
         fine = await self.fines.get_by_id(fine_id)
         if not fine:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Multa nao encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Multa não encontrada")
         await self._ensure_vehicle_visible_to_user(fine.vehicle_id, current_user)
         return self._serialize(fine)
 
     async def create(self, data: FineCreate, current_user: User) -> dict:
         vehicle = await self.vehicles.get_by_id(data.vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
         await self._ensure_vehicle_visible_to_user(data.vehicle_id, current_user)
 
         infraction = await self._require_active_infraction(data.infraction_type_id)
         if data.driver_id:
             driver = await self.drivers.get_by_id(data.driver_id)
             if not driver:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
 
         payload = data.model_dump()
         payload["description"] = payload.get("description") or infraction.description
@@ -87,13 +87,13 @@ class FineService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel registrar a multa") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível registrar a multa") from exc
         return await self.get(fine.id, current_user=current_user)
 
     async def update(self, fine_id: UUID, data: FineUpdate, current_user: User) -> dict:
         fine = await self.fines.get_by_id(fine_id)
         if not fine:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Multa nao encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Multa não encontrada")
 
         await self._ensure_vehicle_visible_to_user(fine.vehicle_id, current_user)
 
@@ -101,7 +101,7 @@ class FineService:
         if "driver_id" in payload and payload["driver_id"]:
             driver = await self.drivers.get_by_id(payload["driver_id"])
             if not driver:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
         if "infraction_type_id" in payload and payload["infraction_type_id"]:
             infraction = await self._require_active_infraction(payload["infraction_type_id"])
             payload["description"] = payload.get("description") or infraction.description
@@ -123,7 +123,7 @@ class FineService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar a multa") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar a multa") from exc
         return await self.get(fine.id, current_user=current_user)
 
     async def list_infractions(self, *, search: str | None = None, active_only: bool = True, limit: int = 200) -> list[dict]:
@@ -149,13 +149,13 @@ class FineService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Enquadramento ja cadastrado") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Enquadramento já cadastrado") from exc
         return self._serialize_infraction(infraction)
 
     async def update_infraction(self, infraction_id: UUID, data: FineInfractionUpdate, current_user: User) -> dict:
         infraction = await self.fines.get_infraction_by_id(infraction_id)
         if not infraction:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enquadramento nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enquadramento não encontrado")
 
         before = self._serialize_infraction(infraction)
         payload = data.model_dump(exclude_unset=True)
@@ -177,23 +177,23 @@ class FineService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar o enquadramento") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar o enquadramento") from exc
         return self._serialize_infraction(infraction)
 
     async def _require_active_infraction(self, infraction_id: UUID) -> FineInfraction:
         infraction = await self.fines.get_infraction_by_id(infraction_id)
         if not infraction or not infraction.is_active:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enquadramento de multa nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Enquadramento de multa não encontrado")
         return infraction
 
     async def _ensure_vehicle_visible_to_user(self, vehicle_id: UUID, current_user: User | None) -> None:
         organization_id = scoped_organization_id(current_user)
         if organization_id is None:
             if production_scope_is_empty(current_user):
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
             return
         if not await self.vehicles.is_vehicle_in_organization(vehicle_id, organization_id):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
     def _serialize(self, fine: Fine) -> dict:
         return {

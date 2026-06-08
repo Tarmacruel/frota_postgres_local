@@ -235,7 +235,7 @@ const vehicleHistoryFieldLabels = {
 }
 
 function getVehicleHistoryTypeLabel(value) {
-  if (value === 'MOVEMENT') return 'Movimentacao'
+  if (value === 'MOVEMENT') return 'Movimentação'
   if (value === 'CREATE') return 'Cadastro'
   return 'Edição'
 }
@@ -764,14 +764,14 @@ export default function VehiclesPage() {
       await previewRowsToPdf({
         title: `Frota PMTF - Histórico ${selectedVehicle.plate}`,
         fileName: `frota-pmtf-histórico-${selectedVehicle.plate.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
-        subtitle: `Histórico de edições e movimentacoes do veículo ${selectedVehicle.plate} | ${selectedVehicle.brand} ${selectedVehicle.model} | ${historyPeriodLabel}.`,
+        subtitle: `Histórico de edições e movimentações do veículo ${selectedVehicle.plate} | ${selectedVehicle.brand} ${selectedVehicle.model} | ${historyPeriodLabel}.`,
         columns: historyColumns,
         rows: selectedHistory,
         summaryMetrics: [
           { label: 'Veículo', value: selectedVehicle.plate, tone: 'blue' },
           { label: 'Eventos', value: selectedHistory.length, tone: 'blue' },
           { label: 'Edições', value: historyEditCount, tone: 'amber' },
-          { label: 'Movimentacoes', value: historyMovementCount, tone: 'blue' },
+          { label: 'Movimentações', value: historyMovementCount, tone: 'blue' },
           { label: 'Tipo', value: getOwnershipLabel(selectedVehicle.ownership_type), tone: 'blue' },
           { label: 'Status', value: getStatusLabel(selectedVehicle.status), tone: selectedVehicle.status === 'ATIVO' ? 'green' : selectedVehicle.status === 'MANUTENCAO' ? 'amber' : 'red' },
         ],
@@ -1069,7 +1069,7 @@ export default function VehiclesPage() {
         onClose={closeVehicleModal}
       >
         <form onSubmit={handleSubmit} className="stack">
-          <AccordionSection title="Dados básicos" subtitle="Identificacao e classificacao" open>
+          <AccordionSection title="Dados básicos" subtitle="Identificação e classificação" open>
             <div className="form-grid modal-form-grid">
               <div className="form-field">
                 <label htmlFor="plate">Placa</label>
@@ -1145,7 +1145,7 @@ export default function VehiclesPage() {
                     value={form.edit_reason}
                     onChange={(event) => setForm({ ...form, edit_reason: event.target.value })}
                   />
-                  <span className="helper-text">Uma nova justificativa fica registrada em cada edição e em qualquer nova movimentacao de lotação gerada pela alteração.</span>
+                  <span className="helper-text">Uma nova justificativa fica registrada em cada edição e em qualquer nova movimentação de lotação gerada pela alteração.</span>
                 </div>
               </div>
             </AccordionSection>

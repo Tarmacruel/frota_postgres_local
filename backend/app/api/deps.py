@@ -74,7 +74,7 @@ def require_permission(module: str, action: str):
             default_flags = default_permissions_for_role(str(role_value)).get(module, {})
             if default_flags.get(permission_column):
                 return current_user
-            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="PermissÃ£o insuficiente")
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permissão insuficiente")
 
         if not getattr(permission, permission_column):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permissão insuficiente")

@@ -189,7 +189,7 @@ export default function AuditPage() {
       <div className="panel-heading">
         <div>
           <h2 className="section-title">Auditoria administrativa</h2>
-          <p className="section-copy">Acompanhe criacoes, edições e exclusoes registradas nas áreas sensíveis do sistema.</p>
+          <p className="section-copy">Acompanhe criações, edições e exclusões registradas nas áreas sensíveis do sistema.</p>
         </div>
         <div className="actions-inline">
           <button className="secondary-button" type="button" onClick={handleExportPdf}>Pré-visualizar PDF</button>
@@ -232,7 +232,7 @@ export default function AuditPage() {
         </div>
         <div className="metric-inline">
           <strong>{filteredLogs.filter((log) => log.action === 'DELETE').length}</strong>
-          <span>exclusoes registradas</span>
+          <span>exclusões registradas</span>
         </div>
       </div>
 

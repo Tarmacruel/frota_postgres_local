@@ -13,7 +13,7 @@ def _load_xlsx(name_prefix: str):
     try:
         path = next((ROOT / "storage").glob(f"{name_prefix}*.xlsx"))
     except StopIteration:
-        pytest.skip(f"Relatorio real {name_prefix}*.xlsx nao encontrado em storage")
+        pytest.skip(f"Relatório real {name_prefix}*.xlsx não encontrado em storage")
     service = DataImportService(db=None)
     rows = service._read_upload_rows(path.read_bytes(), ".xlsx")
     entity_type, header_index, header = service._detect_header(rows)

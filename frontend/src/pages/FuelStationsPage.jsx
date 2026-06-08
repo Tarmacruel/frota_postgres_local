@@ -439,14 +439,14 @@ export default function FuelStationsPage() {
         </div>
         <div className="table-wrap">
           <table className="data-table">
-            <thead><tr><th>Usuário</th><th>Email</th><th>Status</th><th>Ações</th></tr></thead>
+            <thead><tr><th>Usuário</th><th>E-mail</th><th>Status</th><th>Ações</th></tr></thead>
             <tbody>
               {!selectedStationId ? <tr><td colSpan={4}><div className="empty-state">Selecione um posto para gerenciar os vínculos.</div></td></tr> : null}
               {selectedStationId && links.length === 0 ? <tr><td colSpan={4}><div className="empty-state">Nenhum usuário vinculado a este posto.</div></td></tr> : null}
               {selectedStationId && links.map((link) => (
                 <tr key={link.id}>
                   <td data-label="Usuário">{link.user_name || link.user_id}</td>
-                  <td data-label="Email">{link.user_email || '-'}</td>
+                  <td data-label="E-mail">{link.user_email || '-'}</td>
                   <td data-label="Status">{link.active ? 'Ativo' : 'Inativo'}</td>
                   <td data-label="Ações">
                     <div className="actions-inline">

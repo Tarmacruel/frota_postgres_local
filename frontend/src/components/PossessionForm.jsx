@@ -197,7 +197,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
 
     if (nextFile.size > MAX_DOCUMENT_SIZE_BYTES) {
       setLoanTermDocument(null)
-      setDocumentError('O documento anexado deve ter no maximo 12 MB.')
+      setDocumentError('O documento anexado deve ter no máximo 12 MB.')
       if (documentInputRef.current) {
         documentInputRef.current.value = ''
       }
@@ -469,7 +469,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
         <input
           id="possession-contact"
           className="app-input"
-          placeholder="Telefone ou contato rapido"
+          placeholder="Telefone ou contato rápido"
           value={form.driver_contact}
           readOnly
         />

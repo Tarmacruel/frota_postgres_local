@@ -9,7 +9,7 @@ export default function ProtectedRoute({ children, adminOnly = false, allowedRol
       <div className="app-loading">
         <div className="loading-card">
           <strong>Carregando ambiente da frota</strong>
-          <p className="muted">Validando sua sessao e preparando os dados operacionais.</p>
+          <p className="muted">Validando sua sessão e preparando os dados operacionais.</p>
         </div>
       </div>
     )

@@ -159,7 +159,7 @@ export default function MaintenanceForm({ vehicles, initialData = null, onClose,
           id="maintenance-parts"
           className="app-textarea"
           rows="4"
-          placeholder="Itens substituidos, observações e referencias."
+          placeholder="Itens substituídos, observações e referências."
           value={form.parts_replaced}
           onChange={(event) => setForm({ ...form, parts_replaced: event.target.value })}
         />

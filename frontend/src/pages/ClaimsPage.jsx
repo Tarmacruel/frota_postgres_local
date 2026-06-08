@@ -112,7 +112,7 @@ export default function ClaimsPage() {
     await previewRowsToPdf({
       title: 'Frota PMTF - Sinistros',
       fileName: 'frota-pmtf-sinistros',
-      subtitle: 'Relatório da pagina atual de sinistros.',
+      subtitle: 'Relatório da página atual de sinistros.',
       columns: exportColumns,
       rows: records,
       filters: [
@@ -246,7 +246,7 @@ export default function ClaimsPage() {
       <Modal
         open={isModalOpen}
         title={editingRecord ? 'Editar sinistro' : 'Novo sinistro'}
-        description="Relacione o veículo, o condutor quando conhecido e os dados operacionais da ocorrencia."
+        description="Relacione o veículo, o condutor quando conhecido e os dados operacionais da ocorrência."
         onClose={() => setIsModalOpen(false)}
       >
         <ClaimForm

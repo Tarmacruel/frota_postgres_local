@@ -72,5 +72,5 @@ def default_permissions_for_role(role: str) -> dict[str, dict[str, bool]]:
 
 def action_to_column(action: str) -> str:
     if action not in PERMISSION_ACTIONS:
-        raise ValueError(f"Acao de permissao desconhecida: {action}")
+        raise ValueError(f"Ação de permissão desconhecida: {action}")
     return f"can_{action}"

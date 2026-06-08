@@ -32,7 +32,7 @@ export default function CostPerKmRanking({ rows = [] }) {
             <ResponsiveContainer>
               <ScatterChart>
                 <CartesianGrid strokeDasharray="3 3" />
-                <XAxis type="number" dataKey="benchmark" name="Benchmark" unit=" R$/km" />
+                <XAxis type="number" dataKey="benchmark" name="Referência" unit=" R$/km" />
                 <YAxis type="number" dataKey="tco" name="TCO" unit=" R$/km" />
                 <Tooltip
                   cursor={{ strokeDasharray: '3 3' }}
@@ -48,7 +48,7 @@ export default function CostPerKmRanking({ rows = [] }) {
             </ResponsiveContainer>
           </div>
           <div className="analytics-scatter-legend">
-            <span><i style={{ backgroundColor: 'var(--analytics-critical)' }} /> +30% acima do benchmark</span>
+            <span><i style={{ backgroundColor: 'var(--analytics-critical)' }} /> +30% acima da referência</span>
             <span><i style={{ backgroundColor: 'var(--analytics-low)' }} /> -20% abaixo (eficiente)</span>
             <span><i style={{ backgroundColor: 'var(--analytics-medium)' }} /> Faixa intermediária</span>
           </div>
