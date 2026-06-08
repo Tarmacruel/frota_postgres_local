@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import SearchableSelect from '../components/SearchableSelect'
 import Pagination from '../components/Pagination'
 import Modal from '../components/Modal'
+import FineInfractionsCatalog from '../components/FineInfractionsCatalog'
 import { masterDataAPI } from '../api/masterData'
 import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
@@ -23,7 +24,7 @@ const IMPORT_TEMPLATE_ROWS = [
 ]
 
 export default function CadastrosPage() {
-  const { canCreate, canEdit, canDeleteModule } = useAuth()
+  const { canCreate, canEdit, canDeleteModule, isAdmin } = useAuth()
   const canWrite = canCreate('master_data') || canEdit('master_data')
   const canDelete = canDeleteModule('master_data')
   const {
@@ -63,6 +64,7 @@ export default function CadastrosPage() {
     organizations: true,
     departments: true,
     allocations: true,
+    infractions: true,
   })
 
   const organizationOptions = organizations.map((organization) => ({
@@ -191,6 +193,7 @@ export default function CadastrosPage() {
         if (activeTab === 'organizations') document.getElementById('search-organization-input')?.focus()
         if (activeTab === 'departments') document.getElementById('search-department-input')?.focus()
         if (activeTab === 'allocations') document.getElementById('search-allocation-input')?.focus()
+        if (activeTab === 'infractions') document.getElementById('search-infraction-input')?.focus()
       }
     }
 
@@ -491,8 +494,8 @@ export default function CadastrosPage() {
     <div className="surface-panel">
       <div className="panel-heading">
         <div>
-          <h2 className="section-title">Cadastros de lotação</h2>
-          <p className="section-copy">Cadastre previamente órgãos, departamentos e lotações para padronizar a lotação dos veículos.</p>
+          <h2 className="section-title">Cadastros</h2>
+          <p className="section-copy">Cadastre bases auxiliares para padronizar lotações, veículos e registros de multas.</p>
         </div>
         <div className="actions-inline">
           <button className="ghost-button cadastros-toolbar-btn" type="button" onClick={resetForms}>Limpar formularios</button>
@@ -575,6 +578,15 @@ export default function CadastrosPage() {
         >
           Lotações ({allocations.length})
         </button>
+        {isAdmin ? (
+          <button
+            className={activeTab === 'infractions' ? 'app-button' : 'ghost-button'}
+            type="button"
+            onClick={() => setActiveTab('infractions')}
+          >
+            Infrações CTB
+          </button>
+        ) : null}
       </div>
 
       <div className="cadastros-grid">
@@ -1018,6 +1030,21 @@ export default function CadastrosPage() {
             </>
           ) : null}
         </section>
+
+        {isAdmin ? (
+          <section className="surface-panel panel-nested" style={{ display: activeTab === 'infractions' ? 'block' : 'none' }}>
+            <div className="panel-heading">
+              <div>
+                <h3 className="section-title">Infrações CTB</h3>
+                <p className="section-copy">Catálogo usado na seleção de multas. Itens provisórios vieram de importações e podem ser corrigidos.</p>
+              </div>
+              <button type="button" className="ghost-button cadastros-toolbar-btn" onClick={() => togglePanel('infractions')}>
+                {expandedPanels.infractions ? 'Recolher' : 'Expandir'}
+              </button>
+            </div>
+            {expandedPanels.infractions ? <FineInfractionsCatalog /> : null}
+          </section>
+        ) : null}
       </div>
 
       <Modal

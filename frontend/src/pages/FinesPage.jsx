@@ -32,21 +32,6 @@ const initialForm = {
   notes: '',
 }
 
-const initialInfractionForm = {
-  id: null,
-  code: '',
-  desdobramento: '0',
-  description: '',
-  ctb_article: '',
-  offender: '',
-  severity: '',
-  competent_body: '',
-  default_amount: '',
-  points: '',
-  is_active: true,
-  source: '',
-}
-
 function formatDate(value) {
   if (!value) return '-'
   return new Date(value).toLocaleDateString('pt-BR')
@@ -90,7 +75,7 @@ function infractionTitle(item) {
 }
 
 export default function FinesPage() {
-  const { canCreate, canEdit, isAdmin } = useAuth()
+  const { canCreate, canEdit } = useAuth()
   const canCreateFine = canCreate('fines')
   const canEditFine = canEdit('fines')
   const [vehicles, setVehicles] = useState([])
@@ -103,15 +88,12 @@ export default function FinesPage() {
   const [vehicleFilter, setVehicleFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('TODOS')
   const [loading, setLoading] = useState(true)
-  const [catalogLoading, setCatalogLoading] = useState(false)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState(null)
   const [form, setForm] = useState(initialForm)
   const [submitting, setSubmitting] = useState(false)
-  const [catalogSearch, setCatalogSearch] = useState('')
-  const [infractionForm, setInfractionForm] = useState(initialInfractionForm)
   const { organizations } = useMasterDataCatalog()
 
   const organizationOptions = organizations.map((organization) => ({
@@ -121,11 +103,6 @@ export default function FinesPage() {
 
   const infractionOptions = useMemo(() => infractions.filter((item) => item.is_active).map(infractionOption), [infractions])
   const selectedInfraction = infractions.find((item) => item.id === form.infraction_type_id)
-  const catalogRows = useMemo(() => {
-    const term = catalogSearch.trim().toLowerCase()
-    if (!term) return infractions
-    return infractions.filter((item) => `${item.code} ${item.desdobramento} ${item.description} ${item.ctb_article || ''}`.toLowerCase().includes(term))
-  }, [infractions, catalogSearch])
 
   function getVehicleOrganizationName(vehicleId) {
     return vehicles.find((vehicle) => vehicle.id === vehicleId)?.current_location?.organization_name || 'Sem secretaria'
@@ -146,7 +123,7 @@ export default function FinesPage() {
   async function loadInfractions(params = {}) {
     const { data } = await finesAPI.listInfractions({
       limit: 500,
-      active_only: isAdmin ? false : true,
+      active_only: true,
       ...params,
     })
     setInfractions(data)
@@ -204,7 +181,7 @@ export default function FinesPage() {
     }
   }
 
-  useEffect(() => { loadAux().catch(() => {}) }, [isAdmin])
+  useEffect(() => { loadAux().catch(() => {}) }, [])
   useEffect(() => { loadFines(1) }, [search, organizationFilter, vehicleFilter, statusFilter])
 
   function openCreate() {
@@ -311,51 +288,6 @@ export default function FinesPage() {
     })
   }
 
-  function startInfractionEdit(item) {
-    setInfractionForm({
-      id: item.id,
-      code: item.code,
-      desdobramento: item.desdobramento,
-      description: item.description,
-      ctb_article: item.ctb_article || '',
-      offender: item.offender || '',
-      severity: item.severity || '',
-      competent_body: item.competent_body || '',
-      default_amount: item.default_amount || '',
-      points: item.points || '',
-      is_active: item.is_active,
-      source: item.source || '',
-    })
-  }
-
-  async function saveInfraction(event) {
-    event.preventDefault()
-    if (!isAdmin) return
-    try {
-      setCatalogLoading(true)
-      setError('')
-      const payload = {
-        ...infractionForm,
-        default_amount: infractionForm.default_amount === '' ? null : Number(infractionForm.default_amount),
-        points: infractionForm.points === '' ? null : Number(infractionForm.points),
-        source: infractionForm.source || null,
-      }
-      if (infractionForm.id) {
-        await finesAPI.updateInfraction(infractionForm.id, payload)
-        setFeedback('Enquadramento atualizado.')
-      } else {
-        await finesAPI.createInfraction(payload)
-        setFeedback('Enquadramento cadastrado.')
-      }
-      setInfractionForm(initialInfractionForm)
-      await loadInfractions()
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível salvar o enquadramento.'))
-    } finally {
-      setCatalogLoading(false)
-    }
-  }
-
   return (
     <div className="surface-panel">
       <div className="panel-heading">
@@ -405,53 +337,6 @@ export default function FinesPage() {
       </div>
 
       <Pagination currentPage={pagination.page} totalPages={pagination.pages} onPageChange={loadFines} />
-
-      {isAdmin ? (
-        <section className="surface-panel panel-nested" style={{ marginTop: 22 }}>
-          <div className="panel-heading">
-            <div>
-              <h3 className="section-title">Infrações CTB</h3>
-              <p className="section-copy">Catálogo usado na seleção de multas. Itens provisórios vieram de importações e podem ser corrigidos.</p>
-            </div>
-          </div>
-          <form className="form-grid" onSubmit={saveInfraction}>
-            <div className="form-field"><label>Código</label><input className="app-input" value={infractionForm.code} onChange={(e) => setInfractionForm({ ...infractionForm, code: e.target.value })} required /></div>
-            <div className="form-field"><label>Desdobramento</label><input className="app-input" value={infractionForm.desdobramento} onChange={(e) => setInfractionForm({ ...infractionForm, desdobramento: e.target.value })} required /></div>
-            <div className="form-field" style={{ gridColumn: '1 / -1' }}><label>Descrição</label><textarea className="app-textarea" rows="3" value={infractionForm.description} onChange={(e) => setInfractionForm({ ...infractionForm, description: e.target.value })} required /></div>
-            <div className="form-field"><label>Amparo CTB</label><input className="app-input" value={infractionForm.ctb_article} onChange={(e) => setInfractionForm({ ...infractionForm, ctb_article: e.target.value })} /></div>
-            <div className="form-field"><label>Gravidade</label><input className="app-input" value={infractionForm.severity} onChange={(e) => setInfractionForm({ ...infractionForm, severity: e.target.value })} /></div>
-            <div className="form-field"><label>Valor padrão</label><input type="number" min="0" step="0.01" className="app-input" value={infractionForm.default_amount} onChange={(e) => setInfractionForm({ ...infractionForm, default_amount: e.target.value })} /></div>
-            <div className="form-field"><label>Pontos</label><input type="number" min="0" className="app-input" value={infractionForm.points} onChange={(e) => setInfractionForm({ ...infractionForm, points: e.target.value })} /></div>
-            <div className="form-field"><label>Infrator</label><input className="app-input" value={infractionForm.offender} onChange={(e) => setInfractionForm({ ...infractionForm, offender: e.target.value })} /></div>
-            <div className="form-field"><label>Órgão competente</label><input className="app-input" value={infractionForm.competent_body} onChange={(e) => setInfractionForm({ ...infractionForm, competent_body: e.target.value })} /></div>
-            <div className="form-field"><label>Fonte</label><input className="app-input" value={infractionForm.source} onChange={(e) => setInfractionForm({ ...infractionForm, source: e.target.value })} /></div>
-            <label className="section-copy" style={{ display: 'flex', alignItems: 'center', gap: 8 }}><input type="checkbox" checked={infractionForm.is_active} onChange={(e) => setInfractionForm({ ...infractionForm, is_active: e.target.checked })} />Ativo para seleção</label>
-            <div className="actions-inline" style={{ gridColumn: '1 / -1' }}>
-              <button className="app-button" type="submit" disabled={catalogLoading}>{catalogLoading ? 'Salvando...' : infractionForm.id ? 'Atualizar enquadramento' : 'Cadastrar enquadramento'}</button>
-              {infractionForm.id ? <button className="ghost-button" type="button" onClick={() => setInfractionForm(initialInfractionForm)}>Cancelar edição</button> : null}
-            </div>
-          </form>
-          <div className="filter-inline" style={{ margin: '18px 0 12px' }}>
-            <input className="app-input" placeholder="Buscar código, artigo ou descrição" value={catalogSearch} onChange={(e) => setCatalogSearch(e.target.value)} />
-          </div>
-          <div className="table-wrap table-wrap-wide">
-            <table className="data-table data-table-wide">
-              <thead><tr><th>Código</th><th>Descrição</th><th>Valor</th><th>Status</th><th>Ações</th></tr></thead>
-              <tbody>
-                {catalogRows.slice(0, 80).map((item) => (
-                  <tr key={item.id}>
-                    <td data-label="Código"><strong>{item.code}/{item.desdobramento}</strong><br /><span className="muted">{item.ctb_article || '-'}</span></td>
-                    <td data-label="Descrição">{item.description}</td>
-                    <td data-label="Valor">{item.default_amount ? formatMoney(item.default_amount) : '-'}</td>
-                    <td data-label="Status"><span className={`status-badge status-${item.is_active ? 'ATIVO' : 'INATIVO'}`}>{item.is_provisional ? 'Provisório' : item.is_active ? 'Ativo' : 'Inativo'}</span></td>
-                    <td data-label="Ações"><button type="button" className="mini-button" onClick={() => startInfractionEdit(item)}>Editar</button></td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </section>
-      ) : null}
 
       <Modal open={isModalOpen} title={editingRecord ? 'Editar multa' : 'Nova multa'} onClose={() => setIsModalOpen(false)}>
         <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
