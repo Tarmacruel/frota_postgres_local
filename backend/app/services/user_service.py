@@ -8,7 +8,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.permissions import PERMISSION_MODULES, blank_permissions, default_permissions_for_role
 from app.core.security import get_password_hash
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.user_permission import UserPermission
 from app.repositories.master_data_repository import MasterDataRepository
 from app.repositories.user_repository import UserRepository
@@ -25,6 +25,16 @@ class UserService:
 
     async def list(self, skip: int, limit: int):
         return await self.users.list(skip=skip, limit=limit)
+
+    async def list_signers(self, current_user: User) -> list[User]:
+        organization_id = None if current_user.role == UserRole.ADMIN else current_user.organization_id
+        if current_user.role == UserRole.PRODUCAO and organization_id is None:
+            return []
+        return await self.users.list_signers(
+            organization_id=organization_id,
+            exclude_user_id=current_user.id,
+            limit=200,
+        )
 
     async def create(self, data: UserCreate, current_user: User) -> User:
         existing = await self.users.get_by_email(data.email.lower())

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
 from jose import jwt
@@ -38,3 +39,20 @@ def set_jwt_cookie(response: Response, token: str) -> None:
 
 def clear_jwt_cookie(response: Response) -> None:
     response.delete_cookie(key=settings.COOKIE_NAME, path="/")
+    response.delete_cookie(key=settings.CSRF_COOKIE_NAME, path="/")
+
+
+def create_csrf_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def set_csrf_cookie(response: Response, token: str) -> None:
+    response.set_cookie(
+        key=settings.CSRF_COOKIE_NAME,
+        value=token,
+        httponly=True,
+        secure=settings.COOKIE_SECURE,
+        samesite="lax",
+        path="/",
+        max_age=settings.ACCESS_TOKEN_EXPIRE_MINUTES * 60,
+    )

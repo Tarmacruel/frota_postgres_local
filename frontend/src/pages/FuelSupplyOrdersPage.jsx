@@ -1,8 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import Modal from '../components/Modal'
+import DocumentSignaturePanel from '../components/DocumentSignaturePanel'
 import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
 import FuelSupplyOrderConfirmForm from '../components/FuelSupplyOrderConfirmForm'
+import { DIGITAL_DOCUMENT_TYPES } from '../api/documentSignatures'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
@@ -75,6 +77,7 @@ export default function FuelSupplyOrdersPage() {
   const [organizationFilter, setOrganizationFilter] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const [selectedOrder, setSelectedOrder] = useState(null)
+  const [signatureOrder, setSignatureOrder] = useState(null)
 
   const organizationOptions = useMemo(
     () => [{ value: '', label: 'Todas as secretarias' }, ...organizations.map((organization) => ({ value: organization.id, label: organization.name }))],
@@ -135,6 +138,13 @@ export default function FuelSupplyOrdersPage() {
     } catch (err) {
       setError(getApiErrorMessage(err, 'Não foi possível abrir o comprovante da ordem.'))
     }
+  }
+
+  function handleOrderSignatureChanged(summary) {
+    if (!signatureOrder) return
+    const nextOrder = { ...signatureOrder, signature_summary: summary }
+    setSignatureOrder(nextOrder)
+    setOrders((current) => current.map((order) => (order.id === signatureOrder.id ? nextOrder : order)))
   }
 
   return (
@@ -223,6 +233,7 @@ export default function FuelSupplyOrdersPage() {
                     <td data-label="Ações">
                       <div className="actions-inline">
                         <button className="mini-button" type="button" onClick={() => handlePreviewOrderDocument(order)}>Comprovante</button>
+                        <button className="mini-button" type="button" onClick={() => setSignatureOrder(order)}>Assinatura</button>
                         {canConfirmOrder ? <button className="app-button" type="button" onClick={() => setSelectedOrder(order)}>Confirmar abastecimento</button> : null}
                       </div>
                     </td>
@@ -249,6 +260,23 @@ export default function FuelSupplyOrdersPage() {
               setFeedback(message)
               loadOrders()
             }}
+          />
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={Boolean(signatureOrder)}
+        onClose={() => setSignatureOrder(null)}
+        title="Assinatura da ordem"
+        description={signatureOrder ? `Assinatura digital interna da ordem ${formatOrderNumber(signatureOrder)}.` : ''}
+      >
+        {signatureOrder ? (
+          <DocumentSignaturePanel
+            documentType={DIGITAL_DOCUMENT_TYPES.FUEL_SUPPLY_ORDER}
+            sourceId={signatureOrder.id}
+            summary={signatureOrder.signature_summary}
+            title="Assinatura da ordem de abastecimento"
+            onChanged={handleOrderSignatureChanged}
           />
         ) : null}
       </Modal>

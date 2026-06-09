@@ -48,6 +48,7 @@ async function buildDocument(order) {
 
   const logoDataUrl = await loadOptimizedLogo().catch(() => null)
   const validationUrl = resolvePublicValidationUrl(order.public_validation_path)
+  const signatureSummary = order.signature_summary || null
   const qrCodeDataUrl = validationUrl
     ? await QRCode.toDataURL(validationUrl, {
       margin: 1,
@@ -284,6 +285,36 @@ async function buildDocument(order) {
 
   if (order.notes) {
     cursorY = addWrappedBlock('Observações institucionais', order.notes, cursorY)
+  }
+
+  if (signatureSummary?.document_id) {
+    const signatures = signatureSummary.signatures || []
+    const signatureLines = signatures.length > 0
+      ? signatures.map((signature) => `${signature.signer_name} - ${formatDateTimeLabel(signature.signed_at)}`)
+      : ['Documento digital emitido, aguardando assinatura.']
+    const lines = doc.splitTextToSize([
+      `Status: ${signatureSummary.status || '-'}`,
+      `Hash SHA-256: ${signatureSummary.content_hash || '-'}`,
+      ...signatureLines,
+    ].join('\n'), pageWidth - (marginX * 2) - 18)
+    const blockHeight = Math.max(54, (lines.length * 9) + 22)
+    if (cursorY > pageHeight - blockHeight - 130) {
+      doc.addPage()
+      cursorY = headerTop + 58
+    }
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(32, 48, 74)
+    doc.text('ASSINATURAS DIGITAIS INTERNAS', marginX, cursorY)
+    doc.setDrawColor(36, 82, 232)
+    doc.setLineWidth(0.7)
+    doc.roundedRect(marginX, cursorY + 8, pageWidth - (marginX * 2), blockHeight, 12, 12)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(55, 65, 81)
+    doc.text(lines, marginX + 10, cursorY + 25)
+    cursorY += blockHeight + 22
   }
 
   doc.setFont('helvetica', 'normal')

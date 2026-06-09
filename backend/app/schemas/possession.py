@@ -170,6 +170,7 @@ class PossessionOut(BaseModel):
     document_url: str | None
     document_uploaded_at: datetime | None
     capture_location: CaptureLocationOut | None
+    signature_summary: dict | None = None
 
 
 class PossessionListResponse(PaginatedResponse[PossessionOut]):
@@ -187,7 +188,6 @@ class PossessionTermPublicOut(BaseModel):
     vehicle_description: str | None
     driver_name: str
     driver_document_masked: str | None
-    driver_contact: str | None
     start_date: datetime
     end_date: datetime | None
     start_odometer_km: float | None
@@ -195,3 +195,4 @@ class PossessionTermPublicOut(BaseModel):
     kilometers_driven: float | None
     observation: str | None
     created_at: datetime
+    signature_summary: dict | None = None

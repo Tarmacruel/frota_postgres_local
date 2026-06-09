@@ -11,6 +11,7 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 class Settings(BaseSettings):
     DATABASE_URL: str
     SECRET_KEY: str
+    SIGNATURE_EVIDENCE_SECRET: str | None = None
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60
     STORAGE_DIR: Path = BASE_DIR / "storage"
@@ -37,7 +38,18 @@ class Settings(BaseSettings):
         "https://187.103.204.73",
     ]
     COOKIE_NAME: str = "access_token"
+    CSRF_COOKIE_NAME: str = "csrf_token"
     COOKIE_SECURE: bool = False
+    TRUSTED_HOSTS: list[str] = [
+        "localhost",
+        "127.0.0.1",
+        "test",
+        "testserver",
+        "192.168.18.103",
+        "frota.sirel.com.br",
+        "187.103.204.73",
+        "*.localhost",
+    ]
     APP_ENV: str = "development"
     ENABLE_LEGACY_FUEL_SUPPLY_CREATE: bool = False
 
@@ -46,6 +58,13 @@ class Settings(BaseSettings):
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
     def parse_cors(cls, value):
+        if isinstance(value, str):
+            return json.loads(value)
+        return value
+
+    @field_validator("TRUSTED_HOSTS", mode="before")
+    @classmethod
+    def parse_trusted_hosts(cls, value):
         if isinstance(value, str):
             return json.loads(value)
         return value

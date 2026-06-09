@@ -209,6 +209,7 @@ class FuelSupplyOrderOut(BaseModel):
     confirmed_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    signature_summary: dict | None = None
 
 
 class FuelSupplyOrderListResponse(PaginatedResponse[FuelSupplyOrderOut]):
@@ -237,3 +238,4 @@ class FuelSupplyOrderPublicOut(BaseModel):
     created_at: datetime
     expires_at: datetime
     confirmed_at: datetime | None
+    signature_summary: dict | None = None

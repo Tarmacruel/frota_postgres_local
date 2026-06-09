@@ -59,6 +59,13 @@ async def test_openapi_contains_new_routes(client):
     assert "/api/fuel-supply-orders/{order_id}/confirm" in paths
     assert "/api/fuel-supply-orders/{order_id}/cancel" in paths
     assert "/api/public/fuel-supply-orders/{validation_code}" in paths
+    assert "/api/document-signatures/pending" in paths
+    assert "/api/document-signatures/documents" in paths
+    assert "/api/document-signatures/documents/{document_id}" in paths
+    assert "/api/document-signatures/documents/{document_id}/sign" in paths
+    assert "/api/document-signatures/documents/{document_id}/requests" in paths
+    assert "/api/document-signatures/requests/{request_id}/decline" in paths
+    assert "/api/document-signatures/requests/{request_id}" in paths
     assert "/api/payment-processes" in paths
     assert "/api/payment-processes/import" in paths
     assert "/api/payment-processes/template" in paths
@@ -70,6 +77,7 @@ async def test_openapi_contains_new_routes(client):
     assert "/api/vehicles/{vehicle_id}/current-driver" in paths
     assert "/api/vehicles/{vehicle_id}/historico" in paths
     assert "/api/users/{user_id}/permissions" in paths
+    assert "/api/users/signers" in paths
 
     vehicle_history_params = {
         param["name"]
@@ -123,6 +131,7 @@ async def test_openapi_contains_new_routes(client):
     assert "fuel_station_longitude" in fuel_supply_order["properties"]
     assert "fuel_station_maps_url" in fuel_supply_order["properties"]
     assert "created_by_contact" in fuel_supply_order["properties"]
+    assert "signature_summary" in fuel_supply_order["properties"]
 
     public_fuel_supply_order = schemas["FuelSupplyOrderPublicOut"]
     assert "validation_code" in public_fuel_supply_order["properties"]
@@ -135,6 +144,7 @@ async def test_openapi_contains_new_routes(client):
     assert "fuel_station_maps_url" in public_fuel_supply_order["properties"]
     assert "created_by_contact" not in public_fuel_supply_order["properties"]
     assert "max_amount" not in public_fuel_supply_order["properties"]
+    assert "signature_summary" in public_fuel_supply_order["properties"]
 
     payment_process = schemas["PaymentProcessOut"]
     assert "kind" in payment_process["properties"]
@@ -158,11 +168,14 @@ async def test_openapi_contains_new_routes(client):
     assert "return_term_public_validation_path" in possession["properties"]
     assert "vehicle_description" in possession["properties"]
     assert "document_available" in possession["properties"]
+    assert "signature_summary" in possession["properties"]
 
     public_possession_term = schemas["PossessionTermPublicOut"]
     assert "validation_code" in public_possession_term["properties"]
     assert "public_validation_path" in public_possession_term["properties"]
     assert "driver_document_masked" in public_possession_term["properties"]
+    assert "driver_contact" not in public_possession_term["properties"]
+    assert "signature_summary" in public_possession_term["properties"]
 
     current_user = schemas["CurrentUserOut"]
     assert "must_change_password" in current_user["properties"]
@@ -189,6 +202,7 @@ async def test_openapi_contains_new_routes(client):
 
     user_permissions_out = schemas["UserPermissionsOut"]
     assert "permissions" in user_permissions_out["properties"]
+    assert "UserSignerOut" in schemas
 
     driver_create = schemas["DriverCreate"]
     assert "organization_id" in driver_create["properties"]
@@ -204,3 +218,4 @@ async def test_openapi_contains_new_routes(client):
     assert "organization_name" in driver_out["properties"]
 
     assert "/api/auth/change-password" in paths
+    assert "/api/auth/csrf" in paths

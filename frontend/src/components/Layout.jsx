@@ -6,6 +6,7 @@ import { AppIcon, getInitials } from './AppIcon'
 import SearchOverlay from './SearchOverlay'
 import Modal from './Modal'
 import { adminNotificationsAPI } from '../api/adminNotifications'
+import { documentSignaturesAPI } from '../api/documentSignatures'
 
 const THEME_STORAGE_KEY = 'frota-theme'
 const SIDEBAR_STORAGE_KEY = 'frota-sidebar-compact'
@@ -32,6 +33,8 @@ export default function Layout() {
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [adminNotifications, setAdminNotifications] = useState([])
   const [unreadNotifications, setUnreadNotifications] = useState(0)
+  const [signatureRequestsOpen, setSignatureRequestsOpen] = useState(false)
+  const [pendingSignatureRequests, setPendingSignatureRequests] = useState([])
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined
@@ -195,6 +198,27 @@ export default function Layout() {
     }
   }, [isAdmin, passwordChangeRequired])
 
+  useEffect(() => {
+    if (passwordChangeRequired) return
+
+    let mounted = true
+    async function loadPendingSignatures() {
+      try {
+        const { data } = await documentSignaturesAPI.pending()
+        if (mounted) setPendingSignatureRequests(Array.isArray(data) ? data : [])
+      } catch {
+        if (mounted) setPendingSignatureRequests([])
+      }
+    }
+
+    loadPendingSignatures()
+    const timer = window.setInterval(loadPendingSignatures, 45000)
+    return () => {
+      mounted = false
+      window.clearInterval(timer)
+    }
+  }, [passwordChangeRequired])
+
   async function openNotificationsCenter() {
     if (!isAdmin || passwordChangeRequired) return
     setNotificationsOpen(true)
@@ -216,6 +240,29 @@ export default function Layout() {
     } catch {
       return
     }
+  }
+
+  async function declinePendingSignature(requestId) {
+    try {
+      await documentSignaturesAPI.declineRequest(requestId)
+      setPendingSignatureRequests((current) => current.filter((item) => item.id !== requestId))
+    } catch {
+      return
+    }
+  }
+
+  function openPendingSignature(request) {
+    const document = request.document || {}
+    setSignatureRequestsOpen(false)
+    if (document.document_type === 'FUEL_SUPPLY_ORDER') {
+      navigate('/ordens-abastecimento')
+      return
+    }
+    if (document.source_id) {
+      navigate(`/posses?focus=${document.source_id}`)
+      return
+    }
+    navigate('/posses')
   }
 
   async function handleLogout() {
@@ -360,6 +407,18 @@ export default function Layout() {
                 {unreadNotifications > 0 ? <span className="badge-counter">{unreadNotifications > 99 ? '99+' : unreadNotifications}</span> : null}
               </button>
             ) : null}
+            {!passwordChangeRequired ? (
+              <button
+                type="button"
+                className="icon-button theme-button"
+                aria-label="Abrir assinaturas pendentes"
+                title="Assinaturas pendentes"
+                onClick={() => setSignatureRequestsOpen(true)}
+              >
+                <AppIcon name="audit" className="app-icon" />
+                {pendingSignatureRequests.length > 0 ? <span className="badge-counter">{pendingSignatureRequests.length > 99 ? '99+' : pendingSignatureRequests.length}</span> : null}
+              </button>
+            ) : null}
             <button type="button" className="icon-button theme-button" aria-label={darkMode ? 'Ativar modo claro' : 'Ativar modo escuro'} title={darkMode ? 'Modo claro' : 'Modo escuro'} onClick={() => setDarkMode((current) => !current)}>
               <AppIcon name={darkMode ? 'sun' : 'moon'} className="app-icon" />
             </button>
@@ -403,6 +462,33 @@ export default function Layout() {
                     <button className="mini-button" type="button" onClick={() => markNotificationAsRead(notification.id)}>Marcar como lida</button>
                   </div>
                 ) : <span className="muted">Lida</span>}
+              </div>
+            ))}
+          </div>
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={signatureRequestsOpen}
+        title="Assinaturas pendentes"
+        description="Solicitações nominais de coassinatura aguardando sua confirmação."
+        onClose={() => setSignatureRequestsOpen(false)}
+      >
+        {pendingSignatureRequests.length === 0 ? <div className="empty-state">Nenhuma assinatura pendente no momento.</div> : null}
+        {pendingSignatureRequests.length > 0 ? (
+          <div className="stack" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
+            {pendingSignatureRequests.map((request) => (
+              <div key={request.id} className="surface-panel panel-nested">
+                <div className="stack">
+                  <strong>{request.document?.title || 'Documento digital'}</strong>
+                  <span className="muted">Solicitado por {request.requested_by_name || 'usuário do sistema'}</span>
+                  <span className="muted">Hash: {request.document?.content_hash_short || '-'}</span>
+                  {request.message ? <span>{request.message}</span> : null}
+                </div>
+                <div className="actions-inline" style={{ marginTop: 8 }}>
+                  <button className="mini-button" type="button" onClick={() => openPendingSignature(request)}>Abrir origem</button>
+                  <button className="mini-button danger" type="button" onClick={() => declinePendingSignature(request.id)}>Recusar</button>
+                </div>
               </div>
             ))}
           </div>

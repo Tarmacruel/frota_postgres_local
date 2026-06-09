@@ -68,3 +68,19 @@ class UserOut(BaseModel):
     @classmethod
     def validate_email(cls, value: str) -> str:
         return normalize_email(value)
+
+
+class UserSignerOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    id: UUID
+    name: str
+    email: str
+    organization_id: UUID | None = None
+    organization_name: str | None = None
+    role: UserRole
+
+    @field_validator("email")
+    @classmethod
+    def validate_signer_email(cls, value: str) -> str:
+        return normalize_email(value)

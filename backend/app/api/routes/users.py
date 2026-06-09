@@ -3,11 +3,11 @@ from __future__ import annotations
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import require_admin
+from app.api.deps import get_current_user_ready, require_admin
 from app.db.session import get_db_session
 from app.models.user import User
 from app.schemas.auth import MessageOut
-from app.schemas.user import UserCreate, UserOut, UserPermissionsOut, UserPermissionsUpdate, UserUpdate
+from app.schemas.user import UserCreate, UserOut, UserPermissionsOut, UserPermissionsUpdate, UserSignerOut, UserUpdate
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
@@ -20,6 +20,14 @@ async def list_users(
     db: AsyncSession = Depends(get_db_session),
 ):
     return await UserService(db).list(skip=skip, limit=limit)
+
+
+@router.get("/signers", response_model=list[UserSignerOut])
+async def list_signature_signers(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(get_current_user_ready),
+):
+    return await UserService(db).list_signers(current_user)
 
 
 @router.post("", response_model=UserOut, status_code=status.HTTP_201_CREATED)

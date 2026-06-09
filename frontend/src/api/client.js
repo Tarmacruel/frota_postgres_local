@@ -22,4 +22,51 @@ const api = axios.create({
   withCredentials: true,
 })
 
+let csrfToken = ''
+let csrfPromise = null
+
+function isUnsafeMethod(method = 'get') {
+  return ['post', 'put', 'patch', 'delete'].includes(method.toLowerCase())
+}
+
+function isCsrfExempt(url = '') {
+  return String(url).includes('/auth/login')
+}
+
+async function getCsrfToken() {
+  if (csrfToken) return csrfToken
+  if (!csrfPromise) {
+    csrfPromise = api.get('/auth/csrf')
+      .then((response) => {
+        csrfToken = response.data?.csrf_token || ''
+        return csrfToken
+      })
+      .finally(() => {
+        csrfPromise = null
+      })
+  }
+  return csrfPromise
+}
+
+api.interceptors.request.use(async (config) => {
+  if (isUnsafeMethod(config.method) && !isCsrfExempt(config.url)) {
+    const token = await getCsrfToken()
+    if (token) {
+      config.headers = config.headers || {}
+      config.headers['X-CSRF-Token'] = token
+    }
+  }
+  return config
+})
+
+api.interceptors.response.use(
+  (response) => response,
+  (error) => {
+    if (error?.response?.status === 403 && String(error?.response?.data?.detail || '').includes('CSRF')) {
+      csrfToken = ''
+    }
+    throw error
+  },
+)
+
 export default api

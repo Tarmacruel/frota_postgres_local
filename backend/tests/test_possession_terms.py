@@ -97,6 +97,8 @@ async def test_public_loan_term_masks_driver_document():
     assert payload["validation_code"] == "TE-ABC123DEF456"
     assert payload["public_validation_path"] == "/validar/termo-emprestimo/TE-ABC123DEF456"
     assert payload["driver_document_masked"] == "430.***.***-98"
+    assert "driver_contact" not in payload
+    assert payload["signature_summary"]["status"] == "UNSIGNED"
     assert payload["vehicle_description"] == "TOA5G07 - VW Nova Track"
 
 

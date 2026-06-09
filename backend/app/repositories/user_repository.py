@@ -22,6 +22,20 @@ class UserRepository:
         )
         return list(result.scalars().all())
 
+    async def list_signers(self, *, organization_id: UUID | None = None, exclude_user_id: UUID | None = None, limit: int = 200) -> list[User]:
+        stmt = (
+            select(User)
+            .options(joinedload(User.organization), selectinload(User.permission_entries))
+            .order_by(User.name.asc())
+            .limit(limit)
+        )
+        if organization_id:
+            stmt = stmt.where(User.organization_id == organization_id)
+        if exclude_user_id:
+            stmt = stmt.where(User.id != exclude_user_id)
+        result = await self.db.execute(stmt)
+        return list(result.scalars().unique().all())
+
     async def get_by_email(self, email: str) -> User | None:
         result = await self.db.execute(
             select(User)

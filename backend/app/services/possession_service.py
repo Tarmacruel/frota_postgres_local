@@ -21,6 +21,8 @@ from app.schemas.common import PaginatedResponse, build_pagination
 from app.schemas.possession import PossessionAdminUpdate, PossessionCreate, PossessionPhotoCreate, PossessionUpdate
 from app.services.admin_notification_service import AdminNotificationService
 from app.services.audit_service import AuditService
+from app.services.document_signature_service import DocumentSignatureService, SOURCE_POSSESSION
+from app.models.document_signature import DigitalDocumentType
 
 MAX_PHOTO_SIZE_BYTES = 8 * 1024 * 1024
 MAX_DOCUMENT_SIZE_BYTES = 12 * 1024 * 1024
@@ -58,7 +60,12 @@ class PossessionService:
         organization_id = scoped_organization_id(current_user)
         records = await self.possessions.list(vehicle_id=vehicle_id, active=active, organization_id=organization_id)
         can_view_location = self._can_view_location(current_user)
-        return [self._serialize(record, can_view_location=can_view_location) for record in records]
+        payloads = []
+        for record in records:
+            payload = self._serialize(record, can_view_location=can_view_location)
+            payload["signature_summary"] = await self._build_possession_signature_summary(record)
+            payloads.append(payload)
+        return payloads
 
     async def list_paginated(
         self,
@@ -86,7 +93,7 @@ class PossessionService:
         )
         can_view_location = self._can_view_location(current_user)
         return PaginatedResponse[dict](
-            data=[self._serialize(record, can_view_location=can_view_location) for record in records],
+            data=[await self._serialize_with_signatures(record, can_view_location=can_view_location) for record in records],
             pagination=build_pagination(page, limit, total),
         )
 
@@ -98,7 +105,7 @@ class PossessionService:
         record = await self.possessions.get_active_by_vehicle(vehicle_id)
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nenhum condutor ativo encontrado para este veículo")
-        return self._serialize(record, can_view_location=self._can_view_location(current_user))
+        return await self._serialize_with_signatures(record, can_view_location=self._can_view_location(current_user))
 
     async def start(
         self,
@@ -284,6 +291,13 @@ class PossessionService:
                 possession.return_document_size_bytes = return_term_payload["size_bytes"]
                 possession.return_document_uploaded_at = datetime.now(timezone.utc)
 
+            await DocumentSignatureService(self.db).mark_source_documents_superseded(
+                source_type=SOURCE_POSSESSION,
+                source_id=possession.id,
+                document_types=[DigitalDocumentType.POSSESSION_RETURN_TERM],
+                current_user=current_user,
+                reason="POSSESSION_END_UPDATED",
+            )
             await self.audit.record(
                 actor=current_user,
                 action="UPDATE",
@@ -424,6 +438,17 @@ class PossessionService:
 
             await self._store_photo_payloads(possession, photo_payloads, stored_photo_paths)
 
+            await DocumentSignatureService(self.db).mark_source_documents_superseded(
+                source_type=SOURCE_POSSESSION,
+                source_id=possession.id,
+                document_types=[
+                    DigitalDocumentType.POSSESSION_LOAN_TERM,
+                    DigitalDocumentType.POSSESSION_RETURN_TERM,
+                ],
+                current_user=current_user,
+                reason="POSSESSION_ADMIN_EDIT",
+            )
+
             after = {
                 "driver_id": str(possession.driver_id) if possession.driver_id else None,
                 "driver_name": possession.driver_name,
@@ -526,6 +551,16 @@ class PossessionService:
                     "return_term_validation_code": possession.return_term_validation_code,
                 },
             )
+            await DocumentSignatureService(self.db).mark_source_documents_superseded(
+                source_type=SOURCE_POSSESSION,
+                source_id=possession.id,
+                document_types=[
+                    DigitalDocumentType.POSSESSION_LOAN_TERM,
+                    DigitalDocumentType.POSSESSION_RETURN_TERM,
+                ],
+                current_user=current_user,
+                reason="POSSESSION_DELETE",
+            )
             await self.possessions.delete(possession)
             await self.db.commit()
         except IntegrityError as exc:
@@ -623,7 +658,12 @@ class PossessionService:
             if not record:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Termo público não encontrado")
 
-        return self._serialize_public_term(record, term_type=term_type)
+        payload = self._serialize_public_term(record, term_type=term_type)
+        payload["signature_summary"] = await DocumentSignatureService(self.db).get_summary_for_source(
+            DigitalDocumentType.POSSESSION_RETURN_TERM if term_type == "return" else DigitalDocumentType.POSSESSION_LOAN_TERM,
+            record.id,
+        )
+        return payload
 
     async def _get_by_id(self, possession_id: UUID, current_user: User | None = None) -> dict:
         record = await self.possessions.get_by_id(possession_id)
@@ -631,7 +671,7 @@ class PossessionService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
         await self._ensure_possession_visible_to_user(record, current_user)
         await self.db.refresh(record, attribute_names=["vehicle", "photos"])
-        return self._serialize(record, can_view_location=self._can_view_location(current_user))
+        return await self._serialize_with_signatures(record, can_view_location=self._can_view_location(current_user))
 
     async def _ensure_vehicle_exists(self, vehicle_id: UUID, current_user: User | None = None) -> Vehicle:
         vehicle = await self.vehicles.get_by_id(vehicle_id)
@@ -993,6 +1033,19 @@ class PossessionService:
             "document_url": f"/api/possession/{record.id}/document" if record.document_path else None,
             "document_uploaded_at": record.document_uploaded_at,
             "capture_location": primary_photo["capture_location"] if primary_photo else None,
+            "signature_summary": None,
+        }
+
+    async def _serialize_with_signatures(self, record: VehiclePossession, *, can_view_location: bool) -> dict:
+        payload = self._serialize(record, can_view_location=can_view_location)
+        payload["signature_summary"] = await self._build_possession_signature_summary(record)
+        return payload
+
+    async def _build_possession_signature_summary(self, record: VehiclePossession) -> dict:
+        service = DocumentSignatureService(self.db)
+        return {
+            "loan": await service.get_summary_for_source(DigitalDocumentType.POSSESSION_LOAN_TERM, record.id),
+            "return": await service.get_summary_for_source(DigitalDocumentType.POSSESSION_RETURN_TERM, record.id),
         }
 
     def _serialize_public_term(self, record: VehiclePossession, *, term_type: str) -> dict:
@@ -1012,7 +1065,6 @@ class PossessionService:
             "vehicle_description": self._build_vehicle_description(record),
             "driver_name": record.driver_name,
             "driver_document_masked": self._mask_document(record.driver_document),
-            "driver_contact": record.driver_contact,
             "start_date": record.start_date,
             "end_date": record.end_date,
             "start_odometer_km": record.start_odometer_km,

@@ -19,6 +19,8 @@ from app.repositories.vehicle_repository import VehicleRepository
 from app.schemas.common import PaginatedResponse, build_pagination
 from app.schemas.fuel_supply import FuelSupplyOrderCancel, FuelSupplyOrderConfirm, FuelSupplyOrderCreate
 from app.services.audit_service import AuditService
+from app.services.document_signature_service import DocumentSignatureService, SOURCE_FUEL_SUPPLY_ORDER
+from app.models.document_signature import DigitalDocumentType
 
 MAX_RECEIPT_SIZE_BYTES = 8 * 1024 * 1024
 RECEIPT_EXTENSIONS = {
@@ -61,7 +63,7 @@ class FuelSupplyOrderService:
 
         records, total = await self.orders.list_paginated(page=page, limit=limit, **scoped_filters)
         return PaginatedResponse[dict](
-            data=[self._serialize_order(item) for item in records],
+            data=[await self._serialize_order_with_signatures(item) for item in records],
             pagination=build_pagination(page, limit, total),
         )
 
@@ -130,7 +132,7 @@ class FuelSupplyOrderService:
             await self._ensure_station_access(current_user=current_user, order=order)
         if current_user:
             await self._ensure_order_visible_to_user(order, current_user)
-        return self._serialize_order(order)
+        return await self._serialize_order_with_signatures(order)
 
     async def get_public_order(self, validation_code: str) -> dict:
         await self._expire_overdue_orders()
@@ -141,7 +143,12 @@ class FuelSupplyOrderService:
         order = await self.orders.get_by_validation_code(normalized_code)
         if not order:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comprovante público não encontrado")
-        return self._serialize_public_order(order)
+        payload = self._serialize_public_order(order)
+        payload["signature_summary"] = await DocumentSignatureService(self.db).get_summary_for_source(
+            DigitalDocumentType.FUEL_SUPPLY_ORDER,
+            order.id,
+        )
+        return payload
 
     async def confirm_order(self, order_id: UUID, data: FuelSupplyOrderConfirm, receipt: UploadFile, current_user: User) -> dict:
         order = await self.orders.get_by_id(order_id)
@@ -236,6 +243,14 @@ class FuelSupplyOrderService:
             order.confirmed_at = now
             order.confirmed_by_user_id = current_user.id
 
+            await DocumentSignatureService(self.db).mark_source_documents_superseded(
+                source_type=SOURCE_FUEL_SUPPLY_ORDER,
+                source_id=order.id,
+                document_types=[DigitalDocumentType.FUEL_SUPPLY_ORDER],
+                current_user=current_user,
+                reason="FUEL_ORDER_CONFIRMED",
+            )
+
             await self.audit.record(
                 actor=current_user,
                 action="ORDER_CONFIRMED",
@@ -282,6 +297,14 @@ class FuelSupplyOrderService:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem expirada")
 
         order.status = FuelSupplyOrderStatus.CANCELLED
+
+        await DocumentSignatureService(self.db).mark_source_documents_superseded(
+            source_type=SOURCE_FUEL_SUPPLY_ORDER,
+            source_id=order.id,
+            document_types=[DigitalDocumentType.FUEL_SUPPLY_ORDER],
+            current_user=current_user,
+            reason="FUEL_ORDER_CANCELLED",
+        )
 
         await self.audit.record(
             actor=current_user,
@@ -456,7 +479,16 @@ class FuelSupplyOrderService:
             "confirmed_at": item.confirmed_at,
             "created_at": item.created_at,
             "updated_at": item.updated_at,
+            "signature_summary": None,
         }
+
+    async def _serialize_order_with_signatures(self, item: FuelSupplyOrder) -> dict:
+        payload = self._serialize_order(item)
+        payload["signature_summary"] = await DocumentSignatureService(self.db).get_summary_for_source(
+            DigitalDocumentType.FUEL_SUPPLY_ORDER,
+            item.id,
+        )
+        return payload
 
     def _serialize_public_order(self, item: FuelSupplyOrder) -> dict:
         serialized = self._serialize_order(item)

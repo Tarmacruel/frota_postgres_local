@@ -48,6 +48,7 @@ class FuelSupplyOrderOut(BaseModel):
     confirmed_at: datetime | None
     created_at: datetime
     updated_at: datetime
+    signature_summary: dict | None = None
 
 
 class FuelSupplyOrderConfirmPayload(BaseModel):

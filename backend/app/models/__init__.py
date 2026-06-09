@@ -10,6 +10,14 @@ from app.models.data_import import (
     DataImportSuggestedAction,
 )
 from app.models.driver import Driver, DriverLicenseCategory
+from app.models.document_signature import (
+    DigitalDocument,
+    DigitalDocumentStatus,
+    DigitalDocumentType,
+    DocumentSignature,
+    DocumentSignatureRequest,
+    DocumentSignatureRequestStatus,
+)
 from app.models.fine import Fine, FineInfraction, FineStatus
 from app.models.fuel_station import FuelStation, FuelStationUser
 from app.models.fuel_supply import FuelSupply
@@ -52,6 +60,12 @@ __all__ = [
     "DataImportSuggestedAction",
     "Driver",
     "DriverLicenseCategory",
+    "DigitalDocument",
+    "DigitalDocumentStatus",
+    "DigitalDocumentType",
+    "DocumentSignature",
+    "DocumentSignatureRequest",
+    "DocumentSignatureRequestStatus",
     "Fine",
     "FineInfraction",
     "FineStatus",

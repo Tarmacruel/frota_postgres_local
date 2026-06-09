@@ -102,6 +102,7 @@ async function buildDocument(record, termType = 'loan') {
   const logoDataUrl = await loadOptimizedLogo().catch(() => null)
   const validationUrl = resolvePossessionTermValidationUrl(getValidationPath(record, termType))
   const validationCode = getValidationCode(record, termType)
+  const signatureSummary = record.signature_summary?.[termType] || record.signature_summary || null
   const qrCodeDataUrl = validationUrl
     ? await QRCode.toDataURL(validationUrl, {
       margin: 1,
@@ -216,6 +217,35 @@ async function buildDocument(record, termType = 'loan') {
     return y + blockHeight + 18
   }
 
+  function addDigitalSignatureBlock(y) {
+    if (!signatureSummary?.document_id) return y
+
+    const signatures = signatureSummary.signatures || []
+    const signatureLines = signatures.length > 0
+      ? signatures.map((signature) => `${signature.signer_name} - ${formatEmissionDateTime(signature.signed_at)}`)
+      : ['Documento digital emitido, aguardando assinatura.']
+    const lines = [
+      `Status: ${signatureSummary.status || '-'}`,
+      `Hash SHA-256: ${signatureSummary.content_hash || '-'}`,
+      ...signatureLines,
+    ]
+    const blockLines = doc.splitTextToSize(lines.join('\n'), contentWidth - 18)
+    const blockHeight = Math.max(48, (blockLines.length * 8.5) + 18)
+
+    doc.setDrawColor(36, 82, 232)
+    doc.setLineWidth(0.6)
+    doc.roundedRect(marginX, y, contentWidth, blockHeight, 6, 6)
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(7.6)
+    doc.setTextColor(36, 82, 232)
+    doc.text('ASSINATURAS DIGITAIS INTERNAS', marginX + 9, y + 12)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(6.9)
+    doc.setTextColor(55, 65, 81)
+    doc.text(blockLines, marginX + 9, y + 24)
+    return y + blockHeight + 10
+  }
+
   drawHeader()
   cursorY = 116
 
@@ -267,7 +297,7 @@ async function buildDocument(record, termType = 'loan') {
   cursorY += 19
   cursorY = addParagraph(`Teixeira de Freitas-BA, ${formatDate(termType === 'return' ? record.end_date : record.start_date)}.`, cursorY, { align: 'left' })
 
-  const signatureY = Math.min(Math.max(cursorY + 38, 604), validationBlockY - 50)
+  const signatureY = Math.min(Math.max(cursorY + 38, 578), validationBlockY - 110)
   doc.setDrawColor(31, 41, 55)
   doc.line(marginX + 96, signatureY, pageWidth - marginX - 96, signatureY)
   doc.setFont('helvetica', 'normal')
@@ -276,6 +306,7 @@ async function buildDocument(record, termType = 'loan') {
   doc.text(record.driver_name || 'Motorista responsável', pageWidth / 2, signatureY + 13, { align: 'center' })
   doc.text('Motorista responsável', pageWidth / 2, signatureY + 24, { align: 'center' })
 
+  addDigitalSignatureBlock(signatureY + 36)
   addValidationBlock(validationBlockY)
 
   doc.setFont('helvetica', 'normal')

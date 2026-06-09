@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException, Request, Response, status
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
-from app.core.security import clear_jwt_cookie, create_access_token, set_jwt_cookie
+from app.core.security import clear_jwt_cookie, create_access_token, create_csrf_token, set_csrf_cookie, set_jwt_cookie
 from app.db.session import get_db_session
 from app.schemas.auth import ChangePasswordInput, CurrentUserOut, LoginInput, MessageOut
 from app.services.auth_service import AuthService
@@ -33,6 +33,13 @@ async def login(data: LoginInput, response: Response, request: Request, db: Asyn
 async def logout(response: Response):
     clear_jwt_cookie(response)
     return {"message": "Logout"}
+
+
+@router.get("/csrf")
+async def csrf(response: Response, current_user=Depends(get_current_user)):
+    token = create_csrf_token()
+    set_csrf_cookie(response, token)
+    return {"csrf_token": token}
 
 
 @router.get("/me", response_model=CurrentUserOut)

@@ -127,7 +127,6 @@ export default function PublicPossessionTermPage({ termType }) {
                   <div><dt>Modelo</dt><dd>{term.vehicle_model || '-'}</dd></div>
                   <div><dt>Condutor</dt><dd>{term.driver_name || '-'}</dd></div>
                   <div><dt>Documento</dt><dd>{term.driver_document_masked || '-'}</dd></div>
-                  <div><dt>Contato</dt><dd>{term.driver_contact || '-'}</dd></div>
                 </dl>
               </article>
 
@@ -147,6 +146,17 @@ export default function PublicPossessionTermPage({ termType }) {
               <section className="public-order-notes">
                 <h2>Observações</h2>
                 <p>{term.observation}</p>
+              </section>
+            ) : null}
+
+            {term.signature_summary?.document_id ? (
+              <section className="public-order-notes">
+                <h2>Assinaturas digitais internas</h2>
+                <p>Hash SHA-256: <strong>{term.signature_summary.content_hash}</strong></p>
+                <p>Status: {term.signature_summary.is_complete ? 'Concluída' : 'Pendente'}</p>
+                {(term.signature_summary.signatures || []).map((signature) => (
+                  <p key={signature.id}>{signature.signer_name} assinou em {formatDate(signature.signed_at)}.</p>
+                ))}
               </section>
             ) : null}
 

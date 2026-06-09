@@ -1,12 +1,14 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import DriverSelect from '../components/DriverSelect'
+import DocumentSignaturePanel from '../components/DocumentSignaturePanel'
 import Modal from '../components/Modal'
 import DriverBadge from '../components/DriverBadge'
 import Pagination from '../components/Pagination'
 import PossessionForm from '../components/PossessionForm'
 import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
+import { DIGITAL_DOCUMENT_TYPES } from '../api/documentSignatures'
 import { possessionAPI } from '../api/possession'
 import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
@@ -726,6 +728,20 @@ export default function PossessionPage() {
     }
   }
 
+  function handleTermSignatureChanged(termType, summary) {
+    if (!termRecord) return
+    const nextSignatureSummary = {
+      ...(termRecord.signature_summary || {}),
+      [termType]: summary,
+    }
+    setTermRecord({ ...termRecord, signature_summary: nextSignatureSummary })
+    setRecords((current) => current.map((record) => (
+      record.id === termRecord.id
+        ? { ...record, signature_summary: nextSignatureSummary }
+        : record
+    )))
+  }
+
   const activeCount = filteredRecords.filter((item) => item.is_active).length
 
   return (
@@ -1252,6 +1268,13 @@ export default function PossessionPage() {
                   </button>
                 ) : null}
               </div>
+              <DocumentSignaturePanel
+                documentType={DIGITAL_DOCUMENT_TYPES.POSSESSION_LOAN_TERM}
+                sourceId={termRecord.id}
+                summary={termRecord.signature_summary?.loan}
+                title="Assinatura do termo de empréstimo"
+                onChanged={(summary) => handleTermSignatureChanged('loan', summary)}
+              />
             </article>
 
             {!termRecord.is_active ? (
@@ -1276,6 +1299,13 @@ export default function PossessionPage() {
                     </button>
                   ) : null}
                 </div>
+                <DocumentSignaturePanel
+                  documentType={DIGITAL_DOCUMENT_TYPES.POSSESSION_RETURN_TERM}
+                  sourceId={termRecord.id}
+                  summary={termRecord.signature_summary?.return}
+                  title="Assinatura do termo de devolução"
+                  onChanged={(summary) => handleTermSignatureChanged('return', summary)}
+                />
               </article>
             ) : (
               <article className="evidence-meta-card">
