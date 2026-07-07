@@ -3,8 +3,10 @@ from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from fastapi import HTTPException
 
 from app.models.document_signature import DigitalDocumentStatus, DocumentSignatureRequestStatus
+from app.models.user import UserRole
 from app.services.document_signature_service import DocumentSignatureService
 
 
@@ -50,3 +52,37 @@ async def test_joint_signature_requires_creator_and_requested_signer():
 
     assert document.status == DigitalDocumentStatus.COMPLETED
     assert document.completed_at == now
+
+
+def test_joint_signature_request_requires_requested_signer_cpf():
+    service = DocumentSignatureService(db=None)
+    current_user = SimpleNamespace(role=UserRole.ADMIN, organization_id=None)
+    requested_signer = SimpleNamespace(must_change_password=False, cpf=None, organization_id=None)
+
+    with pytest.raises(HTTPException) as exc:
+        service._ensure_signer_can_be_requested(current_user=current_user, requested_signer=requested_signer)
+
+    assert exc.value.status_code == 409
+
+
+def test_signature_serialization_exposes_only_masked_cpf():
+    service = DocumentSignatureService(db=None)
+    signed_at = datetime.now(timezone.utc)
+    signature = SimpleNamespace(
+        id=uuid4(),
+        signer_user_id=uuid4(),
+        signer_name="Servidor",
+        signer_email="servidor@frota.local",
+        signer_role="PRODUCAO",
+        signer_organization_name="Secretaria",
+        signer_cpf_masked="529.***.***-25",
+        signer_cpf_hash="secret-hash",
+        content_hash="content",
+        signature_fingerprint="fingerprint",
+        signed_at=signed_at,
+    )
+
+    payload = service._serialize_signature(signature)
+
+    assert payload["signer_cpf_masked"] == "529.***.***-25"
+    assert "signer_cpf_hash" not in payload

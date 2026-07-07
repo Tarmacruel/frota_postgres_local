@@ -30,7 +30,7 @@ function flattenCatalog(organizations) {
   return { departments, allocations }
 }
 
-export function useMasterDataCatalog() {
+export function useMasterDataCatalog({ includeAll = false } = {}) {
   const [organizations, setOrganizations] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -39,7 +39,7 @@ export function useMasterDataCatalog() {
     try {
       setLoading(true)
       setError('')
-      const { data } = await masterDataAPI.getCatalog()
+      const { data } = await masterDataAPI.getCatalog(includeAll ? { include_all: true } : undefined)
       setOrganizations(data.organizations || [])
     } catch (err) {
       setError(getApiErrorMessage(err, 'Não foi possível carregar os cadastros de lotação.'))
@@ -50,7 +50,7 @@ export function useMasterDataCatalog() {
 
   useEffect(() => {
     reload()
-  }, [])
+  }, [includeAll])
 
   const { departments, allocations } = useMemo(() => flattenCatalog(organizations), [organizations])
 

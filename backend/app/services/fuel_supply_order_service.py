@@ -221,6 +221,7 @@ class FuelSupplyOrderService:
             additive_type=data.additive_type,
             additive_quantity_liters=data.additive_quantity_liters,
             fuel_station_id=station.id,
+            fuel_supply_order_id=order.id,
             fuel_station=station.name,
             notes=data.notes,
             consumption_km_l=consumption_km_l,
@@ -442,6 +443,7 @@ class FuelSupplyOrderService:
         return " - ".join(description_parts)
 
     def _serialize_order(self, item: FuelSupplyOrder) -> dict:
+        supply = item.supply
         return {
             "id": item.id,
             "request_number": f"AB-{str(item.id).split('-')[0].upper()}",
@@ -477,6 +479,13 @@ class FuelSupplyOrderService:
             "max_amount": float(item.max_amount) if item.max_amount is not None else None,
             "notes": item.notes,
             "confirmed_at": item.confirmed_at,
+            "supply_id": supply.id if supply else None,
+            "supply_supplied_at": supply.supplied_at if supply else None,
+            "supply_liters": float(supply.liters) if supply else None,
+            "supply_total_amount": float(supply.total_amount) if supply and supply.total_amount is not None else None,
+            "supply_fuel_type": supply.fuel_type if supply else None,
+            "supply_odometer_km": supply.odometer_km if supply else None,
+            "supply_receipt_url": f"/api/fuel-supplies/{supply.id}/receipt" if supply else None,
             "created_at": item.created_at,
             "updated_at": item.updated_at,
             "signature_summary": None,

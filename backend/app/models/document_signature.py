@@ -93,6 +93,8 @@ class DocumentSignature(Base):
     signer_role = mapped_column(String(30), nullable=True)
     signer_organization_id = mapped_column(PGUUID(as_uuid=True), nullable=True)
     signer_organization_name = mapped_column(String(180), nullable=True)
+    signer_cpf_masked = mapped_column(String(20), nullable=True)
+    signer_cpf_hash = mapped_column(String(64), nullable=True)
     content_hash: Mapped[str] = mapped_column(String(64), nullable=False)
     signature_fingerprint: Mapped[str] = mapped_column(String(64), nullable=False)
     signed_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))

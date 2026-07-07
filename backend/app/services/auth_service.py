@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
+from app.core.cpf import mask_cpf
 from app.core.security import get_password_hash, verify_password
 from app.repositories.user_repository import UserRepository
-from app.schemas.auth import LoginInput
+from app.schemas.auth import LoginInput, RegisterCpfInput
 from app.models.user import User
 from app.services.audit_service import AuditService
 
@@ -37,6 +38,26 @@ class AuthService:
             entity_id=user.id,
             entity_label=user.email,
             details={"password_changed": True, "must_change_password": False},
+        )
+        await self.db.flush()
+        await self.db.commit()
+
+    async def register_cpf(self, *, user: User, data: RegisterCpfInput) -> None:
+        if user.cpf:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="CPF ja cadastrado para este usuario")
+
+        existing = await self.users.get_by_cpf(data.cpf)
+        if existing and existing.id != user.id:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"CPF {mask_cpf(data.cpf)} ja cadastrado")
+
+        user.cpf = data.cpf
+        await self.audit.record(
+            actor=user,
+            action="UPDATE",
+            entity_type="USER_CPF",
+            entity_id=user.id,
+            entity_label=user.email,
+            details={"cpf_registered": True, "cpf_masked": mask_cpf(user.cpf)},
         )
         await self.db.flush()
         await self.db.commit()

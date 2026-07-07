@@ -16,6 +16,7 @@ import { paymentContractsAPI, paymentProcessesAPI, paymentSuppliersAPI } from '.
 import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
 import { useAuth } from '../context/AuthContext'
+import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { previewRowsToPdf } from '../utils/exportData'
 
@@ -155,6 +156,16 @@ function formatDateTime(value) {
   return new Intl.DateTimeFormat('pt-BR', { dateStyle: 'short', timeStyle: 'short' }).format(date)
 }
 
+function toLocalDateStart(value) {
+  if (!value) return null
+  const text = String(value)
+  const normalized = /^\d{4}-\d{2}-\d{2}/.test(text) ? `${text.slice(0, 10)}T00:00:00` : text
+  const date = new Date(normalized)
+  if (Number.isNaN(date.getTime())) return null
+  date.setHours(0, 0, 0, 0)
+  return date
+}
+
 function toDateInput(value) {
   if (!value) return ''
   return String(value).slice(0, 10)
@@ -204,8 +215,22 @@ function statusTone(value) {
   return 'MANUTENCAO'
 }
 
+function isOpenProcess(row) {
+  return !['PAID', 'ARCHIVED', 'CANCELLED'].includes(row.stage)
+}
+
+function isOverdueProcess(row) {
+  if (!row.due_date || !isOpenProcess(row)) return false
+  const due = toLocalDateStart(row.due_date)
+  if (!due) return false
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  return due < today
+}
+
 export default function PaymentProcessesPage() {
   const { canEdit, canDeleteModule, user } = useAuth()
+  const { organizations } = useMasterDataCatalog()
   const canManage = canEdit('payment_processes')
   const canDeleteProcesses = canDeleteModule('payment_processes')
   const [activeView, setActiveView] = useState('processes')
@@ -217,7 +242,7 @@ export default function PaymentProcessesPage() {
   const [suppliers, setSuppliers] = useState([])
   const [contracts, setContracts] = useState([])
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0, limit: PAGE_SIZE })
-  const [filters, setFilters] = useState({ kind: '', stage: '', supplier_id: '', contract_id: '', competence_month: '', due_from: '', due_to: '', search: '' })
+  const [filters, setFilters] = useState({ kind: '', stage: '', organization_id: '', supplier_id: '', contract_id: '', competence_month: '', due_from: '', due_to: '', search: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
@@ -247,6 +272,7 @@ export default function PaymentProcessesPage() {
     limit: PAGE_SIZE,
     kind: filters.kind || undefined,
     stage: filters.stage || undefined,
+    organization_id: filters.organization_id || undefined,
     supplier_id: filters.supplier_id || undefined,
     contract_id: filters.contract_id || undefined,
     competence_month: toApiMonth(filters.competence_month) || undefined,
@@ -258,6 +284,7 @@ export default function PaymentProcessesPage() {
   const reportColumns = useMemo(() => [
     { header: 'Processo', value: (row) => row.process_number || '-' },
     { header: 'Etapa', value: (row) => row.stage_label || stageLabel(row.stage) },
+    { header: 'Secretaria', value: (row) => row.organization_name || '-' },
     { header: 'Fornecedor', value: (row) => row.supplier_name || '-' },
     { header: 'Contrato', value: (row) => row.contract_number || '-' },
     { header: 'NF/Fatura', value: (row) => `${row.invoice_number || '-'} / ${row.billing_number || '-'}` },
@@ -267,22 +294,15 @@ export default function PaymentProcessesPage() {
     { header: 'Alertas', value: (row) => String(row.alerts?.length || 0), align: 'center', width: 42 },
   ], [])
 
-  const reportMetrics = useMemo(() => [
-    { label: 'Processos', value: dashboard?.total_processes ?? pagination.total },
-    { label: 'Em aberto', value: dashboard?.open_processes ?? 0 },
-    { label: 'Vencidos', value: dashboard?.overdue_processes ?? 0 },
-    { label: 'Alertas', value: dashboard?.alerts_count ?? 0 },
-    { label: 'Pendente', value: formatCurrency(dashboard?.pending_amount) },
-    { label: 'Pago', value: formatCurrency(dashboard?.paid_amount) },
-  ], [dashboard, pagination.total])
-
   const reportFilters = useMemo(() => {
     const supplier = suppliers.find((item) => item.id === filters.supplier_id)
     const contract = contracts.find((item) => item.id === filters.contract_id)
+    const organization = organizations.find((item) => item.id === filters.organization_id)
 
     return [
       filters.kind ? { label: 'Tipo', value: kindOptions.find((option) => option.value === filters.kind)?.label || filters.kind } : null,
       filters.stage ? { label: 'Etapa', value: stageLabel(filters.stage) } : null,
+      filters.organization_id ? { label: 'Secretaria', value: organization?.name || filters.organization_id } : null,
       filters.supplier_id ? { label: 'Fornecedor', value: supplier?.name || filters.supplier_id } : null,
       filters.contract_id ? { label: 'Contrato', value: contract?.number || filters.contract_id } : null,
       filters.competence_month ? { label: 'Competência', value: formatMonthLabel(filters.competence_month) } : null,
@@ -290,7 +310,7 @@ export default function PaymentProcessesPage() {
       filters.due_to ? { label: 'Vencimento final', value: formatDate(filters.due_to) } : null,
       filters.search ? { label: 'Busca', value: filters.search } : null,
     ].filter(Boolean)
-  }, [contracts, filters, suppliers])
+  }, [contracts, filters, organizations, suppliers])
 
   useEffect(() => {
     loadCatalogs()
@@ -368,7 +388,23 @@ export default function PaymentProcessesPage() {
 
   function resetFilters() {
     setPagination((current) => ({ ...current, page: 1 }))
-    setFilters({ kind: '', stage: '', supplier_id: '', contract_id: '', competence_month: '', due_from: '', due_to: '', search: '' })
+    setFilters({ kind: '', stage: '', organization_id: '', supplier_id: '', contract_id: '', competence_month: '', due_from: '', due_to: '', search: '' })
+  }
+
+  function buildReportMetrics(rows) {
+    const openRows = rows.filter(isOpenProcess)
+    const paidRows = rows.filter((row) => ['PAID', 'ARCHIVED'].includes(row.stage))
+    const pendingAmount = openRows.reduce((total, row) => total + toNumber(row.amount), 0)
+    const paidAmount = paidRows.reduce((total, row) => total + toNumber(row.amount), 0)
+
+    return [
+      { label: 'Processos', value: rows.length },
+      { label: 'Em aberto', value: openRows.length },
+      { label: 'Vencidos', value: rows.filter(isOverdueProcess).length },
+      { label: 'Alertas', value: rows.reduce((total, row) => total + (row.alerts?.length || 0), 0) },
+      { label: 'Pendente', value: formatCurrency(pendingAmount) },
+      { label: 'Pago', value: formatCurrency(paidAmount) },
+    ]
   }
 
   async function openProcess(processId) {
@@ -422,7 +458,7 @@ export default function PaymentProcessesPage() {
         columns: reportColumns,
         rows,
         filters: reportFilters,
-        summaryMetrics: reportMetrics,
+        summaryMetrics: buildReportMetrics(rows),
         referenceLabel: `Total filtrado para o relatório: ${rows.length} processo(s).`,
         responsibleSector: 'Secretaria Municipal de Administração | Departamento de Gestão da Frota',
         generatedBy: user?.name || user?.email || 'Usuário autenticado',
@@ -768,6 +804,12 @@ export default function PaymentProcessesPage() {
                   {stageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </Field>
+              <Field label="Secretaria">
+                <select className="app-select" value={filters.organization_id} onChange={(event) => updateFilter({ organization_id: event.target.value })}>
+                  <option value="">Todas</option>
+                  {organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
+                </select>
+              </Field>
               <Field label="Fornecedor">
                 <select className="app-select" value={filters.supplier_id} onChange={(event) => updateFilter({ supplier_id: event.target.value, contract_id: '' })}>
                   <option value="">Todos</option>
@@ -782,6 +824,12 @@ export default function PaymentProcessesPage() {
               </Field>
               <Field label="Competência">
                 <input className="app-input" type="month" value={filters.competence_month} onChange={(event) => updateFilter({ competence_month: event.target.value })} />
+              </Field>
+              <Field label="Vencimento inicial">
+                <input className="app-input" type="date" value={filters.due_from} onChange={(event) => updateFilter({ due_from: event.target.value })} />
+              </Field>
+              <Field label="Vencimento final">
+                <input className="app-input" type="date" value={filters.due_to} onChange={(event) => updateFilter({ due_to: event.target.value })} />
               </Field>
               <Field label="Busca">
                 <input className="app-input" type="search" value={filters.search} onChange={(event) => updateFilter({ search: event.target.value })} placeholder="Processo, NF, fornecedor..." />

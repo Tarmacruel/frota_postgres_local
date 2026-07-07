@@ -8,6 +8,7 @@ import { finesAPI } from '../api/fines'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
+import { DRIVER_LICENSE_CATEGORY_OPTIONS } from '../constants/driverCategories'
 
 const rowStatusOptions = [
   { value: '', label: 'Todas' },
@@ -50,8 +51,6 @@ const vehicleStatusOptions = [
   { value: 'MANUTENCAO', label: 'Manutenção' },
   { value: 'INATIVO', label: 'Inativo' },
 ]
-
-const driverCategoryOptions = ['A', 'B', 'C', 'D', 'E', 'AB', 'AC', 'AD', 'AE'].map((value) => ({ value, label: value }))
 
 const fieldLabels = {
   plate: 'Placa',
@@ -221,7 +220,7 @@ function staticOptionsForField(key, entityType) {
   if (key === 'vehicle_type') return vehicleTypeOptions
   if (key === 'ownership_type') return ownershipOptions
   if (key === 'status') return entityType === 'FINE' ? fineStatusOptions : vehicleStatusOptions
-  if (key === 'cnh_categoria') return driverCategoryOptions
+  if (key === 'cnh_categoria') return DRIVER_LICENSE_CATEGORY_OPTIONS
   return null
 }
 

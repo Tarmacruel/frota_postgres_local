@@ -44,6 +44,39 @@ function formatCurrency(value) {
   return formatCurrencyBRL(value)
 }
 
+function formatDateOnly(value) {
+  if (!value) return '-'
+  const normalized = String(value).length === 10 ? `${value}T00:00:00` : value
+  const date = new Date(normalized)
+  if (Number.isNaN(date.getTime())) return '-'
+  return new Intl.DateTimeFormat('pt-BR').format(date)
+}
+
+function dateBoundaryToIso(value, boundary) {
+  if (!value) return undefined
+  const suffix = boundary === 'end' ? 'T23:59:59.999' : 'T00:00:00.000'
+  const date = new Date(`${value}${suffix}`)
+  if (Number.isNaN(date.getTime())) return undefined
+  return date.toISOString()
+}
+
+function orderMatchesSearch(order, search) {
+  const term = search.trim().toLowerCase()
+  if (!term) return true
+  return [
+    order.request_number,
+    order.vehicle_plate,
+    order.organization_name,
+    order.fuel_station_name,
+    order.created_by_name,
+    order.fuel_station_phone,
+    order.supply_fuel_type,
+    order.notes,
+  ]
+    .filter(Boolean)
+    .some((value) => String(value).toLowerCase().includes(term))
+}
+
 function buildOrderMapsUrl(order) {
   if (order.fuel_station_maps_url) return order.fuel_station_maps_url
   if (order.fuel_station_latitude === null || order.fuel_station_latitude === undefined) return ''
@@ -84,7 +117,7 @@ export default function FuelSuppliesPage() {
   const [organizations, setOrganizations] = useState([])
   const [fuelStations, setFuelStations] = useState([])
   const [filters, setFilters] = useState({ vehicle_id: '', organization_id: '', fuel_station_id: '', only_anomalies: '' })
-  const [orderFilters, setOrderFilters] = useState({ status: 'TODOS', organization_id: '', fuel_station_id: '' })
+  const [orderFilters, setOrderFilters] = useState({ status: 'TODOS', organization_id: '', fuel_station_id: '', created_from: '', created_to: '' })
   const [search, setSearch] = useState('')
   const [orderSearch, setOrderSearch] = useState('')
   const [historyLoading, setHistoryLoading] = useState(true)
@@ -141,10 +174,7 @@ export default function FuelSuppliesPage() {
     try {
       setOrdersLoading(true)
       setError('')
-      const params = { limit: 100, page: 1 }
-      if (orderFilters.status !== 'TODOS') params.status = orderFilters.status
-      if (orderFilters.organization_id) params.organization_id = orderFilters.organization_id
-      if (orderFilters.fuel_station_id) params.fuel_station_id = orderFilters.fuel_station_id
+      const params = buildOrderQueryParams({ includePaging: true })
       const { data } = await fuelSupplyOrdersAPI.list(params)
       setOrders(asArray(data))
     } catch (err) {
@@ -162,6 +192,23 @@ export default function FuelSuppliesPage() {
     loadOrders()
   }, [orderFilters, canViewOrders])
 
+  function buildOrderQueryParams({ includePaging = false } = {}) {
+    const params = includePaging ? { limit: 100, page: 1 } : {}
+    if (orderFilters.status !== 'TODOS') params.status = orderFilters.status
+    if (orderFilters.organization_id) params.organization_id = orderFilters.organization_id
+    if (orderFilters.fuel_station_id) params.fuel_station_id = orderFilters.fuel_station_id
+    const createdFrom = dateBoundaryToIso(orderFilters.created_from, 'start')
+    const createdTo = dateBoundaryToIso(orderFilters.created_to, 'end')
+    if (createdFrom) params.created_from = createdFrom
+    if (createdTo) params.created_to = createdTo
+    return params
+  }
+
+  async function loadOrderReportRows() {
+    const rows = await fuelSupplyOrdersAPI.listAllForReport(buildOrderQueryParams())
+    return rows.filter((order) => orderMatchesSearch(order, orderSearch))
+  }
+
   const filteredRecords = useMemo(() => {
     const term = search.trim().toLowerCase()
     return records.filter((record) => {
@@ -173,21 +220,7 @@ export default function FuelSuppliesPage() {
   }, [records, search])
 
   const filteredOrders = useMemo(() => {
-    const term = orderSearch.trim().toLowerCase()
-    return orders.filter((order) => {
-      if (!term) return true
-      return [
-        order.request_number,
-        order.vehicle_plate,
-        order.organization_name,
-        order.fuel_station_name,
-        order.created_by_name,
-        order.fuel_station_phone,
-        order.notes,
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term))
-    })
+    return orders.filter((order) => orderMatchesSearch(order, orderSearch))
   }, [orders, orderSearch])
 
   const totalHistoryPages = Math.max(1, Math.ceil(filteredRecords.length / 10))
@@ -213,6 +246,22 @@ export default function FuelSuppliesPage() {
     () => orderExportColumns.filter((column) => column.header !== 'Localização posto'),
     [orderExportColumns],
   )
+
+  const orderReportColumns = useMemo(() => [
+    { header: 'Ordem', value: (order) => formatOrderNumber(order) },
+    { header: 'Emissão', value: (order) => formatDate(order.created_at) },
+    { header: 'Situação', value: (order) => getOrderStatusLabel(order.status) },
+    { header: 'Secretaria', value: (order) => order.organization_name || '-' },
+    { header: 'Veículo', value: (order) => order.vehicle_description || order.vehicle_plate || '-' },
+    { header: 'Posto', value: (order) => order.fuel_station_name || '-' },
+    { header: 'Solicitante', value: (order) => order.created_by_name || '-' },
+    { header: 'Litros previstos', value: (order) => formatNumber(order.requested_liters), align: 'right', width: 46 },
+    { header: 'Abastecido em', value: (order) => formatDate(order.supply_supplied_at) },
+    { header: 'Litros reais', value: (order) => formatNumber(order.supply_liters), align: 'right', width: 42 },
+    { header: 'Valor real', value: (order) => formatCurrency(order.supply_total_amount), align: 'right', width: 56 },
+    { header: 'Combustível', value: (order) => order.supply_fuel_type || '-' },
+    { header: 'Odômetro', value: (order) => formatNumber(order.supply_odometer_km, 1), align: 'right', width: 50 },
+  ], [])
 
   const organizationFilterOptions = useMemo(
     () => [{ value: '', label: 'Todas as secretarias' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))],
@@ -248,8 +297,33 @@ export default function FuelSuppliesPage() {
     }
   }
 
+  function buildOrderReportFilters() {
+    return [
+      { label: 'Situação', value: orderFilters.status === 'TODOS' ? 'Todas as situações' : getOrderStatusLabel(orderFilters.status) },
+      { label: 'Secretaria', value: organizations.find((org) => org.id === orderFilters.organization_id)?.name || 'Todas as secretarias' },
+      { label: 'Posto', value: fuelStations.find((station) => station.id === orderFilters.fuel_station_id)?.name || 'Todos os postos' },
+      orderFilters.created_from ? { label: 'Data inicial', value: formatDateOnly(orderFilters.created_from) } : null,
+      orderFilters.created_to ? { label: 'Data final', value: formatDateOnly(orderFilters.created_to) } : null,
+      orderSearch.trim() ? { label: 'Busca', value: orderSearch.trim() } : null,
+    ].filter(Boolean)
+  }
+
+  function buildOrderReportMetrics(rows) {
+    const completedRows = rows.filter((order) => order.status === 'COMPLETED')
+    const totalLiters = completedRows.reduce((total, order) => total + Number(order.supply_liters || 0), 0)
+    const totalAmount = completedRows.reduce((total, order) => total + Number(order.supply_total_amount || 0), 0)
+
+    return [
+      { label: 'Ordens no relatório', value: rows.length },
+      { label: 'Abertas', value: rows.filter((order) => order.status === 'OPEN').length },
+      { label: 'Concluídas', value: completedRows.length },
+      { label: 'Litros reais', value: formatNumber(totalLiters) },
+      { label: 'Valor real', value: formatCurrency(totalAmount) },
+    ]
+  }
+
   async function handlePreviewOrdersPdf() {
-    if (filteredOrders.length === 0) {
+    if (orders.length === 0) {
       setFeedback('Não há ordens filtradas para pré-visualizar em PDF.')
       return
     }
@@ -257,23 +331,19 @@ export default function FuelSuppliesPage() {
     try {
       setError('')
       setFeedback('')
+      const reportRows = await loadOrderReportRows()
+      if (reportRows.length === 0) {
+        setFeedback('Não há ordens filtradas para pré-visualizar em PDF.')
+        return
+      }
       await previewRowsToPdf({
         title: 'Frota PMTF - Ordens de abastecimento',
         fileName: 'frota-pmtf-ordens-abastecimento',
         subtitle: 'Relatório institucional das ordens emitidas para os postos credenciados.',
-        columns: orderPdfExportColumns,
-        rows: filteredOrders,
-        filters: [
-          { label: 'Situação', value: orderFilters.status === 'TODOS' ? 'Todas as situações' : getOrderStatusLabel(orderFilters.status) },
-          { label: 'Secretaria', value: organizations.find((org) => org.id === orderFilters.organization_id)?.name || 'Todas as secretarias' },
-          { label: 'Posto', value: fuelStations.find((station) => station.id === orderFilters.fuel_station_id)?.name || 'Todos os postos' },
-          ...(orderSearch.trim() ? [{ label: 'Busca', value: orderSearch.trim() }] : []),
-        ],
-        summaryMetrics: [
-          { label: 'Ordens exibidas', value: filteredOrders.length },
-          { label: 'Abertas', value: filteredOrders.filter((order) => order.status === 'OPEN').length },
-          { label: 'Concluídas', value: filteredOrders.filter((order) => order.status === 'COMPLETED').length },
-        ],
+        columns: orderReportColumns,
+        rows: reportRows,
+        filters: buildOrderReportFilters(),
+        summaryMetrics: buildOrderReportMetrics(reportRows),
         orientation: 'landscape',
       })
       setFeedback('Pré-visualização do PDF das ordens aberta em nova guia.')
@@ -283,7 +353,7 @@ export default function FuelSuppliesPage() {
   }
 
   async function handleExportOrdersXlsx() {
-    if (filteredOrders.length === 0) {
+    if (orders.length === 0) {
       setFeedback('Não há ordens filtradas para exportar.')
       return
     }
@@ -291,17 +361,17 @@ export default function FuelSuppliesPage() {
     try {
       setError('')
       setFeedback('')
+      const reportRows = await loadOrderReportRows()
+      if (reportRows.length === 0) {
+        setFeedback('Não há ordens filtradas para exportar.')
+        return
+      }
       await exportRowsToXlsx({
         fileName: 'frota-pmtf-ordens-abastecimento',
         sheetName: 'Ordens de abastecimento',
-        columns: orderExportColumns,
-        rows: filteredOrders,
-        filters: [
-          { label: 'Situação', value: orderFilters.status === 'TODOS' ? 'Todas as situações' : getOrderStatusLabel(orderFilters.status) },
-          { label: 'Secretaria', value: organizations.find((org) => org.id === orderFilters.organization_id)?.name || 'Todas as secretarias' },
-          { label: 'Posto', value: fuelStations.find((station) => station.id === orderFilters.fuel_station_id)?.name || 'Todos os postos' },
-          ...(orderSearch.trim() ? [{ label: 'Busca', value: orderSearch.trim() }] : []),
-        ],
+        columns: orderReportColumns,
+        rows: reportRows,
+        filters: buildOrderReportFilters(),
       })
       setFeedback('Exportação das ordens em XLSX iniciada com sucesso.')
     } catch (err) {
@@ -354,7 +424,7 @@ export default function FuelSuppliesPage() {
 
   function clearOrderFilters() {
     setOrderSearch('')
-    setOrderFilters({ status: 'TODOS', organization_id: '', fuel_station_id: '' })
+    setOrderFilters({ status: 'TODOS', organization_id: '', fuel_station_id: '', created_from: '', created_to: '' })
   }
 
   return (
@@ -442,6 +512,28 @@ export default function FuelSuppliesPage() {
             placeholder="Filtrar posto"
             searchPlaceholder="Buscar posto"
           />
+          <label className="form-field filter-date-field">
+            <span>Data inicial</span>
+            <input
+              className="app-input"
+              type="date"
+              value={orderFilters.created_from}
+              onChange={(event) => setOrderFilters((prev) => ({ ...prev, created_from: event.target.value }))}
+              aria-label="Data inicial da emissão"
+              title="Data inicial da emissão"
+            />
+          </label>
+          <label className="form-field filter-date-field">
+            <span>Data final</span>
+            <input
+              className="app-input"
+              type="date"
+              value={orderFilters.created_to}
+              onChange={(event) => setOrderFilters((prev) => ({ ...prev, created_to: event.target.value }))}
+              aria-label="Data final da emissão"
+              title="Data final da emissão"
+            />
+          </label>
           <button className="ghost-button" type="button" onClick={clearOrderFilters}>Limpar filtros</button>
         </div>
 

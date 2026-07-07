@@ -19,6 +19,12 @@ PASSWORD_CHANGE_REQUIRED_DETAIL = {
 }
 
 
+CPF_REQUIRED_DETAIL = {
+    "code": "CPF_REQUIRED",
+    "message": "Informe seu CPF para liberar o acesso",
+}
+
+
 async def get_current_user(
     db: AsyncSession = Depends(get_db_session),
     access_token: str | None = Cookie(default=None),
@@ -45,6 +51,8 @@ async def get_current_user(
 async def get_current_user_ready(current_user: User = Depends(get_current_user)) -> User:
     if current_user.must_change_password:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=PASSWORD_CHANGE_REQUIRED_DETAIL)
+    if not current_user.cpf:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=CPF_REQUIRED_DETAIL)
     return current_user
 
 

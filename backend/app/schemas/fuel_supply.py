@@ -207,6 +207,13 @@ class FuelSupplyOrderOut(BaseModel):
     max_amount: float | None
     notes: str | None
     confirmed_at: datetime | None
+    supply_id: UUID | None = None
+    supply_supplied_at: datetime | None = None
+    supply_liters: float | None = None
+    supply_total_amount: float | None = None
+    supply_fuel_type: str | None = None
+    supply_odometer_km: float | None = None
+    supply_receipt_url: str | None = None
     created_at: datetime
     updated_at: datetime
     signature_summary: dict | None = None

@@ -313,11 +313,17 @@ export default function VehiclesPage() {
     getDepartmentsByOrganization,
     getAllocationsByDepartment,
   } = useMasterDataCatalog()
+  const editCatalog = useMasterDataCatalog({ includeAll: true })
 
   const statusFilter = searchParams.get('status') || 'TODOS'
   const focusVehicleId = searchParams.get('focus')
+  const modalOrganizations = editingId ? editCatalog.organizations : organizations
+  const modalCatalogLoading = editingId ? editCatalog.loading : catalogLoading
+  const modalCatalogError = editingId ? editCatalog.error : ''
+  const modalGetDepartmentsByOrganization = editingId ? editCatalog.getDepartmentsByOrganization : getDepartmentsByOrganization
+  const modalGetAllocationsByDepartment = editingId ? editCatalog.getAllocationsByDepartment : getAllocationsByDepartment
 
-  const organizationOptions = organizations.map((organization) => ({
+  const organizationOptions = modalOrganizations.map((organization) => ({
     value: organization.id,
     label: organization.name,
     description: `${organization.departments.length} departamento(s)`,
@@ -341,13 +347,13 @@ export default function VehiclesPage() {
     ]
   }, [organizationFilter, organizations, vehicles])
 
-  const departmentOptions = (form.organization_id ? getDepartmentsByOrganization(form.organization_id) : []).map((department) => ({
+  const departmentOptions = (form.organization_id ? modalGetDepartmentsByOrganization(form.organization_id) : []).map((department) => ({
     value: department.id,
     label: department.name,
     description: department.organization_name,
   }))
 
-  const allocationOptions = (form.department_id ? getAllocationsByDepartment(form.department_id) : []).map((allocation) => ({
+  const allocationOptions = (form.department_id ? modalGetAllocationsByDepartment(form.department_id) : []).map((allocation) => ({
     value: allocation.id,
     label: allocation.name,
     description: allocation.display_name,
@@ -903,7 +909,7 @@ export default function VehiclesPage() {
       ) : null}
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
-      {catalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError}</div> : null}
+      {catalogError || modalCatalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError || modalCatalogError}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
       <div className="surface-panel panel-nested">
@@ -1118,7 +1124,7 @@ export default function VehiclesPage() {
             <div className="form-grid modal-form-grid">
               <div className="form-field">
                 <label>Órgão</label>
-                <SearchableSelect value={form.organization_id} onChange={(value) => setForm({ ...form, organization_id: value, department_id: '', allocation_id: '' })} options={organizationOptions} placeholder={catalogLoading ? 'Carregando órgãos...' : 'Selecione o órgão'} searchPlaceholder="Buscar órgão" disabled={catalogLoading || organizationOptions.length === 0} />
+                <SearchableSelect value={form.organization_id} onChange={(value) => setForm({ ...form, organization_id: value, department_id: '', allocation_id: '' })} options={organizationOptions} placeholder={modalCatalogLoading ? 'Carregando órgãos...' : 'Selecione o órgão'} searchPlaceholder="Buscar órgão" disabled={modalCatalogLoading || organizationOptions.length === 0} />
               </div>
               <div className="form-field">
                 <label>Departamento</label>
@@ -1152,7 +1158,7 @@ export default function VehiclesPage() {
           ) : null}
 
           <div className="actions-inline modal-actions">
-            <button className="app-button" type="submit" disabled={submitting || catalogLoading || Boolean(editingId && !form.edit_reason.trim())}>
+            <button className="app-button" type="submit" disabled={submitting || modalCatalogLoading || Boolean(editingId && !form.edit_reason.trim())}>
               {submitting ? 'Salvando...' : editingId ? 'Atualizar veículo' : 'Cadastrar veículo'}
             </button>
             <button className="ghost-button" type="button" onClick={closeVehicleModal}>Cancelar</button>

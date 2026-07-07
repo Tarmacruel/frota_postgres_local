@@ -3,9 +3,10 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 from uuid import UUID
-from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, String, text
+from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, String, text
 from sqlalchemy.dialects.postgresql import CITEXT, UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
+from app.core.cpf import mask_cpf
 from app.core.permissions import default_permissions_for_role
 from app.db.base import Base
 
@@ -19,6 +20,7 @@ class UserRole(str, enum.Enum):
 
 class User(Base):
     __tablename__ = "users"
+    __table_args__ = (Index("uq_users_cpf", "cpf", unique=True),)
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     name: Mapped[str] = mapped_column(String(150), nullable=False)
@@ -29,6 +31,7 @@ class User(Base):
         nullable=True,
         index=True,
     )
+    cpf: Mapped[str | None] = mapped_column(String(11), nullable=True)
     password_hash: Mapped[str] = mapped_column(String(255), nullable=False)
     must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False, server_default=text("false"))
     role: Mapped[UserRole] = mapped_column(Enum(UserRole, name="user_role"), nullable=False, default=UserRole.PADRAO)
@@ -45,6 +48,18 @@ class User(Base):
     @property
     def organization_name(self) -> str | None:
         return self.organization.name if self.organization else None
+
+    @property
+    def cpf_masked(self) -> str | None:
+        return mask_cpf(self.cpf)
+
+    @property
+    def has_cpf(self) -> bool:
+        return bool(self.cpf)
+
+    @property
+    def must_register_cpf(self) -> bool:
+        return not self.has_cpf
 
     @property
     def permissions(self) -> dict[str, dict[str, bool]]:

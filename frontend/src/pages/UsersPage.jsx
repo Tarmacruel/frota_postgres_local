@@ -11,6 +11,7 @@ import { getRoleLabel } from '../utils/roles'
 const initialForm = {
   name: '',
   email: '',
+  cpf: '',
   organization_id: '',
   password: '',
   role: 'PADRAO',
@@ -51,7 +52,7 @@ export default function UsersPage() {
     return users.filter((user) => {
       const term = search.trim().toLowerCase()
       const matchesSearch =
-        !term || [user.name, user.email, user.organization_name, getRoleLabel(user.role)].some((value) => String(value).toLowerCase().includes(term))
+        !term || [user.name, user.email, user.cpf_masked, user.organization_name, getRoleLabel(user.role)].some((value) => String(value).toLowerCase().includes(term))
       const matchesRole = roleFilter === 'TODOS' || user.role === roleFilter
       const matchesOrganization =
         organizationFilter === 'TODAS' ||
@@ -63,6 +64,7 @@ export default function UsersPage() {
   const exportColumns = [
     { header: 'Nome', value: (user) => user.name },
     { header: 'E-mail', value: (user) => user.email },
+    { header: 'CPF', value: (user) => user.cpf_masked || 'Pendente' },
     { header: 'Secretaria', value: (user) => user.organization_name || 'Não informada' },
     { header: 'Perfil', value: (user) => getRoleLabel(user.role) },
     { header: 'Senha', value: (user) => (user.must_change_password ? 'Troca pendente' : 'Regularizada') },
@@ -98,6 +100,7 @@ export default function UsersPage() {
     setForm({
       name: user.name,
       email: user.email,
+      cpf: '',
       organization_id: user.organization_id || '',
       password: '',
       role: user.role,
@@ -172,6 +175,10 @@ export default function UsersPage() {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if (!editingUser && !form.cpf.trim()) {
+      setError('Informe o CPF do usuario.')
+      return
+    }
     if (!form.organization_id) {
       setError('Selecione a secretaria do usuário.')
       return
@@ -189,6 +196,7 @@ export default function UsersPage() {
           organization_id: form.organization_id,
           role: form.role,
         }
+        if (form.cpf.trim()) payload.cpf = form.cpf
         if (form.password.trim()) payload.password = form.password
         await api.put(`/users/${editingUser.id}`, payload)
         setFeedback('Usuário atualizado com sucesso.')
@@ -313,7 +321,7 @@ export default function UsersPage() {
         <div className="filter-inline">
           <input
             className="app-input"
-            placeholder="Buscar por nome, e-mail, secretaria ou perfil"
+            placeholder="Buscar por nome, e-mail, CPF, secretaria ou perfil"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -355,6 +363,10 @@ export default function UsersPage() {
           <strong>{users.filter((user) => user.must_change_password).length}</strong>
           <span>trocas pendentes</span>
         </div>
+        <div className="metric-inline">
+          <strong>{users.filter((user) => user.must_register_cpf).length}</strong>
+          <span>CPFs pendentes</span>
+        </div>
       </div>
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
@@ -368,6 +380,7 @@ export default function UsersPage() {
               <tr>
                 <th>Nome</th>
                 <th>E-mail</th>
+                <th>CPF</th>
                 <th>Secretaria</th>
                 <th>Perfil</th>
                 <th>Senha</th>
@@ -379,11 +392,11 @@ export default function UsersPage() {
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="8" className="muted">Carregando usuários...</td>
+                  <td colSpan="9" className="muted">Carregando usuários...</td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan="8">
+                  <td colSpan="9">
                     <div className="empty-state">Nenhum usuário encontrado para os filtros aplicados.</div>
                   </td>
                 </tr>
@@ -397,6 +410,7 @@ export default function UsersPage() {
                       </div>
                     </td>
                     <td data-label="E-mail">{user.email}</td>
+                    <td data-label="CPF">{user.cpf_masked || 'Pendente'}</td>
                     <td data-label="Secretaria">{user.organization_name || 'Não informada'}</td>
                     <td data-label="Perfil">
                       <span className={`status-badge ${user.role === 'ADMIN' ? 'status-ATIVO' : user.role === 'PRODUCAO' ? 'status-PRODUCAO' : user.role === 'POSTO' ? 'status-POSTO' : 'status-INATIVO'}`}>
@@ -450,6 +464,17 @@ export default function UsersPage() {
               placeholder="usuario@frota.local"
               value={form.email}
               onChange={(event) => setForm({ ...form, email: event.target.value })}
+            />
+          </div>
+          <div className="form-field">
+            <label htmlFor="user-cpf">{editingUser ? 'Substituir CPF (opcional)' : 'CPF'}</label>
+            <input
+              id="user-cpf"
+              className="app-input"
+              placeholder={editingUser ? (editingUser.cpf_masked || 'Preencha somente para substituir') : '000.000.000-00'}
+              value={form.cpf}
+              onChange={(event) => setForm({ ...form, cpf: event.target.value })}
+              inputMode="numeric"
             />
           </div>
           <div className="form-field">

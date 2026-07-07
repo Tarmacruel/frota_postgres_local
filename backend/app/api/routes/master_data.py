@@ -26,10 +26,11 @@ router = APIRouter(prefix="/api/master-data", tags=["MasterData"])
 
 @router.get("/catalog", response_model=MasterDataCatalogOut)
 async def get_catalog(
+    include_all: bool = Query(default=False),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("master_data", "view")),
 ):
-    return await MasterDataService(db).get_catalog(current_user=current_user)
+    return await MasterDataService(db).get_catalog(current_user=current_user, include_all=include_all)
 
 
 @router.get("/organizations", response_model=list[OrganizationOut])

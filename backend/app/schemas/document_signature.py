@@ -43,6 +43,7 @@ class DocumentSignatureOut(BaseModel):
     signer_email: str | None = None
     signer_role: str | None = None
     signer_organization_name: str | None = None
+    signer_cpf_masked: str | None = None
     content_hash: str
     signature_fingerprint: str
     signed_at: datetime

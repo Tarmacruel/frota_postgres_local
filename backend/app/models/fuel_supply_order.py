@@ -73,3 +73,4 @@ class FuelSupplyOrder(Base):
     fuel_station_ref: Mapped["FuelStation | None"] = relationship()
     creator: Mapped["User"] = relationship(foreign_keys=[created_by_user_id])
     confirmer: Mapped["User | None"] = relationship(foreign_keys=[confirmed_by_user_id])
+    supply: Mapped["FuelSupply | None"] = relationship(back_populates="fuel_supply_order", uselist=False)

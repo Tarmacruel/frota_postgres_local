@@ -18,9 +18,11 @@ from app.models.payment_process import (
     PaymentContract,
     PaymentContractAmendment,
     PaymentContractStatus,
+    PaymentProcessChecklistItem,
     PaymentProcess,
     PaymentProcessKind,
     PaymentProcessStage,
+    PaymentProcessStageEvent,
     PaymentSupplier,
 )
 
@@ -328,8 +330,8 @@ class PaymentProcessRepository:
             joinedload(PaymentProcess.contract).selectinload(PaymentContract.processes),
             joinedload(PaymentProcess.assigned_to),
             selectinload(PaymentProcess.references),
-            selectinload(PaymentProcess.checklist_items),
-            selectinload(PaymentProcess.stage_events),
+            selectinload(PaymentProcess.checklist_items).joinedload(PaymentProcessChecklistItem.updater),
+            selectinload(PaymentProcess.stage_events).joinedload(PaymentProcessStageEvent.creator),
         )
 
     def _contract_options(self):

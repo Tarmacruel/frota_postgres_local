@@ -1466,6 +1466,21 @@ button {
   justify-content: stretch;
 }
 
+.filter-inline > .filter-date-field {
+  width: 100%;
+}
+
+.filter-date-field > span {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+}
+
+.filter-date-field > .app-input {
+  min-width: 0;
+  width: 100%;
+}
+
 .toolbar-card {
   margin-bottom: 18px;
   padding: 14px;
@@ -2660,6 +2675,11 @@ button {
   .filter-inline > .app-select,
   .filter-inline > .searchable-select {
     flex: 0 1 220px;
+  }
+
+  .filter-inline > .filter-date-field {
+    flex: 0 1 170px;
+    width: auto;
   }
 
   .filter-inline > .app-button,

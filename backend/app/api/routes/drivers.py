@@ -17,10 +17,11 @@ router = APIRouter(prefix="/api/drivers", tags=["Drivers"])
 async def list_active_drivers(
     search: str | None = Query(default=None),
     limit: int = Query(default=100, ge=1, le=200),
+    organization_id: UUID | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("drivers", "view")),
 ):
-    return await DriverService(db).list_active(search=search, limit=limit, current_user=current_user)
+    return await DriverService(db).list_active(search=search, limit=limit, organization_id=organization_id, current_user=current_user)
 
 
 @router.get("", response_model=DriverListResponse)

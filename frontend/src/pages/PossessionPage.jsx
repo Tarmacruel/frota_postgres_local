@@ -46,6 +46,21 @@ function formatDate(value) {
   return new Date(value).toLocaleString('pt-BR')
 }
 
+function formatDateOnly(value) {
+  if (!value) return '-'
+  const normalized = String(value).length === 10 ? `${value}T00:00:00` : value
+  const date = new Date(normalized)
+  if (Number.isNaN(date.getTime())) return '-'
+  return new Intl.DateTimeFormat('pt-BR').format(date)
+}
+
+function dateBoundary(value, boundary) {
+  if (!value) return null
+  const suffix = boundary === 'end' ? 'T23:59:59.999' : 'T00:00:00.000'
+  const date = new Date(`${value}${suffix}`)
+  return Number.isNaN(date.getTime()) ? null : date
+}
+
 function formatTimestamp(value) {
   if (!value) return '-'
   return new Date(value).toLocaleString('pt-BR')
@@ -122,6 +137,8 @@ export default function PossessionPage() {
   const [search, setSearch] = useState('')
   const [organizationFilter, setOrganizationFilter] = useState('')
   const [vehicleFilter, setVehicleFilter] = useState('')
+  const [startDateFrom, setStartDateFrom] = useState('')
+  const [startDateTo, setStartDateTo] = useState('')
   const [viewFilter, setViewFilter] = useState('ATIVAS')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [endingRecord, setEndingRecord] = useState(null)
@@ -263,6 +280,9 @@ export default function PossessionPage() {
   }, [focusRecordId])
 
   const baseFilteredRecords = useMemo(() => {
+    const startFrom = dateBoundary(startDateFrom, 'start')
+    const startTo = dateBoundary(startDateTo, 'end')
+
     return records.filter((record) => {
       const term = search.trim().toLowerCase()
       const matchesSearch =
@@ -274,10 +294,19 @@ export default function PossessionPage() {
       const matchesOrganization =
         !organizationFilter ||
         (organizationFilter === unassignedOrganizationFilter ? !recordOrganizationId : recordOrganizationId === organizationFilter)
+      let matchesStartDate = true
 
-      return matchesSearch && matchesOrganization
+      if (startFrom || startTo) {
+        const recordStartDate = new Date(record.start_date)
+        matchesStartDate =
+          !Number.isNaN(recordStartDate.getTime()) &&
+          (!startFrom || recordStartDate >= startFrom) &&
+          (!startTo || recordStartDate <= startTo)
+      }
+
+      return matchesSearch && matchesOrganization && matchesStartDate
     })
-  }, [organizationFilter, records, search, vehicles])
+  }, [organizationFilter, records, search, startDateFrom, startDateTo, vehicles])
 
   const focusedRecord = focusRecordId ? records.find((record) => record.id === focusRecordId) || null : null
   const filteredRecords = focusedRecord ? [focusedRecord] : baseFilteredRecords
@@ -286,7 +315,7 @@ export default function PossessionPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, organizationFilter, vehicleFilter, viewFilter, focusRecordId, records.length])
+  }, [search, organizationFilter, vehicleFilter, startDateFrom, startDateTo, viewFilter, focusRecordId, records.length])
 
   function buildFilterSummary() {
     return [
@@ -298,6 +327,8 @@ export default function PossessionPage() {
           : organizationFilterOptions.find((option) => option.value === organizationFilter)?.label || 'Selecionada',
       }] : []),
       ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+      ...(startDateFrom ? [{ label: 'Início da posse a partir de', value: formatDateOnly(startDateFrom) }] : []),
+      ...(startDateTo ? [{ label: 'Início da posse até', value: formatDateOnly(startDateTo) }] : []),
       ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
     ]
   }
@@ -797,6 +828,28 @@ export default function PossessionPage() {
               placeholder="Filtrar veículo"
               searchPlaceholder="Buscar veículo por placa, modelo, chassi ou lotação"
             />
+            <label className="form-field filter-date-field">
+              <span>Data inicial</span>
+              <input
+                className="app-input"
+                type="date"
+                value={startDateFrom}
+                onChange={(event) => setStartDateFrom(event.target.value)}
+                aria-label="Data inicial do início da posse"
+                title="Data inicial do início da posse"
+              />
+            </label>
+            <label className="form-field filter-date-field">
+              <span>Data final</span>
+              <input
+                className="app-input"
+                type="date"
+                value={startDateTo}
+                onChange={(event) => setStartDateTo(event.target.value)}
+                aria-label="Data final do início da posse"
+                title="Data final do início da posse"
+              />
+            </label>
           </div>
         </div>
       </div>

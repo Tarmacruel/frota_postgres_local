@@ -25,10 +25,12 @@ class MasterDataService:
         self.repo = MasterDataRepository(db)
         self.audit = AuditService(db)
 
-    async def get_catalog(self, current_user: User | None = None) -> dict:
+    async def get_catalog(self, current_user: User | None = None, *, include_all: bool = False) -> dict:
         if production_scope_is_empty(current_user):
             return {"organizations": []}
-        organizations = await self.repo.list_catalog(organization_id=scoped_organization_id(current_user))
+        organizations = await self.repo.list_catalog(
+            organization_id=None if include_all else scoped_organization_id(current_user)
+        )
         return {"organizations": organizations}
 
     async def list_organizations(self, current_user: User | None = None) -> list[Organization]:

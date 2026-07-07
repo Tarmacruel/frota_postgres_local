@@ -1,0 +1,128 @@
+- generic [active] [ref=e1]:
+  - generic [ref=e50]:
+    - complementary [ref=e51]:
+      - generic [ref=e52]:
+        - generic [ref=e53]:
+          - img "Brasão oficial da Prefeitura Municipal de Teixeira de Freitas" [ref=e55]
+          - strong [ref=e57]: Frota PMTF
+        - button "Rebater menu lateral" [ref=e58] [cursor=pointer]:
+          - img [ref=e59]
+      - generic [ref=e63]:
+        - generic [ref=e64]:
+          - generic [ref=e65]: Visao geral
+          - navigation "Visao geral" [ref=e66]:
+            - link "Início. Resumo" [ref=e67] [cursor=pointer]:
+              - /url: /
+              - img [ref=e69]
+              - generic [ref=e75]: Início
+              - text: Resumo
+        - generic [ref=e76]:
+          - generic [ref=e77]: Operacional
+          - navigation "Operacional" [ref=e78]:
+            - link "Veículos. Frota" [ref=e79] [cursor=pointer]:
+              - /url: /vehicles
+              - img [ref=e81]
+              - generic [ref=e86]: Veículos
+              - text: Frota
+            - link "Posses. Responsáveis" [ref=e87] [cursor=pointer]:
+              - /url: /posses
+              - img [ref=e89]
+              - generic [ref=e93]: Posses
+              - text: Responsáveis
+            - link "Condutores. Motoristas" [ref=e94] [cursor=pointer]:
+              - /url: /condutores
+              - img [ref=e96]
+              - generic [ref=e102]: Condutores
+              - text: Motoristas
+            - link "Manutenções. Custos" [ref=e103] [cursor=pointer]:
+              - /url: /manutencoes
+              - img [ref=e105]
+              - generic [ref=e110]: Manutenções
+              - text: Custos
+            - link "Sinistros. Ocorrências" [ref=e111] [cursor=pointer]:
+              - /url: /sinistros
+              - img [ref=e113]
+              - generic [ref=e117]: Sinistros
+              - text: Ocorrências
+            - link "Multas. Autos" [ref=e118] [cursor=pointer]:
+              - /url: /multas
+              - img [ref=e120]
+              - generic [ref=e123]: Multas
+              - text: Autos
+            - link "Abastecimentos. Consumo" [ref=e124] [cursor=pointer]:
+              - /url: /abastecimentos
+              - img [ref=e126]
+              - generic [ref=e131]: Abastecimentos
+              - text: Consumo
+            - link "Ordens abertas. Pendentes" [ref=e132] [cursor=pointer]:
+              - /url: /ordens-abastecimento
+              - img [ref=e134]
+              - generic [ref=e139]: Ordens abertas
+              - text: Pendentes
+        - generic [ref=e140]:
+          - generic [ref=e141]: Gestão
+          - navigation "Gestão" [ref=e142]:
+            - link "Cadastros. Lotação" [ref=e143] [cursor=pointer]:
+              - /url: /cadastros
+              - img [ref=e145]
+              - generic [ref=e148]: Cadastros
+              - text: Lotação
+            - link "Postos. Credenciados" [ref=e149] [cursor=pointer]:
+              - /url: /postos
+              - img [ref=e151]
+              - generic [ref=e154]: Postos
+              - text: Credenciados
+            - link "Processos de pagamento. Pagamentos" [ref=e155] [cursor=pointer]:
+              - /url: /processos-pagamento
+              - img [ref=e157]
+              - generic [ref=e160]: Processos de pagamento
+              - text: Pagamentos
+            - link "Análises. BI" [ref=e161] [cursor=pointer]:
+              - /url: /analytics
+              - img [ref=e163]
+              - generic [ref=e169]: Análises
+              - text: BI
+            - link "Importar/Exportar. Importação" [ref=e170] [cursor=pointer]:
+              - /url: /importacao-dados
+              - img [ref=e172]
+              - generic [ref=e175]: Importar/Exportar
+              - text: Importação
+            - link "Usuários. Perfis" [ref=e176] [cursor=pointer]:
+              - /url: /users
+              - img [ref=e178]
+              - generic [ref=e184]: Usuários
+              - text: Perfis
+            - link "Auditoria. Logs" [ref=e185] [cursor=pointer]:
+              - /url: /auditoria
+              - img [ref=e187]
+              - generic [ref=e191]: Auditoria
+              - text: Logs
+      - generic [ref=e193]:
+        - generic [ref=e194]: A
+        - strong [ref=e196]: Administrador
+        - button "Alterar senha" [ref=e197] [cursor=pointer]:
+          - img [ref=e198]
+        - button "Encerrar sessão" [ref=e203] [cursor=pointer]:
+          - img [ref=e204]
+    - generic [ref=e207]:
+      - banner [ref=e208]:
+        - heading "Início" [level=1] [ref=e211]
+        - generic [ref=e212]:
+          - button "Abrir busca global" [disabled] [ref=e213] [cursor=pointer]:
+            - generic [ref=e214]:
+              - img [ref=e215]
+              - generic [ref=e218]: Busca global
+          - button "Ativar modo escuro" [ref=e219] [cursor=pointer]:
+            - img [ref=e220]
+      - main [ref=e222]:
+        - generic [ref=e224]: Informe seu CPF para continuar usando o sistema.
+  - dialog "CPF obrigatÃ³rio" [ref=e225]:
+    - banner [ref=e226]:
+      - generic [ref=e228]:
+        - heading "CPF obrigatÃ³rio" [level=3] [ref=e229]
+        - generic "Informe seu CPF para preparar o acesso Ã s assinaturas digitais com certificado." [ref=e230]: i
+    - generic [ref=e232]:
+      - textbox "CPF" [ref=e233]
+      - generic [ref=e234]:
+        - button "Registrar CPF" [ref=e235] [cursor=pointer]
+        - button "Sair" [ref=e236] [cursor=pointer]

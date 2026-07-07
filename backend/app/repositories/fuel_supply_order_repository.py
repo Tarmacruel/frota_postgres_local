@@ -29,6 +29,7 @@ class FuelSupplyOrderRepository:
                 joinedload(FuelSupplyOrder.fuel_station_ref),
                 joinedload(FuelSupplyOrder.creator),
                 joinedload(FuelSupplyOrder.confirmer),
+                joinedload(FuelSupplyOrder.supply),
             )
             .where(FuelSupplyOrder.id == order_id)
         )
@@ -44,6 +45,7 @@ class FuelSupplyOrderRepository:
                 joinedload(FuelSupplyOrder.fuel_station_ref),
                 joinedload(FuelSupplyOrder.creator),
                 joinedload(FuelSupplyOrder.confirmer),
+                joinedload(FuelSupplyOrder.supply),
             )
             .where(FuelSupplyOrder.validation_code == validation_code)
         )
@@ -60,6 +62,8 @@ class FuelSupplyOrderRepository:
         fuel_station_id: UUID | None = None,
         fuel_station_ids: list[UUID] | None = None,
         due_until: datetime | None = None,
+        created_from: datetime | None = None,
+        created_to: datetime | None = None,
     ) -> tuple[list[FuelSupplyOrder], int]:
         stmt = select(FuelSupplyOrder).options(
             joinedload(FuelSupplyOrder.vehicle),
@@ -68,6 +72,7 @@ class FuelSupplyOrderRepository:
             joinedload(FuelSupplyOrder.fuel_station_ref),
             joinedload(FuelSupplyOrder.creator),
             joinedload(FuelSupplyOrder.confirmer),
+            joinedload(FuelSupplyOrder.supply),
         )
         count_stmt = select(func.count(FuelSupplyOrder.id))
 
@@ -84,6 +89,10 @@ class FuelSupplyOrderRepository:
             filters.append(FuelSupplyOrder.fuel_station_id.in_(fuel_station_ids))
         if due_until:
             filters.append(FuelSupplyOrder.expires_at <= due_until)
+        if created_from:
+            filters.append(FuelSupplyOrder.created_at >= created_from)
+        if created_to:
+            filters.append(FuelSupplyOrder.created_at <= created_to)
 
         if filters:
             clause = and_(*filters)

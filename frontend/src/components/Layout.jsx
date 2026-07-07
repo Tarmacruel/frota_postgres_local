@@ -17,10 +17,12 @@ function readStorage(key, fallback) {
 }
 
 export default function Layout() {
-  const { user, logout, changePassword, mustChangePassword, isAdmin, canView, roleLabel } = useAuth()
+  const { user, logout, changePassword, registerCpf, mustChangePassword, mustRegisterCpf, isAdmin, canView, roleLabel } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const passwordChangeRequired = Boolean(mustChangePassword)
+  const cpfRegistrationRequired = Boolean(mustRegisterCpf) && !passwordChangeRequired
+  const accessBlocked = passwordChangeRequired || cpfRegistrationRequired
   const mainRef = useRef(null)
 
   const [navOpen, setNavOpen] = useState(false)
@@ -30,6 +32,8 @@ export default function Layout() {
   const [passwordModalOpen, setPasswordModalOpen] = useState(false)
   const [passwordForm, setPasswordForm] = useState({ current_password: '', new_password: '', confirm_password: '' })
   const [passwordFeedback, setPasswordFeedback] = useState('')
+  const [cpfForm, setCpfForm] = useState({ cpf: '' })
+  const [cpfFeedback, setCpfFeedback] = useState('')
   const [notificationsOpen, setNotificationsOpen] = useState(false)
   const [adminNotifications, setAdminNotifications] = useState([])
   const [unreadNotifications, setUnreadNotifications] = useState(0)
@@ -151,7 +155,7 @@ export default function Layout() {
 
   useEffect(() => {
     const handleKeyDown = (event) => {
-      if (passwordChangeRequired) return
+      if (accessBlocked) return
       const target = event.target
       const tagName = target?.tagName?.toLowerCase()
       const isTypingTarget = tagName === 'input' || tagName === 'textarea' || target?.isContentEditable
@@ -166,7 +170,7 @@ export default function Layout() {
 
     window.addEventListener('keydown', handleKeyDown)
     return () => window.removeEventListener('keydown', handleKeyDown)
-  }, [passwordChangeRequired])
+  }, [accessBlocked])
 
   useEffect(() => {
     if (!passwordChangeRequired) return
@@ -174,9 +178,14 @@ export default function Layout() {
     setPasswordModalOpen(true)
   }, [passwordChangeRequired])
 
+  useEffect(() => {
+    if (!cpfRegistrationRequired) return
+    setSearchOpen(false)
+  }, [cpfRegistrationRequired])
+
 
   useEffect(() => {
-    if (!isAdmin || passwordChangeRequired) return
+    if (!isAdmin || accessBlocked) return
 
     let mounted = true
     async function loadUnreadCount() {
@@ -196,10 +205,10 @@ export default function Layout() {
       mounted = false
       window.clearInterval(timer)
     }
-  }, [isAdmin, passwordChangeRequired])
+  }, [isAdmin, accessBlocked])
 
   useEffect(() => {
-    if (passwordChangeRequired) return
+    if (accessBlocked) return
 
     let mounted = true
     async function loadPendingSignatures() {
@@ -217,10 +226,10 @@ export default function Layout() {
       mounted = false
       window.clearInterval(timer)
     }
-  }, [passwordChangeRequired])
+  }, [accessBlocked])
 
   async function openNotificationsCenter() {
-    if (!isAdmin || passwordChangeRequired) return
+    if (!isAdmin || accessBlocked) return
     setNotificationsOpen(true)
     try {
       const { data } = await adminNotificationsAPI.list({ limit: 80 })
@@ -290,6 +299,18 @@ export default function Layout() {
     }
   }
 
+  async function handleCpfRegistration(event) {
+    event.preventDefault()
+    setCpfFeedback('')
+    try {
+      await registerCpf({ cpf: cpfForm.cpf })
+      setCpfForm({ cpf: '' })
+      setCpfFeedback('')
+    } catch {
+      setCpfFeedback('Nao foi possivel registrar o CPF. Confira o numero informado.')
+    }
+  }
+
   function renderNavLink(item) {
     return (
       <NavLink
@@ -313,7 +334,7 @@ export default function Layout() {
 
   return (
     <div className={`app-shell${sidebarCompact ? ' sidebar-compact' : ''}`}>
-      <SearchOverlay open={!passwordChangeRequired && searchOpen} onClose={() => setSearchOpen(false)} onSelect={(result) => navigate(result.route)} />
+      <SearchOverlay open={!accessBlocked && searchOpen} onClose={() => setSearchOpen(false)} onSelect={(result) => navigate(result.route)} />
 
       <button type="button" className={`sidebar-scrim${navOpen ? ' is-visible' : ''}`} aria-label="Fechar navegação" onClick={() => setNavOpen(false)} />
 
@@ -380,12 +401,12 @@ export default function Layout() {
               className="topbar-search-trigger"
               aria-label="Abrir busca global"
               onClick={() => {
-                if (!passwordChangeRequired) setSearchOpen(true)
+                if (!accessBlocked) setSearchOpen(true)
               }}
               onFocus={() => {
-                if (!passwordChangeRequired) setSearchOpen(true)
+                if (!accessBlocked) setSearchOpen(true)
               }}
-              disabled={passwordChangeRequired}
+              disabled={accessBlocked}
             >
               <span className="topbar-search-copy">
                 <AppIcon name="search" className="app-icon" />
@@ -395,7 +416,7 @@ export default function Layout() {
             </button>
 
 
-            {isAdmin && !passwordChangeRequired ? (
+            {isAdmin && !accessBlocked ? (
               <button
                 type="button"
                 className="icon-button theme-button"
@@ -407,7 +428,7 @@ export default function Layout() {
                 {unreadNotifications > 0 ? <span className="badge-counter">{unreadNotifications > 99 ? '99+' : unreadNotifications}</span> : null}
               </button>
             ) : null}
-            {!passwordChangeRequired ? (
+            {!accessBlocked ? (
               <button
                 type="button"
                 className="icon-button theme-button"
@@ -429,6 +450,10 @@ export default function Layout() {
           {passwordChangeRequired ? (
             <div className="surface-panel">
               <div className="empty-state">Altere sua senha provisória para continuar usando o sistema.</div>
+            </div>
+          ) : cpfRegistrationRequired ? (
+            <div className="surface-panel">
+              <div className="empty-state">Informe seu CPF para continuar usando o sistema.</div>
             </div>
           ) : (
             <Outlet />
@@ -512,6 +537,31 @@ export default function Layout() {
           <div className="actions-inline modal-actions">
             <button className="app-button" type="submit">Salvar senha</button>
             {passwordChangeRequired ? <button className="ghost-button" type="button" onClick={handleLogout}>Sair</button> : null}
+          </div>
+        </form>
+      </Modal>
+
+      <Modal
+        open={cpfRegistrationRequired}
+        title="CPF obrigatorio"
+        description="Informe seu CPF para preparar o acesso as assinaturas digitais com certificado."
+        onClose={() => {}}
+        canClose={false}
+      >
+        <form onSubmit={handleCpfRegistration} className="stack">
+          <input
+            className="app-input"
+            placeholder="CPF"
+            value={cpfForm.cpf}
+            onChange={(event) => setCpfForm({ cpf: event.target.value })}
+            inputMode="numeric"
+            autoComplete="off"
+            required
+          />
+          {cpfFeedback ? <div className="alert alert-error">{cpfFeedback}</div> : null}
+          <div className="actions-inline modal-actions">
+            <button className="app-button" type="submit">Registrar CPF</button>
+            <button className="ghost-button" type="button" onClick={handleLogout}>Sair</button>
           </div>
         </form>
       </Modal>

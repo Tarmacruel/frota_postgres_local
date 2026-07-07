@@ -14,6 +14,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
 from app.core.config import settings
+from app.core.cpf import hash_cpf, mask_cpf
 from app.core.organization_scope import production_scope_is_empty, scoped_organization_id
 from app.core.security import verify_password
 from app.models.document_signature import (
@@ -124,6 +125,8 @@ class DocumentSignatureService:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Documento não está mais disponível para assinatura")
         if current_user.must_change_password:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Troca de senha obrigatória antes de assinar")
+        if not current_user.cpf:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Informe seu CPF antes de assinar")
         if not verify_password(data.current_password, current_user.password_hash):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Senha atual incorreta")
         if any(signature.signer_user_id == current_user.id for signature in document.signatures):
@@ -140,6 +143,8 @@ class DocumentSignatureService:
             signer_role=current_user.role.value if current_user.role else None,
             signer_organization_id=current_user.organization_id,
             signer_organization_name=current_user.organization_name,
+            signer_cpf_masked=mask_cpf(current_user.cpf),
+            signer_cpf_hash=hash_cpf(current_user.cpf),
             content_hash=document.content_hash,
             signature_fingerprint=self._build_signature_fingerprint(document, current_user, now),
             signed_at=now,
@@ -556,6 +561,8 @@ class DocumentSignatureService:
     def _ensure_signer_can_be_requested(self, *, current_user: User, requested_signer: User) -> None:
         if requested_signer.must_change_password:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Servidor selecionado precisa regularizar a senha antes de assinar")
+        if not requested_signer.cpf:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Servidor selecionado precisa informar o CPF antes de assinar")
         if current_user.role == UserRole.ADMIN:
             return
         current_org = getattr(current_user, "organization_id", None)
@@ -724,6 +731,7 @@ class DocumentSignatureService:
             "signer_email": signature.signer_email,
             "signer_role": signature.signer_role,
             "signer_organization_name": signature.signer_organization_name,
+            "signer_cpf_masked": signature.signer_cpf_masked,
             "content_hash": signature.content_hash,
             "signature_fingerprint": signature.signature_fingerprint,
             "signed_at": signature.signed_at,
@@ -769,6 +777,7 @@ class DocumentSignatureService:
             "document_id": str(document.id),
             "content_hash": document.content_hash,
             "signer_user_id": str(signer.id),
+            "signer_cpf_hash": hash_cpf(signer.cpf),
             "signed_at": signed_at.isoformat(),
         }
         return self._hmac_json(payload)

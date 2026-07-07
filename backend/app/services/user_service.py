@@ -6,6 +6,7 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.cpf import mask_cpf
 from app.core.permissions import PERMISSION_MODULES, blank_permissions, default_permissions_for_role
 from app.core.security import get_password_hash
 from app.models.user import User, UserRole
@@ -41,10 +42,12 @@ class UserService:
         if existing:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="E-mail já cadastrado")
 
+        await self._ensure_unique_cpf(data.cpf)
         organization = await self._require_organization(data.organization_id)
         user = User(
             name=data.name.strip(),
             email=data.email.lower(),
+            cpf=data.cpf,
             organization_id=organization.id,
             organization=organization,
             password_hash=get_password_hash(data.password),
@@ -64,6 +67,7 @@ class UserService:
                 details={
                     "name": user.name,
                     "email": user.email,
+                    "cpf_masked": user.cpf_masked,
                     "organization_id": str(user.organization_id) if user.organization_id else None,
                     "organization_name": user.organization_name,
                     "role": user.role.value,
@@ -87,6 +91,8 @@ class UserService:
         previous_values = {
             "name": user.name,
             "email": user.email,
+            "cpf_masked": user.cpf_masked,
+            "has_cpf": user.has_cpf,
             "organization_id": str(user.organization_id) if user.organization_id else None,
             "organization_name": user.organization_name,
             "role": user.role.value,
@@ -101,6 +107,12 @@ class UserService:
             user.name = payload["name"].strip()
         if payload.get("email") is not None:
             user.email = payload["email"].lower()
+        if "cpf" in payload:
+            if not payload["cpf"]:
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CPF nao pode ser removido")
+            if payload["cpf"] != user.cpf:
+                await self._ensure_unique_cpf(payload["cpf"], exclude_id=user.id)
+                user.cpf = payload["cpf"]
         next_role = payload.get("role")
         role_changed = next_role is not None and next_role != user.role
         if next_role is not None:
@@ -128,6 +140,8 @@ class UserService:
                     "after": {
                         "name": user.name,
                         "email": user.email,
+                        "cpf_masked": user.cpf_masked,
+                        "has_cpf": user.has_cpf,
                         "organization_id": str(user.organization_id) if user.organization_id else None,
                         "organization_name": user.organization_name,
                         "role": user.role.value,
@@ -232,6 +246,11 @@ class UserService:
         if not organization:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Secretaria não encontrada")
         return organization
+
+    async def _ensure_unique_cpf(self, cpf: str, *, exclude_id: UUID | None = None) -> None:
+        existing = await self.users.get_by_cpf(cpf)
+        if existing and existing.id != exclude_id:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"CPF {mask_cpf(cpf)} ja cadastrado")
 
     def _add_default_permissions(self, user: User) -> None:
         for module, flags in default_permissions_for_role(user.role.value).items():

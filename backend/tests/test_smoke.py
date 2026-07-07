@@ -79,6 +79,18 @@ async def test_openapi_contains_new_routes(client):
     assert "/api/users/{user_id}/permissions" in paths
     assert "/api/users/signers" in paths
 
+    catalog_params = {
+        param["name"]
+        for param in paths["/api/master-data/catalog"]["get"].get("parameters", [])
+    }
+    assert "include_all" in catalog_params
+
+    active_driver_params = {
+        param["name"]
+        for param in paths["/api/drivers/active"]["get"].get("parameters", [])
+    }
+    assert "organization_id" in active_driver_params
+
     vehicle_history_params = {
         param["name"]
         for param in paths["/api/vehicles/{vehicle_id}/historico"]["get"].get("parameters", [])
@@ -132,6 +144,13 @@ async def test_openapi_contains_new_routes(client):
     assert "fuel_station_maps_url" in fuel_supply_order["properties"]
     assert "created_by_contact" in fuel_supply_order["properties"]
     assert "signature_summary" in fuel_supply_order["properties"]
+    assert "supply_id" in fuel_supply_order["properties"]
+    assert "supply_supplied_at" in fuel_supply_order["properties"]
+    assert "supply_liters" in fuel_supply_order["properties"]
+    assert "supply_total_amount" in fuel_supply_order["properties"]
+    assert "supply_fuel_type" in fuel_supply_order["properties"]
+    assert "supply_odometer_km" in fuel_supply_order["properties"]
+    assert "supply_receipt_url" in fuel_supply_order["properties"]
 
     public_fuel_supply_order = schemas["FuelSupplyOrderPublicOut"]
     assert "validation_code" in public_fuel_supply_order["properties"]
@@ -179,17 +198,28 @@ async def test_openapi_contains_new_routes(client):
 
     current_user = schemas["CurrentUserOut"]
     assert "must_change_password" in current_user["properties"]
+    assert "cpf_masked" in current_user["properties"]
+    assert "has_cpf" in current_user["properties"]
+    assert "must_register_cpf" in current_user["properties"]
+    assert "cpf" not in current_user["properties"]
     assert "permissions" in current_user["properties"]
 
     user_create = schemas["UserCreate"]
     assert "organization_id" in user_create["properties"]
     assert "organization_id" in user_create["required"]
+    assert "cpf" in user_create["properties"]
+    assert "cpf" in user_create["required"]
 
     user_update = schemas["UserUpdate"]
     assert "organization_id" in user_update["properties"]
+    assert "cpf" in user_update["properties"]
 
     user_out = schemas["UserOut"]
     assert "must_change_password" in user_out["properties"]
+    assert "cpf_masked" in user_out["properties"]
+    assert "has_cpf" in user_out["properties"]
+    assert "must_register_cpf" in user_out["properties"]
+    assert "cpf" not in user_out["properties"]
     assert "organization_id" in user_out["properties"]
     assert "organization_name" in user_out["properties"]
     assert "permissions" in user_out["properties"]
@@ -203,6 +233,9 @@ async def test_openapi_contains_new_routes(client):
     user_permissions_out = schemas["UserPermissionsOut"]
     assert "permissions" in user_permissions_out["properties"]
     assert "UserSignerOut" in schemas
+    document_signature = schemas["DocumentSignatureOut"]
+    assert "signer_cpf_masked" in document_signature["properties"]
+    assert "signer_cpf_hash" not in document_signature["properties"]
 
     driver_create = schemas["DriverCreate"]
     assert "organization_id" in driver_create["properties"]
@@ -218,4 +251,5 @@ async def test_openapi_contains_new_routes(client):
     assert "organization_name" in driver_out["properties"]
 
     assert "/api/auth/change-password" in paths
+    assert "/api/auth/cpf" in paths
     assert "/api/auth/csrf" in paths

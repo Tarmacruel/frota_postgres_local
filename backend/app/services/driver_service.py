@@ -4,7 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.core.organization_scope import ensure_organization_access, production_scope_is_empty, scoped_organization_id
+from app.core.organization_scope import ensure_organization_access, production_scope_is_empty
 from app.models.driver import Driver
 from app.models.user import User
 from app.repositories.driver_repository import DriverRepository
@@ -45,7 +45,6 @@ class DriverService:
         if production_scope_is_empty(current_user):
             return PaginatedResponse[dict](data=[], pagination=build_pagination(page, limit, 0))
 
-        organization_id = scoped_organization_id(current_user, organization_id)
         items, total = await self.drivers.list_paginated(
             page=page,
             limit=limit,
@@ -55,11 +54,17 @@ class DriverService:
         )
         return PaginatedResponse[dict](data=[self._serialize(item) for item in items], pagination=build_pagination(page, limit, total))
 
-    async def list_active(self, *, search: str | None = None, limit: int = 100, current_user: User | None = None) -> list[dict]:
+    async def list_active(
+        self,
+        *,
+        search: str | None = None,
+        limit: int = 100,
+        organization_id: UUID | None = None,
+        current_user: User | None = None,
+    ) -> list[dict]:
         if production_scope_is_empty(current_user):
             return []
 
-        organization_id = scoped_organization_id(current_user)
         items = await self.drivers.list_active(search=search, limit=limit, organization_id=organization_id)
         return [self._serialize(item) for item in items]
 
@@ -67,13 +72,15 @@ class DriverService:
         driver = await self.drivers.get_by_id(driver_id)
         if not driver:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
-        ensure_organization_access(current_user, driver.organization_id)
+        if production_scope_is_empty(current_user):
+            ensure_organization_access(current_user, driver.organization_id)
         return self._serialize(driver)
 
     async def create(self, data: DriverCreate, current_user: User) -> dict:
         await self._ensure_unique_document(data.documento)
         organization = await self._require_organization(data.organization_id)
-        ensure_organization_access(current_user, organization.id)
+        if production_scope_is_empty(current_user):
+            ensure_organization_access(current_user, organization.id)
         driver = Driver(**data.model_dump())
         driver.organization = organization
         try:
@@ -107,7 +114,8 @@ class DriverService:
         if not driver:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
 
-        ensure_organization_access(current_user, driver.organization_id)
+        if production_scope_is_empty(current_user):
+            ensure_organization_access(current_user, driver.organization_id)
 
         payload = data.model_dump(exclude_unset=True)
         if "documento" in payload and payload["documento"] != driver.documento:
@@ -115,7 +123,8 @@ class DriverService:
         next_organization = None
         if "organization_id" in payload:
             next_organization = await self._require_organization(payload["organization_id"]) if payload["organization_id"] else None
-            ensure_organization_access(current_user, next_organization.id if next_organization else None)
+            if production_scope_is_empty(current_user):
+                ensure_organization_access(current_user, next_organization.id if next_organization else None)
             payload["organization_id"] = next_organization.id if next_organization else None
 
         before = self._serialize(driver)

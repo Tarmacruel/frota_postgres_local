@@ -69,6 +69,8 @@ async def list_fuel_supply_orders(
     vehicle_id: UUID | None = Query(default=None),
     fuel_station_id: UUID | None = Query(default=None),
     due_until: datetime | None = Query(default=None),
+    created_from: datetime | None = Query(default=None),
+    created_to: datetime | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("fuel_supply_orders", "view")),
 ):
@@ -81,6 +83,8 @@ async def list_fuel_supply_orders(
         vehicle_id=vehicle_id,
         fuel_station_id=fuel_station_id,
         due_until=due_until,
+        created_from=created_from,
+        created_to=created_to,
     )
 
 

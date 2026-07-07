@@ -44,6 +44,14 @@ class UserRepository:
         )
         return result.scalar_one_or_none()
 
+    async def get_by_cpf(self, cpf: str) -> User | None:
+        result = await self.db.execute(
+            select(User)
+            .options(joinedload(User.organization), selectinload(User.permission_entries))
+            .where(User.cpf == cpf)
+        )
+        return result.scalar_one_or_none()
+
     async def get_by_id(self, user_id: UUID) -> User | None:
         result = await self.db.execute(
             select(User)

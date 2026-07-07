@@ -8,6 +8,7 @@ import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
+import { DRIVER_LICENSE_CATEGORY_OPTIONS } from '../constants/driverCategories'
 
 const initialForm = {
   nome_completo: '',
@@ -64,7 +65,7 @@ export default function DriversPage() {
   const [editingRecord, setEditingRecord] = useState(null)
   const [form, setForm] = useState(initialForm)
   const [submitting, setSubmitting] = useState(false)
-  const { organizations, loading: catalogLoading, error: catalogError } = useMasterDataCatalog()
+  const { organizations, loading: catalogLoading, error: catalogError } = useMasterDataCatalog({ includeAll: true })
 
   const organizationOptions = organizations.map((organization) => ({
     value: organization.id,
@@ -385,7 +386,7 @@ export default function DriversPage() {
               <div className="form-field">
                 <label htmlFor="driver-license">Categoria</label>
                 <select id="driver-license" className="app-select" value={form.cnh_categoria} onChange={(event) => setForm({ ...form, cnh_categoria: event.target.value })}>
-                  {['A', 'B', 'C', 'D', 'E'].map((option) => <option key={option} value={option}>{option}</option>)}
+                  {DRIVER_LICENSE_CATEGORY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </div>
               <div className="form-field">

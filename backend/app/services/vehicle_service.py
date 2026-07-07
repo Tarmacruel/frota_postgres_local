@@ -220,7 +220,6 @@ class VehicleService:
 
             if data.allocation_id is not None:
                 allocation = await self._require_allocation(data.allocation_id)
-                ensure_organization_access(current_user, allocation.organization_id)
                 active = await self.vehicles.get_active_history(vehicle.id)
                 current_allocation_id = active.allocation_id if active else None
                 if current_allocation_id != allocation.id:
@@ -264,7 +263,6 @@ class VehicleService:
             await self.db.rollback()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar o veículo") from exc
 
-        await self._ensure_vehicle_visible_to_user(vehicle_id, current_user=current_user)
         active = await self.vehicles.get_active_history(vehicle.id)
         possession = await self.vehicles.get_active_possession(vehicle.id)
         return self._serialize_vehicle(vehicle, active, possession)

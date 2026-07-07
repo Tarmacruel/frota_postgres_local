@@ -50,6 +50,11 @@ export function AuthProvider({ children }) {
     return await loadMe({ silent: true })
   }
 
+  async function registerCpf({ cpf }) {
+    await api.post('/auth/cpf', { cpf })
+    return await loadMe({ silent: true })
+  }
+
   const value = useMemo(() => {
     const can = (module, action = 'view') => hasPermission(user, module, action)
     const permissions = Object.values(user?.permissions || {})
@@ -59,8 +64,10 @@ export function AuthProvider({ children }) {
       login,
       logout,
       changePassword,
+      registerCpf,
       reload: loadMe,
       mustChangePassword: Boolean(user?.must_change_password),
+      mustRegisterCpf: Boolean(user?.must_register_cpf),
       isAdmin: isAdmin(user?.role),
       isProduction: user?.role === 'PRODUCAO',
       isPosto: isPosto(user?.role),
