@@ -1,18 +1,23 @@
 import { useEffect, useMemo, useState } from 'react'
 import Modal from '../components/Modal'
+import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
+import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
+import { PERMISSION_ACTIONS, PERMISSION_MODULES, normalizePermissions } from '../utils/permissions'
 import { getRoleLabel } from '../utils/roles'
 
 const initialForm = {
   name: '',
   email: '',
+  cpf: '',
+  organization_id: '',
   password: '',
   role: 'PADRAO',
 }
 
-const roleOptions = ['ADMIN', 'PRODUCAO', 'PADRAO']
+const roleOptions = ['ADMIN', 'PRODUCAO', 'POSTO', 'PADRAO']
 
 function formatDate(value) {
   if (!value) return '-'
@@ -25,26 +30,44 @@ export default function UsersPage() {
   const [editingUser, setEditingUser] = useState(null)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('TODOS')
+  const [organizationFilter, setOrganizationFilter] = useState('TODAS')
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
+  const [permissionsModalOpen, setPermissionsModalOpen] = useState(false)
+  const [permissionsUser, setPermissionsUser] = useState(null)
+  const [permissionsForm, setPermissionsForm] = useState(() => normalizePermissions())
+  const [permissionsLoading, setPermissionsLoading] = useState(false)
+  const [permissionsSaving, setPermissionsSaving] = useState(false)
+  const { organizations, loading: catalogLoading, error: catalogError } = useMasterDataCatalog()
+
+  const organizationOptions = organizations.map((organization) => ({
+    value: organization.id,
+    label: organization.name,
+  }))
 
   const filteredUsers = useMemo(() => {
     return users.filter((user) => {
       const term = search.trim().toLowerCase()
       const matchesSearch =
-        !term || [user.name, user.email, getRoleLabel(user.role)].some((value) => String(value).toLowerCase().includes(term))
+        !term || [user.name, user.email, user.cpf_masked, user.organization_name, getRoleLabel(user.role)].some((value) => String(value).toLowerCase().includes(term))
       const matchesRole = roleFilter === 'TODOS' || user.role === roleFilter
-      return matchesSearch && matchesRole
+      const matchesOrganization =
+        organizationFilter === 'TODAS' ||
+        (organizationFilter === 'SEM_SECRETARIA' ? !user.organization_id : user.organization_id === organizationFilter)
+      return matchesSearch && matchesRole && matchesOrganization
     })
-  }, [users, search, roleFilter])
+  }, [users, search, roleFilter, organizationFilter])
 
   const exportColumns = [
     { header: 'Nome', value: (user) => user.name },
     { header: 'E-mail', value: (user) => user.email },
+    { header: 'CPF', value: (user) => user.cpf_masked || 'Pendente' },
+    { header: 'Secretaria', value: (user) => user.organization_name || 'Não informada' },
     { header: 'Perfil', value: (user) => getRoleLabel(user.role) },
+    { header: 'Senha', value: (user) => (user.must_change_password ? 'Troca pendente' : 'Regularizada') },
     { header: 'Criado em', value: (user) => formatDate(user.created_at) },
     { header: 'Atualizado em', value: (user) => formatDate(user.updated_at) },
   ]
@@ -56,7 +79,7 @@ export default function UsersPage() {
       const { data } = await api.get('/users')
       setUsers(data)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar os usuarios.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar os usuários.'))
     } finally {
       setLoading(false)
     }
@@ -77,6 +100,8 @@ export default function UsersPage() {
     setForm({
       name: user.name,
       email: user.email,
+      cpf: '',
+      organization_id: user.organization_id || '',
       password: '',
       role: user.role,
     })
@@ -89,8 +114,76 @@ export default function UsersPage() {
     setIsModalOpen(false)
   }
 
+  function closePermissionsModal() {
+    setPermissionsModalOpen(false)
+    setPermissionsUser(null)
+    setPermissionsForm(normalizePermissions())
+  }
+
+  async function openPermissionsModal(user) {
+    setPermissionsUser(user)
+    setPermissionsForm(normalizePermissions(user.permissions))
+    setPermissionsModalOpen(true)
+    try {
+      setPermissionsLoading(true)
+      setError('')
+      const { data } = await api.get(`/users/${user.id}/permissions`)
+      setPermissionsForm(normalizePermissions(data.permissions))
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Não foi possível carregar as permissões do usuário.'))
+    } finally {
+      setPermissionsLoading(false)
+    }
+  }
+
+  function togglePermission(moduleKey, field) {
+    setPermissionsForm((current) => ({
+      ...current,
+      [moduleKey]: {
+        ...current[moduleKey],
+        [field]: !current[moduleKey]?.[field],
+      },
+    }))
+  }
+
+  function setModulePermissions(moduleKey, value) {
+    setPermissionsForm((current) => ({
+      ...current,
+      [moduleKey]: PERMISSION_ACTIONS.reduce((flags, action) => {
+        flags[action.field] = value
+        return flags
+      }, {}),
+    }))
+  }
+
+  async function savePermissions() {
+    if (!permissionsUser) return
+    try {
+      setPermissionsSaving(true)
+      setError('')
+      setFeedback('')
+      await api.put(`/users/${permissionsUser.id}/permissions`, { permissions: permissionsForm })
+      setFeedback(`Permissões de ${permissionsUser.name} atualizadas com sucesso.`)
+      closePermissionsModal()
+      await loadUsers()
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Não foi possível salvar as permissões do usuário.'))
+    } finally {
+      setPermissionsSaving(false)
+    }
+  }
+
   async function handleSubmit(event) {
     event.preventDefault()
+    if (!editingUser && !form.cpf.trim()) {
+      setError('Informe o CPF do usuario.')
+      return
+    }
+    if (!form.organization_id) {
+      setError('Selecione a secretaria do usuário.')
+      return
+    }
+
     try {
       setSubmitting(true)
       setError('')
@@ -100,42 +193,44 @@ export default function UsersPage() {
         const payload = {
           name: form.name,
           email: form.email,
+          organization_id: form.organization_id,
           role: form.role,
         }
+        if (form.cpf.trim()) payload.cpf = form.cpf
         if (form.password.trim()) payload.password = form.password
         await api.put(`/users/${editingUser.id}`, payload)
-        setFeedback('Usuario atualizado com sucesso.')
+        setFeedback('Usuário atualizado com sucesso.')
       } else {
-        await api.post('/users', form)
-        setFeedback('Usuario criado com sucesso.')
+        await api.post('/users', { ...form, organization_id: form.organization_id })
+        setFeedback('Usuário criado com sucesso.')
       }
 
       closeModal()
       await loadUsers()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o usuario.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar o usuário.'))
     } finally {
       setSubmitting(false)
     }
   }
 
   async function handleDelete(user) {
-    if (!window.confirm(`Excluir o usuario ${user.email}?`)) return
+    if (!window.confirm(`Excluir o usuário ${user.email}?`)) return
 
     try {
       setError('')
       setFeedback('')
       await api.delete(`/users/${user.id}`)
-      setFeedback('Usuario removido com sucesso.')
+      setFeedback('Usuário removido com sucesso.')
       await loadUsers()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel excluir o usuario.'))
+      setError(getApiErrorMessage(err, 'Não foi possível excluir o usuário.'))
     }
   }
 
   async function handleExportPdf() {
     if (filteredUsers.length === 0) {
-      setFeedback('Nao ha usuarios filtrados para previsualizar.')
+      setFeedback('Não há usuários filtrados para pré-visualizar.')
       return
     }
 
@@ -143,25 +238,34 @@ export default function UsersPage() {
       setError('')
       setFeedback('')
       await previewRowsToPdf({
-        title: 'Frota PMTF - Usuarios',
-        fileName: 'frota-pmtf-usuarios',
-        subtitle: 'Relatorio dos perfis administrativos, de producao e consulta.',
+        title: 'Frota PMTF - Usuários',
+        fileName: 'frota-pmtf-usuários',
+        subtitle: 'Relatório dos perfis administrativos, de produção, posto e consulta.',
         columns: exportColumns,
         rows: filteredUsers,
         filters: [
           { label: 'Perfil', value: roleFilter === 'TODOS' ? 'Todos os perfis' : getRoleLabel(roleFilter) },
+          {
+            label: 'Secretaria',
+            value:
+              organizationFilter === 'TODAS'
+                ? 'Todas as secretarias'
+                : organizationFilter === 'SEM_SECRETARIA'
+                  ? 'Não informada'
+                  : organizations.find((organization) => organization.id === organizationFilter)?.name || organizationFilter,
+          },
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
-      setFeedback('Pre-visualizacao do PDF de usuarios aberta em nova guia.')
+      setFeedback('Pré-visualização do PDF de usuários aberta em nova guia.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel gerar o PDF dos usuarios.'))
+      setError(getApiErrorMessage(err, 'Não foi possível gerar o PDF dos usuários.'))
     }
   }
 
   async function handleExportXlsx() {
     if (filteredUsers.length === 0) {
-      setFeedback('Nao ha usuarios filtrados para exportar.')
+      setFeedback('Não há usuários filtrados para exportar.')
       return
     }
 
@@ -169,36 +273,46 @@ export default function UsersPage() {
       setError('')
       setFeedback('')
       await exportRowsToXlsx({
-        fileName: 'frota-pmtf-usuarios',
-        sheetName: 'Usuarios',
+        fileName: 'frota-pmtf-usuários',
+        sheetName: 'Usuários',
         columns: exportColumns,
         rows: filteredUsers,
         filters: [
           { label: 'Perfil', value: roleFilter === 'TODOS' ? 'Todos os perfis' : getRoleLabel(roleFilter) },
+          {
+            label: 'Secretaria',
+            value:
+              organizationFilter === 'TODAS'
+                ? 'Todas as secretarias'
+                : organizationFilter === 'SEM_SECRETARIA'
+                  ? 'Não informada'
+                  : organizations.find((organization) => organization.id === organizationFilter)?.name || organizationFilter,
+          },
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
-      setFeedback('Exportacao de usuarios em XLSX iniciada com sucesso.')
+      setFeedback('Exportação de usuários em XLSX iniciada com sucesso.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel exportar os usuarios em XLSX.'))
+      setError(getApiErrorMessage(err, 'Não foi possível exportar os usuários em XLSX.'))
     }
   }
 
   function clearFilters() {
     setSearch('')
     setRoleFilter('TODOS')
+    setOrganizationFilter('TODAS')
   }
 
   return (
     <div className="surface-panel">
       <div className="panel-heading">
         <div>
-          <h2 className="section-title">Gestao de usuarios</h2>
-          <p className="section-copy">Gerencie perfis administrativos, operadores de producao e usuarios apenas de consulta.</p>
+          <h2 className="section-title">Gestão de usuários</h2>
+          <p className="section-copy">Gerencie perfis administrativos, operadores de produção, postos credenciados e usuários apenas de consulta.</p>
         </div>
         <div className="actions-inline">
-          <button className="app-button" type="button" onClick={openCreateModal}>Novo usuario</button>
-          <button className="secondary-button" type="button" onClick={handleExportPdf}>Previsualizar PDF</button>
+          <button className="app-button" type="button" onClick={openCreateModal}>Novo usuário</button>
+          <button className="secondary-button" type="button" onClick={handleExportPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
       </div>
@@ -207,10 +321,17 @@ export default function UsersPage() {
         <div className="filter-inline">
           <input
             className="app-input"
-            placeholder="Buscar por nome, e-mail ou perfil"
+            placeholder="Buscar por nome, e-mail, CPF, secretaria ou perfil"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
+          <select className="app-select" value={organizationFilter} onChange={(event) => setOrganizationFilter(event.target.value)}>
+            <option value="TODAS">Todas as secretarias</option>
+            <option value="SEM_SECRETARIA">Sem secretaria</option>
+            {organizations.map((organization) => (
+              <option key={organization.id} value={organization.id}>{organization.name}</option>
+            ))}
+          </select>
           <select className="app-select" value={roleFilter} onChange={(event) => setRoleFilter(event.target.value)}>
             <option value="TODOS">Todos os perfis</option>
             {roleOptions.map((role) => (
@@ -224,19 +345,32 @@ export default function UsersPage() {
       <div className="panel-metrics">
         <div className="metric-inline">
           <strong>{filteredUsers.length}</strong>
-          <span>usuarios exibidos</span>
+          <span>usuários exibidos</span>
         </div>
         <div className="metric-inline">
           <strong>{users.filter((user) => user.role === 'PRODUCAO').length}</strong>
-          <span>perfil producao</span>
+          <span>perfil produção</span>
+        </div>
+        <div className="metric-inline">
+          <strong>{users.filter((user) => user.role === 'POSTO').length}</strong>
+          <span>perfil posto</span>
         </div>
         <div className="metric-inline">
           <strong>{users.filter((user) => user.role === 'ADMIN').length}</strong>
           <span>administradores</span>
         </div>
+        <div className="metric-inline">
+          <strong>{users.filter((user) => user.must_change_password).length}</strong>
+          <span>trocas pendentes</span>
+        </div>
+        <div className="metric-inline">
+          <strong>{users.filter((user) => user.must_register_cpf).length}</strong>
+          <span>CPFs pendentes</span>
+        </div>
       </div>
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
+      {catalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
       <div className="surface-panel panel-nested">
@@ -246,21 +380,24 @@ export default function UsersPage() {
               <tr>
                 <th>Nome</th>
                 <th>E-mail</th>
+                <th>CPF</th>
+                <th>Secretaria</th>
                 <th>Perfil</th>
+                <th>Senha</th>
                 <th>Criado em</th>
                 <th>Atualizado em</th>
-                <th>Acoes</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
                 <tr>
-                  <td colSpan="6" className="muted">Carregando usuarios...</td>
+                  <td colSpan="9" className="muted">Carregando usuários...</td>
                 </tr>
               ) : filteredUsers.length === 0 ? (
                 <tr>
-                  <td colSpan="6">
-                    <div className="empty-state">Nenhum usuario encontrado para os filtros aplicados.</div>
+                  <td colSpan="9">
+                    <div className="empty-state">Nenhum usuário encontrado para os filtros aplicados.</div>
                   </td>
                 </tr>
               ) : (
@@ -273,16 +410,24 @@ export default function UsersPage() {
                       </div>
                     </td>
                     <td data-label="E-mail">{user.email}</td>
+                    <td data-label="CPF">{user.cpf_masked || 'Pendente'}</td>
+                    <td data-label="Secretaria">{user.organization_name || 'Não informada'}</td>
                     <td data-label="Perfil">
-                      <span className={`status-badge ${user.role === 'ADMIN' ? 'status-ATIVO' : user.role === 'PRODUCAO' ? 'status-PRODUCAO' : 'status-INATIVO'}`}>
+                      <span className={`status-badge ${user.role === 'ADMIN' ? 'status-ATIVO' : user.role === 'PRODUCAO' ? 'status-PRODUCAO' : user.role === 'POSTO' ? 'status-POSTO' : 'status-INATIVO'}`}>
                         {getRoleLabel(user.role)}
+                      </span>
+                    </td>
+                    <td data-label="Senha">
+                      <span className={`status-badge ${user.must_change_password ? 'status-MANUTENCAO' : 'status-ATIVO'}`}>
+                        {user.must_change_password ? 'Troca pendente' : 'Regularizada'}
                       </span>
                     </td>
                     <td data-label="Criado em">{formatDate(user.created_at)}</td>
                     <td data-label="Atualizado em">{formatDate(user.updated_at)}</td>
-                    <td data-label="Acoes">
+                    <td data-label="Ações">
                       <div className="actions-inline">
                         <button type="button" className="mini-button" onClick={() => openEditModal(user)}>Editar</button>
+                        <button type="button" className="mini-button" onClick={() => openPermissionsModal(user)}>Permissões</button>
                         <button type="button" className="mini-button danger" onClick={() => handleDelete(user)}>Excluir</button>
                       </div>
                     </td>
@@ -296,8 +441,8 @@ export default function UsersPage() {
 
       <Modal
         open={isModalOpen}
-        title={editingUser ? 'Editar usuario' : 'Novo usuario'}
-        description="Defina o perfil correto para cada pessoa: administracao total, operacao de producao ou consulta."
+        title={editingUser ? 'Editar usuário' : 'Novo usuário'}
+        description="Defina o perfil correto para cada pessoa: administração total, operação de produção, posto credenciado ou consulta."
         onClose={closeModal}
       >
         <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
@@ -322,14 +467,36 @@ export default function UsersPage() {
             />
           </div>
           <div className="form-field">
-            <label htmlFor="user-password">{editingUser ? 'Nova senha (opcional)' : 'Senha'}</label>
+            <label htmlFor="user-cpf">{editingUser ? 'Substituir CPF (opcional)' : 'CPF'}</label>
+            <input
+              id="user-cpf"
+              className="app-input"
+              placeholder={editingUser ? (editingUser.cpf_masked || 'Preencha somente para substituir') : '000.000.000-00'}
+              value={form.cpf}
+              onChange={(event) => setForm({ ...form, cpf: event.target.value })}
+              inputMode="numeric"
+            />
+          </div>
+          <div className="form-field">
+            <label htmlFor="user-password">{editingUser ? 'Redefinir senha provisória (opcional)' : 'Senha provisória'}</label>
             <input
               id="user-password"
               className="app-input"
               type="password"
-              placeholder={editingUser ? 'Preencha apenas se quiser trocar' : 'Minimo de 8 caracteres'}
+              placeholder={editingUser ? 'Preencha para exigir troca no próximo acesso' : 'Mínimo de 8 caracteres'}
               value={form.password}
               onChange={(event) => setForm({ ...form, password: event.target.value })}
+            />
+          </div>
+          <div className="form-field modal-field-span">
+            <label>Secretaria</label>
+            <SearchableSelect
+              value={form.organization_id}
+              onChange={(value) => setForm({ ...form, organization_id: value })}
+              options={organizationOptions}
+              placeholder={catalogLoading ? 'Carregando secretarias...' : 'Selecione a secretaria'}
+              searchPlaceholder="Buscar secretaria"
+              disabled={catalogLoading || organizationOptions.length === 0}
             />
           </div>
           <div className="form-field modal-field-span">
@@ -342,11 +509,67 @@ export default function UsersPage() {
           </div>
           <div className="actions-inline modal-actions">
             <button className="app-button" type="submit" disabled={submitting}>
-              {submitting ? 'Salvando...' : editingUser ? 'Atualizar usuario' : 'Criar usuario'}
+              {submitting ? 'Salvando...' : editingUser ? 'Atualizar usuário' : 'Criar usuário'}
             </button>
             <button className="ghost-button" type="button" onClick={closeModal}>Cancelar</button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={permissionsModalOpen}
+        title={permissionsUser ? `Permissões de ${permissionsUser.name}` : 'Permissões'}
+        description="Defina acesso por módulo e ação operacional."
+        onClose={closePermissionsModal}
+      >
+        {permissionsLoading ? (
+          <div className="empty-state">Carregando permissões...</div>
+        ) : (
+          <div className="stack">
+            <div className="table-wrap table-wrap-wide">
+              <table className="data-table data-table-wide">
+                <thead>
+                  <tr>
+                    <th>Módulo</th>
+                    {PERMISSION_ACTIONS.map((action) => <th key={action.key}>{action.label}</th>)}
+                    <th>Atalhos</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {PERMISSION_MODULES.map((module) => (
+                    <tr key={module.key}>
+                      <td data-label="Módulo"><strong>{module.label}</strong></td>
+                      {PERMISSION_ACTIONS.map((action) => (
+                        <td key={`${module.key}-${action.field}`} data-label={action.label}>
+                          <label className="checkbox-field">
+                            <input
+                              type="checkbox"
+                              checked={Boolean(permissionsForm[module.key]?.[action.field])}
+                              onChange={() => togglePermission(module.key, action.field)}
+                            />
+                            <span>{action.label}</span>
+                          </label>
+                        </td>
+                      ))}
+                      <td data-label="Atalhos">
+                        <div className="actions-inline">
+                          <button type="button" className="mini-button" onClick={() => setModulePermissions(module.key, true)}>Tudo</button>
+                          <button type="button" className="mini-button" onClick={() => setModulePermissions(module.key, false)}>Limpar</button>
+                        </div>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+            <div className="actions-inline modal-actions">
+              <button className="app-button" type="button" disabled={permissionsSaving} onClick={savePermissions}>
+                {permissionsSaving ? 'Salvando...' : 'Salvar permissões'}
+              </button>
+              <button className="ghost-button" type="button" onClick={closePermissionsModal}>Cancelar</button>
+            </div>
+          </div>
+        )}
       </Modal>
     </div>
   )

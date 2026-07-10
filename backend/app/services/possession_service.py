@@ -3,12 +3,13 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from pathlib import Path
 from re import sub
-from uuid import UUID
+from uuid import UUID, uuid4
 from fastapi import HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
+from app.core.organization_scope import production_scope_is_empty, scoped_organization_id
 from app.models.possession import VehiclePossession
 from app.models.possession_photo import VehiclePossessionPhoto
 from app.models.user import User, UserRole
@@ -20,6 +21,8 @@ from app.schemas.common import PaginatedResponse, build_pagination
 from app.schemas.possession import PossessionAdminUpdate, PossessionCreate, PossessionPhotoCreate, PossessionUpdate
 from app.services.admin_notification_service import AdminNotificationService
 from app.services.audit_service import AuditService
+from app.services.document_signature_service import DocumentSignatureService, SOURCE_POSSESSION
+from app.models.document_signature import DigitalDocumentType
 
 MAX_PHOTO_SIZE_BYTES = 8 * 1024 * 1024
 MAX_DOCUMENT_SIZE_BYTES = 12 * 1024 * 1024
@@ -37,6 +40,8 @@ DOCUMENT_EXTENSIONS = {
     "application/vnd.openxmlformats-officedocument.wordprocessingml.document": ".docx",
 }
 INLINE_DOCUMENT_MIME_TYPES = {"application/pdf", "image/jpeg", "image/png", "image/webp"}
+PUBLIC_LOAN_TERM_PATH_PREFIX = "/validar/termo-emprestimo"
+PUBLIC_RETURN_TERM_PATH_PREFIX = "/validar/termo-devolucao"
 
 
 class PossessionService:
@@ -49,9 +54,18 @@ class PossessionService:
         self.admin_notifications = AdminNotificationService(db)
 
     async def list(self, vehicle_id: UUID | None = None, active: bool | None = None, current_user: User | None = None) -> list[dict]:
-        records = await self.possessions.list(vehicle_id=vehicle_id, active=active)
+        if production_scope_is_empty(current_user):
+            return []
+
+        organization_id = scoped_organization_id(current_user)
+        records = await self.possessions.list(vehicle_id=vehicle_id, active=active, organization_id=organization_id)
         can_view_location = self._can_view_location(current_user)
-        return [self._serialize(record, can_view_location=can_view_location) for record in records]
+        payloads = []
+        for record in records:
+            payload = self._serialize(record, can_view_location=can_view_location)
+            payload["signature_summary"] = await self._build_possession_signature_summary(record)
+            payloads.append(payload)
+        return payloads
 
     async def list_paginated(
         self,
@@ -64,6 +78,10 @@ class PossessionService:
         search: str | None = None,
         current_user: User | None = None,
     ) -> PaginatedResponse[dict]:
+        if production_scope_is_empty(current_user):
+            return PaginatedResponse[dict](data=[], pagination=build_pagination(page, limit, 0))
+
+        organization_id = scoped_organization_id(current_user)
         records, total = await self.possessions.list_paginated(
             page=page,
             limit=limit,
@@ -71,10 +89,11 @@ class PossessionService:
             active=active,
             driver_id=driver_id,
             search=search,
+            organization_id=organization_id,
         )
         can_view_location = self._can_view_location(current_user)
         return PaginatedResponse[dict](
-            data=[self._serialize(record, can_view_location=can_view_location) for record in records],
+            data=[await self._serialize_with_signatures(record, can_view_location=can_view_location) for record in records],
             pagination=build_pagination(page, limit, total),
         )
 
@@ -82,11 +101,11 @@ class PossessionService:
         return await self.list(active=True, current_user=current_user)
 
     async def get_current_driver(self, vehicle_id: UUID, current_user: User | None = None) -> dict:
-        await self._ensure_vehicle_exists(vehicle_id)
+        await self._ensure_vehicle_exists(vehicle_id, current_user=current_user)
         record = await self.possessions.get_active_by_vehicle(vehicle_id)
         if not record:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nenhum condutor ativo encontrado para este veiculo")
-        return self._serialize(record, can_view_location=self._can_view_location(current_user))
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nenhum condutor ativo encontrado para este veículo")
+        return await self._serialize_with_signatures(record, can_view_location=self._can_view_location(current_user))
 
     async def start(
         self,
@@ -94,25 +113,26 @@ class PossessionService:
         *,
         photos: list[UploadFile],
         photo_metadata: list[PossessionPhotoCreate],
-        signed_document: UploadFile | None,
+        loan_term_document: UploadFile | None,
         current_user: User,
     ) -> dict:
-        vehicle = await self._ensure_vehicle_exists(data.vehicle_id)
+        vehicle = await self._ensure_vehicle_exists(data.vehicle_id, current_user=current_user)
         selected_driver = await self._resolve_driver_snapshot(
             driver_id=data.driver_id,
             fallback_name=data.driver_name,
             fallback_document=data.driver_document,
             fallback_contact=data.driver_contact,
+            current_user=current_user,
         )
-        photo_payloads = await self._read_and_validate_captured_photos(photos, photo_metadata, require_at_least_one=True)
-        document_payload = await self._read_and_validate_document(signed_document)
+        photo_payloads = await self._read_and_validate_captured_photos(photos, photo_metadata, require_at_least_one=False)
+        loan_term_payload = await self._read_and_validate_document(loan_term_document)
 
         effective_start = data.start_date or datetime.now(timezone.utc)
         current_active = await self.possessions.get_active_by_vehicle(data.vehicle_id)
         if current_active and effective_start < current_active.start_date:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Nova posse nao pode iniciar antes da posse ativa atual",
+                detail="Nova posse não pode iniciar antes da posse ativa atual",
             )
 
         auto_close_end_odometer = data.start_odometer_km
@@ -142,13 +162,15 @@ class PossessionService:
             start_date=effective_start,
             observation=data.observation,
             start_odometer_km=data.start_odometer_km,
-            document_name=document_payload["filename"] if document_payload else None,
-            document_mime_type=document_payload["mime_type"] if document_payload else None,
-            document_size_bytes=document_payload["size_bytes"] if document_payload else None,
-            document_uploaded_at=datetime.now(timezone.utc) if document_payload else None,
+            document_name=loan_term_payload["filename"] if loan_term_payload else None,
+            document_mime_type=loan_term_payload["mime_type"] if loan_term_payload else None,
+            document_size_bytes=loan_term_payload["size_bytes"] if loan_term_payload else None,
+            document_uploaded_at=datetime.now(timezone.utc) if loan_term_payload else None,
+            loan_term_validation_code=await self._generate_validation_code("TE"),
+            return_term_validation_code=await self._generate_validation_code("TD"),
         )
 
-        stored_document_path: Path | None = None
+        stored_loan_term_path: Path | None = None
         stored_photo_paths: list[Path] = []
         try:
             await self.possessions.end_active_for_vehicle(
@@ -158,12 +180,13 @@ class PossessionService:
             )
             await self.possessions.create(possession)
 
-            if document_payload:
-                relative_document_path, stored_document_path = self._build_document_storage_paths(
+            if loan_term_payload:
+                relative_document_path, stored_loan_term_path = self._build_document_storage_paths(
                     possession.id,
-                    document_payload["mime_type"],
+                    loan_term_payload["mime_type"],
+                    document_kind="loan",
                 )
-                self._store_file(stored_document_path, document_payload["content"])
+                self._store_file(stored_loan_term_path, loan_term_payload["content"])
                 possession.document_path = relative_document_path
 
             await self._store_photo_payloads(possession, photo_payloads, stored_photo_paths)
@@ -183,18 +206,20 @@ class PossessionService:
                     "start_odometer_km": possession.start_odometer_km,
                     "kilometers_driven": self._calculate_kilometers_driven(possession.start_odometer_km, possession.end_odometer_km),
                     "photo_count": len(photo_payloads),
-                    "signed_document_attached": bool(document_payload),
+                    "loan_term_attached": bool(loan_term_payload),
+                    "loan_term_name": possession.document_name,
+                    "loan_term_mime_type": possession.document_mime_type,
+                    "loan_term_size_bytes": possession.document_size_bytes,
+                    "signed_document_attached": bool(loan_term_payload),
                     "signed_document_name": possession.document_name,
-                    "signed_document_mime_type": possession.document_mime_type,
-                    "signed_document_size_bytes": possession.document_size_bytes,
                     "capture_accuracy_meters": [payload["capture_accuracy_meters"] for payload in photo_payloads],
                 },
             )
             if pending_admin_notification_payload:
                 await self.admin_notifications.notify(
-                    title="Divergencia de quilometragem entre posses",
+                    title="Divergência de quilometragem entre posses",
                     message=(
-                        f"Veiculo {vehicle.plate}: nova posse iniciou em {data.start_odometer_km:.1f} km "
+                        f"Veículo {vehicle.plate}: nova posse iniciou em {data.start_odometer_km:.1f} km "
                         f"e a posse anterior encerrada tinha {current_active.end_odometer_km:.1f} km."
                     ),
                     event_type="POSSESSION_ODOMETER_GAP",
@@ -205,36 +230,45 @@ class PossessionService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            self._cleanup_file(stored_document_path)
+            self._cleanup_file(stored_loan_term_path)
             self._cleanup_files(stored_photo_paths)
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel iniciar a posse") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível iniciar a posse") from exc
         except OSError as exc:
             await self.db.rollback()
-            self._cleanup_file(stored_document_path)
+            self._cleanup_file(stored_loan_term_path)
             self._cleanup_files(stored_photo_paths)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Nao foi possivel armazenar os arquivos da posse",
+                detail="Não foi possível armazenar os arquivos da posse",
             ) from exc
         except Exception:
             await self.db.rollback()
-            self._cleanup_file(stored_document_path)
+            self._cleanup_file(stored_loan_term_path)
             self._cleanup_files(stored_photo_paths)
             raise
 
         return await self._get_by_id(possession.id, current_user)
 
-    async def end(self, possession_id: UUID, data: PossessionUpdate, current_user: User) -> dict:
+    async def end(
+        self,
+        possession_id: UUID,
+        data: PossessionUpdate,
+        current_user: User,
+        *,
+        return_term_document: UploadFile | None = None,
+    ) -> dict:
         possession = await self.possessions.get_by_id(possession_id)
         if not possession:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
+        await self._ensure_possession_visible_to_user(possession, current_user)
         if possession.end_date is not None:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Registro de posse ja encerrado")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Registro de posse já encerrado")
 
+        return_term_payload = await self._read_and_validate_document(return_term_document)
         payload = data.model_dump(exclude_unset=True)
         effective_end = payload.get("end_date") or datetime.now(timezone.utc)
         if effective_end < possession.start_date:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data final nao pode ser anterior ao inicio da posse")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data final não pode ser anterior ao início da posse")
 
         possession.end_date = effective_end
         if "observation" in payload:
@@ -242,7 +276,28 @@ class PossessionService:
         if "end_odometer_km" in payload:
             possession.end_odometer_km = payload["end_odometer_km"]
 
+        stored_return_term_path: Path | None = None
         try:
+            if return_term_payload:
+                relative_document_path, stored_return_term_path = self._build_document_storage_paths(
+                    possession.id,
+                    return_term_payload["mime_type"],
+                    document_kind="return",
+                )
+                self._store_file(stored_return_term_path, return_term_payload["content"])
+                possession.return_document_path = relative_document_path
+                possession.return_document_name = return_term_payload["filename"]
+                possession.return_document_mime_type = return_term_payload["mime_type"]
+                possession.return_document_size_bytes = return_term_payload["size_bytes"]
+                possession.return_document_uploaded_at = datetime.now(timezone.utc)
+
+            await DocumentSignatureService(self.db).mark_source_documents_superseded(
+                source_type=SOURCE_POSSESSION,
+                source_id=possession.id,
+                document_types=[DigitalDocumentType.POSSESSION_RETURN_TERM],
+                current_user=current_user,
+                reason="POSSESSION_END_UPDATED",
+            )
             await self.audit.record(
                 actor=current_user,
                 action="UPDATE",
@@ -255,13 +310,30 @@ class PossessionService:
                     "observation": possession.observation,
                     "end_odometer_km": possession.end_odometer_km,
                     "kilometers_driven": self._calculate_kilometers_driven(possession.start_odometer_km, possession.end_odometer_km),
+                    "return_term_attached": bool(return_term_payload),
+                    "return_term_name": possession.return_document_name,
+                    "return_term_mime_type": possession.return_document_mime_type,
+                    "return_term_size_bytes": possession.return_document_size_bytes,
                 },
             )
             await self.db.flush()
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel encerrar a posse") from exc
+            self._cleanup_file(stored_return_term_path)
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível encerrar a posse") from exc
+
+        except OSError as exc:
+            await self.db.rollback()
+            self._cleanup_file(stored_return_term_path)
+            raise HTTPException(
+                status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                detail="Não foi possível armazenar o termo de devolução da posse",
+            ) from exc
+        except Exception:
+            await self.db.rollback()
+            self._cleanup_file(stored_return_term_path)
+            raise
 
         return await self._get_by_id(possession.id, current_user)
 
@@ -271,22 +343,25 @@ class PossessionService:
         data: PossessionAdminUpdate,
         current_user: User,
         *,
-        signed_document: UploadFile | None = None,
+        loan_term_document: UploadFile | None = None,
+        return_term_document: UploadFile | None = None,
         new_photos: list[UploadFile] | None = None,
         new_photo_metadata: list[PossessionPhotoCreate] | None = None,
     ) -> dict:
         possession = await self.possessions.get_by_id(possession_id)
         if not possession:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
 
+        await self._ensure_possession_visible_to_user(possession, current_user)
         if data.end_date is not None and data.end_date < data.start_date:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data final nao pode ser anterior ao inicio da posse")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data final não pode ser anterior ao início da posse")
 
         selected_driver = await self._resolve_driver_snapshot(
             driver_id=data.driver_id,
             fallback_name=data.driver_name,
             fallback_document=data.driver_document,
             fallback_contact=data.driver_contact,
+            current_user=current_user,
         )
         period_changed = possession.start_date != data.start_date or possession.end_date != data.end_date
         if period_changed:
@@ -297,7 +372,8 @@ class PossessionService:
                 end_date=data.end_date,
             )
 
-        document_payload = await self._read_and_validate_document(signed_document)
+        loan_term_payload = await self._read_and_validate_document(loan_term_document)
+        return_term_payload = await self._read_and_validate_document(return_term_document)
         photo_payloads = await self._read_and_validate_admin_photos(new_photos or [], new_photo_metadata or [])
         existing_entries = self._serialize_photo_entries(possession, can_view_location=self._can_view_location(current_user))
         before = {
@@ -310,6 +386,8 @@ class PossessionService:
             "observation": possession.observation,
             "start_odometer_km": possession.start_odometer_km,
             "end_odometer_km": possession.end_odometer_km,
+            "loan_term_name": possession.document_name,
+            "return_term_name": possession.return_document_name,
             "document_name": possession.document_name,
             "photo_count": len(existing_entries),
         }
@@ -326,22 +404,50 @@ class PossessionService:
 
         old_document_path = self._resolve_document_path(possession.document_path) if possession.document_path else None
         old_document_path_str = possession.document_path
-        stored_document_path: Path | None = None
+        old_return_document_path = self._resolve_document_path(possession.return_document_path) if possession.return_document_path else None
+        old_return_document_path_str = possession.return_document_path
+        stored_loan_term_path: Path | None = None
+        stored_return_term_path: Path | None = None
         stored_photo_paths: list[Path] = []
         try:
-            if document_payload:
-                relative_document_path, stored_document_path = self._build_document_storage_paths(
+            if loan_term_payload:
+                relative_document_path, stored_loan_term_path = self._build_document_storage_paths(
                     possession.id,
-                    document_payload["mime_type"],
+                    loan_term_payload["mime_type"],
+                    document_kind="loan",
                 )
-                self._store_file(stored_document_path, document_payload["content"])
+                self._store_file(stored_loan_term_path, loan_term_payload["content"])
                 possession.document_path = relative_document_path
-                possession.document_name = document_payload["filename"]
-                possession.document_mime_type = document_payload["mime_type"]
-                possession.document_size_bytes = document_payload["size_bytes"]
+                possession.document_name = loan_term_payload["filename"]
+                possession.document_mime_type = loan_term_payload["mime_type"]
+                possession.document_size_bytes = loan_term_payload["size_bytes"]
                 possession.document_uploaded_at = datetime.now(timezone.utc)
 
+            if return_term_payload:
+                relative_document_path, stored_return_term_path = self._build_document_storage_paths(
+                    possession.id,
+                    return_term_payload["mime_type"],
+                    document_kind="return",
+                )
+                self._store_file(stored_return_term_path, return_term_payload["content"])
+                possession.return_document_path = relative_document_path
+                possession.return_document_name = return_term_payload["filename"]
+                possession.return_document_mime_type = return_term_payload["mime_type"]
+                possession.return_document_size_bytes = return_term_payload["size_bytes"]
+                possession.return_document_uploaded_at = datetime.now(timezone.utc)
+
             await self._store_photo_payloads(possession, photo_payloads, stored_photo_paths)
+
+            await DocumentSignatureService(self.db).mark_source_documents_superseded(
+                source_type=SOURCE_POSSESSION,
+                source_id=possession.id,
+                document_types=[
+                    DigitalDocumentType.POSSESSION_LOAN_TERM,
+                    DigitalDocumentType.POSSESSION_RETURN_TERM,
+                ],
+                current_user=current_user,
+                reason="POSSESSION_ADMIN_EDIT",
+            )
 
             after = {
                 "driver_id": str(possession.driver_id) if possession.driver_id else None,
@@ -354,6 +460,8 @@ class PossessionService:
                 "start_odometer_km": possession.start_odometer_km,
                 "end_odometer_km": possession.end_odometer_km,
                 "kilometers_driven": self._calculate_kilometers_driven(possession.start_odometer_km, possession.end_odometer_km),
+                "loan_term_name": possession.document_name,
+                "return_term_name": possession.return_document_name,
                 "document_name": possession.document_name,
                 "photo_count": len(existing_entries) + len(photo_payloads),
             }
@@ -369,7 +477,9 @@ class PossessionService:
                     "reason": data.edit_reason,
                     "before": before,
                     "after": after,
-                    "document_replaced": bool(document_payload),
+                    "loan_term_replaced": bool(loan_term_payload),
+                    "return_term_replaced": bool(return_term_payload),
+                    "document_replaced": bool(loan_term_payload),
                     "added_photo_count": len(photo_payloads),
                 },
             )
@@ -377,33 +487,97 @@ class PossessionService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            self._cleanup_file(stored_document_path)
+            self._cleanup_file(stored_loan_term_path)
+            self._cleanup_file(stored_return_term_path)
             self._cleanup_files(stored_photo_paths)
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar a posse") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar a posse") from exc
         except OSError as exc:
             await self.db.rollback()
-            self._cleanup_file(stored_document_path)
+            self._cleanup_file(stored_loan_term_path)
+            self._cleanup_file(stored_return_term_path)
             self._cleanup_files(stored_photo_paths)
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Nao foi possivel armazenar os anexos da posse",
+                detail="Não foi possível armazenar os anexos da posse",
             ) from exc
         except Exception:
             await self.db.rollback()
-            self._cleanup_file(stored_document_path)
+            self._cleanup_file(stored_loan_term_path)
+            self._cleanup_file(stored_return_term_path)
             self._cleanup_files(stored_photo_paths)
             raise
 
-        if document_payload and old_document_path and old_document_path_str != possession.document_path:
+        if loan_term_payload and old_document_path and old_document_path_str != possession.document_path:
             self._cleanup_file(old_document_path)
+        if return_term_payload and old_return_document_path and old_return_document_path_str != possession.return_document_path:
+            self._cleanup_file(old_return_document_path)
 
         return await self._get_by_id(possession.id, current_user)
 
-    async def get_photo_file(self, possession_id: UUID, *, photo_id: UUID | None = None) -> FileResponse:
+    async def delete(self, possession_id: UUID, current_user: User) -> None:
+        possession = await self.possessions.get_by_id(possession_id)
+        if not possession:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
+
+        await self._ensure_possession_visible_to_user(possession, current_user)
+        stored_paths = self._collect_possession_file_paths(possession)
+        photo_count = (1 if possession.photo_path else 0) + len(possession.photos)
+        vehicle_label = possession.vehicle.plate if possession.vehicle else possession.vehicle_id
+
+        try:
+            await self.audit.record(
+                actor=current_user,
+                action="DELETE",
+                entity_type="POSSESSION",
+                entity_id=possession.id,
+                entity_label=f"{vehicle_label} - {possession.driver_name}",
+                details={
+                    "vehicle_id": str(possession.vehicle_id),
+                    "driver_id": str(possession.driver_id) if possession.driver_id else None,
+                    "driver_name": possession.driver_name,
+                    "driver_document": possession.driver_document,
+                    "driver_contact": possession.driver_contact,
+                    "start_date": possession.start_date.isoformat() if possession.start_date else None,
+                    "end_date": possession.end_date.isoformat() if possession.end_date else None,
+                    "observation": possession.observation,
+                    "start_odometer_km": possession.start_odometer_km,
+                    "end_odometer_km": possession.end_odometer_km,
+                    "kilometers_driven": self._calculate_kilometers_driven(possession.start_odometer_km, possession.end_odometer_km),
+                    "is_active": possession.is_active,
+                    "photo_count": photo_count,
+                    "loan_term_name": possession.document_name,
+                    "return_term_name": possession.return_document_name,
+                    "loan_term_validation_code": possession.loan_term_validation_code,
+                    "return_term_validation_code": possession.return_term_validation_code,
+                },
+            )
+            await DocumentSignatureService(self.db).mark_source_documents_superseded(
+                source_type=SOURCE_POSSESSION,
+                source_id=possession.id,
+                document_types=[
+                    DigitalDocumentType.POSSESSION_LOAN_TERM,
+                    DigitalDocumentType.POSSESSION_RETURN_TERM,
+                ],
+                current_user=current_user,
+                reason="POSSESSION_DELETE",
+            )
+            await self.possessions.delete(possession)
+            await self.db.commit()
+        except IntegrityError as exc:
+            await self.db.rollback()
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível remover a posse") from exc
+        except Exception:
+            await self.db.rollback()
+            raise
+
+        self._cleanup_files(stored_paths)
+
+    async def get_photo_file(self, possession_id: UUID, *, photo_id: UUID | None = None, current_user: User | None = None) -> FileResponse:
         record = await self.possessions.get_by_id(possession_id)
         if not record:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
 
+        await self._ensure_possession_visible_to_user(record, current_user)
         if photo_id is None:
             if record.photo_path:
                 absolute_photo_path = self._resolve_photo_path(record.photo_path)
@@ -417,12 +591,12 @@ class PossessionService:
         else:
             selected_photo = next((photo for photo in record.photos if photo.id == photo_id), None)
             if not selected_photo:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foto da posse nao encontrada")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Foto da posse não encontrada")
             absolute_photo_path = self._resolve_photo_path(selected_photo.photo_path)
             photo_mime_type = selected_photo.photo_mime_type or "application/octet-stream"
 
         if not absolute_photo_path.is_file():
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Arquivo da foto nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Arquivo da foto não encontrado")
 
         return FileResponse(
             absolute_photo_path,
@@ -433,22 +607,34 @@ class PossessionService:
             },
         )
 
-    async def get_document_file(self, possession_id: UUID) -> FileResponse:
+    async def get_document_file(self, possession_id: UUID, *, document_kind: str = "loan", current_user: User | None = None) -> FileResponse:
         record = await self.possessions.get_by_id(possession_id)
         if not record:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse nao encontrado")
-        if not record.document_path:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nenhum documento encontrado para esta posse")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
+        await self._ensure_possession_visible_to_user(record, current_user)
+        if document_kind == "return":
+            document_path = record.return_document_path
+            document_name = record.return_document_name
+            document_mime_type = record.return_document_mime_type
+            missing_detail = "Nenhum termo de devolução encontrado para esta posse"
+        else:
+            document_path = record.document_path
+            document_name = record.document_name
+            document_mime_type = record.document_mime_type
+            missing_detail = "Nenhum termo de empréstimo encontrado para esta posse"
 
-        absolute_document_path = self._resolve_document_path(record.document_path)
+        if not document_path:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=missing_detail)
+
+        absolute_document_path = self._resolve_document_path(document_path)
         if not absolute_document_path.is_file():
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Arquivo do documento nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Arquivo do documento não encontrado")
 
-        disposition_type = "inline" if (record.document_mime_type or "") in INLINE_DOCUMENT_MIME_TYPES else "attachment"
-        filename = record.document_name or absolute_document_path.name
+        disposition_type = "inline" if (document_mime_type or "") in INLINE_DOCUMENT_MIME_TYPES else "attachment"
+        filename = document_name or absolute_document_path.name
         return FileResponse(
             absolute_document_path,
-            media_type=record.document_mime_type or "application/octet-stream",
+            media_type=document_mime_type or "application/octet-stream",
             filename=filename,
             headers={
                 "Cache-Control": "private, no-store, max-age=0",
@@ -456,18 +642,55 @@ class PossessionService:
             },
         )
 
+    async def get_public_term(self, validation_code: str, *, term_type: str) -> dict:
+        normalized_code = (validation_code or "").strip().upper()
+        if not normalized_code:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Termo público não encontrado")
+
+        if term_type == "return":
+            record = await self.possessions.get_by_return_term_validation_code(normalized_code)
+            if not record:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Termo público não encontrado")
+            if record.end_date is None:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Termo de devolução ainda não disponível")
+        else:
+            record = await self.possessions.get_by_loan_term_validation_code(normalized_code)
+            if not record:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Termo público não encontrado")
+
+        payload = self._serialize_public_term(record, term_type=term_type)
+        payload["signature_summary"] = await DocumentSignatureService(self.db).get_summary_for_source(
+            DigitalDocumentType.POSSESSION_RETURN_TERM if term_type == "return" else DigitalDocumentType.POSSESSION_LOAN_TERM,
+            record.id,
+        )
+        return payload
+
     async def _get_by_id(self, possession_id: UUID, current_user: User | None = None) -> dict:
         record = await self.possessions.get_by_id(possession_id)
         if not record:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
+        await self._ensure_possession_visible_to_user(record, current_user)
         await self.db.refresh(record, attribute_names=["vehicle", "photos"])
-        return self._serialize(record, can_view_location=self._can_view_location(current_user))
+        return await self._serialize_with_signatures(record, can_view_location=self._can_view_location(current_user))
 
-    async def _ensure_vehicle_exists(self, vehicle_id: UUID) -> Vehicle:
+    async def _ensure_vehicle_exists(self, vehicle_id: UUID, current_user: User | None = None) -> Vehicle:
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
+        await self._ensure_vehicle_visible_to_user(vehicle_id, current_user)
         return vehicle
+
+    async def _ensure_vehicle_visible_to_user(self, vehicle_id: UUID, current_user: User | None) -> None:
+        organization_id = scoped_organization_id(current_user)
+        if organization_id is None:
+            if production_scope_is_empty(current_user):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
+            return
+        if not await self.vehicles.is_vehicle_in_organization(vehicle_id, organization_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
+
+    async def _ensure_possession_visible_to_user(self, possession: VehiclePossession, current_user: User | None) -> None:
+        await self._ensure_vehicle_visible_to_user(possession.vehicle_id, current_user)
 
     async def _resolve_driver_snapshot(
         self,
@@ -476,6 +699,7 @@ class PossessionService:
         fallback_name: str,
         fallback_document: str | None,
         fallback_contact: str | None,
+        current_user: User | None = None,
     ) -> dict:
         if not driver_id:
             return {
@@ -487,9 +711,9 @@ class PossessionService:
 
         driver = await self.drivers.get_by_id(driver_id)
         if not driver:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor selecionado nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor selecionado não encontrado")
         if not driver.ativo:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Condutor selecionado esta inativo")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Condutor selecionado está inativo")
 
         return {
             "driver_id": driver.id,
@@ -513,7 +737,7 @@ class PossessionService:
             if self._periods_overlap(start_date, end_date, record.start_date, record.end_date):
                 raise HTTPException(
                     status_code=status.HTTP_409_CONFLICT,
-                    detail="Periodo informado se sobrepoe a outro registro de posse deste veiculo",
+                    detail="Período informado se sobrepõe a outro registro de posse deste veículo",
                 )
 
     async def _read_and_validate_captured_photos(
@@ -524,7 +748,7 @@ class PossessionService:
         require_at_least_one: bool,
     ) -> list[dict]:
         if require_at_least_one and not photos:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ao menos uma foto e obrigatoria para registrar a posse")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Ao menos uma foto é obrigatória para registrar a posse")
         if len(photos) != len(photo_metadata):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -556,14 +780,14 @@ class PossessionService:
             if photo_metadata:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
-                    detail="Os metadados enviados para novas fotos nao possuem arquivos correspondentes",
+                    detail="Os metadados enviados para novas fotos não possuem arquivos correspondentes",
                 )
             return []
 
         if photo_metadata and len(photos) != len(photo_metadata):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Se metadados forem enviados na edicao, a quantidade deve corresponder ao numero de fotos anexadas",
+                detail="Se metadados forem enviados na edição, a quantidade deve corresponder ao número de fotos anexadas",
             )
 
         payloads: list[dict] = []
@@ -595,7 +819,7 @@ class PossessionService:
         await photo.close()
 
         if not content:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uma das fotos enviadas esta vazia")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uma das fotos enviadas está vazia")
         if len(content) > MAX_PHOTO_SIZE_BYTES:
             raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Uma das fotos excede o limite de 8 MB")
 
@@ -610,7 +834,7 @@ class PossessionService:
             await document.close()
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Documento assinado deve estar em PDF, JPG, PNG, WEBP, DOC ou DOCX",
+                detail="Termo anexado deve estar em PDF, JPG, PNG, WEBP, DOC ou DOCX",
             )
 
         content = await document.read()
@@ -618,11 +842,11 @@ class PossessionService:
         await document.close()
 
         if not content:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Documento anexado esta vazio")
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Documento anexado está vazio")
         if len(content) > MAX_DOCUMENT_SIZE_BYTES:
             raise HTTPException(
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                detail="Documento assinado excede o limite de 12 MB",
+                detail="Termo anexado excede o limite de 12 MB",
             )
 
         return {
@@ -631,6 +855,16 @@ class PossessionService:
             "filename": self._sanitize_document_name(original_filename),
             "size_bytes": len(content),
         }
+
+    async def _generate_validation_code(self, prefix: str) -> str:
+        for _ in range(8):
+            candidate = f"{prefix}-{uuid4().hex[:12].upper()}"
+            if not await self.possessions.has_validation_code(candidate):
+                return candidate
+        raise HTTPException(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            detail="Não foi possível gerar o código público do termo",
+        )
 
     async def _store_photo_payloads(
         self,
@@ -663,9 +897,10 @@ class PossessionService:
         absolute_path = Path(settings.STORAGE_DIR) / relative_path
         return relative_path.as_posix(), absolute_path
 
-    def _build_document_storage_paths(self, possession_id: UUID, document_mime_type: str) -> tuple[str, Path]:
+    def _build_document_storage_paths(self, possession_id: UUID, document_mime_type: str, *, document_kind: str = "loan") -> tuple[str, Path]:
         extension = DOCUMENT_EXTENSIONS[document_mime_type]
-        relative_path = Path("possession_documents") / f"{possession_id}{extension}"
+        suffix = "" if document_kind == "loan" else f"-{document_kind}"
+        relative_path = Path("possession_documents") / f"{possession_id}{suffix}{extension}"
         absolute_path = Path(settings.STORAGE_DIR) / relative_path
         return relative_path.as_posix(), absolute_path
 
@@ -678,6 +913,17 @@ class PossessionService:
 
     def _resolve_document_path(self, relative_document_path: str) -> Path:
         return Path(settings.STORAGE_DIR) / Path(relative_document_path)
+
+    def _collect_possession_file_paths(self, possession: VehiclePossession) -> list[Path]:
+        paths: list[Path] = []
+        if possession.photo_path:
+            paths.append(self._resolve_photo_path(possession.photo_path))
+        paths.extend(self._resolve_photo_path(photo.photo_path) for photo in possession.photos if photo.photo_path)
+        if possession.document_path:
+            paths.append(self._resolve_document_path(possession.document_path))
+        if possession.return_document_path:
+            paths.append(self._resolve_document_path(possession.return_document_path))
+        return paths
 
     def _cleanup_file(self, absolute_path: Path | None) -> None:
         if not absolute_path:
@@ -709,14 +955,43 @@ class PossessionService:
         normalized = normalized.strip(".-") or "documento-assinado"
         return normalized[:120]
 
+    def _build_public_validation_path(self, validation_code: str | None, *, term_type: str) -> str | None:
+        if not validation_code:
+            return None
+        prefix = PUBLIC_RETURN_TERM_PATH_PREFIX if term_type == "return" else PUBLIC_LOAN_TERM_PATH_PREFIX
+        return f"{prefix}/{validation_code}"
+
+    def _build_vehicle_description(self, record: VehiclePossession) -> str | None:
+        if not record.vehicle:
+            return record.vehicle_id and str(record.vehicle_id)
+
+        parts = [record.vehicle.plate]
+        vehicle_name = " ".join(filter(None, [record.vehicle.brand, record.vehicle.model])).strip()
+        if vehicle_name:
+            parts.append(vehicle_name)
+        return " - ".join(parts)
+
+    def _mask_document(self, value: str | None) -> str | None:
+        if not value:
+            return None
+        digits = "".join(character for character in value if character.isdigit())
+        if len(digits) <= 4:
+            return "***"
+        return f"{digits[:3]}.***.***-{digits[-2:]}"
+
     def _serialize(self, record: VehiclePossession, *, can_view_location: bool) -> dict:
         photos = self._serialize_photo_entries(record, can_view_location=can_view_location)
         primary_photo = photos[0] if photos else None
+        loan_term_url = f"/api/possession/{record.id}/documents/loan-term" if record.document_path else None
+        return_term_url = f"/api/possession/{record.id}/documents/return-term" if record.return_document_path else None
 
         return {
             "id": record.id,
             "vehicle_id": record.vehicle_id,
             "vehicle_plate": record.vehicle.plate if record.vehicle else "",
+            "vehicle_brand": record.vehicle.brand if record.vehicle else None,
+            "vehicle_model": record.vehicle.model if record.vehicle else None,
+            "vehicle_description": self._build_vehicle_description(record),
             "driver_id": record.driver_id,
             "driver_name": record.driver_name,
             "driver_document": record.driver_document,
@@ -734,11 +1009,68 @@ class PossessionService:
             "photo_url": primary_photo["url"] if primary_photo else None,
             "photo_captured_at": primary_photo["captured_at"] if primary_photo else None,
             "photos": photos,
+            "loan_term_available": bool(record.document_path),
+            "loan_term_name": record.document_name,
+            "loan_term_url": loan_term_url,
+            "loan_term_uploaded_at": record.document_uploaded_at,
+            "loan_term_validation_code": record.loan_term_validation_code,
+            "loan_term_public_validation_path": self._build_public_validation_path(
+                record.loan_term_validation_code,
+                term_type="loan",
+            ),
+            "return_term_available": bool(record.return_document_path),
+            "return_term_name": record.return_document_name,
+            "return_term_url": return_term_url,
+            "return_term_uploaded_at": record.return_document_uploaded_at,
+            "return_term_validation_code": record.return_term_validation_code,
+            "return_term_public_validation_path": self._build_public_validation_path(
+                record.return_term_validation_code,
+                term_type="return",
+            ),
             "document_available": bool(record.document_path),
             "document_name": record.document_name,
             "document_url": f"/api/possession/{record.id}/document" if record.document_path else None,
             "document_uploaded_at": record.document_uploaded_at,
             "capture_location": primary_photo["capture_location"] if primary_photo else None,
+            "signature_summary": None,
+        }
+
+    async def _serialize_with_signatures(self, record: VehiclePossession, *, can_view_location: bool) -> dict:
+        payload = self._serialize(record, can_view_location=can_view_location)
+        payload["signature_summary"] = await self._build_possession_signature_summary(record)
+        return payload
+
+    async def _build_possession_signature_summary(self, record: VehiclePossession) -> dict:
+        service = DocumentSignatureService(self.db)
+        return {
+            "loan": await service.get_summary_for_source(DigitalDocumentType.POSSESSION_LOAN_TERM, record.id),
+            "return": await service.get_summary_for_source(DigitalDocumentType.POSSESSION_RETURN_TERM, record.id),
+        }
+
+    def _serialize_public_term(self, record: VehiclePossession, *, term_type: str) -> dict:
+        validation_code = (
+            record.return_term_validation_code
+            if term_type == "return"
+            else record.loan_term_validation_code
+        )
+        return {
+            "term_type": term_type,
+            "validation_code": validation_code,
+            "public_validation_path": self._build_public_validation_path(validation_code, term_type=term_type),
+            "possession_id": record.id,
+            "vehicle_plate": record.vehicle.plate if record.vehicle else "",
+            "vehicle_brand": record.vehicle.brand if record.vehicle else None,
+            "vehicle_model": record.vehicle.model if record.vehicle else None,
+            "vehicle_description": self._build_vehicle_description(record),
+            "driver_name": record.driver_name,
+            "driver_document_masked": self._mask_document(record.driver_document),
+            "start_date": record.start_date,
+            "end_date": record.end_date,
+            "start_odometer_km": record.start_odometer_km,
+            "end_odometer_km": record.end_odometer_km,
+            "kilometers_driven": self._calculate_kilometers_driven(record.start_odometer_km, record.end_odometer_km),
+            "observation": record.observation,
+            "created_at": record.created_at,
         }
 
     def _serialize_photo_entries(self, record: VehiclePossession, *, can_view_location: bool) -> list[dict]:

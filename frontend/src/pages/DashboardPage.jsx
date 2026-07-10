@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../api/client'
+import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 import { AppIcon } from '../components/AppIcon'
@@ -11,7 +12,11 @@ function formatDate(value) {
 }
 
 export default function DashboardPage() {
-  const { user, isAdmin, canWrite } = useAuth()
+  const { user, isAdmin, canCreate, canView, canWrite } = useAuth()
+  const canViewVehicles = canView('vehicles')
+  const canViewMaintenance = canView('maintenance')
+  const canViewPossession = canView('possession')
+  const canCreateVehicle = canCreate('vehicles')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [vehicles, setVehicles] = useState([])
@@ -24,22 +29,22 @@ export default function DashboardPage() {
         setLoading(true)
         setError('')
         const [vehiclesResponse, maintenanceResponse, possessionResponse] = await Promise.all([
-          api.get('/vehicles'),
-          api.get('/maintenance'),
-          api.get('/possession/active'),
+          canViewVehicles ? api.get('/vehicles', { params: { limit: VEHICLE_LIST_LIMIT } }) : Promise.resolve({ data: [] }),
+          canViewMaintenance ? api.get('/maintenance') : Promise.resolve({ data: [] }),
+          canViewPossession ? api.get('/possession/active') : Promise.resolve({ data: [] }),
         ])
         setVehicles(vehiclesResponse.data)
         setMaintenance(maintenanceResponse.data)
         setActivePossessions(possessionResponse.data)
       } catch (err) {
-        setError(getApiErrorMessage(err, 'Nao foi possivel carregar os indicadores da frota.'))
+        setError(getApiErrorMessage(err, 'Não foi possível carregar os indicadores da frota.'))
       } finally {
         setLoading(false)
       }
     }
 
     load()
-  }, [])
+  }, [canViewVehicles, canViewMaintenance, canViewPossession])
 
   const stats = useMemo(() => {
     const ativos = vehicles.filter((item) => item.status === 'ATIVO')
@@ -61,48 +66,53 @@ export default function DashboardPage() {
   }, [vehicles, maintenance, activePossessions])
 
   const metricCards = [
-    { label: 'Veiculos ativos', value: stats.ativos, note: 'Disponiveis para uso imediato.' },
-    { label: 'Em manutencao', value: stats.manutencao, note: 'Demandam retorno operacional.' },
-    { label: 'Sem condutor', value: stats.semCondutor, note: 'Precisam de responsavel definido.' },
-    { label: 'Pendencias abertas', value: stats.manutencoesAbertas, note: 'Chamados de oficina em andamento.' },
+    { label: 'Veículos ativos', value: stats.ativos, note: 'Disponíveis para uso imediato.' },
+    { label: 'Em manutenção', value: stats.manutencao, note: 'Demandam retorno operacional.' },
+    { label: 'Sem condutor', value: stats.semCondutor, note: 'Precisam de responsável definido.' },
+    { label: 'Pendências abertas', value: stats.manutencoesAbertas, note: 'Chamados de oficina em andamento.' },
   ]
 
   const primaryActions = [
     {
-      title: 'Abrir veiculos ativos',
+      title: 'Abrir veículos ativos',
       description: 'Vá direto para a frota pronta para operação e filtre apenas o que está liberado.',
       to: '/vehicles?status=ATIVO',
       cta: 'Consultar ativos',
     },
     {
-      title: 'Revisar manutencoes abertas',
+      title: 'Revisar manutenções abertas',
       description: 'Priorize os veículos em oficina e acompanhe o custo e o prazo dos serviços.',
       to: '/manutencoes',
-      cta: 'Abrir manutencoes',
+      cta: 'Abrir manutenções',
     },
     {
-      title: 'Ver veiculos sem condutor',
+      title: 'Ver veículos sem condutor',
       description: 'Encontre rapidamente os ativos sem posse vigente para redistribuição.',
       to: '/posses',
       cta: 'Abrir posses',
     },
     {
-      title: canWrite ? 'Cadastrar novo veiculo' : 'Consultar base completa',
-      description: canWrite
+      title: canCreateVehicle ? 'Cadastrar novo veículo' : 'Consultar base completa',
+      description: canCreateVehicle
         ? 'Acesse o módulo principal da frota para cadastrar, editar e abrir históricos.'
         : 'Acesse a base consolidada para pesquisa, filtros e emissão de relatórios.',
       to: '/vehicles',
-      cta: canWrite ? 'Gerenciar frota' : 'Consultar frota',
+      cta: canCreateVehicle ? 'Gerenciar frota' : 'Consultar frota',
     },
-  ]
+  ].filter((item) => {
+    if (item.to.startsWith('/vehicles')) return canViewVehicles
+    if (item.to === '/manutencoes') return canViewMaintenance
+    if (item.to === '/posses') return canViewPossession
+    return true
+  })
 
   const adminActions = isAdmin
     ? [
         {
-          title: 'Gestao de usuarios',
+          title: 'Gestão de usuários',
           description: 'Ajuste perfis administrativos, produção e leitura conforme a secretaria.',
           to: '/users',
-          cta: 'Abrir usuarios',
+          cta: 'Abrir usuários',
         },
         {
           title: 'Auditoria administrativa',
@@ -128,10 +138,10 @@ export default function DashboardPage() {
 
         <div className="actions-inline">
           <button type="button" className="secondary-button" onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}>
-            Ver pendencias
+            Ver pendências
           </button>
           <Link to="/vehicles" className="app-button">
-            Abrir operacao
+            Abrir operação
           </Link>
         </div>
       </section>
@@ -164,7 +174,7 @@ export default function DashboardPage() {
 
         <section className="hub-secondary-grid">
           <article className="hub-side-card">
-            <strong>Leitura rapida do dia</strong>
+            <strong>Leitura rápida do dia</strong>
             <p>Hoje a base tem {loading ? '--' : stats.total} veículos, {loading ? '--' : stats.possesAtivas} posses ativas e {loading ? '--' : stats.inativos} registros inativos.</p>
             <div className="panel-metrics" style={{ marginBottom: 0 }}>
               <div className="metric-inline">
@@ -182,7 +192,7 @@ export default function DashboardPage() {
             <strong>Atalhos do perfil {user?.role || '-'}</strong>
             <p>
               {canWrite
-                ? 'Seu perfil pode cadastrar e atualizar dados operacionais. Use o topo para busca global e a barra mobile para acessar os módulos principais.'
+                ? 'Seu perfil pode cadastrar e atualizar dados operacionais. Use o topo para busca global e a barra móvel para acessar os módulos principais.'
                 : 'Seu perfil está em modo consulta. Use filtros, busca global e exportações para localizar e compartilhar informações rapidamente.'}
             </p>
           </article>
@@ -193,16 +203,16 @@ export default function DashboardPage() {
         <section className="surface-panel" style={{ padding: 0, boxShadow: 'none', background: 'transparent', border: '0' }}>
           <div className="panel-heading">
             <div>
-              <h3 className="section-title">Pendencias e historicos recentes</h3>
+              <h3 className="section-title">Pendências e históricos recentes</h3>
               <p className="section-copy">Os itens em aberto ficam reunidos aqui para encurtar o caminho entre leitura e ação.</p>
             </div>
           </div>
 
           <div className="hub-urgent-list">
             {loading ? (
-              <div className="empty-state">Carregando pendencias operacionais...</div>
+              <div className="empty-state">Carregando pendências operacionais...</div>
             ) : stats.manutencoesPendentes.length === 0 ? (
-              <div className="empty-state">Nenhuma manutencao aberta no momento. A frota está sem chamados pendentes de oficina.</div>
+              <div className="empty-state">Nenhuma manutenção aberta no momento. A frota está sem chamados pendentes de oficina.</div>
             ) : (
               stats.manutencoesPendentes.map((item) => (
                 <Link key={item.id} to={`/manutencoes?focus=${item.id}`} className="hub-urgent-item">
@@ -212,7 +222,7 @@ export default function DashboardPage() {
                   </header>
                   <span>{item.service_description}</span>
                   <footer>
-                    <span className="muted">Inicio {formatDate(item.start_date)}</span>
+                    <span className="muted">Início {formatDate(item.start_date)}</span>
                     <span className="muted">Atualizado {formatDate(item.updated_at)}</span>
                   </footer>
                 </Link>
@@ -235,10 +245,10 @@ export default function DashboardPage() {
             ))
           ) : (
             <article className="hub-side-card">
-              <strong>Consulta e relatorios</strong>
+              <strong>Consulta e relatórios</strong>
               <p>As telas operacionais mantêm exportações em PDF e XLSX com identidade institucional da Prefeitura para compartilhamento imediato.</p>
               <footer className="hub-card-footer">
-                <span>Usar relatorios</span>
+                <span>Usar relatórios</span>
                 <AppIcon name="spark" className="app-icon" />
               </footer>
             </article>

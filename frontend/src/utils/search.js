@@ -1,7 +1,7 @@
 export const SEARCH_TYPE_LABELS = {
-  vehicle: 'Veiculos',
+  vehicle: 'Veículos',
   possession: 'Posses',
-  maintenance: 'Manutencoes',
+  maintenance: 'Manutenções',
 }
 
 export function groupSearchResults(results) {

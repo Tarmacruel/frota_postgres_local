@@ -2,14 +2,18 @@ import { useEffect, useState } from 'react'
 import AccordionSection from '../components/AccordionSection'
 import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
+import SearchableSelect from '../components/SearchableSelect'
 import { driversAPI } from '../api/drivers'
 import { useAuth } from '../context/AuthContext'
+import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
+import { DRIVER_LICENSE_CATEGORY_OPTIONS } from '../constants/driverCategories'
 
 const initialForm = {
   nome_completo: '',
   documento: '',
+  organization_id: '',
   contato: '',
   email: '',
   cnh_categoria: 'B',
@@ -44,11 +48,16 @@ function getDaysToExpire(cnhDate) {
 }
 
 export default function DriversPage() {
-  const { canWrite, isAdmin } = useAuth()
+  const { canCreate, canEdit, canDeleteModule } = useAuth()
+  const canCreateDriver = canCreate('drivers')
+  const canEditDriver = canEdit('drivers')
+  const canDeleteDriver = canDeleteModule('drivers')
+  const canManageDriverActions = canEditDriver || canDeleteDriver
   const [records, setRecords] = useState([])
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0, limit: 10 })
   const [search, setSearch] = useState('')
   const [activeFilter, setActiveFilter] = useState('ATIVOS')
+  const [organizationFilter, setOrganizationFilter] = useState('TODAS')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
@@ -56,10 +65,17 @@ export default function DriversPage() {
   const [editingRecord, setEditingRecord] = useState(null)
   const [form, setForm] = useState(initialForm)
   const [submitting, setSubmitting] = useState(false)
+  const { organizations, loading: catalogLoading, error: catalogError } = useMasterDataCatalog({ includeAll: true })
+
+  const organizationOptions = organizations.map((organization) => ({
+    value: organization.id,
+    label: organization.name,
+  }))
 
   const exportColumns = [
     { header: 'Nome completo', value: (item) => item.nome_completo },
     { header: 'Documento', value: (item) => item.documento },
+    { header: 'Secretaria', value: (item) => item.organization_name || 'Não informada' },
     { header: 'Contato', value: (item) => item.contato || '-' },
     { header: 'E-mail', value: (item) => item.email || '-' },
     { header: 'CNH', value: (item) => item.cnh_categoria },
@@ -76,11 +92,12 @@ export default function DriversPage() {
         limit: 10,
         search: search || undefined,
         active: activeFilter === 'TODOS' ? undefined : activeFilter === 'ATIVOS',
+        organization_id: organizationFilter === 'TODAS' ? undefined : organizationFilter,
       })
       setRecords(data.data)
       setPagination(data.pagination)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar os condutores.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar os condutores.'))
     } finally {
       setLoading(false)
     }
@@ -88,7 +105,7 @@ export default function DriversPage() {
 
   useEffect(() => {
     loadDrivers(1)
-  }, [search, activeFilter])
+  }, [search, activeFilter, organizationFilter])
 
   function openCreateModal() {
     setEditingRecord(null)
@@ -101,6 +118,7 @@ export default function DriversPage() {
     setForm({
       nome_completo: record.nome_completo,
       documento: record.documento,
+      organization_id: record.organization_id || '',
       contato: record.contato || '',
       email: record.email || '',
       cnh_categoria: record.cnh_categoria,
@@ -117,6 +135,15 @@ export default function DriversPage() {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if ((editingRecord && !canEditDriver) || (!editingRecord && !canCreateDriver)) {
+      setError('Você não tem permissão para salvar condutores.')
+      return
+    }
+    if (!form.organization_id) {
+      setError('Selecione a secretaria do condutor.')
+      return
+    }
+
     try {
       setSubmitting(true)
       setError('')
@@ -136,7 +163,7 @@ export default function DriversPage() {
       closeModal()
       await loadDrivers(editingRecord ? pagination.page : 1)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o condutor.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar o condutor.'))
     } finally {
       setSubmitting(false)
     }
@@ -149,7 +176,7 @@ export default function DriversPage() {
       setFeedback('Condutor inativado com sucesso.')
       await loadDrivers(pagination.page)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel inativar o condutor.'))
+      setError(getApiErrorMessage(err, 'Não foi possível inativar o condutor.'))
     }
   }
 
@@ -158,11 +185,18 @@ export default function DriversPage() {
     await previewRowsToPdf({
       title: 'Frota PMTF - Condutores cadastrados',
       fileName: 'frota-pmtf-condutores-cadastrados',
-      subtitle: 'Relatorio da pagina atual dos condutores cadastrados.',
+      subtitle: 'Relatório da página atual dos condutores cadastrados.',
       columns: exportColumns,
       rows: records,
       filters: [
         { label: 'Status', value: activeFilter },
+        {
+          label: 'Secretaria',
+          value:
+            organizationFilter === 'TODAS'
+              ? 'Todas as secretarias'
+              : organizations.find((organization) => organization.id === organizationFilter)?.name || organizationFilter,
+        },
         ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
       ],
     })
@@ -177,6 +211,13 @@ export default function DriversPage() {
       rows: records,
       filters: [
         { label: 'Status', value: activeFilter },
+        {
+          label: 'Secretaria',
+          value:
+            organizationFilter === 'TODAS'
+              ? 'Todas as secretarias'
+              : organizations.find((organization) => organization.id === organizationFilter)?.name || organizationFilter,
+        },
         ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
       ],
     })
@@ -187,11 +228,11 @@ export default function DriversPage() {
       <div className="panel-heading">
         <div>
           <h2 className="section-title">Condutores cadastrados</h2>
-          <p className="section-copy">Mantenha a base reutilizavel de condutores para posse, busca e futuros modulos operacionais.</p>
+          <p className="section-copy">Mantenha a base reutilizável de condutores para posse, busca e futuros módulos operacionais.</p>
         </div>
         <div className="actions-inline">
-          {canWrite ? <button className="app-button" type="button" onClick={openCreateModal}>Novo condutor</button> : null}
-          <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Previsualizar PDF</button>
+          {canCreateDriver ? <button className="app-button" type="button" onClick={openCreateModal}>Novo condutor</button> : null}
+          <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
       </div>
@@ -206,7 +247,13 @@ export default function DriversPage() {
             ))}
           </div>
           <div className="filter-inline">
-            <input className="app-input" placeholder="Buscar por nome ou documento" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <input className="app-input" placeholder="Buscar por nome, documento ou secretaria" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <select className="app-select" value={organizationFilter} onChange={(event) => setOrganizationFilter(event.target.value)}>
+              <option value="TODAS">Todas as secretarias</option>
+              {organizations.map((organization) => (
+                <option key={organization.id} value={organization.id}>{organization.name}</option>
+              ))}
+            </select>
           </div>
         </div>
       </div>
@@ -237,6 +284,7 @@ export default function DriversPage() {
       </div>
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
+      {catalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
       <div className="surface-panel panel-nested">
@@ -246,19 +294,20 @@ export default function DriversPage() {
               <tr>
                 <th>Nome</th>
                 <th>Documento</th>
+                <th>Secretaria</th>
                 <th>Contato</th>
                 <th>E-mail</th>
                 <th>CNH</th>
                 <th>Alerta CNH</th>
                 <th>Status</th>
-                {canWrite ? <th>Acoes</th> : null}
+                {canManageDriverActions ? <th>Ações</th> : null}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={canWrite ? 8 : 7} className="muted">Carregando condutores...</td></tr>
+                <tr><td colSpan={canManageDriverActions ? 9 : 8} className="muted">Carregando condutores...</td></tr>
               ) : !records.length ? (
-                <tr><td colSpan={canWrite ? 8 : 7}><div className="empty-state">Nenhum condutor encontrado para o filtro atual.</div></td></tr>
+                <tr><td colSpan={canManageDriverActions ? 9 : 8}><div className="empty-state">Nenhum condutor encontrado para o filtro atual.</div></td></tr>
               ) : (
                 records.map((record) => {
                   const cnhAlert = getCnhAlert(record.cnh_validade)
@@ -266,6 +315,7 @@ export default function DriversPage() {
                   <tr key={record.id}>
                     <td data-label="Nome"><strong>{record.nome_completo}</strong></td>
                     <td data-label="Documento">{record.documento}</td>
+                    <td data-label="Secretaria">{record.organization_name || 'Não informada'}</td>
                     <td data-label="Contato">{record.contato || '-'}</td>
                     <td data-label="E-mail">{record.email || '-'}</td>
                     <td data-label="CNH">{record.cnh_categoria} {record.cnh_validade ? `| validade ${formatDate(record.cnh_validade)}` : ''}</td>
@@ -273,11 +323,11 @@ export default function DriversPage() {
                       {cnhAlert ? <span className={`alert ${cnhAlert.tone}`}>{cnhAlert.label}</span> : '-'}
                     </td>
                     <td data-label="Status"><span className={`status-badge ${record.ativo ? 'status-ATIVO' : 'status-INATIVO'}`}>{record.ativo ? 'ATIVO' : 'INATIVO'}</span></td>
-                    {canWrite ? (
-                      <td data-label="Acoes">
+                    {canManageDriverActions ? (
+                      <td data-label="Ações">
                         <div className="actions-inline">
-                          <button type="button" className="mini-button" onClick={() => openEditModal(record)}>Editar</button>
-                          {isAdmin && record.ativo ? <button type="button" className="mini-button danger" onClick={() => handleDeactivate(record)}>Inativar</button> : null}
+                          {canEditDriver ? <button type="button" className="mini-button" onClick={() => openEditModal(record)}>Editar</button> : null}
+                          {canDeleteDriver && record.ativo ? <button type="button" className="mini-button danger" onClick={() => handleDeactivate(record)}>Inativar</button> : null}
                         </div>
                       </td>
                     ) : null}
@@ -295,11 +345,11 @@ export default function DriversPage() {
       <Modal
         open={isModalOpen}
         title={editingRecord ? 'Editar condutor' : 'Novo condutor'}
-        description="Agrupe os dados em blocos simples para manter o cadastro mais limpo e escalavel."
+        description="Agrupe os dados em blocos simples para manter o cadastro mais limpo e escalável."
         onClose={closeModal}
       >
         <form onSubmit={handleSubmit} className="stack">
-          <AccordionSection title="Dados basicos" subtitle="Identificacao e contato" open>
+          <AccordionSection title="Dados básicos" subtitle="Identificação e contato" open>
             <div className="form-grid modal-form-grid">
               <div className="form-field">
                 <label htmlFor="driver-name">Nome completo</label>
@@ -308,6 +358,17 @@ export default function DriversPage() {
               <div className="form-field">
                 <label htmlFor="driver-document">Documento</label>
                 <input id="driver-document" className="app-input" value={form.documento} onChange={(event) => setForm({ ...form, documento: event.target.value })} />
+              </div>
+              <div className="form-field modal-field-span">
+                <label>Secretaria</label>
+                <SearchableSelect
+                  value={form.organization_id}
+                  onChange={(value) => setForm({ ...form, organization_id: value })}
+                  options={organizationOptions}
+                  placeholder={catalogLoading ? 'Carregando secretarias...' : 'Selecione a secretaria'}
+                  searchPlaceholder="Buscar secretaria"
+                  disabled={catalogLoading || organizationOptions.length === 0}
+                />
               </div>
               <div className="form-field">
                 <label htmlFor="driver-contact">Contato</label>
@@ -325,7 +386,7 @@ export default function DriversPage() {
               <div className="form-field">
                 <label htmlFor="driver-license">Categoria</label>
                 <select id="driver-license" className="app-select" value={form.cnh_categoria} onChange={(event) => setForm({ ...form, cnh_categoria: event.target.value })}>
-                  {['A', 'B', 'C', 'D', 'E'].map((option) => <option key={option} value={option}>{option}</option>)}
+                  {DRIVER_LICENSE_CATEGORY_OPTIONS.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
               </div>
               <div className="form-field">

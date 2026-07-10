@@ -15,8 +15,10 @@ class FuelSupply(Base):
         Index("idx_fuel_supplies_vehicle", "vehicle_id"),
         Index("idx_fuel_supplies_driver", "driver_id"),
         Index("idx_fuel_supplies_organization", "organization_id"),
+        Index("idx_fuel_supplies_fuel_station_id", "fuel_station_id"),
         Index("idx_fuel_supplies_supplied_at", "supplied_at"),
         Index("idx_fuel_supplies_anomaly", "is_consumption_anomaly"),
+        Index("uq_fuel_supplies_order_id", "fuel_supply_order_id", unique=True),
     )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
@@ -33,6 +35,19 @@ class FuelSupply(Base):
     odometer_km: Mapped[float] = mapped_column(Float, nullable=False)
     liters: Mapped[float] = mapped_column(Float, nullable=False)
     total_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
+    fuel_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    additive_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    additive_quantity_liters: Mapped[float | None] = mapped_column(Float, nullable=True)
+    fuel_station_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("fuel_stations.id", ondelete="SET NULL"),
+        nullable=True,
+    )
+    fuel_supply_order_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True),
+        ForeignKey("fuel_supply_orders.id", ondelete="SET NULL"),
+        nullable=True,
+    )
     fuel_station: Mapped[str | None] = mapped_column(String(180), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
 
@@ -51,3 +66,5 @@ class FuelSupply(Base):
     vehicle: Mapped["Vehicle"] = relationship(back_populates="fuel_supplies")
     driver: Mapped["Driver | None"] = relationship(back_populates="fuel_supplies")
     organization: Mapped["Organization | None"] = relationship()
+    fuel_station_ref: Mapped["FuelStation | None"] = relationship()
+    fuel_supply_order: Mapped["FuelSupplyOrder | None"] = relationship(back_populates="supply")

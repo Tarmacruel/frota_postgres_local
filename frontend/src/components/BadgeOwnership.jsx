@@ -1,5 +1,5 @@
 const labelMap = {
-  PROPRIO: 'Proprio',
+  PROPRIO: 'Próprio',
   LOCADO: 'Locado',
   CEDIDO: 'Cedido',
 }

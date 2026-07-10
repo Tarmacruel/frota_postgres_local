@@ -6,12 +6,16 @@ param(
 $ErrorActionPreference = "Stop"
 
 # Find repository root
-$repoRoot = $PWD
-while ($repoRoot -ne $repoRoot.Substring(0, 3)) {
-    if (Test-Path (Join-Path $repoRoot ".git")) {
+$repoRoot = (Get-Location).Path
+while ($true) {
+    if (Test-Path -LiteralPath (Join-Path $repoRoot ".git")) {
         break
     }
-    $repoRoot = Split-Path $repoRoot -Parent
+    $parent = Split-Path -Path $repoRoot -Parent
+    if (-not $parent -or $parent -eq $repoRoot) {
+        throw "Nao foi possivel localizar a raiz do repositorio a partir de '$repoRoot'."
+    }
+    $repoRoot = $parent
 }
 
 $frontendDir = Join-Path $repoRoot "frontend"

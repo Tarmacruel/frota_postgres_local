@@ -20,6 +20,7 @@ class LocationHistory(Base):
         index=True,
     )
     department: Mapped[str] = mapped_column(String(255), nullable=False)
+    justification: Mapped[str | None] = mapped_column(String(500), nullable=True)
     start_date: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     end_date = mapped_column(DateTime(timezone=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))

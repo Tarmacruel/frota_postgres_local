@@ -6,7 +6,7 @@ import { getApiErrorMessage } from '../utils/apiError'
 
 const accessNotes = [
   'Credenciais liberadas somente para servidores e setores autorizados.',
-  'Solicite criacao, redefinicao ou ajuste de perfil ao administrador responsavel.',
+  'Solicite criação, redefinição ou ajuste de perfil ao administrador responsável.',
   'Utilize o subdominio oficial `frota.sirel.com.br` para acesso externo.',
 ]
 
@@ -44,7 +44,7 @@ export default function LoginPage() {
             <div className="login-brand-header">
               <span className="eyebrow">Acesso institucional protegido</span>
               <div className="login-brandline">
-                <img className="login-brand-logo" src={officialBrand.logoPath} alt="Brasao oficial da Prefeitura Municipal de Teixeira de Freitas" />
+                <img className="login-brand-logo" src={officialBrand.logoPath} alt="Brasão oficial da Prefeitura Municipal de Teixeira de Freitas" />
                 <div>
                   <strong>{officialBrand.systemName}</strong>
                   <span>{officialBrand.subtitle}</span>
@@ -94,7 +94,7 @@ export default function LoginPage() {
                     className="app-input login-app-input"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    placeholder="usuario@frota.local"
+                    placeholder="usuário@frota.local"
                   />
                 </div>
               </div>
@@ -122,7 +122,7 @@ export default function LoginPage() {
             </form>
 
             <div className="login-demo-block">
-              <strong>Orientacoes de acesso</strong>
+              <strong>Orientações de acesso</strong>
               <div className="alert alert-info">
                 {accessNotes.map((note) => (
                   <div key={note}>{note}</div>

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from uuid import UUID
+from fastapi.encoders import jsonable_encoder
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.audit_log import AuditLog
 from app.models.user import User
@@ -45,6 +46,6 @@ class AuditService:
             entity_type=entity_type.upper(),
             entity_id=entity_id,
             entity_label=entity_label,
-            details=details,
+            details=jsonable_encoder(details) if details is not None else None,
         )
         return await self.audit_logs.create(audit_log)

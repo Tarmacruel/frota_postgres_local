@@ -2,9 +2,10 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from fastapi import HTTPException, status
+from app.core.cpf import mask_cpf
 from app.core.security import get_password_hash, verify_password
 from app.repositories.user_repository import UserRepository
-from app.schemas.auth import LoginInput
+from app.schemas.auth import LoginInput, RegisterCpfInput
 from app.models.user import User
 from app.services.audit_service import AuditService
 
@@ -18,7 +19,7 @@ class AuthService:
     async def authenticate(self, data: LoginInput) -> User:
         user = await self.users.get_by_email(data.email.lower())
         if not user:
-            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuario nao encontrado")
+            raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário não encontrado")
         if not verify_password(data.password, user.password_hash):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Senha incorreta")
         return user
@@ -29,13 +30,34 @@ class AuthService:
         if verify_password(new_password, user.password_hash):
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nova senha deve ser diferente da atual")
         user.password_hash = get_password_hash(new_password)
+        user.must_change_password = False
         await self.audit.record(
             actor=user,
             action="UPDATE",
             entity_type="USER_PASSWORD",
             entity_id=user.id,
             entity_label=user.email,
-            details={"password_changed": True},
+            details={"password_changed": True, "must_change_password": False},
+        )
+        await self.db.flush()
+        await self.db.commit()
+
+    async def register_cpf(self, *, user: User, data: RegisterCpfInput) -> None:
+        if user.cpf:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="CPF ja cadastrado para este usuario")
+
+        existing = await self.users.get_by_cpf(data.cpf)
+        if existing and existing.id != user.id:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"CPF {mask_cpf(data.cpf)} ja cadastrado")
+
+        user.cpf = data.cpf
+        await self.audit.record(
+            actor=user,
+            action="UPDATE",
+            entity_type="USER_CPF",
+            entity_id=user.id,
+            entity_label=user.email,
+            details={"cpf_registered": True, "cpf_masked": mask_cpf(user.cpf)},
         )
         await self.db.flush()
         await self.db.commit()

@@ -60,7 +60,7 @@ export default function SearchOverlay({ open, onClose, onSelect }) {
         setResults(data)
         setActiveIndex(0)
       } catch (err) {
-        setError(getApiErrorMessage(err, 'Nao foi possivel executar a busca global.'))
+        setError(getApiErrorMessage(err, 'Não foi possível executar a busca global.'))
       } finally {
         setLoading(false)
       }
@@ -109,7 +109,7 @@ export default function SearchOverlay({ open, onClose, onSelect }) {
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               onKeyDown={handleInputKeyDown}
-              placeholder="Buscar veiculo, chassi, condutor, lotacao ou manutencao"
+              placeholder="Buscar veículo, chassi, condutor, lotação ou manutenção"
             />
           </div>
           <button type="button" className="icon-button" onClick={onClose} aria-label="Fechar busca">
@@ -120,8 +120,8 @@ export default function SearchOverlay({ open, onClose, onSelect }) {
         <div className="search-overlay-body">
           {!query.trim() ? (
             <div className="search-empty-state">
-              <strong>Busca global da operacao</strong>
-              <span>Encontre veiculos, condutores e manutencoes sem navegar manualmente entre telas.</span>
+              <strong>Busca global da operação</strong>
+              <span>Encontre veículos, condutores e manutenções sem navegar manualmente entre telas.</span>
             </div>
           ) : null}
 
@@ -131,7 +131,7 @@ export default function SearchOverlay({ open, onClose, onSelect }) {
           {!loading && query.trim() && !error && flatResults.length === 0 ? (
             <div className="search-empty-state">
               <strong>Nenhum resultado encontrado</strong>
-              <span>Tente buscar por placa, nome do condutor, secretaria ou descricao de servico.</span>
+              <span>Tente buscar por placa, nome do condutor, secretaria ou descrição de serviço.</span>
             </div>
           ) : null}
 

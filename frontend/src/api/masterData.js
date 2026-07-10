@@ -1,7 +1,7 @@
 import api from './client'
 
 export const masterDataAPI = {
-  getCatalog: () => api.get('/master-data/catalog'),
+  getCatalog: (params) => api.get('/master-data/catalog', { params }),
   listOrganizations: () => api.get('/master-data/organizations'),
   createOrganization: (data) => api.post('/master-data/organizations', data),
   updateOrganization: (id, data) => api.put(`/master-data/organizations/${id}`, data),

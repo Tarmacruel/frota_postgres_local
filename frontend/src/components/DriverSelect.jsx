@@ -3,11 +3,12 @@ import { driversAPI } from '../api/drivers'
 import SearchableSelect from './SearchableSelect'
 
 function buildOption(driver) {
+  const organizationLabel = driver.organization_name || 'Sem secretaria'
   return {
     value: driver.id,
     label: driver.nome_completo,
-    description: `${driver.documento} | CNH ${driver.cnh_categoria}${driver.contato ? ` | ${driver.contato}` : ''}`,
-    keywords: [driver.nome_completo, driver.documento, driver.contato, driver.email].filter(Boolean).join(' '),
+    description: `${organizationLabel} | ${driver.documento} | CNH ${driver.cnh_categoria}${driver.contato ? ` | ${driver.contato}` : ''}`,
+    keywords: [driver.nome_completo, driver.documento, driver.contato, driver.email, organizationLabel].filter(Boolean).join(' '),
     driver,
   }
 }

@@ -243,13 +243,13 @@ echo Aguardando disponibilidade...
 timeout /t 2 /nobreak
 
 echo.
-echo Menu de Opcoes:
-echo 1 - Aplicar migrations (RECOMENDADO na primeira execucao)
+echo Menu de Opções:
+echo 1 - Aplicar migrations (RECOMENDADO na primeira execução)
 echo 2 - Apenas verificar status
 echo 3 - Resetar banco completamente
 echo.
 
-set /p choice="Escolha uma opcao (1-3): "
+set /p choice="Escolha uma opção (1-3): "
 
 if "%choice%"=="1" (
     cd backend
@@ -313,7 +313,7 @@ python -m venv .venv
 cd backend
 
 # Criar schema
-alembic revision --autogenerate -m "descricao da mudanca"
+alembic revision --autogenerate -m "descrição da mudança"
 
 # Aplicar
 alembic upgrade heads

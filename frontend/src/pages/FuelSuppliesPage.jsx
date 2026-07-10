@@ -2,12 +2,33 @@ import { useEffect, useMemo, useState } from 'react'
 import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
-import FuelSupplyForm from '../components/FuelSupplyForm'
+import FuelSupplyOrderCreateForm from '../components/FuelSupplyOrderCreateForm'
 import api from '../api/client'
+import { fuelStationsAPI } from '../api/fuelStations'
 import { masterDataAPI } from '../api/masterData'
 import { fuelSuppliesAPI } from '../api/fuelSupplies'
+import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
+import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
+import { downloadFuelSupplyOrderDocument, previewFuelSupplyOrderDocument } from '../utils/fuelSupplyOrderDocument'
+import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
+import {
+  formatCurrencyBRL,
+  formatOrderNumber,
+  getOrderStatusClass,
+  getOrderStatusLabel,
+  resolvePublicValidationUrl,
+} from '../utils/fuelSupplyOrders'
+import { formatAdditiveDetails } from '../utils/fuelSupplyDetails'
+
+const ORDER_STATUS_OPTIONS = [
+  { value: 'TODOS', label: 'Todas as situações' },
+  { value: 'OPEN', label: 'Abertas' },
+  { value: 'COMPLETED', label: 'Concluídas' },
+  { value: 'EXPIRED', label: 'Expiradas' },
+  { value: 'CANCELLED', label: 'Canceladas' },
+]
 
 function formatDate(value) {
   if (!value) return '-'
@@ -19,8 +40,63 @@ function formatNumber(value, digits = 2) {
   return Number(value).toFixed(digits)
 }
 
+function formatCurrency(value) {
+  return formatCurrencyBRL(value)
+}
+
+function formatDateOnly(value) {
+  if (!value) return '-'
+  const normalized = String(value).length === 10 ? `${value}T00:00:00` : value
+  const date = new Date(normalized)
+  if (Number.isNaN(date.getTime())) return '-'
+  return new Intl.DateTimeFormat('pt-BR').format(date)
+}
+
+function dateBoundaryToIso(value, boundary) {
+  if (!value) return undefined
+  const suffix = boundary === 'end' ? 'T23:59:59.999' : 'T00:00:00.000'
+  const date = new Date(`${value}${suffix}`)
+  if (Number.isNaN(date.getTime())) return undefined
+  return date.toISOString()
+}
+
+function orderMatchesSearch(order, search) {
+  const term = search.trim().toLowerCase()
+  if (!term) return true
+  return [
+    order.request_number,
+    order.vehicle_plate,
+    order.organization_name,
+    order.fuel_station_name,
+    order.created_by_name,
+    order.fuel_station_phone,
+    order.supply_fuel_type,
+    order.notes,
+  ]
+    .filter(Boolean)
+    .some((value) => String(value).toLowerCase().includes(term))
+}
+
+function buildOrderMapsUrl(order) {
+  if (order.fuel_station_maps_url) return order.fuel_station_maps_url
+  if (order.fuel_station_latitude === null || order.fuel_station_latitude === undefined) return ''
+  if (order.fuel_station_longitude === null || order.fuel_station_longitude === undefined) return ''
+  const latitude = Number(order.fuel_station_latitude).toFixed(6)
+  const longitude = Number(order.fuel_station_longitude).toFixed(6)
+  return `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=18/${latitude}/${longitude}`
+}
+
+function buildStationOption(station) {
+  return {
+    value: station.id,
+    label: station.name,
+    description: [station.address, station.phone].filter(Boolean).join(' | '),
+    keywords: [station.name, station.cnpj, station.address, station.phone].filter(Boolean).join(' '),
+  }
+}
+
 function buildVehicleOption(vehicle) {
-  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
+  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
   return { value: vehicle.id, label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`, description: locationLabel }
 }
 
@@ -31,32 +107,41 @@ function asArray(payload) {
 }
 
 export default function FuelSuppliesPage() {
-  const { canWrite } = useAuth()
+  const { canCreate, canEdit, canView } = useAuth()
+  const canViewOrders = canView('fuel_supply_orders')
+  const canCreateOrder = canCreate('fuel_supply_orders')
+  const canEditOrder = canEdit('fuel_supply_orders')
   const [records, setRecords] = useState([])
+  const [orders, setOrders] = useState([])
   const [vehicles, setVehicles] = useState([])
-  const [drivers, setDrivers] = useState([])
   const [organizations, setOrganizations] = useState([])
-  const [filters, setFilters] = useState({ vehicle_id: '', driver_id: '', organization_id: '', only_anomalies: '' })
+  const [fuelStations, setFuelStations] = useState([])
+  const [filters, setFilters] = useState({ vehicle_id: '', organization_id: '', fuel_station_id: '', only_anomalies: '' })
+  const [orderFilters, setOrderFilters] = useState({ status: 'TODOS', organization_id: '', fuel_station_id: '', created_from: '', created_to: '' })
   const [search, setSearch] = useState('')
-  const [loading, setLoading] = useState(true)
+  const [orderSearch, setOrderSearch] = useState('')
+  const [historyLoading, setHistoryLoading] = useState(true)
+  const [ordersLoading, setOrdersLoading] = useState(true)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
-  const [currentPage, setCurrentPage] = useState(1)
-  const [isModalOpen, setIsModalOpen] = useState(false)
+  const [lastIssuedOrder, setLastIssuedOrder] = useState(null)
+  const [currentHistoryPage, setCurrentHistoryPage] = useState(1)
+  const [currentOrdersPage, setCurrentOrdersPage] = useState(1)
+  const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
 
   useEffect(() => {
     async function loadDependencies() {
       try {
-        const [vehiclesResponse, driversResponse, organizationsResponse] = await Promise.all([
-          api.get('/vehicles'),
-          api.get('/drivers'),
+        const [vehiclesResponse, organizationsResponse, stationsResponse] = await Promise.all([
+          api.get('/vehicles', { params: { limit: VEHICLE_LIST_LIMIT } }),
           masterDataAPI.listOrganizations(),
+          fuelStationsAPI.list({ active_only: true }),
         ])
         setVehicles(asArray(vehiclesResponse.data))
-        setDrivers(asArray(driversResponse.data))
         setOrganizations(asArray(organizationsResponse.data))
+        setFuelStations(asArray(stationsResponse.data))
       } catch (err) {
-        setError(getApiErrorMessage(err, 'Nao foi possivel carregar os cadastros de apoio.'))
+        setError(getApiErrorMessage(err, 'Não foi possível carregar os cadastros de apoio.'))
       }
     }
     loadDependencies()
@@ -64,19 +149,38 @@ export default function FuelSuppliesPage() {
 
   async function loadRecords() {
     try {
-      setLoading(true)
+      setHistoryLoading(true)
       setError('')
       const params = { limit: 100, page: 1 }
       if (filters.vehicle_id) params.vehicle_id = filters.vehicle_id
-      if (filters.driver_id) params.driver_id = filters.driver_id
       if (filters.organization_id) params.organization_id = filters.organization_id
+      if (filters.fuel_station_id) params.fuel_station_id = filters.fuel_station_id
       if (filters.only_anomalies === 'true') params.only_anomalies = true
       const { data } = await fuelSuppliesAPI.list(params)
       setRecords(data.data || [])
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar os abastecimentos.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar os abastecimentos.'))
     } finally {
-      setLoading(false)
+      setHistoryLoading(false)
+    }
+  }
+
+  async function loadOrders() {
+    if (!canViewOrders) {
+      setOrders([])
+      setOrdersLoading(false)
+      return
+    }
+    try {
+      setOrdersLoading(true)
+      setError('')
+      const params = buildOrderQueryParams({ includePaging: true })
+      const { data } = await fuelSupplyOrdersAPI.list(params)
+      setOrders(asArray(data))
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Não foi possível carregar as ordens de abastecimento.'))
+    } finally {
+      setOrdersLoading(false)
     }
   }
 
@@ -84,94 +188,490 @@ export default function FuelSuppliesPage() {
     loadRecords()
   }, [filters])
 
+  useEffect(() => {
+    loadOrders()
+  }, [orderFilters, canViewOrders])
+
+  function buildOrderQueryParams({ includePaging = false } = {}) {
+    const params = includePaging ? { limit: 100, page: 1 } : {}
+    if (orderFilters.status !== 'TODOS') params.status = orderFilters.status
+    if (orderFilters.organization_id) params.organization_id = orderFilters.organization_id
+    if (orderFilters.fuel_station_id) params.fuel_station_id = orderFilters.fuel_station_id
+    const createdFrom = dateBoundaryToIso(orderFilters.created_from, 'start')
+    const createdTo = dateBoundaryToIso(orderFilters.created_to, 'end')
+    if (createdFrom) params.created_from = createdFrom
+    if (createdTo) params.created_to = createdTo
+    return params
+  }
+
+  async function loadOrderReportRows() {
+    const rows = await fuelSupplyOrdersAPI.listAllForReport(buildOrderQueryParams())
+    return rows.filter((order) => orderMatchesSearch(order, orderSearch))
+  }
+
   const filteredRecords = useMemo(() => {
     const term = search.trim().toLowerCase()
     return records.filter((record) => {
       if (!term) return true
-      return [record.vehicle_plate, record.driver_name, record.organization_name, record.fuel_station, record.notes]
+      return [record.vehicle_plate, record.organization_name, record.fuel_station_name, record.fuel_station, record.fuel_type, record.additive_type, record.notes]
         .filter(Boolean)
         .some((value) => value.toLowerCase().includes(term))
     })
   }, [records, search])
 
-  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / 10))
-  const paginatedRecords = filteredRecords.slice((currentPage - 1) * 10, currentPage * 10)
+  const filteredOrders = useMemo(() => {
+    return orders.filter((order) => orderMatchesSearch(order, orderSearch))
+  }, [orders, orderSearch])
+
+  const totalHistoryPages = Math.max(1, Math.ceil(filteredRecords.length / 10))
+  const paginatedRecords = filteredRecords.slice((currentHistoryPage - 1) * 10, currentHistoryPage * 10)
+  const totalOrdersPages = Math.max(1, Math.ceil(filteredOrders.length / 10))
+  const paginatedOrders = filteredOrders.slice((currentOrdersPage - 1) * 10, currentOrdersPage * 10)
+
+  const orderExportColumns = useMemo(() => [
+    { header: 'Ordem', value: (order) => formatOrderNumber(order) },
+    { header: 'Situação', value: (order) => getOrderStatusLabel(order.status) },
+    { header: 'Veículo', value: (order) => order.vehicle_description || order.vehicle_plate || '-' },
+    { header: 'Posto', value: (order) => order.fuel_station_name || '-' },
+    { header: 'Telefone posto', value: (order) => order.fuel_station_phone || '-' },
+    { header: 'Localização posto', value: (order) => order.fuel_station_maps_url || buildOrderMapsUrl(order) || '-' },
+    { header: 'Secretaria', value: (order) => order.organization_name || '-' },
+    { header: 'Solicitante', value: (order) => order.created_by_name || '-' },
+    { header: 'Prazo', value: (order) => formatDate(order.expires_at) },
+    { header: 'Litros previstos', value: (order) => order.requested_liters ?? '-' },
+    { header: 'Código público', value: (order) => order.validation_code || '-' },
+  ], [])
+
+  const orderPdfExportColumns = useMemo(
+    () => orderExportColumns.filter((column) => column.header !== 'Localização posto'),
+    [orderExportColumns],
+  )
+
+  const orderReportColumns = useMemo(() => [
+    { header: 'Ordem', value: (order) => formatOrderNumber(order) },
+    { header: 'Emissão', value: (order) => formatDate(order.created_at) },
+    { header: 'Situação', value: (order) => getOrderStatusLabel(order.status) },
+    { header: 'Secretaria', value: (order) => order.organization_name || '-' },
+    { header: 'Veículo', value: (order) => order.vehicle_description || order.vehicle_plate || '-' },
+    { header: 'Posto', value: (order) => order.fuel_station_name || '-' },
+    { header: 'Solicitante', value: (order) => order.created_by_name || '-' },
+    { header: 'Litros previstos', value: (order) => formatNumber(order.requested_liters), align: 'right', width: 46 },
+    { header: 'Abastecido em', value: (order) => formatDate(order.supply_supplied_at) },
+    { header: 'Litros reais', value: (order) => formatNumber(order.supply_liters), align: 'right', width: 42 },
+    { header: 'Valor real', value: (order) => formatCurrency(order.supply_total_amount), align: 'right', width: 56 },
+    { header: 'Combustível', value: (order) => order.supply_fuel_type || '-' },
+    { header: 'Odômetro', value: (order) => formatNumber(order.supply_odometer_km, 1), align: 'right', width: 50 },
+  ], [])
+
+  const organizationFilterOptions = useMemo(
+    () => [{ value: '', label: 'Todas as secretarias' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))],
+    [organizations],
+  )
 
   useEffect(() => {
-    setCurrentPage(1)
+    setCurrentHistoryPage(1)
   }, [search, filters, records.length])
+
+  useEffect(() => {
+    setCurrentOrdersPage(1)
+  }, [orderSearch, orderFilters, orders.length])
+
+  async function handleCancelOrder(order) {
+    if (!canEditOrder) {
+      setError('Você não tem permissão para cancelar ordens de abastecimento.')
+      return
+    }
+    if (!window.confirm(`Cancelar a ordem ${formatOrderNumber(order)}?`)) return
+
+    const reason = window.prompt('Motivo do cancelamento (opcional):', '')
+    if (reason === null) return
+
+    try {
+      setError('')
+      setFeedback('')
+      await fuelSupplyOrdersAPI.cancel(order.id, { reason: reason.trim() || null })
+      setFeedback(`Ordem ${formatOrderNumber(order)} cancelada com sucesso.`)
+      await loadOrders()
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Não foi possível cancelar a ordem de abastecimento.'))
+    }
+  }
+
+  function buildOrderReportFilters() {
+    return [
+      { label: 'Situação', value: orderFilters.status === 'TODOS' ? 'Todas as situações' : getOrderStatusLabel(orderFilters.status) },
+      { label: 'Secretaria', value: organizations.find((org) => org.id === orderFilters.organization_id)?.name || 'Todas as secretarias' },
+      { label: 'Posto', value: fuelStations.find((station) => station.id === orderFilters.fuel_station_id)?.name || 'Todos os postos' },
+      orderFilters.created_from ? { label: 'Data inicial', value: formatDateOnly(orderFilters.created_from) } : null,
+      orderFilters.created_to ? { label: 'Data final', value: formatDateOnly(orderFilters.created_to) } : null,
+      orderSearch.trim() ? { label: 'Busca', value: orderSearch.trim() } : null,
+    ].filter(Boolean)
+  }
+
+  function buildOrderReportMetrics(rows) {
+    const completedRows = rows.filter((order) => order.status === 'COMPLETED')
+    const totalLiters = completedRows.reduce((total, order) => total + Number(order.supply_liters || 0), 0)
+    const totalAmount = completedRows.reduce((total, order) => total + Number(order.supply_total_amount || 0), 0)
+
+    return [
+      { label: 'Ordens no relatório', value: rows.length },
+      { label: 'Abertas', value: rows.filter((order) => order.status === 'OPEN').length },
+      { label: 'Concluídas', value: completedRows.length },
+      { label: 'Litros reais', value: formatNumber(totalLiters) },
+      { label: 'Valor real', value: formatCurrency(totalAmount) },
+    ]
+  }
+
+  async function handlePreviewOrdersPdf() {
+    if (orders.length === 0) {
+      setFeedback('Não há ordens filtradas para pré-visualizar em PDF.')
+      return
+    }
+
+    try {
+      setError('')
+      setFeedback('')
+      const reportRows = await loadOrderReportRows()
+      if (reportRows.length === 0) {
+        setFeedback('Não há ordens filtradas para pré-visualizar em PDF.')
+        return
+      }
+      await previewRowsToPdf({
+        title: 'Frota PMTF - Ordens de abastecimento',
+        fileName: 'frota-pmtf-ordens-abastecimento',
+        subtitle: 'Relatório institucional das ordens emitidas para os postos credenciados.',
+        columns: orderReportColumns,
+        rows: reportRows,
+        filters: buildOrderReportFilters(),
+        summaryMetrics: buildOrderReportMetrics(reportRows),
+        orientation: 'landscape',
+      })
+      setFeedback('Pré-visualização do PDF das ordens aberta em nova guia.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Não foi possível gerar o PDF das ordens de abastecimento.'))
+    }
+  }
+
+  async function handleExportOrdersXlsx() {
+    if (orders.length === 0) {
+      setFeedback('Não há ordens filtradas para exportar.')
+      return
+    }
+
+    try {
+      setError('')
+      setFeedback('')
+      const reportRows = await loadOrderReportRows()
+      if (reportRows.length === 0) {
+        setFeedback('Não há ordens filtradas para exportar.')
+        return
+      }
+      await exportRowsToXlsx({
+        fileName: 'frota-pmtf-ordens-abastecimento',
+        sheetName: 'Ordens de abastecimento',
+        columns: orderReportColumns,
+        rows: reportRows,
+        filters: buildOrderReportFilters(),
+      })
+      setFeedback('Exportação das ordens em XLSX iniciada com sucesso.')
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Não foi possível exportar as ordens em XLSX.'))
+    }
+  }
+
+  async function handlePreviewOrderDocument(order) {
+    try {
+      setError('')
+      await previewFuelSupplyOrderDocument(order)
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Não foi possível abrir o comprovante da ordem.'))
+    }
+  }
+
+  async function handleDownloadOrderDocument(order) {
+    try {
+      setError('')
+      await downloadFuelSupplyOrderDocument(order)
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Não foi possível baixar o comprovante da ordem.'))
+    }
+  }
+
+  async function handleCopyPublicLink(order) {
+    const publicUrl = resolvePublicValidationUrl(order.public_validation_path)
+    if (!publicUrl) {
+      setFeedback('Link público indisponível para esta ordem.')
+      return
+    }
+
+    if (!navigator.clipboard) {
+      setFeedback(`Link público: ${publicUrl}`)
+      return
+    }
+
+    try {
+      await navigator.clipboard.writeText(publicUrl)
+      setFeedback(`Link público da ordem ${formatOrderNumber(order)} copiado com sucesso.`)
+    } catch {
+      setFeedback(`Link público: ${publicUrl}`)
+    }
+  }
+
+  function clearHistoryFilters() {
+    setSearch('')
+    setFilters({ vehicle_id: '', organization_id: '', fuel_station_id: '', only_anomalies: '' })
+  }
+
+  function clearOrderFilters() {
+    setOrderSearch('')
+    setOrderFilters({ status: 'TODOS', organization_id: '', fuel_station_id: '', created_from: '', created_to: '' })
+  }
 
   return (
     <div className="surface-panel">
       <div className="panel-heading">
         <div>
-          <h2 className="section-title">Abastecimentos</h2>
-          <p className="section-copy">Gestao de abastecimento com comprovante obrigatorio e alertas automaticos de consumo.</p>
+          <h2 className="section-title">Gestão de abastecimentos</h2>
+          <p className="section-copy">Emita ordens para os postos vinculados e acompanhe o histórico confirmado com comprovantes e alertas de consumo.</p>
         </div>
-        {canWrite ? <button className="app-button" type="button" onClick={() => setIsModalOpen(true)}>Novo abastecimento</button> : null}
+        <div className="actions-inline">
+          {canCreateOrder ? <button className="app-button" type="button" onClick={() => setIsOrderModalOpen(true)}>Nova ordem</button> : null}
+          <button className="ghost-button" type="button" onClick={() => { loadOrders(); loadRecords() }}>Atualizar painel</button>
+        </div>
       </div>
 
-      <div className="toolbar-card">
-        <div className="filter-inline">
-          <input className="app-input" placeholder="Buscar por placa, condutor, orgao ou posto" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veiculos' }, ...vehicles.map(buildVehicleOption)]} placeholder="Filtrar veiculo" />
-          <SearchableSelect value={filters.driver_id} onChange={(value) => setFilters((prev) => ({ ...prev, driver_id: value }))} options={[{ value: '', label: 'Todos os condutores' }, ...drivers.map((driver) => ({ value: driver.id, label: driver.nome_completo }))]} placeholder="Filtrar condutor" />
-          <SearchableSelect value={filters.organization_id} onChange={(value) => setFilters((prev) => ({ ...prev, organization_id: value }))} options={[{ value: '', label: 'Todos os orgaos' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))]} placeholder="Filtrar orgao" />
-          <select className="app-input" value={filters.only_anomalies} onChange={(event) => setFilters((prev) => ({ ...prev, only_anomalies: event.target.value }))}>
-            <option value="">Todos</option>
-            <option value="true">Somente alertas</option>
-          </select>
+      <div className="panel-metrics">
+        <div className="metric-inline">
+          <strong>{orders.filter((order) => order.status === 'OPEN').length}</strong>
+          <span>ordens abertas</span>
+        </div>
+        <div className="metric-inline">
+          <strong>{records.length}</strong>
+          <span>abastecimentos carregados</span>
+        </div>
+        <div className="metric-inline">
+          <strong>{records.filter((record) => record.is_consumption_anomaly).length}</strong>
+          <span>alertas de consumo</span>
+        </div>
+        <div className="metric-inline">
+          <strong>{fuelStations.length}</strong>
+          <span>postos ativos</span>
         </div>
       </div>
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
-      <div className="surface-panel panel-nested">
+      {lastIssuedOrder ? (
+        <div className="table-focus-banner">
+          <div>
+            <strong>Comprovante institucional disponível para {formatOrderNumber(lastIssuedOrder)}</strong>
+            <span>
+              O documento oficial já pode ser pré-visualizado, baixado em PDF ou compartilhado pelo link público com
+              validação por QR Code.
+            </span>
+          </div>
+          <div className="actions-inline">
+            <button className="app-button" type="button" onClick={() => handlePreviewOrderDocument(lastIssuedOrder)}>Abrir comprovante</button>
+            <button className="secondary-button" type="button" onClick={() => handleDownloadOrderDocument(lastIssuedOrder)}>Baixar PDF</button>
+            <button className="ghost-button" type="button" onClick={() => handleCopyPublicLink(lastIssuedOrder)}>Copiar link público</button>
+          </div>
+        </div>
+      ) : null}
+
+      {canViewOrders ? <div className="surface-panel panel-nested" style={{ marginBottom: 16 }}>
+        <div className="panel-heading">
+          <div>
+            <h3 className="section-title">Ordens de abastecimento</h3>
+            <p className="section-copy">Acompanhe o ciclo completo das ordens emitidas para os postos credenciados.</p>
+          </div>
+          <div className="actions-inline">
+            <button className="secondary-button" type="button" onClick={handlePreviewOrdersPdf}>Pré-visualizar PDF</button>
+            <button className="ghost-button" type="button" onClick={handleExportOrdersXlsx}>Exportar XLSX</button>
+          </div>
+        </div>
+
+        <div className="filter-inline">
+          <input className="app-input" placeholder="Buscar ordem por placa, secretaria, posto, solicitante ou observação" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} />
+          <select className="app-select" value={orderFilters.status} onChange={(event) => setOrderFilters((prev) => ({ ...prev, status: event.target.value }))}>
+            {ORDER_STATUS_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>{option.label}</option>
+            ))}
+          </select>
+          <SearchableSelect
+            value={orderFilters.organization_id}
+            onChange={(value) => setOrderFilters((prev) => ({ ...prev, organization_id: value }))}
+            options={organizationFilterOptions}
+            placeholder="Filtrar secretaria"
+            searchPlaceholder="Buscar secretaria"
+          />
+          <SearchableSelect
+            value={orderFilters.fuel_station_id}
+            onChange={(value) => setOrderFilters((prev) => ({ ...prev, fuel_station_id: value }))}
+            options={[{ value: '', label: 'Todos os postos' }, ...fuelStations.map(buildStationOption)]}
+            placeholder="Filtrar posto"
+            searchPlaceholder="Buscar posto"
+          />
+          <label className="form-field filter-date-field">
+            <span>Data inicial</span>
+            <input
+              className="app-input"
+              type="date"
+              value={orderFilters.created_from}
+              onChange={(event) => setOrderFilters((prev) => ({ ...prev, created_from: event.target.value }))}
+              aria-label="Data inicial da emissão"
+              title="Data inicial da emissão"
+            />
+          </label>
+          <label className="form-field filter-date-field">
+            <span>Data final</span>
+            <input
+              className="app-input"
+              type="date"
+              value={orderFilters.created_to}
+              onChange={(event) => setOrderFilters((prev) => ({ ...prev, created_to: event.target.value }))}
+              aria-label="Data final da emissão"
+              title="Data final da emissão"
+            />
+          </label>
+          <button className="ghost-button" type="button" onClick={clearOrderFilters}>Limpar filtros</button>
+        </div>
+
         <div className="table-wrap table-wrap-wide">
           <table className="data-table data-table-wide">
             <thead>
               <tr>
-                <th>Veiculo</th>
+                <th>Ordem</th>
+                <th>Veículo</th>
+                <th>Posto</th>
+                <th>Situação</th>
+                <th>Prazo</th>
+                <th>Solicitante</th>
+                <th>Litros previstos</th>
+                <th>Ações</th>
+              </tr>
+            </thead>
+            <tbody>
+              {ordersLoading ? <tr><td colSpan={8} className="muted">Carregando ordens...</td></tr> : null}
+              {!ordersLoading && paginatedOrders.length === 0 ? <tr><td colSpan={8}><div className="empty-state">Nenhuma ordem encontrada para os filtros aplicados.</div></td></tr> : null}
+              {!ordersLoading && paginatedOrders.map((order) => (
+                <tr key={order.id}>
+                  <td data-label="Ordem"><strong>{formatOrderNumber(order)}</strong></td>
+                  <td data-label="Veículo">
+                    <div className="stack">
+                      <strong>{order.vehicle_plate || '-'}</strong>
+                      <span className="muted">{order.organization_name || 'Sem secretaria informada'}</span>
+                    </div>
+                  </td>
+                  <td data-label="Posto">
+                    <div className="stack">
+                      <strong>{order.fuel_station_name || '-'}</strong>
+                      <span className="muted">{order.fuel_station_phone || 'Telefone não informado'}</span>
+                      {buildOrderMapsUrl(order) ? (
+                        <a className="link-inline" href={buildOrderMapsUrl(order)} target="_blank" rel="noreferrer">Abrir mapa</a>
+                      ) : (
+                        <span className="muted">Sem localização</span>
+                      )}
+                    </div>
+                  </td>
+                  <td data-label="Situação">
+                    <span className={`status-badge ${getOrderStatusClass(order.status)}`}>{getOrderStatusLabel(order.status)}</span>
+                  </td>
+                  <td data-label="Prazo">{formatDate(order.expires_at)}</td>
+                  <td data-label="Solicitante">
+                    <div className="stack">
+                      <strong>{order.created_by_name || '-'}</strong>
+                      <span className="muted">{order.organization_name || 'Sem secretaria informada'}</span>
+                    </div>
+                  </td>
+                  <td data-label="Litros previstos">{formatNumber(order.requested_liters)}</td>
+                  <td data-label="Ações">
+                    <div className="actions-inline">
+                      <button type="button" className="mini-button" onClick={() => handlePreviewOrderDocument(order)}>Comprovante</button>
+                      <button type="button" className="mini-button" onClick={() => handleCopyPublicLink(order)}>Link público</button>
+                      <button type="button" className="mini-button" onClick={() => handleDownloadOrderDocument(order)}>Baixar PDF</button>
+                      {order.status === 'OPEN' && canEditOrder ? <button type="button" className="mini-button danger" onClick={() => handleCancelOrder(order)}>Cancelar</button> : null}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <Pagination currentPage={currentOrdersPage} totalPages={totalOrdersPages} onPageChange={setCurrentOrdersPage} />
+      </div> : null}
+
+      <div className="surface-panel panel-nested">
+        <div className="panel-heading">
+          <div>
+            <h3 className="section-title">Histórico de abastecimentos</h3>
+            <p className="section-copy">Consulta histórica dos abastecimentos confirmados, com comprovantes e alertas de consumo.</p>
+          </div>
+        </div>
+
+        <div className="filter-inline" style={{ marginBottom: 12 }}>
+          <input className="app-input" placeholder="Buscar por placa, secretaria, posto, combustível ou aditivo" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(buildVehicleOption)]} placeholder="Filtrar veículo" />
+          <SearchableSelect value={filters.organization_id} onChange={(value) => setFilters((prev) => ({ ...prev, organization_id: value }))} options={organizationFilterOptions} placeholder="Filtrar secretaria" />
+          <SearchableSelect value={filters.fuel_station_id} onChange={(value) => setFilters((prev) => ({ ...prev, fuel_station_id: value }))} options={[{ value: '', label: 'Todos os postos' }, ...fuelStations.map(buildStationOption)]} placeholder="Filtrar posto" />
+          <select className="app-input" value={filters.only_anomalies} onChange={(event) => setFilters((prev) => ({ ...prev, only_anomalies: event.target.value }))}>
+            <option value="">Todos</option>
+            <option value="true">Somente alertas</option>
+          </select>
+          <button className="ghost-button" type="button" onClick={clearHistoryFilters}>Limpar filtros</button>
+        </div>
+
+        <div className="table-wrap table-wrap-wide">
+          <table className="data-table data-table-wide">
+            <thead>
+              <tr>
+                <th>Veículo</th>
                 <th>Data</th>
-                <th>Condutor</th>
-                <th>Orgao</th>
+                <th>Secretaria</th>
+                <th>Posto</th>
                 <th>Litros</th>
+                <th>Valor</th>
+                <th>Combustível</th>
+                <th>Aditivo</th>
                 <th>Km/l</th>
                 <th>Alerta</th>
                 <th>Comprovante</th>
               </tr>
             </thead>
             <tbody>
-              {loading ? <tr><td colSpan={8} className="muted">Carregando abastecimentos...</td></tr> : null}
-              {!loading && paginatedRecords.length === 0 ? <tr><td colSpan={8}><div className="empty-state">Nenhum abastecimento encontrado.</div></td></tr> : null}
-              {!loading && paginatedRecords.map((record) => (
+              {historyLoading ? <tr><td colSpan={11} className="muted">Carregando abastecimentos...</td></tr> : null}
+              {!historyLoading && paginatedRecords.length === 0 ? <tr><td colSpan={11}><div className="empty-state">Nenhum abastecimento encontrado.</div></td></tr> : null}
+              {!historyLoading && paginatedRecords.map((record) => (
                 <tr key={record.id}>
-                  <td>{record.vehicle_plate}</td>
-                  <td>{formatDate(record.supplied_at)}</td>
-                  <td>{record.driver_name || '-'}</td>
-                  <td>{record.organization_name || '-'}</td>
-                  <td>{formatNumber(record.liters)}</td>
-                  <td>{formatNumber(record.consumption_km_l)}</td>
-                  <td>{record.is_consumption_anomaly ? <span className="status-chip warning">Alerta</span> : '-'}</td>
-                  <td><a className="link-inline" href={record.receipt_url} target="_blank" rel="noreferrer">Abrir</a></td>
+                  <td data-label="Veículo">{record.vehicle_plate}</td>
+                  <td data-label="Data">{formatDate(record.supplied_at)}</td>
+                  <td data-label="Secretaria">{record.organization_name || '-'}</td>
+                  <td data-label="Posto">{record.fuel_station_name || record.fuel_station || '-'}</td>
+                  <td data-label="Litros">{formatNumber(record.liters)}</td>
+                  <td data-label="Valor">{formatCurrency(record.total_amount)}</td>
+                  <td data-label="Combustível">{record.fuel_type || '-'}</td>
+                  <td data-label="Aditivo">{formatAdditiveDetails(record, formatNumber)}</td>
+                  <td data-label="Km/l">{formatNumber(record.consumption_km_l)}</td>
+                  <td data-label="Alerta">{record.is_consumption_anomaly ? <span className="status-chip warning">Alerta</span> : '-'}</td>
+                  <td data-label="Comprovante"><a className="link-inline" href={record.receipt_url} target="_blank" rel="noreferrer">Abrir</a></td>
                 </tr>
               ))}
             </tbody>
           </table>
         </div>
-        <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} />
+        <Pagination currentPage={currentHistoryPage} totalPages={totalHistoryPages} onPageChange={setCurrentHistoryPage} />
       </div>
 
-      <Modal open={isModalOpen} onClose={() => setIsModalOpen(false)} title="Novo abastecimento" description="Registre o abastecimento com comprovante obrigatorio.">
-        <FuelSupplyForm
+      <Modal open={isOrderModalOpen && canCreateOrder} onClose={() => setIsOrderModalOpen(false)} title="Nova ordem de abastecimento" description="Emita a ordem para um posto credenciado executar o abastecimento.">
+        <FuelSupplyOrderCreateForm
           vehicles={vehicles}
-          drivers={drivers}
           organizations={organizations}
-          onClose={() => setIsModalOpen(false)}
-          onSuccess={(message) => {
+          fuelStations={fuelStations}
+          onClose={() => setIsOrderModalOpen(false)}
+          onSuccess={({ message, order }) => {
             setFeedback(message)
-            loadRecords()
+            setLastIssuedOrder(order || null)
+            loadOrders()
           }}
         />
       </Modal>

@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import api from '../api/client'
-import { canDelete, canWrite, getRoleLabel, isAdmin } from '../utils/roles'
+import { hasPermission } from '../utils/permissions'
+import { getRoleLabel, isAdmin, isFuelStation, isPosto } from '../utils/roles'
 
 const AuthContext = createContext(null)
 
@@ -44,17 +45,47 @@ export function AuthProvider({ children }) {
     setLoading(false)
   }
 
-  const value = useMemo(() => ({
-    user,
-    loading,
-    login,
-    logout,
-    reload: loadMe,
-    isAdmin: isAdmin(user?.role),
-    canWrite: canWrite(user?.role),
-    canDelete: canDelete(user?.role),
-    roleLabel: getRoleLabel(user?.role),
-  }), [user, loading])
+  async function changePassword({ current_password, new_password }) {
+    await api.post('/auth/change-password', { current_password, new_password })
+    return await loadMe({ silent: true })
+  }
+
+  async function registerCpf({ cpf }) {
+    await api.post('/auth/cpf', { cpf })
+    return await loadMe({ silent: true })
+  }
+
+  const value = useMemo(() => {
+    const can = (module, action = 'view') => hasPermission(user, module, action)
+    const permissions = Object.values(user?.permissions || {})
+    return {
+      user,
+      loading,
+      login,
+      logout,
+      changePassword,
+      registerCpf,
+      reload: loadMe,
+      mustChangePassword: Boolean(user?.must_change_password),
+      mustRegisterCpf: Boolean(user?.must_register_cpf),
+      isAdmin: isAdmin(user?.role),
+      isProduction: user?.role === 'PRODUCAO',
+      isPosto: isPosto(user?.role),
+      can,
+      canView: (module) => can(module, 'view'),
+      canCreate: (module) => can(module, 'create'),
+      canEdit: (module) => can(module, 'edit'),
+      canDeleteModule: (module) => can(module, 'delete'),
+      canWrite: permissions.some((flags) => flags.can_create || flags.can_edit),
+      canDelete: permissions.some((flags) => flags.can_delete),
+      canManageCadastros: can('master_data', 'view'),
+      canAccessFuelSupplies: can('fuel_supplies', 'view'),
+      canManageFuelSupplyOrders: can('fuel_supply_orders', 'view'),
+      canConfirmFuelOrders: can('fuel_supply_orders', 'edit'),
+      isFuelStation: isFuelStation(user?.role),
+      roleLabel: getRoleLabel(user?.role),
+    }
+  }, [user, loading])
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>
 }
 

@@ -4,6 +4,7 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.organization_scope import production_scope_is_empty, scoped_organization_id
 from app.models.claim import Claim, ClaimStatus, ClaimType
 from app.models.user import User
 from app.models.vehicle import VehicleStatus
@@ -31,28 +32,36 @@ class ClaimService:
         page: int,
         limit: int,
         vehicle_id: UUID | None = None,
+        organization_id: UUID | None = None,
         status_filter: ClaimStatus | None = None,
         tipo: ClaimType | None = None,
         search: str | None = None,
+        current_user: User | None = None,
     ) -> PaginatedResponse[dict]:
+        if production_scope_is_empty(current_user):
+            return PaginatedResponse[dict](data=[], pagination=build_pagination(page, limit, 0))
+
+        organization_id = scoped_organization_id(current_user, organization_id)
         items, total = await self.claims.list_paginated(
             page=page,
             limit=limit,
             vehicle_id=vehicle_id,
+            organization_id=organization_id,
             status=status_filter,
             tipo=tipo,
             search=search,
         )
         return PaginatedResponse[dict](data=[self._serialize(item) for item in items], pagination=build_pagination(page, limit, total))
 
-    async def get(self, claim_id: UUID) -> dict:
+    async def get(self, claim_id: UUID, current_user: User | None = None) -> dict:
         claim = await self.claims.get_by_id(claim_id)
         if not claim:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sinistro nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sinistro não encontrado")
+        await self._ensure_vehicle_visible_to_user(claim.vehicle_id, current_user)
         return self._serialize(claim)
 
     async def create(self, data: ClaimCreate, current_user: User) -> dict:
-        vehicle = await self._require_vehicle_for_claim(data.vehicle_id)
+        vehicle = await self._require_vehicle_for_claim(data.vehicle_id, current_user=current_user)
         driver = await self._require_driver_if_needed(data.driver_id, data.data_ocorrencia, data.vehicle_id)
         await self._validate_closed_claim(data.status, data.valor_estimado, data.justificativa_encerramento)
 
@@ -84,13 +93,15 @@ class ClaimService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel registrar o sinistro") from exc
-        return await self.get(claim.id)
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível registrar o sinistro") from exc
+        return await self.get(claim.id, current_user=current_user)
 
     async def update(self, claim_id: UUID, data: ClaimUpdate, current_user: User) -> dict:
         claim = await self.claims.get_by_id(claim_id)
         if not claim:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sinistro nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sinistro não encontrado")
+
+        await self._ensure_vehicle_visible_to_user(claim.vehicle_id, current_user)
 
         payload = data.model_dump(exclude_unset=True)
         next_vehicle_id = claim.vehicle_id
@@ -100,7 +111,7 @@ class ClaimService:
         next_valor = payload["valor_estimado"] if "valor_estimado" in payload else claim.valor_estimado
         next_justificativa = payload["justificativa_encerramento"] if "justificativa_encerramento" in payload else claim.justificativa_encerramento
 
-        await self._require_vehicle_for_claim(next_vehicle_id)
+        await self._require_vehicle_for_claim(next_vehicle_id, current_user=current_user)
         driver = await self._require_driver_if_needed(next_driver_id, next_data_ocorrencia, next_vehicle_id)
         await self._validate_closed_claim(next_status, next_valor, next_justificativa)
 
@@ -122,30 +133,40 @@ class ClaimService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar o sinistro") from exc
-        return await self.get(claim.id)
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar o sinistro") from exc
+        return await self.get(claim.id, current_user=current_user)
 
-    async def _require_vehicle_for_claim(self, vehicle_id: UUID):
+    async def _require_vehicle_for_claim(self, vehicle_id: UUID, current_user: User | None = None):
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
+        await self._ensure_vehicle_visible_to_user(vehicle_id, current_user)
         if vehicle.status not in {VehicleStatus.ATIVO, VehicleStatus.MANUTENCAO}:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Sinistros so podem ser registrados para veiculos ativos ou em manutencao",
+                detail="Sinistros só podem ser registrados para veículos ativos ou em manutenção",
             )
         return vehicle
+
+    async def _ensure_vehicle_visible_to_user(self, vehicle_id: UUID, current_user: User | None) -> None:
+        organization_id = scoped_organization_id(current_user)
+        if organization_id is None:
+            if production_scope_is_empty(current_user):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
+            return
+        if not await self.vehicles.is_vehicle_in_organization(vehicle_id, organization_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
     async def _require_driver_if_needed(self, driver_id: UUID | None, occurred_at, vehicle_id: UUID):
         if not driver_id:
             return None
         driver = await self.drivers.get_by_id(driver_id)
         if not driver:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
         if not await self.possessions.driver_had_vehicle_at(vehicle_id=vehicle_id, driver_id=driver_id, occurred_at=occurred_at):
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Condutor informado nao possuia posse ativa deste veiculo na data do sinistro",
+                detail="Condutor informado não possuía posse ativa deste veículo na data do sinistro",
             )
         return driver
 

@@ -5,6 +5,8 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.models.claim import Claim, ClaimStatus, ClaimType
+from app.models.location_history import LocationHistory
+from app.models.master_data import Allocation, Department
 
 
 class ClaimRepository:
@@ -25,6 +27,7 @@ class ClaimRepository:
         page: int,
         limit: int,
         vehicle_id: UUID | None = None,
+        organization_id: UUID | None = None,
         status: ClaimStatus | None = None,
         tipo: ClaimType | None = None,
         search: str | None = None,
@@ -35,6 +38,21 @@ class ClaimRepository:
         if vehicle_id:
             stmt = stmt.where(Claim.vehicle_id == vehicle_id)
             count_stmt = count_stmt.where(Claim.vehicle_id == vehicle_id)
+        if organization_id:
+            stmt = (
+                stmt
+                .join(LocationHistory, (LocationHistory.vehicle_id == Claim.vehicle_id) & LocationHistory.end_date.is_(None))
+                .join(Allocation, Allocation.id == LocationHistory.allocation_id)
+                .join(Department, Department.id == Allocation.department_id)
+                .where(Department.organization_id == organization_id)
+            )
+            count_stmt = (
+                count_stmt
+                .join(LocationHistory, (LocationHistory.vehicle_id == Claim.vehicle_id) & LocationHistory.end_date.is_(None))
+                .join(Allocation, Allocation.id == LocationHistory.allocation_id)
+                .join(Department, Department.id == Allocation.department_id)
+                .where(Department.organization_id == organization_id)
+            )
         if status:
             stmt = stmt.where(Claim.status == status)
             count_stmt = count_stmt.where(Claim.status == status)

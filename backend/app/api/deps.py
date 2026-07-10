@@ -3,11 +3,26 @@ from __future__ import annotations
 from uuid import UUID
 from jose import JWTError, jwt
 from fastapi import Cookie, Depends, HTTPException, status
+from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
+from app.core.permissions import action_to_column, default_permissions_for_role
 from app.db.session import get_db_session
 from app.models.user import User, UserRole
+from app.models.user_permission import UserPermission
 from app.repositories.user_repository import UserRepository
+
+
+PASSWORD_CHANGE_REQUIRED_DETAIL = {
+    "code": "PASSWORD_CHANGE_REQUIRED",
+    "message": "Troca de senha obrigatória no primeiro acesso",
+}
+
+
+CPF_REQUIRED_DETAIL = {
+    "code": "CPF_REQUIRED",
+    "message": "Informe seu CPF para liberar o acesso",
+}
 
 
 async def get_current_user(
@@ -33,16 +48,44 @@ async def get_current_user(
     return user
 
 
-async def require_admin(current_user: User = Depends(get_current_user)) -> User:
+async def get_current_user_ready(current_user: User = Depends(get_current_user)) -> User:
+    if current_user.must_change_password:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=PASSWORD_CHANGE_REQUIRED_DETAIL)
+    if not current_user.cpf:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=CPF_REQUIRED_DETAIL)
+    return current_user
+
+
+async def require_admin(current_user: User = Depends(get_current_user_ready)) -> User:
     if current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso restrito a administradores")
     return current_user
 
 
-async def require_writer(current_user: User = Depends(get_current_user)) -> User:
-    if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="Acesso restrito a perfis com permissao de cadastro e edicao",
+def require_permission(module: str, action: str):
+    permission_column = action_to_column(action)
+
+    async def dependency(
+        db: AsyncSession = Depends(get_db_session),
+        current_user: User = Depends(get_current_user_ready),
+    ) -> User:
+        result = await db.execute(
+            select(UserPermission).where(
+                UserPermission.user_id == current_user.id,
+                UserPermission.module == module,
+            )
         )
-    return current_user
+        permission = result.scalar_one_or_none()
+        if not permission:
+            role = getattr(current_user, "role", "")
+            role_value = getattr(role, "value", role)
+            default_flags = default_permissions_for_role(str(role_value)).get(module, {})
+            if default_flags.get(permission_column):
+                return current_user
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permissão insuficiente")
+
+        if not getattr(permission, permission_column):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permissão insuficiente")
+        return current_user
+
+    return dependency

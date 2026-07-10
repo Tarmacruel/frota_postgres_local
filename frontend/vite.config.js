@@ -1,12 +1,30 @@
 import { defineConfig } from 'vite'
+import path from 'node:path'
+import { fileURLToPath } from 'node:url'
 import react from '@vitejs/plugin-react'
 
 const apiProxyTarget = process.env.VITE_API_PROXY_TARGET || 'http://127.0.0.1:8000'
 
+const projectRoot = fileURLToPath(new URL('.', import.meta.url))
+
 export default defineConfig({
   plugins: [react()],
+  optimizeDeps: {
+    include: [
+      'react',
+      'react-dom',
+      'react/jsx-runtime',
+      'react/jsx-dev-runtime',
+    ],
+  },
   resolve: {
-    dedupe: ['react', 'react-dom'],
+    dedupe: ['react', 'react-dom', 'react/jsx-runtime', 'react/jsx-dev-runtime'],
+    alias: {
+      react: path.resolve(projectRoot, 'node_modules/react'),
+      'react-dom': path.resolve(projectRoot, 'node_modules/react-dom'),
+      'react/jsx-runtime': path.resolve(projectRoot, 'node_modules/react/jsx-runtime.js'),
+      'react/jsx-dev-runtime': path.resolve(projectRoot, 'node_modules/react/jsx-dev-runtime.js'),
+    },
   },
   build: {
     chunkSizeWarningLimit: 650,
@@ -23,6 +41,10 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 3000,
+    watch: {
+      usePolling: true,
+      interval: 1000,
+    },
     allowedHosts: true,
     proxy: {
       '/api': {

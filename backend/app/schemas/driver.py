@@ -10,10 +10,19 @@ from app.schemas.common import PaginatedResponse, normalize_email
 class DriverBase(BaseModel):
     nome_completo: str = Field(min_length=3, max_length=150)
     documento: str = Field(min_length=5, max_length=20)
+    registro: str | None = Field(default=None, max_length=30)
+    matricula: str | None = Field(default=None, max_length=30)
+    cargo: str | None = Field(default=None, max_length=120)
+    organization_id: UUID
     contato: str | None = Field(default=None, max_length=50)
     email: str | None = Field(default=None, max_length=100)
+    cnh_numero: str | None = Field(default=None, max_length=30)
     cnh_categoria: DriverLicenseCategory
     cnh_validade: date | None = None
+    rg: str | None = Field(default=None, max_length=30)
+    data_nascimento: date | None = None
+    data_emissao_cnh: date | None = None
+    ultimo_abastecimento: datetime | None = None
 
     @field_validator("nome_completo")
     @classmethod
@@ -31,9 +40,9 @@ class DriverBase(BaseModel):
             raise ValueError("Documento deve ter ao menos 5 caracteres")
         return normalized
 
-    @field_validator("contato")
+    @field_validator("registro", "matricula", "cargo", "contato", "cnh_numero", "rg")
     @classmethod
-    def normalize_contact(cls, value: str | None) -> str | None:
+    def normalize_optional_text(cls, value: str | None) -> str | None:
         if value is None:
             return None
         normalized = value.strip()
@@ -55,10 +64,19 @@ class DriverCreate(DriverBase):
 class DriverUpdate(BaseModel):
     nome_completo: str | None = Field(default=None, min_length=3, max_length=150)
     documento: str | None = Field(default=None, min_length=5, max_length=20)
+    registro: str | None = Field(default=None, max_length=30)
+    matricula: str | None = Field(default=None, max_length=30)
+    cargo: str | None = Field(default=None, max_length=120)
+    organization_id: UUID | None = None
     contato: str | None = Field(default=None, max_length=50)
     email: str | None = Field(default=None, max_length=100)
+    cnh_numero: str | None = Field(default=None, max_length=30)
     cnh_categoria: DriverLicenseCategory | None = None
     cnh_validade: date | None = None
+    rg: str | None = Field(default=None, max_length=30)
+    data_nascimento: date | None = None
+    data_emissao_cnh: date | None = None
+    ultimo_abastecimento: datetime | None = None
     ativo: bool | None = None
 
     @field_validator("nome_completo")
@@ -81,9 +99,9 @@ class DriverUpdate(BaseModel):
             raise ValueError("Documento deve ter ao menos 5 caracteres")
         return normalized
 
-    @field_validator("contato")
+    @field_validator("registro", "matricula", "cargo", "contato", "cnh_numero", "rg")
     @classmethod
-    def normalize_contact(cls, value: str | None) -> str | None:
+    def normalize_optional_text(cls, value: str | None) -> str | None:
         if value is None:
             return None
         normalized = value.strip()
@@ -104,10 +122,20 @@ class DriverOut(BaseModel):
     id: UUID
     nome_completo: str
     documento: str
+    registro: str | None = None
+    matricula: str | None = None
+    cargo: str | None = None
+    organization_id: UUID | None
+    organization_name: str | None = None
     contato: str | None
     email: str | None
+    cnh_numero: str | None = None
     cnh_categoria: DriverLicenseCategory
     cnh_validade: date | None
+    rg: str | None = None
+    data_nascimento: date | None = None
+    data_emissao_cnh: date | None = None
+    ultimo_abastecimento: datetime | None = None
     ativo: bool
     created_at: datetime
     updated_at: datetime

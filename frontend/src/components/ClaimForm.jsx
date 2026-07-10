@@ -3,12 +3,13 @@ import { claimsAPI } from '../api/claims'
 import DriverSelect from './DriverSelect'
 import SearchableSelect from './SearchableSelect'
 import { getApiErrorMessage } from '../utils/apiError'
+import { toDateTimeLocalValue } from '../utils/datetime'
 
 const typeOptions = ['COLISAO', 'ROUBO', 'FURTO', 'AVARIA', 'OUTRO']
 const statusOptions = ['ABERTO', 'EM_ANALISE', 'ENCERRADO']
 
 function vehicleOption(vehicle) {
-  const location = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
+  const location = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
   return {
     value: vehicle.id,
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
@@ -17,11 +18,11 @@ function vehicleOption(vehicle) {
   }
 }
 
-export default function ClaimForm({ vehicles, initialData = null, onSuccess, onClose }) {
+export default function ClaimForm({ vehicles, initialData = null, onSuccess, onClose, canSubmit = true }) {
   const [form, setForm] = useState({
     vehicle_id: initialData?.vehicle_id || '',
     driver_id: initialData?.driver_id || '',
-    data_ocorrencia: initialData?.data_ocorrencia ? new Date(initialData.data_ocorrencia).toISOString().slice(0, 16) : new Date().toISOString().slice(0, 16),
+    data_ocorrencia: initialData?.data_ocorrencia ? toDateTimeLocalValue(initialData.data_ocorrencia) : toDateTimeLocalValue(new Date()),
     tipo: initialData?.tipo || 'COLISAO',
     descricao: initialData?.descricao || '',
     local: initialData?.local || '',
@@ -36,6 +37,10 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if (!canSubmit) {
+      setError('Você não tem permissão para salvar sinistros.')
+      return
+    }
     try {
       setSubmitting(true)
       setError('')
@@ -65,7 +70,7 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
       }
       onClose?.()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar o sinistro.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar o sinistro.'))
     } finally {
       setSubmitting(false)
     }
@@ -76,12 +81,12 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
 
       <div className="form-field modal-field-span">
-        <label>Veiculo</label>
+        <label>Veículo</label>
         <SearchableSelect
           value={form.vehicle_id}
           onChange={(value) => setForm({ ...form, vehicle_id: value })}
           options={vehicles.map(vehicleOption)}
-          placeholder="Selecione o veiculo envolvido"
+          placeholder="Selecione o veículo envolvido"
           searchPlaceholder="Buscar por placa, modelo ou chassi"
         />
       </div>
@@ -115,7 +120,7 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
       </div>
 
       <div className="form-field modal-field-span">
-        <label htmlFor="claim-description">Descricao</label>
+        <label htmlFor="claim-description">Descrição</label>
         <textarea id="claim-description" className="app-textarea" rows="4" value={form.descricao} onChange={(event) => setForm({ ...form, descricao: event.target.value })} />
       </div>
 
@@ -125,7 +130,7 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
       </div>
 
       <div className="form-field">
-        <label htmlFor="claim-bo">Boletim de ocorrencia</label>
+        <label htmlFor="claim-bo">Boletim de ocorrência</label>
         <input id="claim-bo" className="app-input" value={form.boletim_ocorrencia} onChange={(event) => setForm({ ...form, boletim_ocorrencia: event.target.value })} />
       </div>
 
@@ -140,12 +145,12 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
       </div>
 
       <div className="form-field modal-field-span">
-        <label htmlFor="claim-attachments">Anexos (URLs ou referencias, uma por linha)</label>
+        <label htmlFor="claim-attachments">Anexos (URLs ou referências, uma por linha)</label>
         <textarea id="claim-attachments" className="app-textarea" rows="3" value={form.anexos} onChange={(event) => setForm({ ...form, anexos: event.target.value })} />
       </div>
 
       <div className="actions-inline modal-actions">
-        <button className="app-button" type="submit" disabled={submitting || !form.vehicle_id}>
+        <button className="app-button" type="submit" disabled={submitting || !form.vehicle_id || !canSubmit}>
           {submitting ? 'Salvando...' : initialData?.id ? 'Atualizar sinistro' : 'Registrar sinistro'}
         </button>
         <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>

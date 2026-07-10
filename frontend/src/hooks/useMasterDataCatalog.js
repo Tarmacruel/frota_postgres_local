@@ -1,111 +1,92 @@
-// frontend/src/hooks/useMasterDataCatalog.js
-import { useState, useEffect, useCallback } from 'react';
-import api from '../lib/axios';
+import { useEffect, useMemo, useState } from 'react'
+import { masterDataAPI } from '../api/masterData'
+import { getApiErrorMessage } from '../utils/apiError'
 
-/**
- * Hook personalizado para dados mestres - Versão Simplificada
- * NÃO requer MasterDataContext - funciona standalone
- */
-export const useMasterDataCatalog = () => {
-  const [vehicles, setVehicles] = useState([]);
-  const [organs, setOrgans] = useState([]);
-  const [drivers, setDrivers] = useState([]);
-  const [vehicleTypes, setVehicleTypes] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+function flattenCatalog(organizations) {
+  const departments = []
+  const allocations = []
 
-  const fetchVehicles = useCallback(async () => {
+  organizations.forEach((organization) => {
+    organization.departments.forEach((department) => {
+      departments.push({
+        ...department,
+        organization_id: organization.id,
+        organization_name: organization.name,
+      })
+
+      department.allocations.forEach((allocation) => {
+        allocations.push({
+          ...allocation,
+          organization_id: organization.id,
+          organization_name: organization.name,
+          department_id: department.id,
+          department_name: department.name,
+          display_name: allocation.display_name || `${organization.name} - ${department.name} - ${allocation.name}`,
+        })
+      })
+    })
+  })
+
+  return { departments, allocations }
+}
+
+export function useMasterDataCatalog({ includeAll = false } = {}) {
+  const [organizations, setOrganizations] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  async function reload() {
     try {
-      const response = await api.get('/api/vehicles', {
-        params: { limit: 1000, status: 'active' }
-      });
-      setVehicles(response.data.items || response.data || []);
+      setLoading(true)
+      setError('')
+      const { data } = await masterDataAPI.getCatalog(includeAll ? { include_all: true } : undefined)
+      setOrganizations(data.organizations || [])
     } catch (err) {
-      console.error('Erro ao buscar veículos:', err);
-      setVehicles([]);
-    }
-  }, []);
-
-  const fetchOrgans = useCallback(async () => {
-    try {
-      const response = await api.get('/api/organs', { params: { limit: 500 } });
-      setOrgans(response.data.items || response.data || []);
-    } catch (err) {
-      console.error('Erro ao buscar órgãos:', err);
-      setOrgans([]);
-    }
-  }, []);
-
-  const fetchDrivers = useCallback(async () => {
-    try {
-      const response = await api.get('/api/drivers', {
-        params: { limit: 1000, status: 'active' }
-      });
-      setDrivers(response.data.items || response.data || []);
-    } catch (err) {
-      console.error('Erro ao buscar motoristas:', err);
-      setDrivers([]);
-    }
-  }, []);
-
-  const fetchVehicleTypes = useCallback(async () => {
-    try {
-      const response = await api.get('/api/vehicle-types');
-      setVehicleTypes(response.data || []);
-    } catch (err) {
-      // Fallback se endpoint não existir
-      setVehicleTypes([
-        { id: 'SEDAN', name: 'Sedan' },
-        { id: 'HATCH', name: 'Hatch' },
-        { id: 'SUV', name: 'SUV' },
-        { id: 'PICAPE', name: 'Picape' },
-        { id: 'VAN', name: 'Van' },
-        { id: 'ONIBUS', name: 'Ônibus' },
-        { id: 'CAMINHAO', name: 'Caminhão' },
-      ]);
-    }
-  }, []);
-
-  const loadAll = useCallback(async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await Promise.all([
-        fetchVehicles(),
-        fetchOrgans(),
-        fetchDrivers(),
-        fetchVehicleTypes(),
-      ]);
-    } catch (err) {
-      console.error('Erro ao carregar catálogo:', err);
-      setError('Falha ao carregar dados');
+      setError(getApiErrorMessage(err, 'Não foi possível carregar os cadastros de lotação.'))
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [fetchVehicles, fetchOrgans, fetchDrivers, fetchVehicleTypes]);
+  }
 
   useEffect(() => {
-    loadAll();
-  }, [loadAll]);
+    reload()
+  }, [includeAll])
 
-  const refresh = useCallback(() => loadAll(), [loadAll]);
+  const { departments, allocations } = useMemo(() => flattenCatalog(organizations), [organizations])
+
+  function getDepartmentsByOrganization(organizationId) {
+    if (!organizationId) return departments
+    return departments.filter((department) => department.organization_id === organizationId)
+  }
+
+  function getAllocationsByDepartment(departmentId) {
+    if (!departmentId) return allocations
+    return allocations.filter((allocation) => allocation.department_id === departmentId)
+  }
+
+  function findOrganization(organizationId) {
+    return organizations.find((organization) => organization.id === organizationId) || null
+  }
+
+  function findDepartment(departmentId) {
+    return departments.find((department) => department.id === departmentId) || null
+  }
+
+  function findAllocation(allocationId) {
+    return allocations.find((allocation) => allocation.id === allocationId) || null
+  }
 
   return {
-    vehicles,
-    organs,
-    drivers,
-    vehicleTypes,
+    organizations,
+    departments,
+    allocations,
     loading,
     error,
-    refresh,
-    getVehicleById: (id) => vehicles.find(v => v.id === id),
-    getOrganById: (id) => organs.find(o => o.id === id),
-    getDriverById: (id) => drivers.find(d => d.id === id),
-    getVehicleTypeLabel: (typeId) => {
-      const type = vehicleTypes.find(t => t.id === typeId);
-      return type?.name || typeId;
-    },
-  };
-};
-
-export default useMasterDataCatalog;
+    reload,
+    getDepartmentsByOrganization,
+    getAllocationsByDepartment,
+    findOrganization,
+    findDepartment,
+    findAllocation,
+  }
+}

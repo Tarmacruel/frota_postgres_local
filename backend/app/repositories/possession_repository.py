@@ -5,6 +5,8 @@ from uuid import UUID
 from sqlalchemy import func, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
+from app.models.location_history import LocationHistory
+from app.models.master_data import Allocation, Department
 from app.models.possession import VehiclePossession
 
 
@@ -20,7 +22,37 @@ class PossessionRepository:
         )
         return result.scalar_one_or_none()
 
-    async def list(self, vehicle_id: UUID | None = None, active: bool | None = None) -> list[VehiclePossession]:
+    async def get_by_loan_term_validation_code(self, validation_code: str) -> VehiclePossession | None:
+        result = await self.db.execute(
+            select(VehiclePossession)
+            .options(joinedload(VehiclePossession.vehicle), joinedload(VehiclePossession.driver), selectinload(VehiclePossession.photos))
+            .where(VehiclePossession.loan_term_validation_code == validation_code)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_return_term_validation_code(self, validation_code: str) -> VehiclePossession | None:
+        result = await self.db.execute(
+            select(VehiclePossession)
+            .options(joinedload(VehiclePossession.vehicle), joinedload(VehiclePossession.driver), selectinload(VehiclePossession.photos))
+            .where(VehiclePossession.return_term_validation_code == validation_code)
+        )
+        return result.scalar_one_or_none()
+
+    async def has_validation_code(self, validation_code: str) -> bool:
+        result = await self.db.execute(
+            select(VehiclePossession.id).where(
+                (VehiclePossession.loan_term_validation_code == validation_code)
+                | (VehiclePossession.return_term_validation_code == validation_code)
+            )
+        )
+        return result.scalar_one_or_none() is not None
+
+    async def list(
+        self,
+        vehicle_id: UUID | None = None,
+        active: bool | None = None,
+        organization_id: UUID | None = None,
+    ) -> list[VehiclePossession]:
         stmt = (
             select(VehiclePossession)
             .options(joinedload(VehiclePossession.vehicle), joinedload(VehiclePossession.driver), selectinload(VehiclePossession.photos))
@@ -29,6 +61,8 @@ class PossessionRepository:
 
         if vehicle_id:
             stmt = stmt.where(VehiclePossession.vehicle_id == vehicle_id)
+        if organization_id:
+            stmt = self._filter_by_active_organization(stmt, organization_id)
         if active is True:
             stmt = stmt.where(VehiclePossession.end_date.is_(None))
         elif active is False:
@@ -46,6 +80,7 @@ class PossessionRepository:
         active: bool | None = None,
         driver_id: UUID | None = None,
         search: str | None = None,
+        organization_id: UUID | None = None,
     ) -> tuple[list[VehiclePossession], int]:
         stmt = (
             select(VehiclePossession)
@@ -57,6 +92,9 @@ class PossessionRepository:
         if vehicle_id:
             stmt = stmt.where(VehiclePossession.vehicle_id == vehicle_id)
             count_stmt = count_stmt.where(VehiclePossession.vehicle_id == vehicle_id)
+        if organization_id:
+            stmt = self._filter_by_active_organization(stmt, organization_id)
+            count_stmt = self._filter_by_active_organization(count_stmt, organization_id)
         if driver_id:
             stmt = stmt.where(VehiclePossession.driver_id == driver_id)
             count_stmt = count_stmt.where(VehiclePossession.driver_id == driver_id)
@@ -83,6 +121,18 @@ class PossessionRepository:
         total = int((await self.db.execute(count_stmt)).scalar_one())
         items = list((await self.db.execute(stmt)).scalars().unique().all())
         return items, total
+
+    def _filter_by_active_organization(self, stmt, organization_id: UUID):
+        return (
+            stmt
+            .join(LocationHistory, LocationHistory.vehicle_id == VehiclePossession.vehicle_id)
+            .join(Allocation, Allocation.id == LocationHistory.allocation_id)
+            .join(Department, Department.id == Allocation.department_id)
+            .where(
+                LocationHistory.end_date.is_(None),
+                Department.organization_id == organization_id,
+            )
+        )
 
     async def get_active_by_vehicle(self, vehicle_id: UUID) -> VehiclePossession | None:
         result = await self.db.execute(
@@ -120,3 +170,6 @@ class PossessionRepository:
         await self.db.flush()
         await self.db.refresh(possession)
         return possession
+
+    async def delete(self, possession: VehiclePossession) -> None:
+        await self.db.delete(possession)

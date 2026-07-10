@@ -2,20 +2,14 @@ import { useMemo, useState } from 'react'
 import { maintenanceAPI } from '../api/maintenance'
 import SearchableSelect from './SearchableSelect'
 import { getApiErrorMessage } from '../utils/apiError'
-
-function toDateTimeInput(value) {
-  if (!value) return ''
-  const date = new Date(value)
-  if (Number.isNaN(date.getTime())) return ''
-  return date.toISOString().slice(0, 16)
-}
+import { toDateTimeLocalValue } from '../utils/datetime'
 
 function buildInitialState(initialData, vehicles) {
   if (initialData) {
     return {
       vehicle_id: initialData.vehicle_id,
-      start_date: toDateTimeInput(initialData.start_date),
-      end_date: toDateTimeInput(initialData.end_date),
+      start_date: toDateTimeLocalValue(initialData.start_date),
+      end_date: toDateTimeLocalValue(initialData.end_date),
       service_description: initialData.service_description || '',
       parts_replaced: initialData.parts_replaced || '',
       total_cost: initialData.total_cost ?? '',
@@ -24,7 +18,7 @@ function buildInitialState(initialData, vehicles) {
 
   return {
     vehicle_id: '',
-    start_date: toDateTimeInput(new Date().toISOString()),
+    start_date: toDateTimeLocalValue(new Date().toISOString()),
     end_date: '',
     service_description: '',
     parts_replaced: '',
@@ -33,11 +27,11 @@ function buildInitialState(initialData, vehicles) {
 }
 
 function buildVehicleOption(vehicle) {
-  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
+  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
   return {
     value: vehicle.id,
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
-    description: `${vehicle.ownership_type === 'LOCADO' ? 'Locado' : 'Proprio'} | ${locationLabel}`,
+    description: `${vehicle.ownership_type === 'LOCADO' ? 'Locado' : 'Próprio'} | ${locationLabel}`,
     keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.chassis_number, locationLabel].filter(Boolean).join(' '),
   }
 }
@@ -50,14 +44,14 @@ export default function MaintenanceForm({ vehicles, initialData = null, onClose,
 
   const submitLabel = useMemo(() => {
     if (submitting) return 'Salvando...'
-    return isEdit ? 'Atualizar manutencao' : 'Registrar manutencao'
+    return isEdit ? 'Atualizar manutenção' : 'Registrar manutenção'
   }, [isEdit, submitting])
 
   async function handleSubmit(event) {
     event.preventDefault()
 
     if (!form.vehicle_id) {
-      setError('Selecione um veiculo para continuar.')
+      setError('Selecione um veículo para continuar.')
       return
     }
 
@@ -72,7 +66,7 @@ export default function MaintenanceForm({ vehicles, initialData = null, onClose,
           parts_replaced: form.parts_replaced || null,
           total_cost: Number(form.total_cost),
         })
-        onSuccess?.('Manutencao atualizada com sucesso.')
+        onSuccess?.('Manutenção atualizada com sucesso.')
       } else {
         await maintenanceAPI.create({
           vehicle_id: form.vehicle_id,
@@ -82,12 +76,12 @@ export default function MaintenanceForm({ vehicles, initialData = null, onClose,
           parts_replaced: form.parts_replaced || null,
           total_cost: Number(form.total_cost),
         })
-        onSuccess?.('Manutencao registrada com sucesso.')
+        onSuccess?.('Manutenção registrada com sucesso.')
       }
 
       onClose?.()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel salvar a manutencao.'))
+      setError(getApiErrorMessage(err, 'Não foi possível salvar a manutenção.'))
     } finally {
       setSubmitting(false)
     }
@@ -98,20 +92,20 @@ export default function MaintenanceForm({ vehicles, initialData = null, onClose,
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
 
       <div className="form-field">
-        <label>Veiculo</label>
+        <label>Veículo</label>
         <SearchableSelect
           value={form.vehicle_id}
           onChange={(value) => setForm({ ...form, vehicle_id: value })}
           options={vehicles.map(buildVehicleOption)}
-          placeholder="Selecione o veiculo"
-          searchPlaceholder="Buscar veiculo por placa, modelo ou chassi"
+          placeholder="Selecione o veículo"
+          searchPlaceholder="Buscar veículo por placa, modelo ou chassi"
           disabled={isEdit}
-          emptyLabel="Nenhum veiculo disponivel."
+          emptyLabel="Nenhum veículo disponível."
         />
       </div>
 
       <div className="form-field">
-        <label htmlFor="maintenance-start">Inicio</label>
+        <label htmlFor="maintenance-start">Início</label>
         <input
           id="maintenance-start"
           type="datetime-local"
@@ -123,7 +117,7 @@ export default function MaintenanceForm({ vehicles, initialData = null, onClose,
       </div>
 
       <div className="form-field">
-        <label htmlFor="maintenance-end">Conclusao</label>
+        <label htmlFor="maintenance-end">Conclusão</label>
         <input
           id="maintenance-end"
           type="datetime-local"
@@ -148,24 +142,24 @@ export default function MaintenanceForm({ vehicles, initialData = null, onClose,
       </div>
 
       <div className="form-field modal-field-span">
-        <label htmlFor="maintenance-description">Servico realizado</label>
+        <label htmlFor="maintenance-description">Serviço realizado</label>
         <textarea
           id="maintenance-description"
           className="app-textarea"
           rows="5"
-          placeholder="Descreva o servico executado e o contexto da manutencao."
+          placeholder="Descreva o serviço executado e o contexto da manutenção."
           value={form.service_description}
           onChange={(event) => setForm({ ...form, service_description: event.target.value })}
         />
       </div>
 
       <div className="form-field modal-field-span">
-        <label htmlFor="maintenance-parts">Pecas trocadas</label>
+        <label htmlFor="maintenance-parts">Peças trocadas</label>
         <textarea
           id="maintenance-parts"
           className="app-textarea"
           rows="4"
-          placeholder="Itens substituidos, observacoes e referencias."
+          placeholder="Itens substituídos, observações e referências."
           value={form.parts_replaced}
           onChange={(event) => setForm({ ...form, parts_replaced: event.target.value })}
         />

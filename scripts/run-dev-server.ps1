@@ -7,12 +7,16 @@ param(
 $ErrorActionPreference = "Stop"
 
 # Find repository root
-$repoRoot = $PWD
-while ($repoRoot -ne $repoRoot.Substring(0, 3)) {
-    if (Test-Path (Join-Path $repoRoot ".git")) {
+$repoRoot = (Get-Location).Path
+while ($true) {
+    if (Test-Path -LiteralPath (Join-Path $repoRoot ".git")) {
         break
     }
-    $repoRoot = Split-Path $repoRoot -Parent
+    $parent = Split-Path -Path $repoRoot -Parent
+    if (-not $parent -or $parent -eq $repoRoot) {
+        throw "Nao foi possivel localizar a raiz do repositorio a partir de '$repoRoot'."
+    }
+    $repoRoot = $parent
 }
 
 $backendDir = Join-Path $repoRoot "backend"
@@ -21,7 +25,7 @@ $pythonExe = Join-Path $backendDir ".venv\Scripts\python.exe"
 # Validate
 if (-not (Test-Path $pythonExe)) {
     Write-Host "[ERR] venv not found at $backendDir" -ForegroundColor Red
-    Write-Host "Run Setup first: Setup_Backend_Remoto.bat" -ForegroundColor Yellow
+    Write-Host "Run FROTA_Iniciar.bat and choose the PostgreSQL/setup option first." -ForegroundColor Yellow
     exit 1
 }
 

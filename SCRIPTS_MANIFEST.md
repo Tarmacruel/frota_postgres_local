@@ -1,152 +1,55 @@
-# 📋 Scripts do FROTA - Organizados e Atualizados
+# Scripts do FROTAS
 
-## 🚀 SCRIPTS PRINCIPAIS (Start Here)
+Este projeto agora usa uma raiz minima e uma central operacional unica.
 
-| Script | Descrição | Atalho |
-|---|---|---|
-| **Diagnostico.ps1** | ✅ Verifica saúde do sistema antes de iniciar | `powershell .\Diagnostico.ps1` |
-| **Iniciar_Stack_Dev.bat** | ⭐ Inicia Backend + Frontend (recomendado) | Duplo clique |
-| **Iniciar_PostgreSQL.bat** | 🗄️ Gerencia PostgreSQL + migrations | Duplo clique |
-| **TROUBLESHOOTING.md** | 📖 Guia de erros e soluções | Abrir arquivo |
-| **HISTORICO_PROBLEMAS.md** | 📜 Log de problemas resolvidos nesta sessão | Abrir arquivo |
+## Entrada principal
 
----
-
-## ✅ Scripts MANTIDOS (Novos / Atualizados)
-
-### Na raiz do repo:
-
-| Script | Função | Uso |
-|---|---|---|
-| **FROTA_Iniciar.bat** | ⭐ Menu interativo principal | Duplo clique |
-| **FROTA_Parar.bat** | Encerra backend (porta 8000) | Duplo clique |
-| **Publicar_Frota_80.bat** | Modo produção (porta 80) | Futuro deploy |
-| **Setup_Backend_Remoto.bat** | Setup com PostgreSQL remoto | Primeira execução |
-| **Rodar_Backend.bat** | Inicia backend simples | Alternativa rápida |
-| **Iniciar_Dev_Server.bat** | Backend em modo dev (rede) | Testes |
-| **Iniciar_Frontend_Dev.bat** | Frontend em modo dev (rede) | Testes |
-| **Iniciar_Stack_Dev.bat** | ⭐ Backend + Frontend juntos | **👈 USE ESTE** |
-| **Iniciar_PostgreSQL.bat** | 🗄️ Gerencia PostgreSQL + migrations | **👈 USE ESTE** |
-| **Diagnostico.ps1** | ✅ Verifica saúde do sistema | **👈 USE ESTE PRIMEIRO** |
-| **Limpar_Scripts_Antigos.bat** | Remove scripts antigos | Limpeza |
-
-### Em scripts/:
-
-| Script | Função |
+| Arquivo | Funcao |
 |---|---|
-| **run-dev-server.ps1** | Backend dev (PowerShell) |
-| **run-frontend-dev.ps1** | Frontend dev (PowerShell) |
-| **setup-remote-backend.ps1** | Setup automatizado (PowerShell) |
-| **ops/** | Menu system (MANTER COMO ESTÁ) |
+| `FROTA_Iniciar.bat` | Abre a Central Operacional do FROTAS |
+| `Diagnostico.ps1` | Verifica saude basica do ambiente |
+| `Configurar_Backup_Automatico.bat` | Instala/atualiza o backup automatico |
+| `Configurar_Auto_Retomada.bat` | Instala/atualiza o watchdog de auto-retomada |
 
-### Documentação:
+## Central Operacional
 
-| Arquivo | Propósito |
+Execute `FROTA_Iniciar.bat` e escolha uma opcao no menu.
+
+Acoes disponiveis:
+
+| Acao | O que faz |
 |---|---|
-| **README.md** | Documentação principal do projeto |
-| **DEV_SERVER_GUIDE.md** | Guia de dev server em rede |
-| **SETUP_REMOTE_INSTRUCTIONS.md** | Setup detalhado para PostgreSQL remoto |
-| **TROUBLESHOOTING.md** | Erros comuns e soluções |
-| **HISTORICO_PROBLEMAS.md** | Problemas resolvidos nesta sessão |
+| Iniciar stack dev | Sobe backend em `:8000` e frontend em `:3001` |
+| Iniciar backend | Sobe apenas FastAPI |
+| Iniciar frontend | Sobe apenas Vite |
+| Preparar PostgreSQL local | Garante banco local, migrations e seed |
+| Publicar porta 80 | Builda frontend e sobe backend em `:80` |
+| Parar ambiente | Encerra processos conhecidos do FROTAS |
+| Status | Mostra portas, PIDs e caminhos de logs |
+| Abrir logs | Abre `storage\logs` |
+| Backup manual | Gera backup local e copia no OneDrive |
+| Configurar backup automatico | Registra tarefa diaria 3x ao dia |
+| Configurar auto-retomada | Cria runtime local e tarefa `FROTA Watchdog` |
+| Executar watchdog agora | Roda uma verificacao manual do watchdog |
+| Aplicar migrations | Executa `alembic upgrade heads` |
+| Atualizar projeto | `git pull`, migrations e build |
 
----
+## Scripts internos mantidos
 
-## ❌ Scripts REMOVIDOS (Antigos / Substituídos)
-
-### .bat removidos:
-- ~~Backup_Frota_Local.bat~~ → Use backup em cloud/manual
-- ~~Iniciar_Frota_Local.bat~~ → Use Iniciar_Stack_Dev.bat
-- ~~Parar_Frota_Local.bat~~ → Use FROTA_Parar.bat
-- ~~Resetar_Frota_Local.bat~~ → Manual ou use migrations
-- ~~FROTA_Atualizar.bat~~ → Use git pull + Setup
-- ~~FROTA_Backup.bat~~ → Use backup manual
-- ~~FROTA_Migracoes.bat~~ → Setup faz isso
-- ~~FROTA_Resetar.bat~~ → Manual
-- ~~FROTA_Status.bat~~ → Verifique em cmd
-
-### .ps1 removidos em scripts/:
-- ~~activate-sqlite.ps1~~ → SQLite não será usado em produção
-- ~~backup-local.ps1~~ → Backup manual ou cloud
-- ~~backup_frota.ps1~~ → Idem
-- ~~reset_frota.ps1~~ → Manual conforme necessário
-- ~~run-local.ps1~~ → Substituído por run-dev-server.ps1
-- ~~run_frota_production.cmd~~ → Substituído por Publicar_Frota_80.bat
-- ~~run_frota_production.ps1~~ → Idem
-- ~~start_frota.ps1~~ → Substituído por run-dev-server.ps1
-- ~~start_local_postgres.ps1~~ → PostgreSQL em outra máquina
-- ~~stop_frota.ps1~~ → Substituído por FROTA_Parar.bat
-
----
-
-## 🚀 Quick Start Após Limpeza
-
-### Primeira execução:
-```bat
-Setup_Backend_Remoto.bat
-```
-Responda: IP PostgreSQL + Porta
-
-### Rodar normalmente:
-```bat
-Iniciar_Stack_Dev.bat
-```
-
-### Em produção (depois):
-```bat
-Publicar_Frota_80.bat
-```
-
----
-
-## 📊 Estrutura Final
-
-```
-z:\FROTAS\frota_postgres_local\
-├── FROTA_Iniciar.bat ..................... [Menu]
-├── FROTA_Parar.bat ....................... [Stop]
-├── Publicar_Frota_80.bat ................. [Produção]
-├── Setup_Backend_Remoto.bat .............. [Setup]
-├── Rodar_Backend.bat ..................... [Backend simples]
-├── Iniciar_Dev_Server.bat ................ [Backend dev]
-├── Iniciar_Frontend_Dev.bat .............. [Frontend dev]
-├── Iniciar_Stack_Dev.bat ................. [Stack dev] ⭐
-├── Limpar_Scripts_Antigos.bat ............ [Cleanup]
-│
-├── scripts/
-│   ├── run-dev-server.ps1 ................ [Backend PS1]
-│   ├── run-frontend-dev.ps1 .............. [Frontend PS1]
-│   ├── setup-remote-backend.ps1 ......... [Setup PS1]
-│   └── ops/ ............................. [Menu system]
-│
-├── backend/ ............................. [FastAPI]
-├── frontend/ ............................ [React]
-│
-├── README.md ............................ [Principal]
-├── DEV_SERVER_GUIDE.md .................. [Dev servers]
-├── SETUP_REMOTE_INSTRUCTIONS.md ......... [Setup]
-```
-
----
-
-## 💡 Regra: O que Remover, O que Manter
-
-| Situação | Ação |
+| Arquivo | Uso |
 |---|---|
-| Script muito antigo | ❌ Remova |
-| Script duplicado | ❌ Remova (manter só o melhor) |
-| Script não documentado | ❌ Suspeite, pergunte |
-| Script crítico mas antigo | ⚠️ Refatore/Reescreva |
-| Script novo e testado | ✅ Mantenha |
-| Script com bom .md explicando | ✅ Mantenha |
+| `scripts\ops\frota.ps1` | Menu e orquestracao principal |
+| `scripts\ops\common.ps1` | Funcoes compartilhadas |
+| `scripts\run-dev-server.ps1` | Backend dev |
+| `scripts\run-frontend-dev.ps1` | Frontend dev |
+| `scripts\start_local_postgres.ps1` | Bootstrap PostgreSQL local |
+| `scripts\backup-local.ps1` | Backup manual local/espelhado |
+| `scripts\run-backup-automatico.ps1` | Runner da tarefa agendada |
+| `scripts\install-backup-automatico.ps1` | Instalador da tarefa agendada |
+| `scripts\frota-watchdog.ps1` | Monitor e recuperador do app/tunel |
+| `scripts\install-frota-watchdog.ps1` | Instalador do runtime local e tarefa agendada |
+| `scripts\setup-remote-backend.ps1` | Setup para PostgreSQL remoto |
 
----
+## Removidos
 
-**Para limpar automaticamente:**
-```bat
-Limpar_Scripts_Antigos.bat
-```
-
-**Para restaurar (git):**
-```bash
-git checkout <deleted-file>
-```
+Atalhos antigos de raiz e scripts duplicados foram removidos. Use sempre `FROTA_Iniciar.bat` para iniciar, parar, publicar, migrar, verificar status e executar backups.

@@ -41,7 +41,7 @@ class LoginSecurityService:
             if len(hits) >= cls.IP_RATE_MAX_REQUESTS:
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail="Muitas requisicoes de login deste IP. Tente novamente em instantes.",
+                    detail="Muitas requisições de login deste IP. Tente novamente em instantes.",
                 )
             hits.append(now)
 
@@ -62,7 +62,7 @@ class LoginSecurityService:
                 wait_seconds = int(user_until - now)
                 raise HTTPException(
                     status_code=status.HTTP_429_TOO_MANY_REQUESTS,
-                    detail=f"Conta temporariamente bloqueada por seguranca. Aguarde {wait_seconds}s.",
+                    detail=f"Conta temporariamente bloqueada por segurança. Aguarde {wait_seconds}s.",
                 )
 
     @classmethod

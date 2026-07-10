@@ -1,15 +1,15 @@
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 
-export default function ProtectedRoute({ children, adminOnly = false }) {
-  const { user, loading } = useAuth()
+export default function ProtectedRoute({ children, adminOnly = false, allowedRoles = null, permission = null }) {
+  const { user, loading, can } = useAuth()
 
   if (loading) {
     return (
       <div className="app-loading">
         <div className="loading-card">
           <strong>Carregando ambiente da frota</strong>
-          <p className="muted">Validando sua sessao e preparando os dados operacionais.</p>
+          <p className="muted">Validando sua sessão e preparando os dados operacionais.</p>
         </div>
       </div>
     )
@@ -17,5 +17,11 @@ export default function ProtectedRoute({ children, adminOnly = false }) {
 
   if (!user) return <Navigate to="/login" replace />
   if (adminOnly && user.role !== 'ADMIN') return <Navigate to="/unauthorized" replace />
+  if (Array.isArray(allowedRoles) && allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+    return <Navigate to="/unauthorized" replace />
+  }
+  if (permission?.module && !can(permission.module, permission.action || 'view')) {
+    return <Navigate to="/unauthorized" replace />
+  }
   return children
 }

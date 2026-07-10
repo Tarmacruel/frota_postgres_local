@@ -6,6 +6,7 @@ import SearchableSelect from '../components/SearchableSelect'
 import { claimsAPI } from '../api/claims'
 import { vehiclesAPI } from '../api/vehicles'
 import { useAuth } from '../context/AuthContext'
+import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 
@@ -23,7 +24,7 @@ function formatMoney(value) {
 }
 
 function vehicleOption(vehicle) {
-  const location = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotacao'
+  const location = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
   return {
     value: vehicle.id,
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
@@ -33,7 +34,9 @@ function vehicleOption(vehicle) {
 }
 
 export default function ClaimsPage() {
-  const { canWrite } = useAuth()
+  const { canCreate, canEdit } = useAuth()
+  const canCreateClaim = canCreate('claims')
+  const canEditClaim = canEdit('claims')
   const [vehicles, setVehicles] = useState([])
   const [records, setRecords] = useState([])
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0, limit: 10 })
@@ -41,14 +44,26 @@ export default function ClaimsPage() {
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [search, setSearch] = useState('')
+  const [organizationFilter, setOrganizationFilter] = useState('')
   const [vehicleFilter, setVehicleFilter] = useState('')
   const [statusFilter, setStatusFilter] = useState('TODOS')
   const [typeFilter, setTypeFilter] = useState('TODOS')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState(null)
+  const { organizations } = useMasterDataCatalog()
+
+  const organizationOptions = organizations.map((organization) => ({
+    value: organization.id,
+    label: organization.name,
+  }))
+
+  function getVehicleOrganizationName(vehicleId) {
+    return vehicles.find((vehicle) => vehicle.id === vehicleId)?.current_location?.organization_name || 'Sem secretaria'
+  }
 
   const exportColumns = [
-    { header: 'Veiculo', value: (item) => item.vehicle_plate },
+    { header: 'Veículo', value: (item) => item.vehicle_plate },
+    { header: 'Secretaria', value: (item) => getVehicleOrganizationName(item.vehicle_id) },
     { header: 'Condutor', value: (item) => item.driver_name || '-' },
     { header: 'Data', value: (item) => formatDate(item.data_ocorrencia) },
     { header: 'Tipo', value: (item) => item.tipo },
@@ -70,6 +85,7 @@ export default function ClaimsPage() {
         page,
         limit: 10,
         vehicle_id: vehicleFilter || undefined,
+        organization_id: organizationFilter || undefined,
         status: statusFilter !== 'TODOS' ? statusFilter : undefined,
         tipo: typeFilter !== 'TODOS' ? typeFilter : undefined,
         search: search || undefined,
@@ -77,7 +93,7 @@ export default function ClaimsPage() {
       setRecords(data.data)
       setPagination(data.pagination)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Nao foi possivel carregar os sinistros.'))
+      setError(getApiErrorMessage(err, 'Não foi possível carregar os sinistros.'))
     } finally {
       setLoading(false)
     }
@@ -89,20 +105,21 @@ export default function ClaimsPage() {
 
   useEffect(() => {
     loadClaims(1)
-  }, [vehicleFilter, statusFilter, typeFilter, search])
+  }, [organizationFilter, vehicleFilter, statusFilter, typeFilter, search])
 
   async function handlePreviewPdf() {
     if (!records.length) return
     await previewRowsToPdf({
       title: 'Frota PMTF - Sinistros',
       fileName: 'frota-pmtf-sinistros',
-      subtitle: 'Relatorio da pagina atual de sinistros.',
+      subtitle: 'Relatório da página atual de sinistros.',
       columns: exportColumns,
       rows: records,
       filters: [
         { label: 'Status', value: statusFilter },
         { label: 'Tipo', value: typeFilter },
-        ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+        ...(organizationFilter ? [{ label: 'Secretaria', value: organizationOptions.find((item) => item.value === organizationFilter)?.label || 'Selecionada' }] : []),
+        ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
         ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
       ],
     })
@@ -118,7 +135,8 @@ export default function ClaimsPage() {
       filters: [
         { label: 'Status', value: statusFilter },
         { label: 'Tipo', value: typeFilter },
-        ...(vehicleFilter ? [{ label: 'Veiculo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
+        ...(organizationFilter ? [{ label: 'Secretaria', value: organizationOptions.find((item) => item.value === organizationFilter)?.label || 'Selecionada' }] : []),
+        ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
       ],
     })
   }
@@ -128,11 +146,11 @@ export default function ClaimsPage() {
       <div className="panel-heading">
         <div>
           <h2 className="section-title">Sinistros</h2>
-          <p className="section-copy">Registre ocorrencias, acompanhe o status e mantenha o historico de prejuizos e analises da frota.</p>
+          <p className="section-copy">Registre ocorrências, acompanhe o status e mantenha o histórico de prejuízos e análises da frota.</p>
         </div>
         <div className="actions-inline">
-          {canWrite ? <button className="app-button" type="button" onClick={() => { setEditingRecord(null); setIsModalOpen(true) }}>Novo sinistro</button> : null}
-          <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Previsualizar PDF</button>
+          {canCreateClaim ? <button className="app-button" type="button" onClick={() => { setEditingRecord(null); setIsModalOpen(true) }}>Novo sinistro</button> : null}
+          <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
       </div>
@@ -140,13 +158,20 @@ export default function ClaimsPage() {
       <div className="toolbar-card">
         <div className="toolbar-row">
           <div className="filter-inline">
-            <input className="app-input" placeholder="Buscar por descricao, local ou BO" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <input className="app-input" placeholder="Buscar por descrição, local ou BO" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <SearchableSelect
+              value={organizationFilter}
+              onChange={setOrganizationFilter}
+              options={[{ value: '', label: 'Todas as secretarias' }, ...organizationOptions]}
+              placeholder="Filtrar secretaria"
+              searchPlaceholder="Buscar secretaria"
+            />
             <SearchableSelect
               value={vehicleFilter}
               onChange={setVehicleFilter}
-              options={[{ value: '', label: 'Todos os veiculos' }, ...vehicles.map(vehicleOption)]}
-              placeholder="Filtrar veiculo"
-              searchPlaceholder="Buscar veiculo"
+              options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(vehicleOption)]}
+              placeholder="Filtrar veículo"
+              searchPlaceholder="Buscar veículo"
             />
             <select className="app-select" value={statusFilter} onChange={(event) => setStatusFilter(event.target.value)}>
               {statusOptions.map((option) => <option key={option} value={option}>{option}</option>)}
@@ -173,33 +198,38 @@ export default function ClaimsPage() {
           <table className="data-table data-table-wide">
             <thead>
               <tr>
-                <th>Veiculo</th>
+                <th>Veículo</th>
                 <th>Condutor</th>
                 <th>Data</th>
                 <th>Tipo</th>
                 <th>Status</th>
                 <th>Local</th>
                 <th>Valor</th>
-                {canWrite ? <th>Acoes</th> : null}
+                {canEditClaim ? <th>Ações</th> : null}
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={canWrite ? 8 : 7} className="muted">Carregando sinistros...</td></tr>
+                <tr><td colSpan={canEditClaim ? 8 : 7} className="muted">Carregando sinistros...</td></tr>
               ) : !records.length ? (
-                <tr><td colSpan={canWrite ? 8 : 7}><div className="empty-state">Nenhum sinistro encontrado para os filtros aplicados.</div></td></tr>
+                <tr><td colSpan={canEditClaim ? 8 : 7}><div className="empty-state">Nenhum sinistro encontrado para os filtros aplicados.</div></td></tr>
               ) : (
                 records.map((record) => (
                   <tr key={record.id}>
-                    <td data-label="Veiculo"><strong>{record.vehicle_plate}</strong></td>
+                    <td data-label="Veículo">
+                      <div className="stack">
+                        <strong>{record.vehicle_plate}</strong>
+                        <span className="muted">{getVehicleOrganizationName(record.vehicle_id)}</span>
+                      </div>
+                    </td>
                     <td data-label="Condutor">{record.driver_name || '-'}</td>
                     <td data-label="Data">{formatDate(record.data_ocorrencia)}</td>
                     <td data-label="Tipo">{record.tipo}</td>
                     <td data-label="Status"><span className={`status-badge status-${record.status === 'ENCERRADO' ? 'ATIVO' : 'MANUTENCAO'}`}>{record.status}</span></td>
                     <td data-label="Local">{record.local}</td>
                     <td data-label="Valor">{formatMoney(record.valor_estimado)}</td>
-                    {canWrite ? (
-                      <td data-label="Acoes">
+                    {canEditClaim ? (
+                      <td data-label="Ações">
                         <button type="button" className="mini-button" onClick={() => { setEditingRecord(record); setIsModalOpen(true) }}>Editar</button>
                       </td>
                     ) : null}
@@ -216,7 +246,7 @@ export default function ClaimsPage() {
       <Modal
         open={isModalOpen}
         title={editingRecord ? 'Editar sinistro' : 'Novo sinistro'}
-        description="Relacione o veiculo, o condutor quando conhecido e os dados operacionais da ocorrencia."
+        description="Relacione o veículo, o condutor quando conhecido e os dados operacionais da ocorrência."
         onClose={() => setIsModalOpen(false)}
       >
         <ClaimForm
@@ -227,6 +257,7 @@ export default function ClaimsPage() {
             setFeedback(message)
             await loadClaims(editingRecord ? pagination.page : 1)
           }}
+          canSubmit={editingRecord ? canEditClaim : canCreateClaim}
         />
       </Modal>
     </div>

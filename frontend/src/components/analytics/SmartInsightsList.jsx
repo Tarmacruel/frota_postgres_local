@@ -20,7 +20,7 @@ export default function SmartInsightsList({ insights = [] }) {
   if (insights.length === 0) {
     return (
       <section className="surface-panel">
-        <h3 className="section-title">Insights inteligentes</h3>
+        <h3 className="section-title">Alertas inteligentes</h3>
         <div className="empty-state">
           <div style={{ fontSize: 32, marginBottom: 6 }}>✅</div>
           Sem alertas no período selecionado.
@@ -31,7 +31,7 @@ export default function SmartInsightsList({ insights = [] }) {
 
   return (
     <section className="surface-panel">
-      <h3 className="section-title">Insights inteligentes</h3>
+      <h3 className="section-title">Alertas inteligentes</h3>
       <div className="analytics-insight-list">
         {insights.slice(0, 15).map((item, index) => {
           const config = SEVERITY_CONFIG[item.severity] || SEVERITY_CONFIG.MEDIUM

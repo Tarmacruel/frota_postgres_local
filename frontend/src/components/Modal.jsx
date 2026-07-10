@@ -1,13 +1,13 @@
 import { useEffect } from 'react'
 import { createPortal } from 'react-dom'
 
-export default function Modal({ open, title, description, onClose, children }) {
+export default function Modal({ open, title, description, onClose, children, canClose = true }) {
   useEffect(() => {
     if (!open) return undefined
 
     const previousOverflow = document.body.style.overflow
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape' && canClose) onClose()
     }
 
     document.body.style.overflow = 'hidden'
@@ -17,12 +17,12 @@ export default function Modal({ open, title, description, onClose, children }) {
       document.body.style.overflow = previousOverflow
       window.removeEventListener('keydown', handleKeyDown)
     }
-  }, [open, onClose])
+  }, [open, onClose, canClose])
 
   if (!open) return null
 
   return createPortal(
-    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+    <div className="modal-backdrop" role="presentation" onClick={canClose ? onClose : undefined}>
       <section
         className="modal-shell"
         role="dialog"
@@ -32,10 +32,17 @@ export default function Modal({ open, title, description, onClose, children }) {
       >
         <header className="modal-header">
           <div>
-            <h3 className="section-title">{title}</h3>
+            <div className="modal-title-row">
+              <h3 className="section-title">{title}</h3>
+              {description ? (
+                <span className="modal-description-tip" tabIndex={0} title={description} aria-label={description}>
+                  i
+                </span>
+              ) : null}
+            </div>
             {description ? <p className="section-copy">{description}</p> : null}
           </div>
-          <button type="button" className="ghost-button" onClick={onClose}>Fechar</button>
+          {canClose ? <button type="button" className="ghost-button" onClick={onClose}>Fechar</button> : null}
         </header>
         <div className="modal-body">{children}</div>
       </section>

@@ -46,7 +46,7 @@ function normalizeSummaryMetrics(metrics = []) {
     .filter(Boolean)
 }
 
-function formatDateTimeLabel(value) {
+export function formatDateTimeLabel(value) {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) return '-'
 
@@ -113,7 +113,7 @@ async function loadImageDataUrlFromBlob(blob) {
     const image = await new Promise((resolve, reject) => {
       const element = new Image()
       element.onload = () => resolve(element)
-      element.onerror = () => reject(new Error('Nao foi possivel carregar o brasao oficial.'))
+      element.onerror = () => reject(new Error('Não foi possível carregar o brasão oficial.'))
       element.src = objectUrl
     })
 
@@ -134,12 +134,12 @@ async function loadImageDataUrlFromBlob(blob) {
   }
 }
 
-async function loadOptimizedLogo() {
+export async function loadOptimizedLogo() {
   if (!optimizedLogoPromise) {
     optimizedLogoPromise = (async () => {
       const response = await fetch(officialBrand.logoPath)
       if (!response.ok) {
-        throw new Error('Nao foi possivel carregar o brasao oficial.')
+        throw new Error('Não foi possível carregar o brasão oficial.')
       }
 
       const blob = await response.blob()
@@ -156,6 +156,8 @@ function getColumnStyles(columns) {
     {
       halign: column.align || 'left',
       cellWidth: column.width || 'auto',
+      minCellWidth: column.minWidth,
+      overflow: column.overflow || 'linebreak',
     },
   ])))
 }
@@ -169,7 +171,7 @@ async function buildPdfDocument({
   summaryMetrics = [],
   reportCode,
   referenceLabel,
-  responsibleSector = 'Departamento de Gestao da Frota',
+  responsibleSector = 'Departamento de Gestão da Frota',
   orientation,
   generatedBy = 'Sistema oficial da frota municipal',
 }) {
@@ -183,8 +185,23 @@ async function buildPdfDocument({
   const normalizedMetrics = normalizeSummaryMetrics(summaryMetrics)
   const reportLabel = reportCode || buildReportCode(title, generatedAt, rows.length)
 
+  const reportOrientation = computeOrientation(columns, orientation)
+  const isDenseReport = columns.length >= 7
+  const isVeryDenseReport = columns.length >= 9
+  const tableFontSize = isVeryDenseReport ? 7 : isDenseReport ? 7.6 : 8.8
+  const tablePadding = isVeryDenseReport
+    ? { top: 3, right: 4, bottom: 3, left: 4 }
+    : isDenseReport
+      ? { top: 5, right: 5, bottom: 5, left: 5 }
+      : { top: 8, right: 8, bottom: 8, left: 8 }
+  const headPadding = isVeryDenseReport
+    ? { top: 4, right: 4, bottom: 4, left: 4 }
+    : isDenseReport
+      ? { top: 5, right: 5, bottom: 5, left: 5 }
+      : { top: 7, right: 8, bottom: 7, left: 8 }
+
   const doc = new jsPDF({
-    orientation: computeOrientation(columns, orientation),
+    orientation: reportOrientation,
     unit: 'pt',
     format: 'a4',
     compress: true,
@@ -195,8 +212,8 @@ async function buildPdfDocument({
   const totalPagesExp = '{total_pages_count_string}'
   const pageWidth = doc.internal.pageSize.getWidth()
   const pageHeight = doc.internal.pageSize.getHeight()
-  const marginX = 42
-  const headerTop = 34
+  const marginX = reportOrientation === 'landscape' ? 34 : 42
+  const headerTop = reportOrientation === 'landscape' ? 28 : 34
   const footerHeight = 28
 
   function drawHeader() {
@@ -215,7 +232,7 @@ async function buildPdfDocument({
     doc.setFont('helvetica', 'normal')
     doc.setFontSize(8.5)
     doc.setTextColor(107, 114, 128)
-    doc.text(`Emissao: ${formatDateTimeLabel(generatedAt)}`, pageWidth - marginX, headerTop + 14, { align: 'right' })
+    doc.text(`Emissão: ${formatDateTimeLabel(generatedAt)}`, pageWidth - marginX, headerTop + 14, { align: 'right' })
     doc.text(`Ref: ${reportLabel}`, pageWidth - marginX, headerTop + 29, { align: 'right' })
 
     doc.setDrawColor(221, 221, 221)
@@ -238,17 +255,23 @@ async function buildPdfDocument({
   function drawSummaryBlock() {
     let cursorY = headerTop + 64
 
-    doc.setFont('helvetica', 'normal')
-    doc.setFontSize(9)
     doc.setTextColor(75, 85, 99)
+    const lineHeight = isDenseReport ? 9.5 : 12
+    const filterFontSize = (isDenseReport ? 8 : 9) + 2
+    const filterLineHeight = lineHeight + 2
 
     const filtersLine = normalizedFilters.length
       ? `Filtros: ${normalizedFilters.join(' | ')}`
       : 'Filtros: Sem filtros especificos'
 
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(filterFontSize)
     const wrappedFilters = doc.splitTextToSize(filtersLine, pageWidth - (marginX * 2))
-    doc.text(wrappedFilters, marginX, cursorY)
-    cursorY += wrappedFilters.length * 12
+    doc.text(wrappedFilters, pageWidth / 2, cursorY, { align: 'center' })
+    cursorY += wrappedFilters.length * filterLineHeight
+
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(isDenseReport ? 8 : 9)
 
     const metricsLine = normalizedMetrics.length
       ? normalizedMetrics.join(' | ')
@@ -256,21 +279,21 @@ async function buildPdfDocument({
 
     const wrappedMetrics = doc.splitTextToSize(metricsLine, pageWidth - (marginX * 2))
     doc.text(wrappedMetrics, marginX, cursorY)
-    cursorY += wrappedMetrics.length * 12
+    cursorY += wrappedMetrics.length * lineHeight
 
     if (subtitle) {
       const wrappedSubtitle = doc.splitTextToSize(subtitle, pageWidth - (marginX * 2))
       doc.text(wrappedSubtitle, marginX, cursorY)
-      cursorY += wrappedSubtitle.length * 12
+      cursorY += wrappedSubtitle.length * lineHeight
     }
 
     if (referenceLabel) {
       const wrappedReference = doc.splitTextToSize(referenceLabel, pageWidth - (marginX * 2))
       doc.text(wrappedReference, marginX, cursorY)
-      cursorY += wrappedReference.length * 12
+      cursorY += wrappedReference.length * lineHeight
     }
 
-    return cursorY + 6
+    return cursorY + (isDenseReport ? 4 : 6)
   }
 
   const firstPageTableStartY = drawSummaryBlock()
@@ -287,8 +310,8 @@ async function buildPdfDocument({
     },
     styles: {
       font: 'helvetica',
-      fontSize: 8.8,
-      cellPadding: { top: 8, right: 8, bottom: 8, left: 8 },
+      fontSize: tableFontSize,
+      cellPadding: tablePadding,
       textColor: [31, 41, 55],
       lineColor: [229, 231, 235],
       lineWidth: { bottom: 0.5 },
@@ -299,10 +322,11 @@ async function buildPdfDocument({
       fillColor: [249, 250, 251],
       textColor: [55, 65, 81],
       fontStyle: 'bold',
+      fontSize: tableFontSize,
       halign: 'left',
       lineColor: [229, 231, 235],
       lineWidth: { bottom: 0.7 },
-      cellPadding: { top: 7, right: 8, bottom: 7, left: 8 },
+      cellPadding: headPadding,
     },
     alternateRowStyles: {
       fillColor: [250, 250, 250],
@@ -393,7 +417,7 @@ export async function previewRowsToPdf(options) {
             }
           </style>
         </head>
-        <body>Gerando relatorio em PDF...</body>
+        <body>Gerando relatório em PDF...</body>
       </html>
     `)
     previewWindow.document.close()

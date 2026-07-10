@@ -1,0 +1,172 @@
+import { useMemo, useState } from 'react'
+import SearchableSelect from './SearchableSelect'
+import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
+import { getApiErrorMessage } from '../utils/apiError'
+import { toDateTimeLocalValue } from '../utils/datetime'
+
+function buildVehicleOption(vehicle) {
+  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
+  return {
+    value: vehicle.id,
+    label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
+    description: locationLabel,
+    keywords: [vehicle.plate, vehicle.brand, vehicle.model, locationLabel].filter(Boolean).join(' '),
+  }
+}
+
+function buildFuelStationOption(station) {
+  return {
+    value: station.id,
+    label: station.name,
+    description: [station.address, station.phone].filter(Boolean).join(' | '),
+    keywords: [station.name, station.cnpj, station.address, station.phone].filter(Boolean).join(' '),
+  }
+}
+
+function buildDefaultDeadline() {
+  const deadline = new Date(Date.now() + 48 * 60 * 60 * 1000)
+  return toDateTimeLocalValue(deadline.toISOString())
+}
+
+export default function FuelSupplyOrderCreateForm({ vehicles, organizations, fuelStations, onClose, onSuccess }) {
+  const [form, setForm] = useState({
+    vehicle_id: '',
+    organization_id: '',
+    fuel_station_id: '',
+    expires_at: buildDefaultDeadline(),
+    requested_liters: '',
+    notes: '',
+  })
+  const [error, setError] = useState('')
+  const [submitting, setSubmitting] = useState(false)
+
+  const submitLabel = useMemo(() => (submitting ? 'Criando ordem...' : 'Criar ordem'), [submitting])
+
+  async function handleSubmit(event) {
+    event.preventDefault()
+    setError('')
+
+    if (!form.vehicle_id) {
+      setError('Selecione um veículo para emitir a ordem.')
+      return
+    }
+
+    if (!form.fuel_station_id) {
+      setError('Selecione o posto responsável pela ordem.')
+      return
+    }
+
+    if (!form.expires_at) {
+      setError('Informe o prazo limite da ordem.')
+      return
+    }
+
+    if (new Date(form.expires_at).getTime() <= Date.now()) {
+      setError('O prazo da ordem deve estar no futuro.')
+      return
+    }
+
+    try {
+      setSubmitting(true)
+      const payload = {
+        vehicle_id: form.vehicle_id,
+        expires_at: new Date(form.expires_at).toISOString(),
+        fuel_station_id: form.fuel_station_id,
+      }
+      if (form.organization_id) payload.organization_id = form.organization_id
+      if (form.requested_liters) payload.requested_liters = Number(form.requested_liters)
+      if (form.notes.trim()) payload.notes = form.notes.trim()
+
+      const { data } = await fuelSupplyOrdersAPI.create(payload)
+      onSuccess?.({
+        message: 'Ordem de abastecimento criada com sucesso.',
+        order: data,
+      })
+      onClose?.()
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Não foi possível criar a ordem de abastecimento.'))
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
+      {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
+
+      <div className="form-field">
+        <label>Veículo</label>
+        <SearchableSelect
+          value={form.vehicle_id}
+          onChange={(value) => setForm((current) => ({ ...current, vehicle_id: value }))}
+          options={vehicles.map(buildVehicleOption)}
+          placeholder="Selecione o veículo"
+          searchPlaceholder="Buscar veículo"
+        />
+      </div>
+
+      <div className="form-field">
+        <label>Posto</label>
+        <SearchableSelect
+          value={form.fuel_station_id}
+          onChange={(value) => setForm((current) => ({ ...current, fuel_station_id: value }))}
+          options={fuelStations.map(buildFuelStationOption)}
+          placeholder="Selecione o posto"
+          searchPlaceholder="Buscar posto"
+        />
+      </div>
+
+      <div className="form-field">
+        <label>Órgão solicitante</label>
+        <SearchableSelect
+          value={form.organization_id}
+          onChange={(value) => setForm((current) => ({ ...current, organization_id: value }))}
+          options={[{ value: '', label: 'Não informado' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))]}
+          placeholder="Selecione o órgão"
+          searchPlaceholder="Buscar órgão"
+        />
+      </div>
+
+      <div className="form-field">
+        <label>Prazo limite</label>
+        <input
+          type="datetime-local"
+          className="app-input"
+          value={form.expires_at}
+          onChange={(event) => setForm((current) => ({ ...current, expires_at: event.target.value }))}
+          required
+        />
+      </div>
+
+      <div className="form-field">
+        <label>Litros previstos</label>
+        <input
+          type="number"
+          min="0"
+          step="0.01"
+          className="app-input"
+          value={form.requested_liters}
+          onChange={(event) => setForm((current) => ({ ...current, requested_liters: event.target.value }))}
+        />
+      </div>
+
+      <div className="form-field modal-field-span">
+        <label>Observações</label>
+        <textarea
+          className="app-textarea"
+          rows="4"
+          value={form.notes}
+          onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))}
+          placeholder="Informações adicionais para o posto e para a equipe solicitante."
+        />
+      </div>
+
+      <div className="actions-inline modal-actions">
+        <button className="app-button" type="submit" disabled={submitting}>
+          {submitLabel}
+        </button>
+        <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>
+      </div>
+    </form>
+  )
+}

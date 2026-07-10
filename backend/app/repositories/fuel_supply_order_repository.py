@@ -1,0 +1,130 @@
+from __future__ import annotations
+
+from datetime import datetime
+from uuid import UUID
+from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import joinedload
+from app.models.fuel_supply_order import FuelSupplyOrder, FuelSupplyOrderStatus
+from app.models.location_history import LocationHistory
+from app.models.master_data import Allocation, Department
+
+
+class FuelSupplyOrderRepository:
+    def __init__(self, db: AsyncSession):
+        self.db = db
+
+    async def create(self, record: FuelSupplyOrder) -> FuelSupplyOrder:
+        self.db.add(record)
+        await self.db.flush()
+        return record
+
+    async def get_by_id(self, order_id: UUID) -> FuelSupplyOrder | None:
+        result = await self.db.execute(
+            select(FuelSupplyOrder)
+            .options(
+                joinedload(FuelSupplyOrder.vehicle),
+                joinedload(FuelSupplyOrder.driver),
+                joinedload(FuelSupplyOrder.organization),
+                joinedload(FuelSupplyOrder.fuel_station_ref),
+                joinedload(FuelSupplyOrder.creator),
+                joinedload(FuelSupplyOrder.confirmer),
+                joinedload(FuelSupplyOrder.supply),
+            )
+            .where(FuelSupplyOrder.id == order_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_validation_code(self, validation_code: str) -> FuelSupplyOrder | None:
+        result = await self.db.execute(
+            select(FuelSupplyOrder)
+            .options(
+                joinedload(FuelSupplyOrder.vehicle),
+                joinedload(FuelSupplyOrder.driver),
+                joinedload(FuelSupplyOrder.organization),
+                joinedload(FuelSupplyOrder.fuel_station_ref),
+                joinedload(FuelSupplyOrder.creator),
+                joinedload(FuelSupplyOrder.confirmer),
+                joinedload(FuelSupplyOrder.supply),
+            )
+            .where(FuelSupplyOrder.validation_code == validation_code)
+        )
+        return result.scalar_one_or_none()
+
+    async def list_paginated(
+        self,
+        *,
+        page: int,
+        limit: int,
+        status_filter: FuelSupplyOrderStatus | None = None,
+        organization_id: UUID | None = None,
+        vehicle_id: UUID | None = None,
+        fuel_station_id: UUID | None = None,
+        fuel_station_ids: list[UUID] | None = None,
+        due_until: datetime | None = None,
+        created_from: datetime | None = None,
+        created_to: datetime | None = None,
+    ) -> tuple[list[FuelSupplyOrder], int]:
+        stmt = select(FuelSupplyOrder).options(
+            joinedload(FuelSupplyOrder.vehicle),
+            joinedload(FuelSupplyOrder.driver),
+            joinedload(FuelSupplyOrder.organization),
+            joinedload(FuelSupplyOrder.fuel_station_ref),
+            joinedload(FuelSupplyOrder.creator),
+            joinedload(FuelSupplyOrder.confirmer),
+            joinedload(FuelSupplyOrder.supply),
+        )
+        count_stmt = select(func.count(FuelSupplyOrder.id))
+
+        filters = []
+        if status_filter:
+            filters.append(FuelSupplyOrder.status == status_filter)
+        if organization_id:
+            filters.append(self._organization_scope_clause(organization_id))
+        if vehicle_id:
+            filters.append(FuelSupplyOrder.vehicle_id == vehicle_id)
+        if fuel_station_id:
+            filters.append(FuelSupplyOrder.fuel_station_id == fuel_station_id)
+        if fuel_station_ids:
+            filters.append(FuelSupplyOrder.fuel_station_id.in_(fuel_station_ids))
+        if due_until:
+            filters.append(FuelSupplyOrder.expires_at <= due_until)
+        if created_from:
+            filters.append(FuelSupplyOrder.created_at >= created_from)
+        if created_to:
+            filters.append(FuelSupplyOrder.created_at <= created_to)
+
+        if filters:
+            clause = and_(*filters)
+            stmt = stmt.where(clause)
+            count_stmt = count_stmt.where(clause)
+
+        stmt = stmt.order_by(FuelSupplyOrder.created_at.desc()).offset((page - 1) * limit).limit(limit)
+        total = int((await self.db.execute(count_stmt)).scalar_one())
+        records = list((await self.db.execute(stmt)).scalars().unique().all())
+        return records, total
+
+    def _organization_scope_clause(self, organization_id: UUID):
+        vehicle_in_organization = (
+            select(LocationHistory.vehicle_id)
+            .join(Allocation, Allocation.id == LocationHistory.allocation_id)
+            .join(Department, Department.id == Allocation.department_id)
+            .where(
+                LocationHistory.vehicle_id == FuelSupplyOrder.vehicle_id,
+                LocationHistory.end_date.is_(None),
+                Department.organization_id == organization_id,
+            )
+            .exists()
+        )
+        return or_(FuelSupplyOrder.organization_id == organization_id, vehicle_in_organization)
+
+    async def expire_overdue(self, *, reference_time: datetime) -> int:
+        result = await self.db.execute(
+            update(FuelSupplyOrder)
+            .where(
+                FuelSupplyOrder.status == FuelSupplyOrderStatus.OPEN,
+                FuelSupplyOrder.expires_at < reference_time,
+            )
+            .values(status=FuelSupplyOrderStatus.EXPIRED)
+        )
+        return int(result.rowcount or 0)

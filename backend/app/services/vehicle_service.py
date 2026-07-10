@@ -6,6 +6,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.organization_scope import ensure_organization_access, production_scope_is_empty, scoped_organization_id
+from app.models.audit_log import AuditLog
 from app.models.location_history import LocationHistory
 from app.models.master_data import Allocation
 from app.models.user import User
@@ -16,6 +18,23 @@ from app.repositories.vehicle_repository import VehicleRepository
 from app.schemas.common import PaginatedResponse, build_pagination
 from app.schemas.vehicle import VehicleCreate, VehicleUpdate
 
+VEHICLE_OPTIONAL_FIELDS = (
+    "renavam",
+    "year",
+    "prefix",
+    "patrimonio_numero_frota",
+    "color",
+    "fuel_type",
+    "tank_capacity_liters",
+    "transmission",
+    "city",
+    "state",
+    "registered_detran",
+    "engine_spec",
+    "is_provisional",
+    "provisional_source",
+)
+
 
 class VehicleService:
     def __init__(self, db: AsyncSession):
@@ -24,8 +43,12 @@ class VehicleService:
         self.master_data = MasterDataRepository(db)
         self.audit = AuditService(db)
 
-    async def list(self, skip: int, limit: int, status_filter: VehicleStatus | None):
-        vehicles = await self.vehicles.list(skip=skip, limit=limit, status=status_filter)
+    async def list(self, skip: int, limit: int, status_filter: VehicleStatus | None, current_user: User | None = None):
+        if production_scope_is_empty(current_user):
+            return []
+
+        organization_id = scoped_organization_id(current_user)
+        vehicles = await self.vehicles.list(skip=skip, limit=limit, status=status_filter, organization_id=organization_id)
         items = []
         for vehicle in vehicles:
             active = await self.vehicles.get_active_history(vehicle.id)
@@ -43,7 +66,12 @@ class VehicleService:
         search: str | None = None,
         sort: str = "created_at",
         order: str = "desc",
+        current_user: User | None = None,
     ) -> PaginatedResponse[dict]:
+        if production_scope_is_empty(current_user):
+            return PaginatedResponse[dict](data=[], pagination=build_pagination(page, limit, 0))
+
+        organization_id = scoped_organization_id(current_user)
         vehicles, total = await self.vehicles.list_paginated(
             page=page,
             limit=limit,
@@ -52,6 +80,7 @@ class VehicleService:
             search=search,
             sort=sort,
             order=order,
+            organization_id=organization_id,
         )
         items = []
         for vehicle in vehicles:
@@ -60,25 +89,40 @@ class VehicleService:
             items.append(self._serialize_vehicle(vehicle, active, possession))
         return PaginatedResponse[dict](data=items, pagination=build_pagination(page, limit, total))
 
-    async def get_history(self, vehicle_id: UUID):
+    async def get_history(
+        self,
+        vehicle_id: UUID,
+        *,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+        current_user: User | None = None,
+    ):
+        if start_date and end_date and start_date > end_date:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data inicial não pode ser maior que a data final")
+
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
-        history = await self.vehicles.list_history(vehicle_id)
-        return [self._serialize_history(item) for item in history]
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
+        await self._ensure_vehicle_visible_to_user(vehicle_id, current_user=current_user)
+        history = await self.vehicles.list_history(vehicle_id, start_date=start_date, end_date=end_date)
+        audit_logs = await self._list_vehicle_audit_logs(vehicle_id, start_date=start_date, end_date=end_date)
+        events = [self._serialize_history(item) for item in history]
+        events.extend(self._serialize_audit_event(item) for item in audit_logs)
+        return sorted(events, key=lambda item: item["occurred_at"], reverse=True)
 
     async def create(self, data: VehicleCreate, current_user: User) -> dict:
         existing = await self.vehicles.get_by_plate(data.plate.upper())
         if existing:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Placa ja cadastrada")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Placa já cadastrada")
 
         chassis_number = self._normalize_chassis(data.chassis_number)
         if chassis_number:
             duplicate_chassis = await self._get_by_chassis(chassis_number)
             if duplicate_chassis:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Chassi ja cadastrado")
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Chassi já cadastrado")
 
         allocation = await self._require_allocation(data.allocation_id)
+        ensure_organization_access(current_user, allocation.organization_id)
         vehicle = Vehicle(
             plate=data.plate.upper().strip(),
             chassis_number=chassis_number,
@@ -88,6 +132,8 @@ class VehicleService:
             ownership_type=data.ownership_type,
             status=data.status,
         )
+        for field in VEHICLE_OPTIONAL_FIELDS:
+            setattr(vehicle, field, self._normalize_optional_vehicle_value(field, getattr(data, field, None)))
         history = LocationHistory(
             allocation_id=allocation.id,
             department=allocation.display_name,
@@ -107,6 +153,7 @@ class VehicleService:
                     "chassis_number": vehicle.chassis_number,
                     "brand": vehicle.brand,
                     "model": vehicle.model,
+                    **{field: getattr(vehicle, field) for field in VEHICLE_OPTIONAL_FIELDS},
                     "vehicle_type": vehicle.vehicle_type.value,
                     "ownership_type": vehicle.ownership_type.value,
                     "status": vehicle.status.value,
@@ -116,7 +163,7 @@ class VehicleService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel criar o veiculo") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível criar o veículo") from exc
 
         active = await self.vehicles.get_active_history(vehicle.id)
         return self._serialize_vehicle(vehicle, active, None)
@@ -124,14 +171,16 @@ class VehicleService:
     async def update(self, vehicle_id: UUID, data: VehicleUpdate, current_user: User) -> dict:
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
+        await self._ensure_vehicle_visible_to_user(vehicle_id, current_user=current_user)
         previous_active = await self.vehicles.get_active_history(vehicle.id)
         previous_values = {
             "plate": vehicle.plate,
             "chassis_number": vehicle.chassis_number,
             "brand": vehicle.brand,
             "model": vehicle.model,
+            **{field: getattr(vehicle, field) for field in VEHICLE_OPTIONAL_FIELDS},
             "vehicle_type": vehicle.vehicle_type.value,
             "ownership_type": vehicle.ownership_type.value,
             "status": vehicle.status.value,
@@ -141,14 +190,14 @@ class VehicleService:
         if data.plate and data.plate.upper().strip() != vehicle.plate:
             duplicate = await self.vehicles.get_by_plate(data.plate.upper().strip())
             if duplicate and duplicate.id != vehicle.id:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Placa ja cadastrada")
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Placa já cadastrada")
 
         if data.chassis_number is not None:
             next_chassis = self._normalize_chassis(data.chassis_number)
             if next_chassis != vehicle.chassis_number:
                 duplicate_chassis = await self._get_by_chassis(next_chassis)
                 if duplicate_chassis and duplicate_chassis.id != vehicle.id:
-                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Chassi ja cadastrado")
+                    raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Chassi já cadastrado")
 
         try:
             if data.plate is not None:
@@ -159,6 +208,9 @@ class VehicleService:
                 vehicle.brand = data.brand.strip()
             if data.model is not None:
                 vehicle.model = data.model.strip()
+            for field in VEHICLE_OPTIONAL_FIELDS:
+                if getattr(data, field) is not None:
+                    setattr(vehicle, field, self._normalize_optional_vehicle_value(field, getattr(data, field)))
             if data.vehicle_type is not None:
                 vehicle.vehicle_type = data.vehicle_type
             if data.ownership_type is not None:
@@ -177,6 +229,7 @@ class VehicleService:
                         vehicle_id=vehicle.id,
                         allocation_id=allocation.id,
                         department=allocation.display_name,
+                        justification=data.edit_reason,
                     )
                     await self.vehicles.create_history(new_history)
 
@@ -188,12 +241,14 @@ class VehicleService:
                 entity_id=vehicle.id,
                 entity_label=vehicle.plate,
                 details={
+                    "reason": data.edit_reason,
                     "before": previous_values,
                     "after": {
                         "plate": vehicle.plate,
                         "chassis_number": vehicle.chassis_number,
                         "brand": vehicle.brand,
                         "model": vehicle.model,
+                        **{field: getattr(vehicle, field) for field in VEHICLE_OPTIONAL_FIELDS},
                         "vehicle_type": vehicle.vehicle_type.value,
                         "ownership_type": vehicle.ownership_type.value,
                         "status": vehicle.status.value,
@@ -206,7 +261,7 @@ class VehicleService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel atualizar o veiculo") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar o veículo") from exc
 
         active = await self.vehicles.get_active_history(vehicle.id)
         possession = await self.vehicles.get_active_possession(vehicle.id)
@@ -215,7 +270,7 @@ class VehicleService:
     async def delete(self, vehicle_id: UUID, current_user: User) -> None:
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
         active = await self.vehicles.get_active_history(vehicle.id)
         possession = await self.vehicles.get_active_possession(vehicle.id)
@@ -231,6 +286,7 @@ class VehicleService:
                     "chassis_number": vehicle.chassis_number,
                     "brand": vehicle.brand,
                     "model": vehicle.model,
+                    **{field: getattr(vehicle, field) for field in VEHICLE_OPTIONAL_FIELDS},
                     "vehicle_type": vehicle.vehicle_type.value,
                     "ownership_type": vehicle.ownership_type.value,
                     "status": vehicle.status.value,
@@ -242,7 +298,7 @@ class VehicleService:
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Nao foi possivel remover o veiculo") from exc
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível remover o veículo") from exc
 
     async def _get_by_chassis(self, chassis_number: str | None) -> Vehicle | None:
         if not chassis_number:
@@ -255,8 +311,40 @@ class VehicleService:
     async def _require_allocation(self, allocation_id: UUID) -> Allocation:
         allocation = await self.master_data.get_allocation(allocation_id)
         if not allocation:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lotacao nao encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lotação não encontrada")
         return allocation
+
+    async def _ensure_vehicle_visible_to_user(self, vehicle_id: UUID, current_user: User | None) -> None:
+        organization_id = scoped_organization_id(current_user)
+        if organization_id is None:
+            if production_scope_is_empty(current_user):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
+            return
+        if not await self.vehicles.is_vehicle_in_organization(vehicle_id, organization_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
+
+    async def _list_vehicle_audit_logs(
+        self,
+        vehicle_id: UUID,
+        *,
+        start_date: datetime | None = None,
+        end_date: datetime | None = None,
+    ) -> list[AuditLog]:
+        stmt = (
+            select(AuditLog)
+            .where(
+                AuditLog.entity_type == "VEHICLE",
+                AuditLog.entity_id == vehicle_id,
+                AuditLog.action.in_(("CREATE", "UPDATE")),
+            )
+            .order_by(AuditLog.created_at.desc())
+        )
+        if start_date:
+            stmt = stmt.where(AuditLog.created_at >= start_date)
+        if end_date:
+            stmt = stmt.where(AuditLog.created_at <= end_date)
+        result = await self.db.execute(stmt)
+        return list(result.scalars().all())
 
     def _normalize_chassis(self, chassis_number: str | None) -> str | None:
         if chassis_number is None:
@@ -264,14 +352,43 @@ class VehicleService:
         normalized = chassis_number.strip().upper()
         return normalized or None
 
+    def _normalize_optional_vehicle_value(self, field: str, value):
+        if value is None:
+            return None
+        if field == "state":
+            normalized = str(value).strip().upper()
+            return normalized[:2] or None
+        if field == "tank_capacity_liters":
+            return float(value) if value is not None else None
+        if field == "registered_detran":
+            return bool(value) if value is not None else None
+        if isinstance(value, str):
+            normalized = value.strip()
+            return normalized or None
+        return value
+
     def _serialize_vehicle(self, vehicle: Vehicle, active_history: LocationHistory | None, possession) -> dict:
         current_location = self._serialize_location(active_history)
         return {
             "id": vehicle.id,
             "plate": vehicle.plate,
             "chassis_number": vehicle.chassis_number,
+            "renavam": vehicle.renavam,
             "brand": vehicle.brand,
             "model": vehicle.model,
+            "year": vehicle.year,
+            "prefix": vehicle.prefix,
+            "patrimonio_numero_frota": vehicle.patrimonio_numero_frota,
+            "color": vehicle.color,
+            "fuel_type": vehicle.fuel_type,
+            "tank_capacity_liters": vehicle.tank_capacity_liters,
+            "transmission": vehicle.transmission,
+            "city": vehicle.city,
+            "state": vehicle.state,
+            "registered_detran": vehicle.registered_detran,
+            "engine_spec": vehicle.engine_spec,
+            "is_provisional": vehicle.is_provisional,
+            "provisional_source": vehicle.provisional_source,
             "vehicle_type": vehicle.vehicle_type,
             "ownership_type": vehicle.ownership_type,
             "status": vehicle.status,
@@ -298,7 +415,12 @@ class VehicleService:
     def _serialize_history(self, history: LocationHistory) -> dict:
         return {
             "id": history.id,
-            "vehicle_id": history.vehicle_id,
+            "event_type": "MOVEMENT",
+            "action": None,
+            "occurred_at": history.start_date,
+            "title": "Movimentação de lotação",
+            "actor_name": None,
+            "justification": history.justification,
             "allocation_id": history.allocation_id,
             "department": history.department,
             "display_name": history.display_name,
@@ -308,4 +430,37 @@ class VehicleService:
             "start_date": history.start_date,
             "end_date": history.end_date,
             "created_at": history.created_at,
+            "before": None,
+            "after": None,
+        }
+
+    def _serialize_audit_event(self, log: AuditLog) -> dict:
+        details = log.details or {}
+        before = details.get("before") if isinstance(details.get("before"), dict) else None
+        if isinstance(details.get("after"), dict):
+            after = details["after"]
+        elif log.action == "CREATE" and isinstance(details, dict):
+            after = details
+        else:
+            after = None
+
+        return {
+            "id": log.id,
+            "event_type": "CREATE" if log.action == "CREATE" else "EDIT",
+            "action": log.action,
+            "occurred_at": log.created_at,
+            "title": "Cadastro do veículo" if log.action == "CREATE" else "Edição cadastral",
+            "actor_name": log.actor_name,
+            "justification": details.get("reason"),
+            "allocation_id": None,
+            "department": None,
+            "display_name": None,
+            "organization_name": None,
+            "department_name": None,
+            "allocation_name": None,
+            "start_date": None,
+            "end_date": None,
+            "created_at": log.created_at,
+            "before": before,
+            "after": after,
         }

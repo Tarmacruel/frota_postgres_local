@@ -1,0 +1,45 @@
+- generic [ref=e5]:
+  - generic [ref=e6]:
+    - generic [ref=e7]:
+      - generic [ref=e8]: Acesso institucional protegido
+      - generic [ref=e9]:
+        - img "Brasão oficial da Prefeitura Municipal de Teixeira de Freitas" [ref=e10]
+        - generic [ref=e11]:
+          - strong [ref=e12]: Frota PMTF
+          - generic [ref=e13]: Sistema oficial de gestão da frota municipal
+    - generic [ref=e15]:
+      - strong [ref=e16]: Prefeitura Municipal
+      - generic [ref=e17]: Teixeira de Freitas
+      - paragraph [ref=e18]: Plataforma oficial para acompanhamento da frota, condutores e manutenções em um fluxo mais ágil para operação e gestão.
+      - generic [ref=e19]:
+        - generic [ref=e20]: Frota
+        - generic [ref=e21]: Manutenções
+        - generic [ref=e22]: Condutores
+    - generic [ref=e23]:
+      - generic [ref=e24]: Avenida Marechal Castelo Branco, 145 - Centro, Teixeira de Freitas - BA, CEP 45995-041
+      - generic [ref=e25]: CNPJ 13.650.403/0001-28
+      - generic [ref=e26]: Desenvolvido por Jonatas da Silva Sousa.
+  - generic [ref=e27]:
+    - generic [ref=e29]:
+      - heading "Bem-vindo de volta" [level=2] [ref=e30]
+      - paragraph [ref=e31]: Entre com a conta vinculada ao ambiente institucional da Prefeitura Municipal de Teixeira de Freitas.
+    - generic [ref=e32]:
+      - generic [ref=e33]:
+        - generic [ref=e34]: Login institucional
+        - generic [ref=e35]:
+          - generic [ref=e36]: "@"
+          - textbox "Login institucional" [ref=e37]:
+            - /placeholder: usuário@frota.local
+      - generic [ref=e38]:
+        - generic [ref=e39]: Sua senha
+        - generic [ref=e40]:
+          - generic [ref=e41]: "#"
+          - textbox "Sua senha" [ref=e42]:
+            - /placeholder: Digite sua senha
+      - button "Entrar no sistema" [ref=e43] [cursor=pointer]
+    - generic [ref=e44]:
+      - strong [ref=e45]: Orientações de acesso
+      - generic [ref=e46]:
+        - generic [ref=e47]: Credenciais liberadas somente para servidores e setores autorizados.
+        - generic [ref=e48]: Solicite criação, redefinição ou ajuste de perfil ao administrador responsável.
+        - generic [ref=e49]: "Utilize o subdominio oficial `frota.sirel.com.br` para acesso externo."

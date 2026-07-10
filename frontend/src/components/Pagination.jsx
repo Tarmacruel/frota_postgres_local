@@ -7,7 +7,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }) {
   }
 
   return (
-    <nav className="pagination-shell" aria-label="Paginacao">
+    <nav className="pagination-shell" aria-label="Paginação">
       <button type="button" className="ghost-button" onClick={() => onPageChange(currentPage - 1)} disabled={currentPage <= 1}>
         &lt; Anterior
       </button>

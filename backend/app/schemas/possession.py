@@ -80,7 +80,7 @@ class PossessionAdminUpdate(BaseModel):
     def validate_edit_reason(cls, value: str) -> str:
         normalized = value.strip()
         if len(normalized) < 8:
-            raise ValueError("Justificativa da edicao deve ter ao menos 8 caracteres")
+            raise ValueError("Justificativa da edição deve ter ao menos 8 caracteres")
         return normalized
 
 
@@ -115,7 +115,7 @@ class PossessionPhotoCreate(BaseModel):
     @classmethod
     def validate_photo_accuracy(cls, value: float) -> float:
         if value <= 0:
-            raise ValueError("Precisao da localizacao deve ser maior que zero")
+            raise ValueError("Precisão da localização deve ser maior que zero")
         return value
 
 
@@ -133,6 +133,9 @@ class PossessionOut(BaseModel):
     id: UUID
     vehicle_id: UUID
     vehicle_plate: str
+    vehicle_brand: str | None
+    vehicle_model: str | None
+    vehicle_description: str | None
     driver_id: UUID | None
     driver_name: str
     driver_document: str | None
@@ -150,12 +153,46 @@ class PossessionOut(BaseModel):
     photo_url: str | None
     photo_captured_at: datetime | None
     photos: list[PossessionPhotoOut]
+    loan_term_available: bool
+    loan_term_name: str | None
+    loan_term_url: str | None
+    loan_term_uploaded_at: datetime | None
+    loan_term_validation_code: str | None
+    loan_term_public_validation_path: str | None
+    return_term_available: bool
+    return_term_name: str | None
+    return_term_url: str | None
+    return_term_uploaded_at: datetime | None
+    return_term_validation_code: str | None
+    return_term_public_validation_path: str | None
     document_available: bool
     document_name: str | None
     document_url: str | None
     document_uploaded_at: datetime | None
     capture_location: CaptureLocationOut | None
+    signature_summary: dict | None = None
 
 
 class PossessionListResponse(PaginatedResponse[PossessionOut]):
     pass
+
+
+class PossessionTermPublicOut(BaseModel):
+    term_type: str
+    validation_code: str
+    public_validation_path: str
+    possession_id: UUID
+    vehicle_plate: str
+    vehicle_brand: str | None
+    vehicle_model: str | None
+    vehicle_description: str | None
+    driver_name: str
+    driver_document_masked: str | None
+    start_date: datetime
+    end_date: datetime | None
+    start_odometer_km: float | None
+    end_odometer_km: float | None
+    kilometers_driven: float | None
+    observation: str | None
+    created_at: datetime
+    signature_summary: dict | None = None

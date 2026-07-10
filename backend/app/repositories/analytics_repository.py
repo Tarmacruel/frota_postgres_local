@@ -14,7 +14,7 @@ class AnalyticsRepository:
     def _is_missing_snapshot_table(self, exc: ProgrammingError) -> bool:
         message = str(exc).lower()
         return "fleet_analytics_snapshots" in message and (
-            "undefinedtable" in message or "does not exist" in message or "nao existe" in message
+            "undefinedtable" in message or "does not exist" in message or "não existe" in message
         )
 
     async def replace_period_snapshots(
