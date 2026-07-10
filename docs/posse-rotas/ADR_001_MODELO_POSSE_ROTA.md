@@ -1,9 +1,11 @@
 # ADR 001 — Separação entre Posse, Rota, Destino e Devolução
 
-- **Status:** aprovado para implementação
+- **Status:** aprovado para implementação, parcialmente substituído pelo ADR 002
 - **Escopo:** módulo de posse de veículos
 - **Branch de trabalho:** `feat/posse-rotas-relatorios-devolucao`
 - **Base:** `módulo-analytics`
+
+> Compatibilidade com termos, assinaturas, permissões e exclusão já existentes em produção é regida pelo `ADR_002_COMPATIBILIDADE_PRODUCAO_E_GOVERNANCA.md`.
 
 ## 1. Contexto
 

@@ -5,6 +5,7 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
+from app.models.user import UserRole
 from app.services.possession_service import PossessionService
 
 
@@ -66,11 +67,26 @@ def build_record(*, active=False):
         created_at=datetime(2026, 5, 2, 11, 10, tzinfo=timezone.utc),
         is_active=active,
         photo_path="possession_photos/legacy.jpg",
-        photos=[SimpleNamespace(photo_path="possession_photos/evidence.jpg")],
+        photo_captured_at=datetime(2026, 5, 2, 11, 11, tzinfo=timezone.utc),
+        capture_latitude=-17.54,
+        capture_longitude=-39.74,
+        capture_accuracy_meters=8.0,
+        photos=[
+            SimpleNamespace(
+                id=uuid4(),
+                photo_path="possession_photos/evidence.jpg",
+                photo_captured_at=datetime(2026, 5, 2, 11, 12, tzinfo=timezone.utc),
+                capture_latitude=-17.54,
+                capture_longitude=-39.74,
+                capture_accuracy_meters=8.0,
+            )
+        ],
         document_path="possession_documents/loan.pdf",
         document_name="loan.pdf",
+        document_uploaded_at=datetime(2026, 5, 2, 11, 15, tzinfo=timezone.utc),
         return_document_path=None if active else "possession_documents/return.pdf",
         return_document_name=None if active else "return.pdf",
+        return_document_uploaded_at=None if active else datetime(2026, 5, 8, 14, 25, tzinfo=timezone.utc),
         loan_term_validation_code="TE-ABC123DEF456",
         return_term_validation_code="TD-ABC123DEF456",
     )
@@ -115,27 +131,91 @@ async def test_public_return_term_is_unavailable_until_possession_ends():
 
 
 @pytest.mark.asyncio
-async def test_delete_possession_records_audit_deletes_record_and_cleans_files():
+async def test_delete_possession_is_denied_audited_and_preserves_record_and_files():
     db = FakeDbSession()
     actor = SimpleNamespace(id=uuid4())
     record = build_record(active=False)
     repository = FakePossessionRepository(record)
     audit = FakeAuditService()
-    cleaned_paths = []
-
     service = PossessionService(db=db)
     service.possessions = repository
     service.audit = audit
-    service._cleanup_files = lambda paths: cleaned_paths.extend(paths)
 
-    await service.delete(record.id, actor)
+    with pytest.raises(HTTPException) as exc:
+        await service.reject_hard_delete(record.id, actor)
 
-    assert repository.deleted is record
+    assert exc.value.status_code == 409
+    assert exc.value.detail["code"] == "POSSESSION_HARD_DELETE_DISABLED"
+    assert repository.deleted is None
     assert db.committed is True
     assert db.rolled_back is False
-    assert audit.records[0]["action"] == "DELETE"
+    assert audit.records[0]["action"] == "DELETE_DENIED"
     assert audit.records[0]["entity_type"] == "POSSESSION"
     assert audit.records[0]["entity_id"] == record.id
-    assert audit.records[0]["details"]["driver_name"] == record.driver_name
+    assert audit.records[0]["details"]["reason"] == "POSSESSION_HARD_DELETE_DISABLED"
     assert audit.records[0]["details"]["is_active"] is False
-    assert len(cleaned_paths) == 4
+
+
+def test_possession_serialization_applies_role_data_exposure():
+    service = PossessionService(db=None)
+    record = build_record(active=False)
+
+    restricted = service._serialize(
+        record,
+        can_view_location=False,
+        can_view_personal_data=False,
+    )
+    operational = service._serialize(
+        record,
+        can_view_location=True,
+        can_view_personal_data=True,
+    )
+
+    assert restricted["driver_document"] == "430.***.***-98"
+    assert restricted["driver_contact"] is None
+    assert restricted["document_url"] is None
+    assert restricted["loan_term_url"] is None
+    assert restricted["return_term_url"] is None
+    assert restricted["capture_location"] is None
+
+    assert operational["driver_document"] == record.driver_document
+    assert operational["driver_contact"] == record.driver_contact
+    assert operational["document_url"] == f"/api/possession/{record.id}/document"
+    assert operational["loan_term_url"] == f"/api/possession/{record.id}/documents/loan-term"
+    assert operational["return_term_url"] == f"/api/possession/{record.id}/documents/return-term"
+    assert operational["capture_location"]["latitude"] == pytest.approx(-17.54)
+
+
+@pytest.mark.asyncio
+async def test_standard_profile_cannot_download_integral_possession_document():
+    service = PossessionService(db=None)
+    service.possessions = FakePossessionRepository(build_record(active=False))
+    actor = SimpleNamespace(id=uuid4(), role=UserRole.PADRAO)
+
+    with pytest.raises(HTTPException) as exc:
+        await service.get_document_file(uuid4(), current_user=actor)
+
+    assert exc.value.status_code == 403
+
+
+def test_production_profile_has_operational_personal_data_and_location_access():
+    service = PossessionService(db=None)
+    actor = SimpleNamespace(role=UserRole.PRODUCAO)
+
+    assert service._can_view_personal_data(actor) is True
+    assert service._can_view_location(actor) is True
+
+
+def test_restricted_signature_summary_omits_signer_emails():
+    service = PossessionService(db=None)
+    summary = {
+        "status": "PENDING",
+        "signatures": [{"signer_name": "Servidor", "signer_email": "servidor@frota.local"}],
+        "requests": [{"requested_signer_name": "Gestor", "requested_signer_email": "gestor@frota.local"}],
+    }
+
+    restricted = service._sanitize_signature_summary(summary, can_view_personal_data=False)
+
+    assert "signer_email" not in restricted["signatures"][0]
+    assert "requested_signer_email" not in restricted["requests"][0]
+    assert summary["signatures"][0]["signer_email"] == "servidor@frota.local"

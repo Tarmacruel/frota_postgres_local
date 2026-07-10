@@ -55,22 +55,35 @@ class SearchRepository:
         result = await self.db.execute(stmt)
         return list(result.all())
 
-    async def search_possessions(self, query: str, limit: int, organization_id=None) -> list[VehiclePossession]:
+    async def search_possessions(
+        self,
+        query: str,
+        limit: int,
+        organization_id=None,
+        *,
+        include_personal_data: bool = False,
+    ) -> list[VehiclePossession]:
+        search_fields = [
+            Vehicle.plate.ilike(query),
+            Vehicle.chassis_number.ilike(query),
+            Vehicle.brand.ilike(query),
+            Vehicle.model.ilike(query),
+            VehiclePossession.driver_name.ilike(query),
+            VehiclePossession.observation.ilike(query),
+        ]
+        if include_personal_data:
+            search_fields.extend(
+                [
+                    VehiclePossession.driver_document.ilike(query),
+                    VehiclePossession.driver_contact.ilike(query),
+                ]
+            )
         stmt = (
             select(VehiclePossession)
             .options(joinedload(VehiclePossession.vehicle))
             .join(Vehicle, Vehicle.id == VehiclePossession.vehicle_id)
             .where(
-                or_(
-                    Vehicle.plate.ilike(query),
-                    Vehicle.chassis_number.ilike(query),
-                    Vehicle.brand.ilike(query),
-                    Vehicle.model.ilike(query),
-                    VehiclePossession.driver_name.ilike(query),
-                    VehiclePossession.driver_document.ilike(query),
-                    VehiclePossession.driver_contact.ilike(query),
-                    VehiclePossession.observation.ilike(query),
-                )
+                or_(*search_fields)
             )
             .order_by(VehiclePossession.start_date.desc(), VehiclePossession.created_at.desc())
             .limit(limit)

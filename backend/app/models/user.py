@@ -7,7 +7,7 @@ from sqlalchemy import Boolean, DateTime, Enum, ForeignKey, Index, String, text
 from sqlalchemy.dialects.postgresql import CITEXT, UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.core.cpf import mask_cpf
-from app.core.permissions import default_permissions_for_role
+from app.core.permissions import apply_role_permission_ceiling, default_permissions_for_role
 from app.db.base import Base
 
 
@@ -65,10 +65,14 @@ class User(Base):
     def permissions(self) -> dict[str, dict[str, bool]]:
         permissions = default_permissions_for_role(self.role.value if self.role else "")
         for entry in self.permission_entries:
-            permissions[entry.module] = {
-                "can_view": entry.can_view,
-                "can_create": entry.can_create,
-                "can_edit": entry.can_edit,
-                "can_delete": entry.can_delete,
-            }
+            permissions[entry.module] = apply_role_permission_ceiling(
+                self.role.value if self.role else "",
+                entry.module,
+                {
+                    "can_view": entry.can_view,
+                    "can_create": entry.can_create,
+                    "can_edit": entry.can_edit,
+                    "can_delete": entry.can_delete,
+                },
+            )
         return permissions

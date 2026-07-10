@@ -19,6 +19,14 @@ const initialForm = {
 
 const roleOptions = ['ADMIN', 'PRODUCAO', 'POSTO', 'PADRAO']
 
+function permissionExceedsPossessionCeiling(moduleKey, actionKey, role) {
+  if (moduleKey !== 'possession') return false
+  if (actionKey === 'delete') return true
+  if (role === 'PADRAO') return actionKey !== 'view'
+  if (role === 'POSTO') return true
+  return false
+}
+
 function formatDate(value) {
   if (!value) return '-'
   return new Date(value).toLocaleString('pt-BR')
@@ -150,7 +158,7 @@ export default function UsersPage() {
     setPermissionsForm((current) => ({
       ...current,
       [moduleKey]: PERMISSION_ACTIONS.reduce((flags, action) => {
-        flags[action.field] = value
+        flags[action.field] = value && !permissionExceedsPossessionCeiling(moduleKey, action.key, permissionsUser?.role)
         return flags
       }, {}),
     }))
@@ -546,6 +554,8 @@ export default function UsersPage() {
                               type="checkbox"
                               checked={Boolean(permissionsForm[module.key]?.[action.field])}
                               onChange={() => togglePermission(module.key, action.field)}
+                              disabled={permissionExceedsPossessionCeiling(module.key, action.key, permissionsUser?.role)}
+                              title={permissionExceedsPossessionCeiling(module.key, action.key, permissionsUser?.role) ? 'Ação acima do teto deste perfil' : undefined}
                             />
                             <span>{action.label}</span>
                           </label>

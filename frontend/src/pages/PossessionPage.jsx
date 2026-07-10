@@ -124,10 +124,9 @@ function normalizeUploadList(fileList) {
 }
 
 export default function PossessionPage() {
-  const { canCreate, canEdit, canDeleteModule, isAdmin } = useAuth()
+  const { canCreate, canEdit, isAdmin } = useAuth()
   const canCreatePossession = canCreate('possession')
   const canEditPossession = canEdit('possession')
-  const canDeletePossession = canDeleteModule('possession')
   const [searchParams, setSearchParams] = useSearchParams()
   const [vehicles, setVehicles] = useState([])
   const [records, setRecords] = useState([])
@@ -662,26 +661,6 @@ export default function PossessionPage() {
     }
   }
 
-  async function handleDeletePossession(record) {
-    if (!record || !window.confirm(`Confirma a exclusão da posse de ${record.driver_name} no veículo ${record.vehicle_plate}?`)) return
-
-    try {
-      setError('')
-      setFeedback('')
-      await possessionAPI.remove(record.id)
-      if (editingRecord?.id === record.id) closeEditModal()
-      if (endingRecord?.id === record.id) closeEndModal()
-      if (photoRecord?.id === record.id) closePhotoModal()
-      if (termRecord?.id === record.id) closeTermModal()
-      if (locationRecord?.record?.id === record.id) closeLocationModal()
-      if (focusRecordId === record.id) clearFocus()
-      setFeedback('Posse excluída com sucesso.')
-      await loadPossessions()
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível excluir a posse.'))
-    }
-  }
-
   async function handlePreviewPdf() {
     if (filteredRecords.length === 0) {
       setFeedback('Não há registros de posse filtrados para pré-visualizar.')
@@ -974,11 +953,6 @@ export default function PossessionPage() {
                         {canEditPossession ? (
                           <button type="button" className="mini-button" onClick={() => openEditModal(record)}>
                             Retificar
-                          </button>
-                        ) : null}
-                        {canDeletePossession ? (
-                          <button type="button" className="mini-button danger" onClick={() => handleDeletePossession(record)}>
-                            Excluir
                           </button>
                         ) : null}
                         {record.is_active && canEditPossession ? (
@@ -1315,7 +1289,7 @@ export default function PossessionPage() {
                 <button type="button" className="secondary-button" onClick={() => handleCopyTermLink(termRecord, 'loan')}>
                   Copiar link empréstimo
                 </button>
-                {(termRecord.loan_term_available ?? termRecord.document_available) ? (
+                {(termRecord.loan_term_url || termRecord.document_url) ? (
                   <button type="button" className="ghost-button" onClick={() => openProtectedFile(termRecord.loan_term_url || termRecord.document_url)}>
                     Abrir anexo empréstimo
                   </button>
@@ -1326,6 +1300,7 @@ export default function PossessionPage() {
                 sourceId={termRecord.id}
                 summary={termRecord.signature_summary?.loan}
                 title="Assinatura do termo de empréstimo"
+                readOnly={!canEditPossession}
                 onChanged={(summary) => handleTermSignatureChanged('loan', summary)}
               />
             </article>
@@ -1346,7 +1321,7 @@ export default function PossessionPage() {
                   <button type="button" className="secondary-button" onClick={() => handleCopyTermLink(termRecord, 'return')}>
                     Copiar link devolução
                   </button>
-                  {termRecord.return_term_available ? (
+                  {termRecord.return_term_url ? (
                     <button type="button" className="ghost-button" onClick={() => openProtectedFile(termRecord.return_term_url)}>
                       Abrir anexo devolução
                     </button>
@@ -1357,6 +1332,7 @@ export default function PossessionPage() {
                   sourceId={termRecord.id}
                   summary={termRecord.signature_summary?.return}
                   title="Assinatura do termo de devolução"
+                  readOnly={!canEditPossession}
                   onChanged={(summary) => handleTermSignatureChanged('return', summary)}
                 />
               </article>

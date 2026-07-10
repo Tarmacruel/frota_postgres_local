@@ -6,7 +6,7 @@ from fastapi import Cookie, Depends, HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
-from app.core.permissions import action_to_column, default_permissions_for_role
+from app.core.permissions import action_to_column, apply_role_permission_ceiling, default_permissions_for_role
 from app.db.session import get_db_session
 from app.models.user import User, UserRole
 from app.models.user_permission import UserPermission
@@ -76,15 +76,22 @@ def require_permission(module: str, action: str):
             )
         )
         permission = result.scalar_one_or_none()
+        role = getattr(current_user, "role", "")
+        role_value = str(getattr(role, "value", role))
         if not permission:
-            role = getattr(current_user, "role", "")
-            role_value = getattr(role, "value", role)
-            default_flags = default_permissions_for_role(str(role_value)).get(module, {})
+            default_flags = default_permissions_for_role(role_value).get(module, {})
             if default_flags.get(permission_column):
                 return current_user
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permissão insuficiente")
 
-        if not getattr(permission, permission_column):
+        permission_flags = {
+            "can_view": permission.can_view,
+            "can_create": permission.can_create,
+            "can_edit": permission.can_edit,
+            "can_delete": permission.can_delete,
+        }
+        effective_flags = apply_role_permission_ceiling(role_value, module, permission_flags)
+        if not effective_flags.get(permission_column):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permissão insuficiente")
         return current_user
 

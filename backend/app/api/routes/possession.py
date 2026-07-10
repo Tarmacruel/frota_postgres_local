@@ -8,7 +8,7 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import require_permission
+from app.api.deps import require_admin, require_permission
 from app.db.session import get_db_session
 from app.models.user import User
 from app.schemas.auth import MessageOut
@@ -322,10 +322,10 @@ async def update_possession(
 async def delete_possession(
     possession_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_permission("possession", "delete")),
+    current_user: User = Depends(require_admin),
 ):
-    await PossessionService(db).delete(possession_id, current_user)
-    return {"message": "Removido"}
+    await PossessionService(db).reject_hard_delete(possession_id, current_user)
+    return {"message": "Exclusão física desabilitada"}
 
 
 @public_router.get("/loan/{validation_code}", response_model=PossessionTermPublicOut)

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.organization_scope import production_scope_is_empty, scoped_organization_id
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.repositories.search_repository import SearchRepository
 
 
@@ -28,7 +28,12 @@ class SearchService:
             else []
         )
         possessions = (
-            await self.search_repo.search_possessions(search_term, per_group_limit, organization_id=organization_id)
+            await self.search_repo.search_possessions(
+                search_term,
+                per_group_limit,
+                organization_id=organization_id,
+                include_personal_data=self._can_view_personal_data(current_user),
+            )
             if self._can_view(current_user, "possession")
             else []
         )
@@ -40,7 +45,7 @@ class SearchService:
 
         results = [
             *[self._serialize_vehicle(vehicle, department, possession) for vehicle, department, possession in vehicles],
-            *[self._serialize_possession(record) for record in possessions],
+            *[self._serialize_possession(record, current_user=current_user) for record in possessions],
             *[self._serialize_maintenance(record) for record in maintenances],
         ]
 
@@ -74,8 +79,9 @@ class SearchService:
             },
         }
 
-    def _serialize_possession(self, record) -> dict:
+    def _serialize_possession(self, record, *, current_user: User) -> dict:
         vehicle_plate = record.vehicle.plate if record.vehicle else ""
+        can_view_personal_data = self._can_view_personal_data(current_user)
         return {
             "type": "possession",
             "id": record.id,
@@ -85,8 +91,8 @@ class SearchService:
             "route": f"/posses?focus={record.id}",
             "context": {
                 "vehicle_plate": vehicle_plate,
-                "driver_document": record.driver_document,
-                "driver_contact": record.driver_contact,
+                "driver_document": record.driver_document if can_view_personal_data else self._mask_document(record.driver_document),
+                "driver_contact": record.driver_contact if can_view_personal_data else None,
             },
         }
 
@@ -133,3 +139,14 @@ class SearchService:
 
     def _can_view(self, current_user: User, module: str) -> bool:
         return bool(current_user.permissions.get(module, {}).get("can_view"))
+
+    def _can_view_personal_data(self, current_user: User) -> bool:
+        return current_user.role in {UserRole.ADMIN, UserRole.PRODUCAO}
+
+    def _mask_document(self, value: str | None) -> str | None:
+        if not value:
+            return None
+        digits = "".join(character for character in value if character.isdigit())
+        if len(digits) <= 4:
+            return "***"
+        return f"{digits[:3]}.***.***-{digits[-2:]}"

@@ -57,6 +57,7 @@ class DocumentSignatureService:
     async def create_document(self, data: DigitalDocumentCreate, current_user: User) -> dict:
         self._ensure_ready()
         self._ensure_module_permission(current_user, data.document_type, "view")
+        self._ensure_possession_term_mutation_allowed(current_user, data.document_type)
         context = await self._build_document_context(data.document_type, data.source_id, current_user=current_user)
         now = datetime.now(timezone.utc)
 
@@ -120,6 +121,7 @@ class DocumentSignatureService:
         document = await self._require_document(document_id)
         await self._ensure_document_visible(document, current_user)
         self._ensure_module_permission(current_user, document.document_type, "view")
+        self._ensure_possession_term_mutation_allowed(current_user, document.document_type)
 
         if document.status in {DigitalDocumentStatus.SUPERSEDED, DigitalDocumentStatus.CANCELLED}:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Documento não está mais disponível para assinatura")
@@ -181,6 +183,7 @@ class DocumentSignatureService:
         document = await self._require_document(document_id)
         await self._ensure_document_visible(document, current_user)
         self._ensure_module_permission(current_user, document.document_type, "edit")
+        self._ensure_possession_term_mutation_allowed(current_user, document.document_type)
         if document.status in {DigitalDocumentStatus.SUPERSEDED, DigitalDocumentStatus.CANCELLED}:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Documento não está disponível para coassinatura")
         if data.requested_signer_user_id == current_user.id:
@@ -199,6 +202,7 @@ class DocumentSignatureService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Servidor selecionado não encontrado")
         self._ensure_signer_can_be_requested(current_user=current_user, requested_signer=signer)
         self._ensure_module_permission(signer, document.document_type, "view")
+        self._ensure_possession_term_mutation_allowed(signer, document.document_type)
 
         now = datetime.now(timezone.utc)
         request = DocumentSignatureRequest(
@@ -272,6 +276,8 @@ class DocumentSignatureService:
     async def decline_request(self, request_id: UUID, current_user: User) -> dict:
         self._ensure_ready()
         request = await self._require_request(request_id)
+        if request.document:
+            self._ensure_possession_term_mutation_allowed(current_user, request.document.document_type)
         if request.requested_signer_user_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solicitação não pertence ao usuário atual")
         if request.status != DocumentSignatureRequestStatus.PENDING:
@@ -300,6 +306,8 @@ class DocumentSignatureService:
     async def cancel_request(self, request_id: UUID, current_user: User) -> dict:
         self._ensure_ready()
         request = await self._require_request(request_id)
+        if request.document:
+            self._ensure_possession_term_mutation_allowed(current_user, request.document.document_type)
         if request.status != DocumentSignatureRequestStatus.PENDING:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Solicitação não está pendente")
         if current_user.role != UserRole.ADMIN and request.requested_by_user_id != current_user.id:
@@ -547,6 +555,18 @@ class DocumentSignatureService:
         field = f"can_{action}"
         if not bool(user.permissions.get(module, {}).get(field)):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permissão insuficiente para o documento")
+
+    def _ensure_possession_term_mutation_allowed(self, user: User, document_type: str) -> None:
+        if document_type not in {
+            DigitalDocumentType.POSSESSION_LOAN_TERM,
+            DigitalDocumentType.POSSESSION_RETURN_TERM,
+        }:
+            return
+        if user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Perfil autorizado apenas para consulta do termo de posse",
+            )
 
     def _can_user_sign_document(self, document: DigitalDocument, current_user: User) -> bool:
         if current_user.role == UserRole.ADMIN:

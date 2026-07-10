@@ -66,7 +66,8 @@ def test_default_permissions_preserve_current_roles():
     posto = default_permissions_for_role("POSTO")
     padrao = default_permissions_for_role("PADRAO")
 
-    assert all(all(flags.values()) for flags in admin.values())
+    assert all(all(flags.values()) for module, flags in admin.items() if module != "possession")
+    assert admin["possession"] == {"can_view": True, "can_create": True, "can_edit": True, "can_delete": False}
     assert producao["vehicles"]["can_create"] is True
     assert producao["vehicles"]["can_delete"] is False
     assert producao["data_imports"]["can_view"] is True
@@ -81,7 +82,54 @@ def test_default_permissions_preserve_current_roles():
     assert posto["fuel_supply_orders"]["can_view"] is True
     assert posto["fuel_supply_orders"]["can_edit"] is True
     assert posto["vehicles"]["can_view"] is False
-    assert all(not any(flags.values()) for flags in padrao.values())
+    assert padrao["possession"] == {"can_view": True, "can_create": False, "can_edit": False, "can_delete": False}
+    assert all(not any(flags.values()) for module, flags in padrao.items() if module != "possession")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    ("role", "action"),
+    [
+        (UserRole.ADMIN, "delete"),
+        (UserRole.PRODUCAO, "delete"),
+        (UserRole.PADRAO, "create"),
+        (UserRole.POSTO, "view"),
+    ],
+)
+async def test_possession_permission_entry_cannot_exceed_role_ceiling(role, action):
+    user_id = uuid4()
+    permission = UserPermission(
+        user_id=user_id,
+        module="possession",
+        can_view=True,
+        can_create=True,
+        can_edit=True,
+        can_delete=True,
+    )
+    dependency = require_permission("possession", action)
+
+    with pytest.raises(HTTPException) as exc:
+        await dependency(
+            db=FakePermissionSession(permission),
+            current_user=SimpleNamespace(id=user_id, role=role),
+        )
+
+    assert exc.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_production_possession_permission_can_be_restricted_by_override():
+    user_id = uuid4()
+    permission = UserPermission(user_id=user_id, module="possession", can_view=False)
+    dependency = require_permission("possession", "view")
+
+    with pytest.raises(HTTPException) as exc:
+        await dependency(
+            db=FakePermissionSession(permission),
+            current_user=SimpleNamespace(id=user_id, role=UserRole.PRODUCAO),
+        )
+
+    assert exc.value.status_code == 403
 
 
 @pytest.mark.asyncio
@@ -105,6 +153,34 @@ def test_user_permissions_fill_missing_modules_from_role_defaults():
     assert user.permissions["vehicles"]["can_view"] is True
     assert user.permissions["data_imports"]["can_view"] is True
     assert user.permissions["data_imports"]["can_edit"] is True
+
+
+def test_user_permissions_apply_possession_ceiling_to_saved_override():
+    user_id = uuid4()
+    user = User(
+        id=user_id,
+        name="Consulta",
+        email="consulta@frota.local",
+        password_hash="hash",
+        role=UserRole.PADRAO,
+    )
+    user.permission_entries = [
+        UserPermission(
+            user_id=user_id,
+            module="possession",
+            can_view=True,
+            can_create=True,
+            can_edit=True,
+            can_delete=True,
+        )
+    ]
+
+    assert user.permissions["possession"] == {
+        "can_view": True,
+        "can_create": False,
+        "can_edit": False,
+        "can_delete": False,
+    }
 
 
 class FakeUserResult:

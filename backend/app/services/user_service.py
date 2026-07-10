@@ -7,7 +7,7 @@ from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.cpf import mask_cpf
-from app.core.permissions import PERMISSION_MODULES, blank_permissions, default_permissions_for_role
+from app.core.permissions import PERMISSION_MODULES, apply_role_permission_ceiling, blank_permissions, default_permissions_for_role
 from app.core.security import get_password_hash
 from app.models.user import User, UserRole
 from app.models.user_permission import UserPermission
@@ -178,7 +178,7 @@ class UserService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
 
         previous_permissions = self._complete_permissions(user.permissions)
-        next_permissions = self._normalize_permissions(data.permissions)
+        next_permissions = self._normalize_permissions(data.permissions, role=user.role.value)
 
         try:
             result = await self.db.execute(select(UserPermission).where(UserPermission.user_id == user.id))
@@ -275,7 +275,12 @@ class UserService:
     def _complete_permissions(self, permissions: dict[str, dict[str, bool]]) -> dict[str, dict[str, bool]]:
         return self._normalize_permissions(permissions)
 
-    def _normalize_permissions(self, permissions: dict[str, object]) -> dict[str, dict[str, bool]]:
+    def _normalize_permissions(
+        self,
+        permissions: dict[str, object],
+        *,
+        role: str | None = None,
+    ) -> dict[str, dict[str, bool]]:
         unknown_modules = sorted(set(permissions.keys()) - set(PERMISSION_MODULES))
         if unknown_modules:
             raise HTTPException(
@@ -286,10 +291,11 @@ class UserService:
         normalized = blank_permissions()
         for module, flags in permissions.items():
             flag_values = flags.model_dump() if hasattr(flags, "model_dump") else dict(flags)
-            normalized[module] = {
+            requested_flags = {
                 "can_view": bool(flag_values.get("can_view", False)),
                 "can_create": bool(flag_values.get("can_create", False)),
                 "can_edit": bool(flag_values.get("can_edit", False)),
                 "can_delete": bool(flag_values.get("can_delete", False)),
             }
+            normalized[module] = apply_role_permission_ceiling(role, module, requested_flags) if role else requested_flags
         return normalized

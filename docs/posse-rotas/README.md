@@ -38,6 +38,7 @@ Uma posse poderá conter várias rotas. O retorno de uma rota não encerrará a 
 Documentos de apoio:
 
 - `ADR_001_MODELO_POSSE_ROTA.md`: decisões arquiteturais vinculantes.
+- `ADR_002_COMPATIBILIDADE_PRODUCAO_E_GOVERNANCA.md`: prevalência de produção, transição do legado, hard delete e tetos de acesso.
 - `MATRIZ_RBAC_LGPD.md`: permissões, classificação de dados e regras de exposição.
 - `CHECKLIST_EXECUCAO.md`: acompanhamento objetivo do progresso.
 

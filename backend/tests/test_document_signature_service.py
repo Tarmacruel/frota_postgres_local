@@ -5,7 +5,7 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
-from app.models.document_signature import DigitalDocumentStatus, DocumentSignatureRequestStatus
+from app.models.document_signature import DigitalDocumentStatus, DigitalDocumentType, DocumentSignatureRequestStatus
 from app.models.user import UserRole
 from app.services.document_signature_service import DocumentSignatureService
 
@@ -86,3 +86,20 @@ def test_signature_serialization_exposes_only_masked_cpf():
 
     assert payload["signer_cpf_masked"] == "529.***.***-25"
     assert "signer_cpf_hash" not in payload
+
+
+def test_standard_profile_cannot_mutate_legacy_possession_term_signature():
+    service = DocumentSignatureService(db=None)
+    user = SimpleNamespace(role=UserRole.PADRAO)
+
+    with pytest.raises(HTTPException) as exc:
+        service._ensure_possession_term_mutation_allowed(user, DigitalDocumentType.POSSESSION_LOAN_TERM)
+
+    assert exc.value.status_code == 403
+
+
+def test_production_profile_can_mutate_legacy_possession_term_signature():
+    service = DocumentSignatureService(db=None)
+    user = SimpleNamespace(role=UserRole.PRODUCAO)
+
+    service._ensure_possession_term_mutation_allowed(user, DigitalDocumentType.POSSESSION_RETURN_TERM)

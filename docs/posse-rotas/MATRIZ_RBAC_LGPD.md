@@ -10,6 +10,8 @@ Perfis atualmente considerados:
 - `PRODUCAO`
 - `PADRAO`
 
+O perfil `POSTO`, existente em produção, não possui acesso ao módulo de posses por padrão.
+
 Caso o código real utilize nomenclatura adicional, o Codex deverá mapear os perfis existentes sem criar permissões implícitas.
 
 ## 2. Matriz de operações
@@ -24,22 +26,22 @@ Caso o código real utilize nomenclatura adicional, o Codex deverá mapear os pe
 | Iniciar rota | Sim | Sim | Não | Posse ativa e sem rota em andamento |
 | Adicionar destino | Sim | Sim | Não | Rota em andamento |
 | Encerrar rota | Sim | Sim | Não | Datas e hodômetros válidos |
-| Cancelar rota operacional | Sim | Sim* | Não | `PRODUCAO` apenas antes do encerramento e com justificativa; confirmar no código |
+| Cancelar rota operacional | Sim | Sim | Não | `PRODUCAO` apenas antes do encerramento e com justificativa |
 | Corrigir rota encerrada | Sim | Não | Não | Nova versão ou auditoria completa |
 | Encerrar posse/devolver veículo | Sim | Sim | Não | Sem rota aberta e com declaração confirmada |
 | Substituir confirmação de devolução | Sim | Não | Não | Registro versionado, sem apagar anterior |
-| Visualizar termo | Sim | Sim | Sim* | Dados mascarados conforme autorização |
-| Baixar termo oficial integral | Sim | Sim | Não* | Validar necessidade operacional |
+| Visualizar termo | Sim | Sim | Sim | `PADRAO` recebe somente representação mascarada |
+| Baixar termo oficial integral | Sim | Sim | Não | Download integral é operacional |
 | Previsualizar relatório resumido | Sim | Sim | Sim | Sem colunas restritas por padrão |
-| Exportar relatório operacional | Sim | Sim | Não* | Sem dados pessoais restritos para `PRODUCAO` |
-| Selecionar documento do condutor | Sim | Não* | Não | Preferir mascarado; liberar integral somente por regra expressa |
-| Selecionar contato | Sim | Sim* | Não | Somente quando necessário à operação |
-| Selecionar localização | Sim | Não* | Não | Não incluir em preset padrão |
+| Exportar relatório operacional | Sim | Sim | Não | `PRODUCAO` pode incluir dados operacionais autorizados |
+| Selecionar documento do condutor | Sim | Sim | Não | `PADRAO` recebe somente valor mascarado em consulta |
+| Selecionar contato | Sim | Sim | Não | Contato integral restrito à operação |
+| Selecionar localização | Sim | Sim | Não | Não incluir em preset padrão; acesso operacional auditável |
 | Consultar auditoria detalhada | Sim | Não | Não | Endpoint exclusivo de `ADMIN` |
 | Excluir auditoria | Não | Não | Não | Operação inexistente |
 | Hard delete de posse/rota/destino | Não | Não | Não | Operação inexistente |
 
-Itens marcados com `*` deverão ser confirmados na Fase 0 com base no uso institucional real. Enquanto não confirmados, aplicar a opção mais restritiva.
+Estas decisões foram confirmadas no desbloqueio anterior à Fase 1 e são complementadas pelo ADR 002. Permissões individuais podem restringir o módulo de posses, mas não ampliar o teto do perfil.
 
 ## 3. Classificação dos dados
 

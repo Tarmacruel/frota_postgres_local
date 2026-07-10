@@ -26,7 +26,7 @@ function getRequestStatusLabel(status) {
   return 'Pendente'
 }
 
-export default function DocumentSignaturePanel({ documentType, sourceId, summary, title, onChanged }) {
+export default function DocumentSignaturePanel({ documentType, sourceId, summary, title, onChanged, readOnly = false }) {
   const { user, isAdmin } = useAuth()
   const [documentSummary, setDocumentSummary] = useState(summary || null)
   const [signers, setSigners] = useState([])
@@ -51,11 +51,11 @@ export default function DocumentSignaturePanel({ documentType, sourceId, summary
         if (mounted) setSigners([])
       }
     }
-    loadSigners()
+    if (!readOnly) loadSigners()
     return () => {
       mounted = false
     }
-  }, [])
+  }, [readOnly])
 
   const hasDocument = Boolean(documentSummary?.document_id)
   const hasSigned = useMemo(
@@ -182,11 +182,11 @@ export default function DocumentSignaturePanel({ documentType, sourceId, summary
           <span className={`status-badge status-${documentSummary?.is_complete ? 'ATIVO' : 'MANUTENCAO'}`}>
             {documentSummary?.signed_count || 0}/{documentSummary?.required_signatures || 1}
           </span>
-        ) : (
+        ) : !readOnly ? (
           <button type="button" className="secondary-button" disabled={loading} onClick={handleCreateDocument}>
             Emitir
           </button>
-        )}
+        ) : null}
       </div>
 
       {documentSummary?.content_hash_short ? (
@@ -220,12 +220,12 @@ export default function DocumentSignaturePanel({ documentType, sourceId, summary
                     {request.requested_signer_name || 'Servidor'}: {getRequestStatusLabel(request.status)}
                   </span>
                   <div className="actions-inline">
-                    {request.status === 'PENDING' && request.requested_signer_user_id === user?.id ? (
+                    {!readOnly && request.status === 'PENDING' && request.requested_signer_user_id === user?.id ? (
                       <button type="button" className="mini-button" disabled={loading} onClick={() => handleDeclineRequest(request.id)}>
                         Recusar
                       </button>
                     ) : null}
-                    {request.status === 'PENDING' && (request.requested_by_user_id === user?.id || isAdmin) ? (
+                    {!readOnly && request.status === 'PENDING' && (request.requested_by_user_id === user?.id || isAdmin) ? (
                       <button type="button" className="mini-button danger" disabled={loading} onClick={() => handleCancelRequest(request.id)}>
                         Cancelar
                       </button>
@@ -238,7 +238,7 @@ export default function DocumentSignaturePanel({ documentType, sourceId, summary
         </>
       ) : null}
 
-      {hasDocument && !hasSigned ? (
+      {!readOnly && hasDocument && !hasSigned ? (
         <form className="signature-form" onSubmit={handleSign}>
           <label>
             <span>{pendingForMe ? 'Assinar solicitação pendente' : 'Assinar com sua ID Digital'}</span>
@@ -257,7 +257,7 @@ export default function DocumentSignaturePanel({ documentType, sourceId, summary
         </form>
       ) : null}
 
-      {hasDocument ? (
+      {!readOnly && hasDocument ? (
         <form className="signature-form" onSubmit={handleRequestSignature}>
           <SearchableSelect
             value={selectedSignerId}

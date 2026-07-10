@@ -19,6 +19,13 @@ PERMISSION_MODULES = (
     "data_imports",
 )
 
+POSSESSION_ROLE_CEILINGS = {
+    "ADMIN": {"can_view": True, "can_create": True, "can_edit": True, "can_delete": False},
+    "PRODUCAO": {"can_view": True, "can_create": True, "can_edit": True, "can_delete": False},
+    "PADRAO": {"can_view": True, "can_create": False, "can_edit": False, "can_delete": False},
+    "POSTO": {"can_view": False, "can_create": False, "can_edit": False, "can_delete": False},
+}
+
 
 def blank_permissions() -> dict[str, dict[str, bool]]:
     return {
@@ -43,6 +50,7 @@ def default_permissions_for_role(role: str) -> dict[str, dict[str, bool]]:
                 "can_edit": True,
                 "can_delete": True,
             }
+        permissions["possession"] = POSSESSION_ROLE_CEILINGS[role].copy()
         return permissions
 
     if role == "PRODUCAO":
@@ -67,7 +75,23 @@ def default_permissions_for_role(role: str) -> dict[str, dict[str, bool]]:
         permissions["fuel_supply_orders"].update(can_view=True, can_edit=True)
         return permissions
 
+    if role == "PADRAO":
+        permissions["possession"] = POSSESSION_ROLE_CEILINGS[role].copy()
+        return permissions
+
     return permissions
+
+
+def apply_role_permission_ceiling(
+    role: str,
+    module: str,
+    flags: dict[str, bool],
+) -> dict[str, bool]:
+    if module != "possession":
+        return flags.copy()
+
+    ceiling = POSSESSION_ROLE_CEILINGS.get(role, blank_permissions()["possession"])
+    return {key: bool(flags.get(key, False) and ceiling[key]) for key in ceiling}
 
 
 def action_to_column(action: str) -> str:
