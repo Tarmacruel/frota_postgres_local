@@ -6,7 +6,7 @@
 
 - [x] Branch `feat/posse-rotas-relatorios-devolucao` criada a partir de `módulo-analytics`.
 - [x] Plano inicial documentado.
-- [ ] Baseline técnico confirmado.
+- [x] Baseline técnico confirmado. Evidência: `BASELINE_TECNICO.md` (2026-07-10).
 - [ ] Implementação concluída.
 - [ ] Ensaio de migration concluído.
 - [ ] Validação funcional concluída.
@@ -16,17 +16,17 @@
 
 ## Fase 0 — Baseline e governança
 
-- [ ] Branch ativa confirmada.
-- [ ] SHA de origem registrado.
-- [ ] Estrutura do backend inventariada.
-- [ ] Estrutura do frontend inventariada.
-- [ ] Heads do Alembic registrados.
-- [ ] Versões de Python, Node e PostgreSQL registradas.
-- [ ] Testes existentes executados.
-- [ ] Build atual executado.
-- [ ] Fluxo atual de posse reproduzido.
-- [ ] Matriz RBAC validada com o código real.
-- [ ] Riscos e débitos técnicos da implementação registrados.
+- [x] Branch ativa confirmada. `feat/posse-rotas-relatorios-devolucao` em `3f956950959f1e38e544ebff09071043db57359f`.
+- [x] SHA de origem registrado. `origin/modulo-analytics` em `bb3b094a9751d0b2ae72c47dc1384cde0580792b`.
+- [x] Estrutura do backend inventariada. Evidência: `BASELINE_TECNICO.md`, seção 4.
+- [x] Estrutura do frontend inventariada. Evidência: `BASELINE_TECNICO.md`, seção 5.
+- [x] Heads do Alembic registrados. `0014_fleet_analytics` e `10d2f34e089d`; `current` falha porque o banco está em `0038_require_user_cpf`.
+- [x] Versões de Python, Node e PostgreSQL registradas. Evidência: `BASELINE_TECNICO.md`, seção 3.
+- [x] Testes existentes executados. `python -m pytest tests -q`: 6 passed em 1,45 s, com warning de configuração do pytest-asyncio.
+- [x] Build atual executado. `npm run build`: sucesso, 369 módulos, 35,11 s.
+- [x] Fluxo atual de posse reproduzido. Rastreamento não mutativo ponta a ponta documentado em `BASELINE_TECNICO.md`, seção 6.
+- [x] Matriz RBAC validada com o código real. Divergências e exposição de dados registradas em `BASELINE_TECNICO.md`, seções 4.4 e 9.
+- [x] Riscos e débitos técnicos da implementação registrados. Evidência: `RISCOS_E_DEBITOS.md`.
 
 ## Fase 1 — Segurança, auditoria e contexto
 
@@ -145,4 +145,4 @@
 
 | Data | Fase | Commit/PR | Comandos executados | Resultado | Responsável |
 |---|---|---|---|---|---|
-| — | — | — | — | — | — |
+| 2026-07-10 | 0 | árvore local em `3f95695` | Git refs/diffs; versões; `alembic heads/current/history --verbose`; consultas somente leitura ao PostgreSQL; `pytest tests -q`; `npm run build`; `Diagnostico.ps1` | Baseline documentado; 6 testes e build passaram; `alembic current` falhou por revisão ausente; diagnóstico teve falso positivo | Codex |
