@@ -20,13 +20,27 @@
 - [x] SHA de origem registrado. `origin/modulo-analytics` em `bb3b094a9751d0b2ae72c47dc1384cde0580792b`.
 - [x] Estrutura do backend inventariada. Evidência: `BASELINE_TECNICO.md`, seção 4.
 - [x] Estrutura do frontend inventariada. Evidência: `BASELINE_TECNICO.md`, seção 5.
-- [x] Heads do Alembic registrados. `0014_fleet_analytics` e `10d2f34e089d`; `current` falha porque o banco está em `0038_require_user_cpf`.
+- [x] Heads do Alembic registrados no baseline inicial. Eram `0014_fleet_analytics` e `10d2f34e089d`; a reconciliação posterior está registrada abaixo.
 - [x] Versões de Python, Node e PostgreSQL registradas. Evidência: `BASELINE_TECNICO.md`, seção 3.
 - [x] Testes existentes executados. `python -m pytest tests -q`: 6 passed em 1,45 s, com warning de configuração do pytest-asyncio.
 - [x] Build atual executado. `npm run build`: sucesso, 369 módulos, 35,11 s.
 - [x] Fluxo atual de posse reproduzido. Rastreamento não mutativo ponta a ponta documentado em `BASELINE_TECNICO.md`, seção 6.
 - [x] Matriz RBAC validada com o código real. Divergências e exposição de dados registradas em `BASELINE_TECNICO.md`, seções 4.4 e 9.
 - [x] Riscos e débitos técnicos da implementação registrados. Evidência: `RISCOS_E_DEBITOS.md`.
+
+## Desbloqueio anterior à Fase 1
+
+- [x] Baseline registrado em commit próprio: `6127290`.
+- [x] `origin/modulo-analytics` incorporada por merge explícito: `9611f38`.
+- [x] Código funcional de produção preservado; helpers experimentais com token/localStorage removidos.
+- [x] Grafo Alembic reconciliado sem migration ou `stamp`: head/current `0038_require_user_cpf`.
+- [x] ADR 002 aprovado para compatibilidade, legado, exclusão e tetos de perfil.
+- [x] Hard delete de posse bloqueado, auditado e coberto por teste.
+- [x] Tetos de `ADMIN`, `PRODUCAO`, `PADRAO` e `POSTO` aplicados no backend e frontend.
+- [x] Exposição integral para `PRODUCAO` e mascarada/restrita para `PADRAO` coberta por testes.
+- [x] Suíte backend pós-merge: 81 testes aprovados em 6,54 s.
+- [x] Build frontend pós-merge: 1.071 módulos em 1 min 33 s.
+- [x] Schema de `vehicle_possession` conferido sem alteração: 31 colunas, 7 índices e 3 constraints.
 
 ## Fase 1 — Segurança, auditoria e contexto
 
@@ -146,3 +160,4 @@
 | Data | Fase | Commit/PR | Comandos executados | Resultado | Responsável |
 |---|---|---|---|---|---|
 | 2026-07-10 | 0 | árvore local em `3f95695` | Git refs/diffs; versões; `alembic heads/current/history --verbose`; consultas somente leitura ao PostgreSQL; `pytest tests -q`; `npm run build`; `Diagnostico.ps1` | Baseline documentado; 6 testes e build passaram; `alembic current` falhou por revisão ausente; diagnóstico teve falso positivo | Codex |
+| 2026-07-10 | Desbloqueio Fase 1 | `6127290`, `9611f38`, `7942826` | merge explícito; consultas de schema; `alembic heads/current/history --verbose`; `pytest tests -q`; `npm run build`; `git diff --check` | Produção sincronizada; Alembic em `0038`; 81 testes e build passaram; nenhuma migration/schema alterados | Codex |

@@ -2,6 +2,21 @@
 
 Classificação: **Crítico** (perda/comprometimento provável ou avanço inseguro), **Alto** (exposição/integridade relevante), **Médio** (fragilidade operacional/manutenibilidade) e **Baixo** (qualidade localizada).
 
+## Atualização de 2026-07-10
+
+| Risco | Situação após desbloqueio |
+|---|---|
+| R-001 | **Resolvido:** produção incorporada por merge `9611f38`; feature não está atrás de `origin/modulo-analytics` |
+| R-002 | **Resolvido:** `heads/current = 0038_require_user_cpf`, sem migration, edição ou `stamp` |
+| R-004 | **Mitigado no módulo de posses:** exposição agora segue teto por perfil; revisão transversal continua na Fase 7 |
+| R-006 | **Mitigado:** API/repository de hard delete de posse neutralizados; FKs legadas serão tratadas na modelagem futura sem apagar histórico |
+| R-010 | **Resolvido por decisão:** transição compatível formalizada no ADR 002 |
+| R-012 | **Resolvido pela sincronização:** ações de posse obedecem permissões efetivas; exclusão foi removida da interface |
+| R-022 | **Resolvido:** cliente experimental com token em `localStorage` removido |
+| R-026 | **Resolvido:** permissões granulares preservadas com teto de perfil no módulo de posses |
+
+Os demais riscos continuam válidos para as fases indicadas.
+
 ## Críticos
 
 | ID | Achado/evidência | Impacto | Tratamento antes/depois |
