@@ -229,6 +229,107 @@ class FakeDocumentSignatureService:
         return None
 
 
+@pytest.mark.asyncio
+async def test_create_order_audits_loaded_order_to_avoid_async_lazy_load():
+    now = datetime.now(timezone.utc)
+    vehicle = SimpleNamespace(id=uuid4(), plate="ABC1D23", brand="VW", model="Gol")
+    station = SimpleNamespace(
+        id=uuid4(),
+        name="Posto Central",
+        cnpj="00.000.000/0001-00",
+        address="Avenida Principal, 100",
+        phone="(73) 99999-0000",
+        latitude=None,
+        longitude=None,
+        active=True,
+    )
+    organization = SimpleNamespace(id=uuid4(), name="Secretaria de Administracao")
+    loaded_order = SimpleNamespace(
+        id=uuid4(),
+        validation_code="OA-TESTE",
+        status=FuelSupplyOrderStatus.OPEN,
+        vehicle_id=vehicle.id,
+        vehicle=vehicle,
+        driver_id=None,
+        driver=None,
+        organization_id=organization.id,
+        organization=organization,
+        fuel_station_id=station.id,
+        fuel_station_ref=station,
+        created_by_user_id=uuid4(),
+        creator=SimpleNamespace(name="Solicitante"),
+        requester_contact=None,
+        confirmed_by_user_id=None,
+        confirmer=None,
+        expires_at=now + timedelta(hours=2),
+        requested_liters=40,
+        max_amount=None,
+        notes=None,
+        confirmed_at=None,
+        created_at=now,
+        updated_at=now,
+        supply=None,
+    )
+
+    class FakeCreateOrders:
+        def __init__(self):
+            self.created = None
+
+        async def create(self, record):
+            self.created = record
+            record.id = loaded_order.id
+            return record
+
+        async def get_by_id(self, order_id):
+            assert order_id == loaded_order.id
+            return loaded_order
+
+        async def get_by_validation_code(self, validation_code):
+            return None
+
+    class FakeVehicles:
+        async def get_by_id(self, vehicle_id):
+            return vehicle if vehicle_id == vehicle.id else None
+
+        async def is_vehicle_in_organization(self, vehicle_id, organization_id):
+            return True
+
+    class FakeMasterData:
+        async def get_organization(self, organization_id):
+            return organization if organization_id == organization.id else None
+
+    service = FuelSupplyOrderService(FakeDb())
+    service.orders = FakeCreateOrders()
+    service.vehicles = FakeVehicles()
+    service.fuel_stations = FakeStations(station)
+    service.master_data = FakeMasterData()
+    service.audit = FakeAudit()
+
+    async def fake_get_order(order_id, *, current_user=None):
+        return {"id": order_id}
+
+    def serialize_spy(item):
+        assert item is loaded_order
+        return {"id": str(item.id), "vehicle_plate": item.vehicle.plate}
+
+    service.get_order = fake_get_order
+    service._serialize_order = serialize_spy
+    current_user = SimpleNamespace(id=uuid4(), role=UserRole.ADMIN, name="Admin", email="admin@example.test")
+    data = FuelSupplyOrderCreate(
+        vehicle_id=vehicle.id,
+        organization_id=organization.id,
+        fuel_station_id=station.id,
+        expires_at=now + timedelta(hours=2),
+        requested_liters=40,
+    )
+
+    result = await service.create_order(data, current_user)
+
+    assert result == {"id": loaded_order.id}
+    assert service.db.committed is True
+    assert service.audit.records[0]["details"] == {"id": str(loaded_order.id), "vehicle_plate": "ABC1D23"}
+
+
 def make_order():
     now = datetime.now(timezone.utc)
     station = SimpleNamespace(

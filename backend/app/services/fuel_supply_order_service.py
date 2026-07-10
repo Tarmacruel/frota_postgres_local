@@ -108,13 +108,19 @@ class FuelSupplyOrderService:
 
         try:
             await self.orders.create(order)
+            loaded_order = await self.orders.get_by_id(order.id)
+            if not loaded_order:
+                raise HTTPException(
+                    status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                    detail="Nao foi possivel carregar a ordem criada",
+                )
             await self.audit.record(
                 actor=current_user,
                 action="ORDER_CREATED",
                 entity_type="FUEL_SUPPLY_ORDER",
                 entity_id=order.id,
                 entity_label=f"{vehicle.plate} - {order.id}",
-                details=self._serialize_order(order),
+                details=self._serialize_order(loaded_order),
             )
             await self.db.commit()
         except IntegrityError as exc:
