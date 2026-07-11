@@ -45,6 +45,12 @@ from app.models.location_history import LocationHistory
 from app.models.maintenance import MaintenanceRecord
 from app.models.possession import VehiclePossession
 from app.models.possession_photo import VehiclePossessionPhoto
+from app.models.possession_trip import (
+    VehiclePossessionReturnConfirmation,
+    VehiclePossessionTrip,
+    VehiclePossessionTripDestination,
+    VehiclePossessionTripStatus,
+)
 
 __all__ = [
     "AdminNotification",
@@ -101,4 +107,8 @@ __all__ = [
     "MaintenanceRecord",
     "VehiclePossession",
     "VehiclePossessionPhoto",
+    "VehiclePossessionTrip",
+    "VehiclePossessionTripDestination",
+    "VehiclePossessionTripStatus",
+    "VehiclePossessionReturnConfirmation",
 ]

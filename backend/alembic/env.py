@@ -9,7 +9,7 @@ import logging
 
 from app.core.config import settings
 from app.db.base import Base
-from app.models import audit_log, data_import, location_history, maintenance, possession, user, user_permission, vehicle  # noqa: F401
+from app.models import audit_log, data_import, location_history, maintenance, possession, possession_trip, user, user_permission, vehicle  # noqa: F401
 
 config = context.config
 
