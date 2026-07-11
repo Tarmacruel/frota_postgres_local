@@ -44,14 +44,14 @@
 
 ## Fase 1 — Segurança, auditoria e contexto
 
-- [ ] Request/correlation ID implementado.
-- [ ] IP e User-Agent normalizados.
-- [ ] Auditoria recebe contexto sem acoplamento indevido.
-- [ ] Proteção CSRF implementada ou justificadamente confirmada.
-- [ ] Origin/Referer validados nas mutações.
-- [ ] Erros não expõem stack trace ou segredos.
-- [ ] Testes 401/403/CSRF executados.
-- [ ] Rotas atuais continuam funcionando.
+- [x] Request/correlation ID implementado. Evidência: `request_context.py` e testes de geração, preservação e substituição.
+- [x] IP e User-Agent normalizados. Evidência: testes de peer não confiável, cadeia confiável, limite e UTC.
+- [x] Auditoria recebe contexto sem acoplamento indevido. Evidência: `ContextVar`, parâmetro opcional compatível e teste de sanitização.
+- [x] Proteção CSRF implementada. Evidência: double-submit para cookie autenticado em POST/PUT/PATCH/DELETE.
+- [x] Origin/Referer validados nas mutações. Evidência: testes de origem ausente, indevida, permitida e fallback de Referer.
+- [x] Erros não expõem stack trace ou segredos. Evidência: envelopes 401/403/422/500 com request ID e log interno sem valores da exceção.
+- [x] Testes 401/403/CSRF executados. Evidência: suíte backend com 95 testes aprovada em 2026-07-11.
+- [x] Rotas atuais continuam funcionando. Evidência: suíte completa e build frontend aprovados.
 
 ## Fase 2 — Modelo de dados e migrations
 
@@ -161,3 +161,4 @@
 |---|---|---|---|---|---|
 | 2026-07-10 | 0 | árvore local em `3f95695` | Git refs/diffs; versões; `alembic heads/current/history --verbose`; consultas somente leitura ao PostgreSQL; `pytest tests -q`; `npm run build`; `Diagnostico.ps1` | Baseline documentado; 6 testes e build passaram; `alembic current` falhou por revisão ausente; diagnóstico teve falso positivo | Codex |
 | 2026-07-10 | Desbloqueio Fase 1 | `6127290`, `9611f38`, `7942826` | merge explícito; consultas de schema; `alembic heads/current/history --verbose`; `pytest tests -q`; `npm run build`; `git diff --check` | Produção sincronizada; Alembic em `0038`; 81 testes e build passaram; nenhuma migration/schema alterados | Codex |
+| 2026-07-11 | 1 | `61d3433` | `python -m pytest tests -q`; `npm run build`; `python -m alembic heads`; `python -m alembic current`; `python -m alembic history --verbose`; `git diff --check` | 95 testes e build aprovados; head/current `0038_require_user_cpf`; request context, CSRF/Origin, auditoria, erros e headers validados; nenhuma migration | Codex |

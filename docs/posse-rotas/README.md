@@ -41,6 +41,7 @@ Documentos de apoio:
 - `ADR_002_COMPATIBILIDADE_PRODUCAO_E_GOVERNANCA.md`: prevalência de produção, transição do legado, hard delete e tetos de acesso.
 - `MATRIZ_RBAC_LGPD.md`: permissões, classificação de dados e regras de exposição.
 - `CHECKLIST_EXECUCAO.md`: acompanhamento objetivo do progresso.
+- `RELATORIO_FASE_1.md`: implementação, testes, deploy, riscos residuais e rollback da camada transversal de segurança.
 
 ## 4. Regras não negociáveis
 

@@ -27,6 +27,10 @@ O código funcional da feature agora parte integralmente de produção. Os helpe
 
 As decisões institucionais foram formalizadas no ADR 002. O endpoint legado de DELETE de posse é não mutativo, audita a tentativa administrativa e responde `409 POSSESSION_HARD_DELETE_DISABLED`. `ADMIN` e `PRODUCAO` recebem os dados operacionais integrais definidos; `PADRAO` recebe documento mascarado, contato/URLs integrais/localização ausentes e não pode mutar assinaturas legadas; `POSTO` não acessa posses.
 
+## Atualização após a Fase 1
+
+Em **2026-07-11**, o commit funcional `61d3433` implantou request ID, contexto tipado, confiança explícita de proxy, CSRF com `Origin`/`Referer`, sanitização de novas auditorias, erros seguros e headers mínimos. A suíte pós-fase possui **95 testes aprovados** e o build Vite continua aprovado com 1.071 módulos. `alembic heads/current` permanecem em `0038_require_user_cpf`; nenhuma migration ou alteração de schema foi criada. O desenho, resultados, deploy, rollback e riscos residuais estão em `RELATORIO_FASE_1.md`.
+
 Os quatro bloqueios listados na seção 10 foram resolvidos. A Fase 1 está liberada do ponto de vista de branch, Alembic, precedência documental e RBAC/LGPD, mas **não foi iniciada** neste desbloqueio.
 
 ## 2. Estado Git da coleta inicial — histórico
@@ -354,6 +358,6 @@ Não executados porque não existem como scripts do projeto: testes frontend, li
 6. Definir política de MIME real/malware, retenção e autorização de arquivos.
 7. Criar ambiente E2E descartável ou fixture PostgreSQL compatível para reproduzir mutações sem tocar dados operacionais.
 
-Nenhum item da Fase 1 foi implementado.
+No instante da coleta original, nenhum item da Fase 1 havia sido implementado. A atualização de 2026-07-11 acima e o `RELATORIO_FASE_1.md` substituem essa conclusão para o estado atual da branch.
 
 Status posterior: itens 1–4 resolvidos pelos commits `9611f38` e `7942826`; itens 5–7 permanecem como entradas de implementação/validação da própria Fase 1 e fases posteriores, não como divergências impeditivas de branch ou migration.

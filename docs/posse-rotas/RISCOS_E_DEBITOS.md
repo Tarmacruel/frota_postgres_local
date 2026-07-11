@@ -17,6 +17,19 @@ Classificação: **Crítico** (perda/comprometimento provável ou avanço insegu
 
 Os demais riscos continuam válidos para as fases indicadas.
 
+## Atualização da Fase 1 — 2026-07-11
+
+| Risco | Situação após a Fase 1 |
+|---|---|
+| R-003 | **Resolvido:** double-submit CSRF, `Origin`/`Referer`, origem explícita e testes negativos/positivos implantados no commit `61d3433` |
+| R-009 | **Mitigado para novos eventos:** documento, CPF e contato são mascarados; token/cookie/segredo e binário são omitidos. Auditorias históricas não foram reescritas e permanecem como risco LGPD residual |
+| R-011 | **Resolvido:** request ID, IP, User-Agent, método, path e UTC percorrem request, erro e novas auditorias |
+| R-016 | **Mitigado no escopo da fase:** suíte passou de 81 para 95 testes, cobrindo request context, proxy, CSRF, 401, 403 e sanitização; E2E e concorrência continuam pendentes |
+| R-023 | **Mitigado:** CORS continua explícito e headers mínimos foram centralizados; hardening integral da CSP permanece na Fase 7 |
+| R-025 | **Pendente de deploy:** exemplo de produção exige `COOKIE_SECURE=true`, mas o ambiente real precisa ser confirmado sob TLS |
+
+Novos riscos operacionais documentados no `RELATORIO_FASE_1.md`: configurar `CSRF_TRUSTED_ORIGINS` com origens HTTPS reais; manter `TRUSTED_PROXY_NETWORKS` vazio até confirmação dos CIDRs; tratar auditorias legadas com dados integrais; e validar a topologia do proxy antes da Fase 2.
+
 ## Críticos
 
 | ID | Achado/evidência | Impacto | Tratamento antes/depois |

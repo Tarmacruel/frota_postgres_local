@@ -70,6 +70,18 @@ async def test_error_response_contains_matching_request_id_without_validation_in
     assert all("input" not in item for item in response.json()["detail"])
 
 
+@pytest.mark.asyncio
+async def test_unauthenticated_response_is_consistent_and_contains_request_id(client):
+    response = await client.get(
+        "/api/auth/me",
+        headers={"X-Request-ID": "unauth-12345678"},
+    )
+
+    assert response.status_code == 401
+    assert response.json() == {"detail": "Não autenticado", "request_id": "unauth-12345678"}
+    assert response.headers["X-Request-ID"] == "unauth-12345678"
+
+
 def test_untrusted_peer_cannot_spoof_client_ip_with_forwarded_header():
     request = _request(client_ip="203.0.113.10", forwarded_for="198.51.100.20")
 
