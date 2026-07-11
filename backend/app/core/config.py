@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
-from pydantic import field_validator
+from pydantic import Field, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 BASE_DIR = Path(__file__).resolve().parents[2]
@@ -39,7 +39,10 @@ class Settings(BaseSettings):
     ]
     COOKIE_NAME: str = "access_token"
     CSRF_COOKIE_NAME: str = "csrf_token"
+    CSRF_TRUSTED_ORIGINS: list[str] = []
     COOKIE_SECURE: bool = False
+    TRUSTED_PROXY_NETWORKS: list[str] = []
+    MAX_USER_AGENT_LENGTH: int = Field(default=256, ge=64, le=1024)
     TRUSTED_HOSTS: list[str] = [
         "localhost",
         "127.0.0.1",
@@ -65,6 +68,13 @@ class Settings(BaseSettings):
     @field_validator("TRUSTED_HOSTS", mode="before")
     @classmethod
     def parse_trusted_hosts(cls, value):
+        if isinstance(value, str):
+            return json.loads(value)
+        return value
+
+    @field_validator("CSRF_TRUSTED_ORIGINS", "TRUSTED_PROXY_NETWORKS", mode="before")
+    @classmethod
+    def parse_security_lists(cls, value):
         if isinstance(value, str):
             return json.loads(value)
         return value

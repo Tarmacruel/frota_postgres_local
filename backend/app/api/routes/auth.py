@@ -5,6 +5,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user
 from app.core.security import clear_jwt_cookie, create_access_token, create_csrf_token, set_csrf_cookie, set_jwt_cookie
+from app.core.request_context import get_request_audit_context
 from app.db.session import get_db_session
 from app.schemas.auth import ChangePasswordInput, CurrentUserOut, LoginInput, MessageOut, RegisterCpfInput
 from app.services.auth_service import AuthService
@@ -15,7 +16,8 @@ router = APIRouter(prefix="/api/auth", tags=["Auth"])
 
 @router.post("/login", response_model=MessageOut)
 async def login(data: LoginInput, response: Response, request: Request, db: AsyncSession = Depends(get_db_session)):
-    client_ip = request.client.host if request.client else "unknown"
+    audit_context = get_request_audit_context()
+    client_ip = audit_context.ip_address if audit_context else (request.client.host if request.client else "unknown")
     LoginSecurityService.enforce_request_rate(ip_address=client_ip)
     LoginSecurityService.enforce_login_allowed(ip_address=client_ip, email=data.email)
     try:

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 import hmac
+import logging
+import traceback
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
+from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
@@ -30,6 +33,16 @@ from app.api.routes.search import router as search_router
 from app.api.routes.users import router as users_router
 from app.api.routes.vehicles import router as vehicles_router
 from app.core.config import settings
+from app.core.request_context import (
+    REQUEST_ID_HEADER,
+    build_request_audit_context,
+    is_allowed_request_origin,
+    reset_request_audit_context,
+    set_request_audit_context,
+)
+
+
+logger = logging.getLogger(__name__)
 
 docs_url = None if settings.APP_ENV == "production" else "/docs"
 redoc_url = None if settings.APP_ENV == "production" else "/redoc"
@@ -46,7 +59,8 @@ app.add_middleware(
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token"],
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", REQUEST_ID_HEADER],
+    expose_headers=[REQUEST_ID_HEADER],
 )
 
 
@@ -60,9 +74,102 @@ async def csrf_middleware(request: Request, call_next):
         if access_token:
             csrf_cookie = request.cookies.get(settings.CSRF_COOKIE_NAME)
             csrf_header = request.headers.get("X-CSRF-Token")
-            if not csrf_cookie or not csrf_header or not hmac.compare_digest(csrf_cookie, csrf_header):
-                return JSONResponse(status_code=403, content={"detail": "Token CSRF inválido ou ausente"})
+            request_id = request.state.audit_context.request_id
+            valid_token = (
+                bool(csrf_cookie)
+                and bool(csrf_header)
+                and len(csrf_cookie) <= 128
+                and len(csrf_header) <= 128
+                and hmac.compare_digest(csrf_cookie, csrf_header)
+            )
+            if not valid_token:
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "detail": "Token CSRF inválido ou ausente",
+                        "code": "CSRF_TOKEN_INVALID",
+                        "request_id": request_id,
+                    },
+                )
+            if not is_allowed_request_origin(request):
+                return JSONResponse(
+                    status_code=403,
+                    content={
+                        "detail": "Origem da requisição não autorizada",
+                        "code": "CSRF_ORIGIN_INVALID",
+                        "request_id": request_id,
+                    },
+                )
     return await call_next(request)
+
+
+@app.middleware("http")
+async def request_context_middleware(request: Request, call_next):
+    context = build_request_audit_context(request)
+    request.state.audit_context = context
+    context_token = set_request_audit_context(context)
+    try:
+        try:
+            response = await call_next(request)
+        except Exception as exc:
+            stack = " > ".join(
+                f"{Path(frame.filename).name}:{frame.lineno}:{frame.name}"
+                for frame in traceback.extract_tb(exc.__traceback__, limit=20)
+            )
+            logger.error(
+                "Erro interno request_id=%s method=%s path=%s exception_type=%s stack=%s",
+                context.request_id,
+                context.method,
+                context.path,
+                type(exc).__name__,
+                stack,
+            )
+            response = JSONResponse(
+                status_code=500,
+                content={"detail": "Erro interno do servidor", "request_id": context.request_id},
+            )
+
+        response.headers[REQUEST_ID_HEADER] = context.request_id
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Referrer-Policy"] = "same-origin"
+        response.headers["X-Frame-Options"] = "DENY"
+        response.headers["Content-Security-Policy"] = "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        if context.path.startswith("/api/"):
+            response.headers["Cache-Control"] = "no-store"
+        return response
+    finally:
+        reset_request_audit_context(context_token)
+
+
+def _request_id(request: Request) -> str:
+    context = getattr(request.state, "audit_context", None)
+    return context.request_id if context else "unavailable"
+
+
+@app.exception_handler(HTTPException)
+async def http_exception_handler(request: Request, exc: HTTPException):
+    return JSONResponse(
+        status_code=exc.status_code,
+        content={"detail": exc.detail, "request_id": _request_id(request)},
+        headers=exc.headers,
+    )
+
+
+@app.exception_handler(RequestValidationError)
+async def validation_exception_handler(request: Request, exc: RequestValidationError):
+    safe_errors = [
+        {
+            "loc": error.get("loc", ()),
+            "msg": "Valor inválido",
+            "type": error.get("type", "validation_error"),
+        }
+        for error in exc.errors()
+    ]
+    return JSONResponse(
+        status_code=422,
+        content={"detail": safe_errors, "request_id": _request_id(request)},
+    )
 
 app.include_router(auth_router)
 app.include_router(audit_router)

@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 from fastapi import HTTPException
 
-from app.api.deps import require_permission
+from app.api.deps import require_admin, require_permission
 from app.core.permissions import default_permissions_for_role
 from app.models.user import User, UserRole
 from app.models.user_permission import UserPermission
@@ -25,6 +25,14 @@ class FakePermissionSession:
 
     async def execute(self, _statement):
         return FakeResult(self.permission)
+
+
+@pytest.mark.asyncio
+async def test_production_role_cannot_access_admin_operation():
+    with pytest.raises(HTTPException) as exc:
+        await require_admin(current_user=SimpleNamespace(role=UserRole.PRODUCAO))
+
+    assert exc.value.status_code == 403
 
 
 @pytest.mark.asyncio
