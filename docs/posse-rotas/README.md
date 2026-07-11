@@ -42,6 +42,7 @@ Documentos de apoio:
 - `MATRIZ_RBAC_LGPD.md`: permissões, classificação de dados e regras de exposição.
 - `CHECKLIST_EXECUCAO.md`: acompanhamento objetivo do progresso.
 - `RELATORIO_FASE_1.md`: implementação, testes, deploy, riscos residuais e rollback da camada transversal de segurança.
+- `RELATORIO_FASE_2.md`: schema, migration, ensaios limpo/cópia, contagens, downgrade e riscos para serviços.
 
 ## 4. Regras não negociáveis
 

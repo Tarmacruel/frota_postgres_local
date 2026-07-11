@@ -30,6 +30,23 @@ Os demais riscos continuam válidos para as fases indicadas.
 
 Novos riscos operacionais documentados no `RELATORIO_FASE_1.md`: configurar `CSRF_TRUSTED_ORIGINS` com origens HTTPS reais; manter `TRUSTED_PROXY_NETWORKS` vazio até confirmação dos CIDRs; tratar auditorias legadas com dados integrais; e validar a topologia do proxy antes da Fase 2.
 
+## Atualização da Fase 2 — 2026-07-11
+
+| Risco | Situação após a Fase 2 |
+|---|---|
+| R-005 | **Parcialmente mitigado no schema futuro:** locks de sequência e índices parciais foram preparados; a confirmação/justificativa da substituição de posse continua para a Fase 3 |
+| R-006 | **Mitigado no banco:** FK veículo→posse alterada para `RESTRICT` e triggers bloqueiam DELETE de posse, rota, destino e confirmação |
+| R-016 | **Mitigado:** 11 testes PostgreSQL de integridade/migration/concorrência e 97 testes gerais aprovados |
+| R-019 | **Mitigado para campos novos:** hodômetros de rota/devolução usam `numeric(12,1)` e checks; campos legados continuam `Float` |
+| R-020 | **Mitigado para sequências:** repository usa lock do pai e teste concorrente real; sobreposição administrativa legada continua para a Fase 3 |
+
+Débitos encontrados no ensaio:
+
+- upgrade de banco totalmente vazio em uma única chamada falha na migration antiga 0034 por uso de `PRODUCAO` antes do commit da 0003; o ensaio passou com fronteira explícita de commit, sem editar migration ou usar `stamp`;
+- `alembic check` continua apontando diffs preexistentes de JSON/índices/FKs em outros módulos, sem divergência nas entidades da Fase 2;
+- os bancos isolados `frota_phase2_clean_20260711_01` e `frota_phase2_copy_20260711_01` foram preservados como evidência; a cópia deve manter acesso restrito até remoção autorizada;
+- o banco fonte permanece em 0038 e deve receber a 0039 antes da publicação do código da Fase 3.
+
 ## Críticos
 
 | ID | Achado/evidência | Impacto | Tratamento antes/depois |

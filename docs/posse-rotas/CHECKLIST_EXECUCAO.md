@@ -8,7 +8,7 @@
 - [x] Plano inicial documentado.
 - [x] Baseline técnico confirmado. Evidência: `BASELINE_TECNICO.md` (2026-07-10).
 - [ ] Implementação concluída.
-- [ ] Ensaio de migration concluído.
+- [x] Ensaio de migration concluído. Evidência: Fase 2 em banco limpo e cópia controlada, registrada em `RELATORIO_FASE_2.md`.
 - [ ] Validação funcional concluída.
 - [ ] Revisão de segurança/LGPD concluída.
 - [ ] Pull Request final aberto para `main`.
@@ -55,17 +55,17 @@
 
 ## Fase 2 — Modelo de dados e migrations
 
-- [ ] Modelo de rota criado.
-- [ ] Modelo de destino criado.
-- [ ] Modelo versionado de confirmação criado.
-- [ ] Número público da posse definido.
-- [ ] Constraints e índices criados.
-- [ ] Índice parcial de rota em andamento criado.
-- [ ] Legado preservado.
-- [ ] Upgrade executado em banco limpo.
-- [ ] Upgrade executado em cópia de banco existente.
-- [ ] Downgrade técnico avaliado e documentado.
-- [ ] Testes de integridade e concorrência executados.
+- [x] Modelo de rota criado. Evidência: `VehiclePossessionTrip` no commit `185066c`.
+- [x] Modelo de destino criado. Evidência: `VehiclePossessionTripDestination` no commit `185066c`.
+- [x] Modelo versionado de confirmação criado. Evidência: append-only, unique current e cadeia de substituição testada.
+- [x] Número público da posse definido. Evidência: sequence `NO CYCLE`, backfill 1–350 sem nulos/duplicatas na cópia.
+- [x] Constraints e índices criados. Evidência: 42 constraints e 19 índices nas tabelas novas.
+- [x] Índice parcial de rota em andamento criado. Evidência: `uq_possession_trip_open`, validado em PostgreSQL.
+- [x] Legado preservado. Evidência: contagens e checksums de IDs/referências idênticos antes/depois; 10/10 arquivos presentes.
+- [x] Upgrade executado em banco limpo. Evidência: `frota_phase2_clean_20260711_01` em `0039_possession_trips`.
+- [x] Upgrade executado em cópia de banco existente. Evidência: `frota_phase2_copy_20260711_01`, 350 posses preservadas.
+- [x] Downgrade técnico avaliado e documentado. Evidência: guarda contra dados novos e rollback por backup no relatório.
+- [x] Testes de integridade e concorrência executados. Evidência: 11 testes PostgreSQL aprovados em 2,60 s.
 
 ## Fase 3 — Backend de posses e rotas
 
@@ -162,3 +162,4 @@
 | 2026-07-10 | 0 | árvore local em `3f95695` | Git refs/diffs; versões; `alembic heads/current/history --verbose`; consultas somente leitura ao PostgreSQL; `pytest tests -q`; `npm run build`; `Diagnostico.ps1` | Baseline documentado; 6 testes e build passaram; `alembic current` falhou por revisão ausente; diagnóstico teve falso positivo | Codex |
 | 2026-07-10 | Desbloqueio Fase 1 | `6127290`, `9611f38`, `7942826` | merge explícito; consultas de schema; `alembic heads/current/history --verbose`; `pytest tests -q`; `npm run build`; `git diff --check` | Produção sincronizada; Alembic em `0038`; 81 testes e build passaram; nenhuma migration/schema alterados | Codex |
 | 2026-07-11 | 1 | `61d3433` | `python -m pytest tests -q`; `npm run build`; `python -m alembic heads`; `python -m alembic current`; `python -m alembic history --verbose`; `git diff --check` | 95 testes e build aprovados; head/current `0038_require_user_cpf`; request context, CSRF/Origin, auditoria, erros e headers validados; nenhuma migration | Codex |
+| 2026-07-11 | 2 | `185066c` | `alembic heads/current/history`; upgrades clean e cópia; `pytest tests/test_phase2_possession_schema.py -q`; `pytest tests -q`; `npm run build`; consultas de catálogo/contagens/checksums; `alembic check`; `git diff --check` | 0039 aplicada nos dois bancos isolados; 11 testes PostgreSQL e 97 testes gerais aprovados; 350 posses e referências preservadas; falhas preexistentes de upgrade vazio/autogenerate registradas | Codex |
