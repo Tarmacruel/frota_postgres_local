@@ -152,6 +152,8 @@ Riscos residuais aceitos para o rollout:
 - PDF/XLSX são gerados em memória sob limites de 1.500/5.000 registros; streaming permanece evolução futura.
 - retenção e scanner antimalware dependem de decisões administrativas/infraestrutura e estão registrados sem prazo inventado.
 - 45 warnings ESLint legados e três avisos de status Starlette não representam falha de build/teste.
+- o serviço PostgreSQL precisa de um restart administrativo para aplicar `listen_addresses=localhost`; até lá, a senha foi rotacionada e o HBA já rejeita endereços não loopback.
+- a rotação do JWT encerrou sessões existentes por desenho; usuários precisam autenticar novamente.
 
 ## Críticos
 

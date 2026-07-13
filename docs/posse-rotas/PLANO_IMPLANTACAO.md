@@ -44,3 +44,7 @@ Versão preparada em 2026-07-13 para publicação local via Cloudflare Tunnel em
 ## Responsabilidade e comunicação
 
 O operador que executa o rollout registra SHA, horários e resultados. O solicitante autorizou nesta conversa a promoção automática para `main` e produção, substituindo excepcionalmente a regra original de PR/revisão humana. Falha após a migration aciona o plano de rollback; falha apenas visual pode ser revertida para o commit anterior sem downgrade destrutivo do banco.
+
+## Registro da execução de 2026-07-13
+
+O plano foi executado para `d0f9e06`. Backup/restauração, migration, build, reinício do app e probes públicos passaram. O restart do serviço PostgreSQL foi negado por privilégio; senha/HBA já restringem acesso e a mudança de listener está persistida para a próxima janela administrativa. Esse item não exigiu rollback porque banco, API e domínio permaneceram saudáveis.

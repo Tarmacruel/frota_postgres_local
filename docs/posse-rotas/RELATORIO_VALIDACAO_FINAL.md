@@ -54,7 +54,19 @@ O fluxo crítico possui labels, foco controlado, Tab/Escape, `aria-live`, estado
 
 ## Rollout efetivo
 
-Esta seção será atualizada no mesmo commit operacional com os SHAs promovidos, horários, `alembic current`, headers/healthcheck públicos e runtime observado após a publicação.
+- commit de aplicação publicado: `d0f9e06`;
+- `alembic heads` e `alembic current`: `0040_report_preferences`; `alembic check`: `No new upgrade operations detected`;
+- upgrade real executado de `0039` para `0040` sem `stamp`, downgrade ou alteração de migration aplicada;
+- contagens pós-upgrade: 35 usuários, 223 veículos, 357 posses, 0 rotas, 0 destinos, 0 confirmações, 0 preferências e 2.211 auditorias. As entidades de negócio permaneceram iguais ao backup; oito auditorias novas foram acumuladas durante a janela de operação;
+- runtime: Uvicorn `127.0.0.1:8000` sem reload/access log e Vite preview `127.0.0.1:3000` sobre `dist`;
+- probes local/público: `/api/health=200`, `/login=200`, `/docs=404`, `/api/auth/me=401` sem sessão;
+- HTML público sem `/@vite/client`, com asset hash; bundle contém o tour e não contém “melhorias em implantação”;
+- respostas públicas contêm `Cache-Control: no-store`, CSP, HSTS, XCTO, X-Frame-Options, Referrer-Policy, Permissions-Policy e request ID na API;
+- nenhum erro foi registrado nos arquivos de stderr do novo runtime durante os probes.
+
+O serviço PostgreSQL recusou reinício por ausência de privilégio do usuário da sessão. A senha do papel da aplicação foi rotacionada, `postgresql.auto.conf` recebeu `listen_addresses='localhost'` para o próximo restart e o `pg_hba.conf` já permite somente `127.0.0.1/32` e `::1/128`. O listener permanece temporariamente em `0.0.0.0`/`::`, mas conexões remotas não encontram regra HBA e são rejeitadas. Reiniciar `postgresql-x64-16` em janela administrativa fecha a superfície de listener.
+
+A verificação visual autenticada pelo navegador não pôde usar a conexão do navegador nesta sessão, e a rotação do JWT invalida cookies anteriores. O tour foi validado por dois testes de componente, presença no bundle de produção e ausência do bloqueio na rota. O smoke por perfil permanece coberto em banco isolado pelas suítes RBAC/API, sem criar dados fictícios em produção.
 
 ## Riscos residuais aceitos
 

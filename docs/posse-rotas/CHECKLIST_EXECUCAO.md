@@ -7,10 +7,10 @@
 - [x] Branch `feat/posse-rotas-relatorios-devolucao` criada a partir de `módulo-analytics`.
 - [x] Plano inicial documentado.
 - [x] Baseline técnico confirmado. Evidência: `BASELINE_TECNICO.md` (2026-07-10).
-- [ ] Implementação concluída.
+- [x] Implementação concluída. Evidência: Fases 1–8 versionadas e release `d0f9e06` publicado.
 - [x] Ensaio de migration concluído. Evidência: Fase 2 em banco limpo e cópia controlada, registrada em `RELATORIO_FASE_2.md`.
-- [ ] Validação funcional concluída.
-- [ ] Revisão de segurança/LGPD concluída.
+- [x] Validação funcional concluída. Evidência: 152 backend, 24 frontend, build e smoke técnico público aprovados.
+- [x] Revisão de segurança/LGPD concluída. Evidência: threat model, inventário, matriz e auditorias de dependência.
 - [ ] Pull Request final aberto para `main`.
 - [ ] Merge autorizado por revisão humana.
 
@@ -158,13 +158,13 @@
 - [x] Testes backend completos executados. Evidência: 152 aprovados, 17 pulados e 3 warnings em 26,35 s.
 - [x] Testes frontend completos executados. Evidência: 12 arquivos e 24 testes aprovados em 8,29 s na cópia local controlada.
 - [x] Build de produção executado. Evidência: Vite 8.1.4, 974 módulos, build aprovado.
-- [ ] Smoke test executado.
+- [x] Smoke test técnico executado. Evidência: health/login 200, docs 404, auth sem sessão 401, headers/bundle/runtime conferidos; perfis cobertos em testes isolados sem mutação real.
 - [x] Desempenho e N+1 verificados. Evidência: preload em três SELECTs para cinco posses e limites de 1.500/5.000 linhas.
 - [x] Rollback documentado. Evidência: `PLANO_ROLLBACK.md` com retorno de app, restauração e preservação pós-backup.
 - [x] Branch sincronizada com `módulo-analytics`. Evidência: ambas as grafias remotas são ancestrais da feature.
 - [x] Divergência com `main` analisada. Evidência: `origin/main` incorporada em `961bb6e`, feature 151/0 antes do commit final.
 - [ ] Promoção para `main` concluída. Substitui PR/revisão por autorização expressa do solicitante neste rollout.
-- [ ] Evidências públicas pós-deploy registradas.
+- [x] Evidências públicas pós-deploy registradas em `RELATORIO_VALIDACAO_FINAL.md`.
 - [ ] Merge automático realizado conforme autorização excepcional do solicitante.
 
 ## Registro de evidências
@@ -180,3 +180,4 @@
 | 2026-07-13 | 4 | árvore de trabalho sobre `4295b98` | `pytest tests -q` com bancos isolados; `compileall`; `alembic heads/current/history/check`; `npm test`; `npm run lint`; `npm run build`; `npm audit`; `git diff --check` | 121 backend e 15 frontend aprovados; head/current 0039; build de 970 módulos; lint sem erros e 45 warnings baseline; zero vulnerabilidades; nenhum schema/backend alterado | Codex |
 | 2026-07-13 | 5 | árvore de trabalho sobre `4295b98` | `pytest tests/test_phase5_possession_return.py -q`; `pytest -q`; `compileall`; Vitest no `Z:` e em cópia local controlada; `npm run lint`; `npm run build`; `npm audit`; `alembic heads/current/history/check`; `git diff --check`; versões do ambiente | 14 direcionados incluídos em 118 backend aprovados, 17 integrações PostgreSQL sem URL isolada puladas; 22/22 frontend aprovados localmente; build 974 módulos; lint 0 erros/45 warnings baseline; audit zero; head/current 0039 e nenhuma operação de upgrade nova | Codex |
 | 2026-07-13 | 6 | árvore sobre commit `d86ce42` | `alembic heads/current/history`; upgrade/downgrade/reupgrade e `alembic check` em bancos efêmeros; `pytest tests/test_phase6_possession_reports.py -q`; `pytest -q`; Vitest em `Z:` e cópia local; `npm run lint`; `npm run build`; `npm audit`; probes SQL read-only | migration 0040 validada e bancos efêmeros removidos; 19 direcionados incluídos em 137 backend aprovados/17 pulados; 25/25 frontend; build 975 módulos; lint 0 erros/45 warnings baseline; audit zero; posse em 5 linhas/3 SELECTs; banco existente preservado em 0039 | Codex |
+| 2026-07-13 | 7–8 | `d0f9e06` | merge `origin/main`; backup/restore descartável; `pytest`; Vitest local; build/lint; npm/pip audit; parser PowerShell; Alembic heads/current/check/upgrade; probes HTTP/headers/processos/contagens | 152 backend e 24 frontend; migration 0039→0040 em produção; health/login 200 e docs 404; tour no bundle, aviso removido; runtime em loopback; PostgreSQL protegido por senha/HBA, restart administrativo pendente | Codex |
