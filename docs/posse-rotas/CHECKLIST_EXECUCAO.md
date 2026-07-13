@@ -139,33 +139,33 @@
 
 ## Fase 7 — Hardening, LGPD e acessibilidade
 
-- [ ] Threat model atualizado.
-- [ ] Testes de IDOR ampliados.
-- [ ] Headers de segurança revisados.
-- [ ] CORS revisado.
-- [ ] Cookies revisados para produção.
-- [ ] Arquivos protegidos contra path traversal e cache indevido.
-- [ ] Mascaramento validado em todos os perfis.
-- [ ] Presets mínimos confirmados.
-- [ ] Logs verificados contra vazamento de dados.
-- [ ] eMAG/WCAG 2.1 AA verificados no fluxo principal.
-- [ ] Dependências revisadas.
+- [x] Threat model atualizado. Evidência: `THREAT_MODEL.md`, 20 ameaças com controle, teste e residual.
+- [x] Testes de IDOR ampliados. Evidência: suíte integrada mantém vínculo posse/rota/destino/arquivo e 152 testes backend aprovados.
+- [x] Headers de segurança revisados. Evidência: CSP, HSTS em produção, frame denial, nosniff, no-referrer, Permissions-Policy e no-store.
+- [x] CORS revisado. Evidência: produção aceita somente `https://frota.sirel.com.br` e falha ao iniciar com origem HTTP.
+- [x] Cookies revisados para produção. Evidência: configuração exige Secure, segredo forte e origem CSRF explícita; testes fail-closed.
+- [x] Arquivos protegidos contra path traversal e cache indevido. Evidência: containment, magic bytes/DOCX, limite e nomes opacos testados.
+- [x] Mascaramento validado em todos os perfis. Evidência: `MATRIZ_ENDPOINTS_PERFIS.md`, RBAC e bloqueio de foto integral para PADRAO.
+- [x] Presets mínimos confirmados. Evidência: Resumido sem documento, contato, coordenadas ou metadados técnicos.
+- [x] Logs verificados contra vazamento de dados. Evidência: inventário e testes de auditoria sem binário/relatório integral/segredo.
+- [x] eMAG/WCAG 2.1 AA verificados no fluxo principal. Evidência: `CHECKLIST_ACESSIBILIDADE.md` e 24 testes frontend.
+- [x] Dependências revisadas. Evidência: `npm audit` 0; `pip-audit` reduzido de 21 para um residual `ecdsa` não alcançável por HS256.
 
 ## Fase 8 — Testes, rollout e integração com main
 
-- [ ] Backup e restauração testados.
-- [ ] Migration ensaiada em cópia recente.
-- [ ] Testes backend completos executados.
-- [ ] Testes frontend completos executados.
-- [ ] Build de produção executado.
+- [x] Backup e restauração testados. Evidência: ZIP/SHA válidos, 51 entradas, banco descartável restaurado e removido.
+- [x] Migration ensaiada em cópia recente. Evidência: 0039 → 0040 em 65.788 ms, contagens idênticas.
+- [x] Testes backend completos executados. Evidência: 152 aprovados, 17 pulados e 3 warnings em 26,35 s.
+- [x] Testes frontend completos executados. Evidência: 12 arquivos e 24 testes aprovados em 8,29 s na cópia local controlada.
+- [x] Build de produção executado. Evidência: Vite 8.1.4, 974 módulos, build aprovado.
 - [ ] Smoke test executado.
-- [ ] Desempenho e N+1 verificados.
-- [ ] Rollback documentado.
-- [ ] Branch sincronizada com `módulo-analytics`.
-- [ ] Divergência com `main` analisada.
-- [ ] PR final para `main` aberto.
-- [ ] Evidências anexadas ao PR.
-- [ ] Nenhum merge automático realizado.
+- [x] Desempenho e N+1 verificados. Evidência: preload em três SELECTs para cinco posses e limites de 1.500/5.000 linhas.
+- [x] Rollback documentado. Evidência: `PLANO_ROLLBACK.md` com retorno de app, restauração e preservação pós-backup.
+- [x] Branch sincronizada com `módulo-analytics`. Evidência: ambas as grafias remotas são ancestrais da feature.
+- [x] Divergência com `main` analisada. Evidência: `origin/main` incorporada em `961bb6e`, feature 151/0 antes do commit final.
+- [ ] Promoção para `main` concluída. Substitui PR/revisão por autorização expressa do solicitante neste rollout.
+- [ ] Evidências públicas pós-deploy registradas.
+- [ ] Merge automático realizado conforme autorização excepcional do solicitante.
 
 ## Registro de evidências
 

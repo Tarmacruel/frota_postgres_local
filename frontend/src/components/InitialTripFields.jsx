@@ -80,6 +80,7 @@ export default function InitialTripFields({ enabled, onEnabledChange, trip, onCh
               maxLength={2000}
               disabled={disabled}
             />
+            <span className="helper-text">Evite nomes, documentos ou contatos que não sejam necessários à operação.</span>
           </div>
           <TripDestinationEditor
             idPrefix="initial-trip"

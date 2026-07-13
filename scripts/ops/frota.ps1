@@ -20,7 +20,7 @@ param(
     )]
     [string]$Action = "Menu",
     [int]$Port = 8000,
-    [int]$FrontendPort = 3001,
+    [int]$FrontendPort = 3000,
     [switch]$InstallDeps,
     [switch]$SkipGitPull,
     [switch]$NoPause
@@ -110,7 +110,7 @@ function Invoke-Migrations {
     Push-Location $paths.BackendRoot
     try {
         Write-Host "Aplicando migrations..." -ForegroundColor Cyan
-        Invoke-CheckedCommand -Label "Alembic upgrade heads" -Command { & $alembic upgrade heads }
+        Invoke-CheckedCommand -Label "Alembic upgrade head" -Command { & $alembic upgrade head }
         Write-Host "Migrations aplicadas." -ForegroundColor Green
     }
     finally {
@@ -185,7 +185,7 @@ function Stop-FrotaEnvironment {
         Remove-IfExists -Path $pidFile
     }
 
-    foreach ($targetPort in @($Port, $FrontendPort, 80)) {
+    foreach ($targetPort in @($Port, $FrontendPort)) {
         $ownerPid = Get-PortOwnerPid -Port $targetPort
         if ($ownerPid -and (Test-ProcessAlive -ProcessId $ownerPid)) {
             Write-Host "Encerrando processo na porta ${targetPort}: PID $ownerPid" -ForegroundColor Yellow
@@ -240,16 +240,20 @@ function Open-Logs {
 }
 
 function Start-Backend {
-    param([int]$TargetPort = $Port)
+    param(
+        [int]$TargetPort = $Port,
+        [switch]$Production
+    )
 
     $existing = Get-PortOwnerPid -Port $TargetPort
     if ($existing) {
         throw "A porta $TargetPort ja esta em uso pelo PID $existing."
     }
 
+    $backendScript = if ($Production) { $paths.BackendProductionScript } else { $paths.BackendDevScript }
     $process = Start-FrotaProcess `
         -Title "Backend" `
-        -ScriptPath $paths.BackendDevScript `
+        -ScriptPath $backendScript `
         -Arguments @("-Port", "$TargetPort") `
         -OutFile $paths.AppLogFile `
         -ErrFile $paths.AppErrLogFile `
@@ -259,19 +263,22 @@ function Start-Backend {
         throw "Backend iniciou com PID $($process.Id), mas a porta $TargetPort nao respondeu. Verifique os logs."
     }
 
-    Write-FrotaSession -ProcessId $process.Id -Port $TargetPort -Production ($TargetPort -eq 80)
+    Write-FrotaSession -ProcessId $process.Id -Port $TargetPort -Production $Production.IsPresent
     Write-Host "Backend: http://localhost:$TargetPort" -ForegroundColor Cyan
 }
 
 function Start-Frontend {
+    param([switch]$Production)
+
     $existing = Get-PortOwnerPid -Port $FrontendPort
     if ($existing) {
         throw "A porta $FrontendPort ja esta em uso pelo PID $existing."
     }
 
+    $frontendScript = if ($Production) { $paths.FrontendProductionScript } else { $paths.FrontendDevScript }
     $process = Start-FrotaProcess `
         -Title "Frontend" `
-        -ScriptPath $paths.FrontendDevScript `
+        -ScriptPath $frontendScript `
         -Arguments @("-Port", "$FrontendPort") `
         -OutFile $paths.FrontendLogFile `
         -ErrFile $paths.FrontendErrLogFile `
@@ -305,7 +312,9 @@ function Invoke-Action {
         "Publish" {
             Invoke-Migrations
             Invoke-FrontendBuild
-            Start-Backend -TargetPort 80
+            Stop-FrotaEnvironment
+            Start-Backend -TargetPort $Port -Production
+            Start-Frontend -Production
         }
         "Stop" { Stop-FrotaEnvironment }
         "Status" { Show-Status }

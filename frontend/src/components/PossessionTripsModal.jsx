@@ -379,6 +379,7 @@ export default function PossessionTripsModal({
             <div className="form-field modal-field-span">
               <label htmlFor="trip-create-observation">Observação</label>
               <textarea id="trip-create-observation" className="app-textarea" rows="3" value={tripForm.observation} onChange={(event) => setTripForm({ ...tripForm, observation: event.target.value })} maxLength={2000} />
+              <span className="helper-text">Evite dados pessoais que não sejam necessários à rota.</span>
             </div>
             <TripDestinationEditor idPrefix="trip-create" destinations={tripForm.destinations} onChange={(destinations) => setTripForm({ ...tripForm, destinations })} disabled={submitting} />
             <div className="actions-inline modal-actions">
@@ -418,6 +419,7 @@ export default function PossessionTripsModal({
             <div className="form-field modal-field-span">
               <label htmlFor="trip-end-observation">Observação do retorno</label>
               <textarea id="trip-end-observation" className="app-textarea" rows="3" value={endForm.observation} onChange={(event) => setEndForm({ ...endForm, observation: event.target.value })} maxLength={2000} />
+              <span className="helper-text">Registre somente ocorrências operacionais relevantes.</span>
             </div>
             <div className="actions-inline modal-actions">
               <button type="submit" className="app-button" disabled={submitting}>{submitting ? 'Registrando...' : 'Registrar retorno da rota'}</button>

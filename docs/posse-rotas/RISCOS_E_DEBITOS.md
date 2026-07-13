@@ -134,6 +134,25 @@ Débitos/riscos residuais para a Fase 7:
 - o módulo de posse continua atrás do bloqueio temporário `MODULE_AVAILABILITY.possession.maintenance=true`; smoke test autenticado em navegador real e decisão de ativação permanecem necessários;
 - revisão transversal de logs, CORS, cookies, headers, retenção de relatórios e acessibilidade WCAG/eMAG continua exclusivamente na Fase 7.
 
+## Atualização das Fases 7 e 8 — 2026-07-13
+
+| Risco | Situação final |
+|---|---|
+| R-004 | **Resolvido no contrato:** serializers, arquivos e registry impedem envio de documento/contato/localização a PADRAO; inventário e matriz registram as saídas. |
+| R-007 | **Mitigado:** limite, tipo declarado, magic bytes e estrutura DOCX validados. Scanner antimalware permanece decisão de infraestrutura. |
+| R-008 | **Resolvido:** paths absolutos, `..` e resolução fora do storage são rejeitados e testados. |
+| R-013 | **Mitigado:** modais e tour possuem foco/Tab/Escape/retorno, labels, aria-live, status textual e redução de movimento; leitor de tela real permanece recomendação institucional. |
+| R-017 | **Mitigado operacionalmente:** 24 testes passam em cópia local controlada; o volume de rede continua inadequado para os workers Vitest. |
+| R-023/R-025 | **Resolvidos para produção:** origens HTTPS explícitas, cookie Secure, segredo forte e headers fail-closed; scripts usam loopback. |
+| R-024 | **Residual médio:** rate limit de login continua em memória e é adequado apenas ao runtime de processo único atual. Distribuição futura exige store compartilhado. |
+
+Riscos residuais aceitos para o rollout:
+
+- `ecdsa 0.19.2` é dependência transitiva com aviso sem correção; o caminho vulnerável não é alcançável porque JWT aceita exclusivamente HS256. Alterar algoritmo exige nova revisão.
+- PDF/XLSX são gerados em memória sob limites de 1.500/5.000 registros; streaming permanece evolução futura.
+- retenção e scanner antimalware dependem de decisões administrativas/infraestrutura e estão registrados sem prazo inventado.
+- 45 warnings ESLint legados e três avisos de status Starlette não representam falha de build/teste.
+
 ## Críticos
 
 | ID | Achado/evidência | Impacto | Tratamento antes/depois |

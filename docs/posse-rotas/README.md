@@ -45,6 +45,12 @@ Documentos de apoio:
 - `RELATORIO_FASE_2.md`: schema, migration, ensaios limpo/cópia, contagens, downgrade e riscos para serviços.
 - `RELATORIO_FASE_3.md`: contratos REST, transações, locks, auditoria, testes e compatibilidade com o frontend atual.
 - `RELATORIO_PRONTIDAO_FASE_4.md`: backup e upgrade do banco fonte, reconciliação Alembic, preparação de testes frontend e critérios de liberação.
+- `THREAT_MODEL.md`: ameaças, controles, testes e riscos residuais da Fase 7.
+- `INVENTARIO_DADOS.md`: classificação, finalidade, acesso e controles LGPD sem inventar prazos de retenção.
+- `MATRIZ_ENDPOINTS_PERFIS.md`: autorização efetiva por contrato e perfil.
+- `CHECKLIST_ACESSIBILIDADE.md`: evidências WCAG/eMAG do fluxo crítico e pendências de homologação assistiva.
+- `PLANO_IMPLANTACAO.md` e `PLANO_ROLLBACK.md`: operação, critérios de aborto e recuperação.
+- `RELATORIO_VALIDACAO_FINAL.md`: comandos, resultados, ensaio da migration, rollout e riscos residuais.
 
 ## 4. Regras não negociáveis
 

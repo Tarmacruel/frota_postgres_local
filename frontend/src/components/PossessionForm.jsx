@@ -626,6 +626,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess, onUnautho
           value={form.observation}
           onChange={(event) => setForm({ ...form, observation: event.target.value })}
         />
+        <span className="helper-text">Informe somente fatos operacionais necessários; não inclua dados pessoais desnecessários.</span>
       </div>
 
       <div className="form-field modal-field-span">

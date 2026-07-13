@@ -1,9 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from io import BytesIO
 from pathlib import Path
 from re import sub
 from uuid import UUID, uuid4
+from zipfile import BadZipFile, ZipFile
 from fastapi import HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
@@ -743,6 +745,8 @@ class PossessionService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
 
         await self._ensure_possession_visible_to_user(record, current_user)
+        if not self._can_view_personal_data(current_user):
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Evidencia integral restrita a perfis operacionais")
         if photo_id is None:
             if record.photo_path:
                 absolute_photo_path = self._resolve_photo_path(record.photo_path)
@@ -798,14 +802,16 @@ class PossessionService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Arquivo do documento não encontrado")
 
         disposition_type = "inline" if (document_mime_type or "") in INLINE_DOCUMENT_MIME_TYPES else "attachment"
-        filename = document_name or absolute_document_path.name
+        extension = absolute_document_path.suffix.lower() or DOCUMENT_EXTENSIONS.get(document_mime_type or "", ".bin")
+        public_reference = str(record.public_number or record.id).replace("-", "")[:20]
+        filename = f"termo-posse-{public_reference}-{document_kind}{extension}"
         return FileResponse(
             absolute_document_path,
             media_type=document_mime_type or "application/octet-stream",
-            filename=filename,
+            filename=self._sanitize_document_name(filename),
+            content_disposition_type=disposition_type,
             headers={
                 "Cache-Control": "private, no-store, max-age=0",
-                "Content-Disposition": f'{disposition_type}; filename="{filename}"',
             },
         )
 
@@ -990,13 +996,15 @@ class PossessionService:
                 detail="As fotos da posse devem estar em JPG, PNG ou WEBP",
             )
 
-        content = await photo.read()
+        content = await photo.read(MAX_PHOTO_SIZE_BYTES + 1)
         await photo.close()
 
         if not content:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Uma das fotos enviadas está vazia")
         if len(content) > MAX_PHOTO_SIZE_BYTES:
             raise HTTPException(status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE, detail="Uma das fotos excede o limite de 8 MB")
+        if not self._content_matches_mime(content, photo_mime_type):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="O conteudo da foto nao corresponde ao formato informado")
 
         return content, photo_mime_type
 
@@ -1012,7 +1020,7 @@ class PossessionService:
                 detail="Termo anexado deve estar em PDF, JPG, PNG, WEBP, DOC ou DOCX",
             )
 
-        content = await document.read()
+        content = await document.read(MAX_DOCUMENT_SIZE_BYTES + 1)
         original_filename = document.filename or "documento-assinado"
         await document.close()
 
@@ -1023,6 +1031,8 @@ class PossessionService:
                 status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                 detail="Termo anexado excede o limite de 12 MB",
             )
+        if not self._content_matches_mime(content, document_mime_type):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="O conteudo do documento nao corresponde ao formato informado")
 
         return {
             "content": content,
@@ -1084,10 +1094,40 @@ class PossessionService:
         absolute_path.write_bytes(content)
 
     def _resolve_photo_path(self, relative_photo_path: str) -> Path:
-        return Path(settings.STORAGE_DIR) / Path(relative_photo_path)
+        return self._resolve_storage_path(relative_photo_path)
 
     def _resolve_document_path(self, relative_document_path: str) -> Path:
-        return Path(settings.STORAGE_DIR) / Path(relative_document_path)
+        return self._resolve_storage_path(relative_document_path)
+
+    def _resolve_storage_path(self, relative_path: str) -> Path:
+        storage_root = Path(settings.STORAGE_DIR).resolve()
+        candidate = (storage_root / Path(relative_path)).resolve()
+        try:
+            candidate.relative_to(storage_root)
+        except ValueError as exc:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Arquivo nao encontrado") from exc
+        return candidate
+
+    @staticmethod
+    def _content_matches_mime(content: bytes, mime_type: str) -> bool:
+        if mime_type == "image/jpeg":
+            return content.startswith(b"\xff\xd8\xff")
+        if mime_type == "image/png":
+            return content.startswith(b"\x89PNG\r\n\x1a\n")
+        if mime_type == "image/webp":
+            return len(content) >= 12 and content[:4] == b"RIFF" and content[8:12] == b"WEBP"
+        if mime_type == "application/pdf":
+            return content.startswith(b"%PDF-")
+        if mime_type == "application/msword":
+            return content.startswith(b"\xd0\xcf\x11\xe0\xa1\xb1\x1a\xe1")
+        if mime_type == "application/vnd.openxmlformats-officedocument.wordprocessingml.document":
+            try:
+                with ZipFile(BytesIO(content)) as archive:
+                    names = set(archive.namelist())
+                return "[Content_Types].xml" in names and "word/document.xml" in names
+            except (BadZipFile, OSError):
+                return False
+        return False
 
     def _cleanup_file(self, absolute_path: Path | None) -> None:
         if not absolute_path:

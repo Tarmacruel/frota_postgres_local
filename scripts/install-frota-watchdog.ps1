@@ -139,6 +139,41 @@ function Update-EnvFileValue {
     Set-Content -LiteralPath $Path -Value $updated -Encoding UTF8
 }
 
+function Get-EnvFileValue {
+    param([string]$Path, [string]$Name)
+    $line = Get-Content -LiteralPath $Path -ErrorAction SilentlyContinue |
+        Where-Object { $_ -match "^$([regex]::Escape($Name))=" } |
+        Select-Object -First 1
+    if (-not $line) { return "" }
+    return ($line -replace "^$([regex]::Escape($Name))=", "").Trim()
+}
+
+function New-SecureToken {
+    $bytes = New-Object byte[] 48
+    $rng = [Security.Cryptography.RandomNumberGenerator]::Create()
+    try { $rng.GetBytes($bytes) } finally { $rng.Dispose() }
+    return [Convert]::ToBase64String($bytes).TrimEnd("=").Replace("+", "-").Replace("/", "_")
+}
+
+function Set-ProductionEnvSecurity {
+    param([string]$Path)
+    $knownDefaults = @("", "supersecretkeychangeinproduction", "troque_este_secret_em_producao")
+    $secret = Get-EnvFileValue -Path $Path -Name "SECRET_KEY"
+    if ($knownDefaults -contains $secret -or $secret.Length -lt 32) {
+        Update-EnvFileValue -Path $Path -Name "SECRET_KEY" -Value (New-SecureToken)
+    }
+    $evidenceSecret = Get-EnvFileValue -Path $Path -Name "SIGNATURE_EVIDENCE_SECRET"
+    if ($evidenceSecret.Length -lt 32) {
+        Update-EnvFileValue -Path $Path -Name "SIGNATURE_EVIDENCE_SECRET" -Value (New-SecureToken)
+    }
+    Update-EnvFileValue -Path $Path -Name "APP_ENV" -Value "production"
+    Update-EnvFileValue -Path $Path -Name "COOKIE_SECURE" -Value "true"
+    Update-EnvFileValue -Path $Path -Name "CORS_ORIGINS" -Value '["https://frota.sirel.com.br"]'
+    Update-EnvFileValue -Path $Path -Name "CSRF_TRUSTED_ORIGINS" -Value '["https://frota.sirel.com.br"]'
+    Update-EnvFileValue -Path $Path -Name "TRUSTED_HOSTS" -Value '["frota.sirel.com.br","localhost","127.0.0.1"]'
+    Update-EnvFileValue -Path $Path -Name "TRUSTED_PROXY_NETWORKS" -Value '["127.0.0.1/32","::1/128"]'
+}
+
 function Ensure-RuntimeEnv {
     $backendRoot = Join-Path $RuntimeRoot "backend"
     $envFile = Join-Path $backendRoot ".env"
@@ -151,17 +186,22 @@ function Ensure-RuntimeEnv {
         else {
             @(
                 "DATABASE_URL=postgresql+asyncpg://frota_user:frota_secret@127.0.0.1:5432/frota_db",
-                "SECRET_KEY=supersecretkeychangeinproduction",
+                "SECRET_KEY=$(New-SecureToken)",
+                "SIGNATURE_EVIDENCE_SECRET=$(New-SecureToken)",
                 "ALGORITHM=HS256",
                 "ACCESS_TOKEN_EXPIRE_MINUTES=60",
-                'CORS_ORIGINS=["http://localhost:3000","http://127.0.0.1:3000","http://localhost:8000","http://127.0.0.1:8000","https://frota.sirel.com.br","http://frota.sirel.com.br"]',
+                'CORS_ORIGINS=["https://frota.sirel.com.br"]',
+                'CSRF_TRUSTED_ORIGINS=["https://frota.sirel.com.br"]',
+                'TRUSTED_HOSTS=["frota.sirel.com.br","localhost","127.0.0.1"]',
+                'TRUSTED_PROXY_NETWORKS=["127.0.0.1/32","::1/128"]',
                 "COOKIE_NAME=access_token",
-                "COOKIE_SECURE=false",
-                "APP_ENV=development"
+                "COOKIE_SECURE=true",
+                "APP_ENV=production"
             ) | Set-Content -LiteralPath $envFile -Encoding UTF8
         }
     }
 
+    Set-ProductionEnvSecurity -Path $envFile
     Ensure-Directory -Path $DataRoot
     Update-EnvFileValue -Path $envFile -Name "STORAGE_DIR" -Value $DataRoot
     Write-Host "STORAGE_DIR configurado em $DataRoot" -ForegroundColor Green
@@ -254,9 +294,9 @@ function Invoke-RuntimeMigrations {
     Write-Host "Aplicando migrations no runtime local..." -ForegroundColor Cyan
     Push-Location $backendRoot
     try {
-        & $alembic upgrade heads
+        & $alembic upgrade head
         if ($LASTEXITCODE -ne 0) {
-            throw "alembic upgrade heads falhou."
+            throw "alembic upgrade head falhou."
         }
     }
     finally {

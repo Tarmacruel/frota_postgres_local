@@ -44,6 +44,23 @@ from app.core.request_context import (
 
 logger = logging.getLogger(__name__)
 
+APP_CONTENT_SECURITY_POLICY = "; ".join(
+    (
+        "default-src 'self'",
+        "base-uri 'self'",
+        "object-src 'none'",
+        "frame-ancestors 'none'",
+        "form-action 'self'",
+        "script-src 'self'",
+        "style-src 'self' 'unsafe-inline' https://fonts.googleapis.com",
+        "font-src 'self' data: https://fonts.gstatic.com",
+        "img-src 'self' data: blob: https://*.tile.openstreetmap.org",
+        "frame-src https://www.openstreetmap.org",
+        "connect-src 'self'",
+        "worker-src 'self' blob:",
+    )
+)
+
 docs_url = None if settings.APP_ENV == "production" else "/docs"
 redoc_url = None if settings.APP_ENV == "production" else "/redoc"
 openapi_url = None if settings.APP_ENV == "production" else "/openapi.json"
@@ -110,7 +127,18 @@ async def request_context_middleware(request: Request, call_next):
     context_token = set_request_audit_context(context)
     try:
         try:
-            response = await call_next(request)
+            content_length = request.headers.get("content-length")
+            if content_length and content_length.isdecimal() and int(content_length) > settings.MAX_REQUEST_BODY_BYTES:
+                response = JSONResponse(
+                    status_code=413,
+                    content={
+                        "detail": "Corpo da requisicao excede o limite permitido",
+                        "code": "REQUEST_BODY_TOO_LARGE",
+                        "request_id": context.request_id,
+                    },
+                )
+            else:
+                response = await call_next(request)
         except Exception as exc:
             stack = " > ".join(
                 f"{Path(frame.filename).name}:{frame.lineno}:{frame.name}"
@@ -131,10 +159,12 @@ async def request_context_middleware(request: Request, call_next):
 
         response.headers[REQUEST_ID_HEADER] = context.request_id
         response.headers["X-Content-Type-Options"] = "nosniff"
-        response.headers["Referrer-Policy"] = "same-origin"
+        response.headers["Referrer-Policy"] = "no-referrer"
         response.headers["X-Frame-Options"] = "DENY"
-        response.headers["Content-Security-Policy"] = "frame-ancestors 'none'; base-uri 'self'; object-src 'none'"
-        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+        response.headers["Content-Security-Policy"] = APP_CONTENT_SECURITY_POLICY
+        response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=(self)"
+        if settings.APP_ENV == "production":
+            response.headers["Strict-Transport-Security"] = "max-age=31536000"
         if context.path.startswith("/api/"):
             response.headers["Cache-Control"] = "no-store"
         return response

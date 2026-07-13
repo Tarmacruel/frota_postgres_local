@@ -4,6 +4,7 @@ import DriverSelect from '../components/DriverSelect'
 import DocumentSignaturePanel from '../components/DocumentSignaturePanel'
 import Modal from '../components/Modal'
 import DriverBadge from '../components/DriverBadge'
+import GuidedTour from '../components/GuidedTour'
 import Pagination from '../components/Pagination'
 import PossessionForm from '../components/PossessionForm'
 import PossessionReportBuilder from '../components/PossessionReportBuilder'
@@ -122,6 +123,7 @@ export default function PossessionPage() {
   const { canCreate, canEdit, isAdmin, isProduction, reload } = useAuth()
   const canCreatePossession = canCreate('possession')
   const canEditPossession = canEdit('possession')
+  const [tourReplayToken, setTourReplayToken] = useState(0)
   const [searchParams, setSearchParams] = useSearchParams()
   const [vehicles, setVehicles] = useState([])
   const [records, setRecords] = useState([])
@@ -813,20 +815,57 @@ export default function PossessionPage() {
 
   const activeCount = filteredRecords.filter((item) => item.is_active).length
 
+  const tourSteps = useMemo(() => ([
+    {
+      selector: '[data-tour="possession-overview"]',
+      title: 'Posse e rota agora são separadas',
+      description: 'A posse representa a responsabilidade pelo veículo. Cada saída e retorno fica registrada como uma rota dentro dela.',
+    },
+    {
+      selector: '[data-tour="possession-create"]',
+      title: canCreatePossession ? 'Comece com ou sem rota' : 'Consulte o histórico com segurança',
+      description: canCreatePossession
+        ? 'Ao criar uma posse, a rota inicial é opcional. Se o veículo já estiver em posse, a substituição exige confirmação e justificativa.'
+        : 'Seu perfil tem acesso de consulta. Documento, contato e localização seguem o mascaramento definido pelo backend.',
+    },
+    {
+      selector: '[data-tour="possession-records"]',
+      title: 'Acompanhe a timeline de rotas',
+      description: 'Em Rotas você inicia deslocamentos, inclui destinos e consulta cada etapa na ordem em que ocorreu.',
+    },
+    {
+      selector: '[data-tour="possession-records"]',
+      title: 'Retorno não encerra a posse',
+      description: 'Registrar retorno fecha somente a rota. Encerrar posse finaliza a responsabilidade e exige a declaração de devolução.',
+    },
+    {
+      selector: '[data-tour="possession-reports"]',
+      title: 'Relatórios seguem o seu perfil',
+      description: 'Use Mais opções para escolher modo, filtros, preset e ordem das colunas. PDF e XLSX são gerados e autorizados pelo backend.',
+    },
+  ]), [canCreatePossession])
+
   return (
     <div className="surface-panel">
       <div className="panel-heading">
-        <div>
+        <div data-tour="possession-overview">
           <h2 className="section-title">Posses de veículos</h2>
           <p className="section-copy">Controle quem está com cada veículo, anexe evidências e mantenha um histórico simples de transferências.</p>
         </div>
         <div className="actions-inline">
           {canCreatePossession ? (
-            <button className="app-button" type="button" onClick={() => setIsCreateModalOpen(true)}>
+            <button data-tour="possession-create" className="app-button" type="button" onClick={() => setIsCreateModalOpen(true)}>
               Nova posse
             </button>
-          ) : null}
-          <PossessionReportBuilder vehicles={vehicles} initialFilters={reportInitialFilters} />
+          ) : (
+            <span data-tour="possession-create" className="route-state-text">Consulta protegida por perfil</span>
+          )}
+          <div data-tour="possession-reports">
+            <PossessionReportBuilder vehicles={vehicles} initialFilters={reportInitialFilters} />
+          </div>
+          <button className="secondary-button" type="button" onClick={() => setTourReplayToken((value) => value + 1)}>
+            Ver tour rápido
+          </button>
         </div>
       </div>
 
@@ -847,7 +886,7 @@ export default function PossessionPage() {
           <div className="filter-inline">
             <input
               className="app-input"
-              placeholder="Buscar por placa, secretaria, condutor ou contato"
+              placeholder={(isAdmin || isProduction) ? 'Buscar por placa, secretaria, condutor ou contato' : 'Buscar por placa ou condutor'}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -916,7 +955,7 @@ export default function PossessionPage() {
       {error ? <div className="alert alert-error" role="alert" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" role="status" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
-      <div className="surface-panel panel-nested">
+      <div className="surface-panel panel-nested" data-tour="possession-records">
         <div className="table-wrap table-wrap-wide">
           <table className="data-table data-table-wide">
             <thead>
@@ -1026,6 +1065,12 @@ export default function PossessionPage() {
       </div>
 
       {!focusedRecord ? <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} /> : null}
+
+      <GuidedTour
+        steps={tourSteps}
+        storageKey="frota-possession-tour-v1"
+        replayToken={tourReplayToken}
+      />
 
       <Modal
         open={isCreateModalOpen}
@@ -1153,6 +1198,7 @@ export default function PossessionPage() {
               value={editForm.observation}
               onChange={(event) => setEditForm({ ...editForm, observation: event.target.value })}
             />
+            <span className="helper-text">Informe somente fatos operacionais necessários; não inclua dados pessoais desnecessários.</span>
           </div>
           <div className="form-field modal-field-span">
             <label htmlFor="edit-possession-reason">Justificativa da retificação</label>
