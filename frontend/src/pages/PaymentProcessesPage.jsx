@@ -460,7 +460,7 @@ export default function PaymentProcessesPage() {
         filters: reportFilters,
         summaryMetrics: buildReportMetrics(rows),
         referenceLabel: `Total filtrado para o relatório: ${rows.length} processo(s).`,
-        responsibleSector: 'Secretaria Municipal de Administração | Departamento de Gestão da Frota',
+        responsibleSector: 'Secretaria Municipal de Administração | Setor de Frotas',
         generatedBy: user?.name || user?.email || 'Usuário autenticado',
         orientation: 'landscape',
       })

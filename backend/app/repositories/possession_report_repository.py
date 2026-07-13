@@ -95,11 +95,14 @@ class PossessionReportRepository:
             pattern = self._search_pattern(filters.search)
             search_conditions = [
                 Vehicle.plate.ilike(pattern, escape="\\"),
-                VehiclePossession.driver_name.ilike(pattern, escape="\\"),
             ]
+            normalized_search = filters.search.strip()
+            if normalized_search.isdecimal():
+                search_conditions.append(VehiclePossession.public_number == int(normalized_search))
             if include_operational_search:
                 search_conditions.extend(
                     [
+                        VehiclePossession.driver_name.ilike(pattern, escape="\\"),
                         VehiclePossession.observation.ilike(pattern, escape="\\"),
                         exists(
                             select(VehiclePossessionTrip.id).where(
@@ -172,11 +175,14 @@ class PossessionReportRepository:
             pattern = self._search_pattern(filters.search)
             search_conditions = [
                 Vehicle.plate.ilike(pattern, escape="\\"),
-                VehiclePossession.driver_name.ilike(pattern, escape="\\"),
             ]
+            normalized_search = filters.search.strip()
+            if normalized_search.isdecimal():
+                search_conditions.append(VehiclePossession.public_number == int(normalized_search))
             if include_operational_search:
                 search_conditions.extend(
                     [
+                        VehiclePossession.driver_name.ilike(pattern, escape="\\"),
                         VehiclePossessionTrip.origin.ilike(pattern, escape="\\"),
                         VehiclePossessionTrip.purpose.ilike(pattern, escape="\\"),
                         VehiclePossessionTrip.observation.ilike(pattern, escape="\\"),

@@ -26,7 +26,7 @@ function getRequestStatusLabel(status) {
   return 'Pendente'
 }
 
-export default function DocumentSignaturePanel({ documentType, sourceId, summary, title, onChanged, readOnly = false }) {
+export default function DocumentSignaturePanel({ documentType, sourceId, summary, title, description, onChanged, readOnly = false }) {
   const { user, isAdmin } = useAuth()
   const [documentSummary, setDocumentSummary] = useState(summary || null)
   const [signers, setSigners] = useState([])
@@ -57,7 +57,10 @@ export default function DocumentSignaturePanel({ documentType, sourceId, summary
     }
   }, [readOnly])
 
-  const hasDocument = Boolean(documentSummary?.document_id)
+  const hasDocument = Boolean(
+    documentSummary?.document_id
+    || (documentSummary?.status && documentSummary.status !== 'UNSIGNED'),
+  )
   const hasSigned = useMemo(
     () => Boolean(documentSummary?.signatures?.some((signature) => signature.signer_user_id === user?.id)),
     [documentSummary, user?.id],
@@ -82,10 +85,29 @@ export default function DocumentSignaturePanel({ documentType, sourceId, summary
     onChanged?.(nextSummary)
   }
 
+  function resetStaleDocument(err) {
+    const detail = err?.response?.data?.detail
+    if (err?.response?.status !== 409 || detail?.code !== 'DIGITAL_DOCUMENT_SOURCE_CHANGED') return false
+    updateSummary({
+      document_id: null,
+      document_type: documentType,
+      source_id: sourceId,
+      status: 'UNSIGNED',
+      required_signatures: 1,
+      signed_count: 0,
+      pending_count: 0,
+      declined_count: 0,
+      is_complete: false,
+      signatures: [],
+      requests: [],
+    })
+    return true
+  }
+
   async function ensureDocument() {
     if (documentSummary?.document_id) return documentSummary
     const { data } = await documentSignaturesAPI.createDocument({ document_type: documentType, source_id: sourceId })
-    updateSummary(data, 'Documento digital emitido para assinatura.')
+    updateSummary(data, 'Documento emitido para assinatura eletrônica.')
     return data
   }
 
@@ -95,7 +117,8 @@ export default function DocumentSignaturePanel({ documentType, sourceId, summary
       setError('')
       await ensureDocument()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível emitir o documento digital.'))
+      resetStaleDocument(err)
+      setError(getApiErrorMessage(err, 'Não foi possível emitir o documento eletrônico.'))
     } finally {
       setLoading(false)
     }
@@ -112,6 +135,7 @@ export default function DocumentSignaturePanel({ documentType, sourceId, summary
       setPassword('')
       updateSummary(data, 'Assinatura registrada com sucesso.')
     } catch (err) {
+      resetStaleDocument(err)
       setError(getApiErrorMessage(err, 'Não foi possível assinar o documento.'))
     } finally {
       setLoading(false)
@@ -137,6 +161,7 @@ export default function DocumentSignaturePanel({ documentType, sourceId, summary
       setMessage('')
       updateSummary(data, 'Solicitação de coassinatura registrada.')
     } catch (err) {
+      resetStaleDocument(err)
       setError(getApiErrorMessage(err, 'Não foi possível solicitar a coassinatura.'))
     } finally {
       setLoading(false)
@@ -175,7 +200,8 @@ export default function DocumentSignaturePanel({ documentType, sourceId, summary
     <section className="signature-panel">
       <div className="signature-panel-head">
         <div>
-          <strong>{title || 'Assinatura digital interna'}</strong>
+          <strong>{title || 'Assinatura eletrônica institucional'}</strong>
+          {description ? <span className="muted">{description}</span> : null}
           <span className="muted">Status: {getStatusLabel(documentSummary?.status)}</span>
         </div>
         {hasDocument ? (
@@ -191,7 +217,7 @@ export default function DocumentSignaturePanel({ documentType, sourceId, summary
 
       {documentSummary?.content_hash_short ? (
         <div className="signature-hash-line">
-          <span>Hash</span>
+          <span>Código de integridade</span>
           <code>{documentSummary.content_hash_short}</code>
         </div>
       ) : null}
@@ -203,7 +229,11 @@ export default function DocumentSignaturePanel({ documentType, sourceId, summary
         <>
           <div className="signature-list">
             {(documentSummary.signatures || []).length === 0 ? (
-              <span className="muted">Nenhuma assinatura registrada.</span>
+              <span className="muted">
+                {readOnly && (documentSummary?.signed_count || 0) > 0
+                  ? 'Assinatura registrada; identificação protegida nesta consulta.'
+                  : 'Nenhuma assinatura registrada.'}
+              </span>
             ) : documentSummary.signatures.map((signature) => (
               <div key={signature.id} className="signature-row">
                 <span><strong>{signature.signer_name}</strong> assinou em {formatDate(signature.signed_at)}</span>
@@ -241,7 +271,7 @@ export default function DocumentSignaturePanel({ documentType, sourceId, summary
       {!readOnly && hasDocument && !hasSigned ? (
         <form className="signature-form" onSubmit={handleSign}>
           <label>
-            <span>{pendingForMe ? 'Assinar solicitação pendente' : 'Assinar com sua ID Digital'}</span>
+              <span>{pendingForMe ? 'Assinar solicitação pendente' : 'Registrar assinatura eletrônica'}</span>
             <input
               className="app-input"
               type="password"

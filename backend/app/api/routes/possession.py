@@ -128,7 +128,7 @@ def parse_initial_trip(
     try:
         payload = json.loads(initial_trip_json)
     except json.JSONDecodeError:
-        _raise_form_error("initial_trip_json", "A rota inicial estÃ¡ em formato invÃ¡lido.")
+        _raise_form_error("initial_trip_json", "A rota inicial está em formato inválido.")
     if not isinstance(payload, dict):
         _raise_form_error("initial_trip_json", "A rota inicial deve ser um objeto JSON.")
     try:

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from types import SimpleNamespace
@@ -8,9 +9,13 @@ from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
+from reportlab.pdfbase import pdfmetrics
+from reportlab.platypus import KeepTogether, Paragraph, Spacer, Table
 from sqlalchemy.exc import IntegrityError
 
 from app.models.user import UserRole
+from app.core.official_identity import MUNICIPALITY_CNPJ, MUNICIPALITY_NAME, crest_path, ensure_pdf_fonts
+from app.core.possession_responsibility import RESPONSIBILITY_ACCEPTANCE_TEXT, RESPONSIBILITY_ACCEPTANCE_VERSION
 from app.schemas.possession_return import PossessionEndWithConfirmation, PossessionReturnCorrection
 from app.services.possession_return_service import (
     DECLARATION_TEXT,
@@ -20,6 +25,7 @@ from app.services.possession_return_service import (
     canonical_payload_sha256,
 )
 from app.services.possession_term_pdf_service import NO_CACHE_HEADERS, PossessionTermPdfService
+from app.services import possession_term_pdf_service as term_pdf_module
 from app.api.routes import possession as possession_routes
 
 
@@ -29,6 +35,7 @@ def _user(role=UserRole.ADMIN):
         name="Usuário de teste",
         email="usuario@example.test",
         role=role,
+        organization_id=None,
     )
 
 
@@ -244,7 +251,17 @@ async def test_standard_return_context_masks_confirmer_identity():
     )
     service.confirmations.get_current = AsyncMock(return_value=current)
     context = await service.get_context(possession.id, _user(UserRole.PADRAO))
-    assert context["current_confirmation"]["confirmer_name"] == "Usuário autenticado (dados restritos)"
+    confirmation = context["current_confirmation"]
+    assert context["driver_name"] == "Identidade protegida"
+    assert context["last_trip_id"] is None
+    assert confirmation["id"] is None
+    assert confirmation["confirmer_name"] == "Identidade protegida"
+    assert confirmation["confirmer_role"] is None
+    assert confirmation["canonical_payload_hash"] is None
+    assert confirmation["vehicle_condition_notes"] is None
+    assert confirmation["last_trip_id"] is None
+    assert confirmation["superseded_by_confirmation_id"] is None
+    assert confirmation["admin_correction_reason"] is None
 
 
 def test_pdf_contains_official_structure_and_omits_technical_metadata():
@@ -268,6 +285,367 @@ def test_pdf_contains_official_structure_and_omits_technical_metadata():
     assert b"127.0.0.1" not in pdf
     assert b"phase5-request" not in pdf
     assert NO_CACHE_HEADERS["Cache-Control"].startswith("private, no-store")
+
+
+def test_pdf_embeds_municipal_crest_and_uses_final_institutional_copy(monkeypatch):
+    possession = _possession(ended=False)
+    captured_text = []
+    original_paragraph = term_pdf_module.Paragraph
+
+    def capture_paragraph(text, *args, **kwargs):
+        captured_text.append(str(text))
+        return original_paragraph(text, *args, **kwargs)
+
+    monkeypatch.setattr(term_pdf_module, "Paragraph", capture_paragraph)
+    pdf = PossessionTermPdfService(AsyncMock())._build_pdf(possession, include_personal=True)
+    rendered_copy = " ".join(captured_text)
+    lowered = rendered_copy.casefold()
+
+    assert crest_path().stat().st_size > 10_000
+    assert b"/Subtype /Image" in pdf
+    assert b"/FontFile2" in pdf
+    assert MUNICIPALITY_NAME.upper() in rendered_copy
+    assert MUNICIPALITY_CNPJ in rendered_copy
+    assert RESPONSIBILITY_ACCEPTANCE_TEXT in rendered_copy
+    assert "Pessoa responsável pela condução" in rendered_copy
+    assert "evidência(s)" not in rendered_copy
+    assert "destino(s)" not in rendered_copy
+    for prohibited in ("gerado pelo backend", "estado persistido", "metadados técnicos", "fluxo atual", "controles de acesso"):
+        assert prohibited not in lowered
+
+
+def test_embedded_roboto_fonts_cover_extended_latin_names():
+    regular, bold = ensure_pdf_fonts()
+
+    for font_name in (regular, bold):
+        glyphs = pdfmetrics.getFont(font_name).face.charToGlyph
+        for character in "ȘșČŁãç":
+            assert ord(character) in glyphs
+
+    possession = _possession(ended=False)
+    possession.driver_name = "Ștefan Ioniță Čapek Łukasz"
+    pdf = PossessionTermPdfService(AsyncMock())._build_pdf(possession, include_personal=True)
+    assert b"/FontFile2" in pdf
+    assert b"/ToUnicode" in pdf
+
+
+def test_signature_date_and_physical_lines_are_kept_on_the_same_page():
+    service = PossessionTermPdfService(AsyncMock())
+    regular, bold = ensure_pdf_fonts()
+    styles = service._styles(font_regular=regular, font_bold=bold)
+    story = service._signature_story(
+        _possession(ended=False),
+        signature_summary=None,
+        include_personal=True,
+        styles=styles,
+    )
+
+    block = next(item for item in reversed(story) if isinstance(item, KeepTogether))
+    assert len(block._content) == 3
+    assert isinstance(block._content[0], Paragraph)
+    assert block._content[0].getPlainText().startswith("Teixeira de Freitas - BA")
+    assert isinstance(block._content[1], Spacer)
+    assert isinstance(block._content[2], Table)
+
+
+def test_signature_section_heading_is_kept_with_declaration_and_status():
+    service = PossessionTermPdfService(AsyncMock())
+    regular, bold = ensure_pdf_fonts()
+    styles = service._styles(font_regular=regular, font_bold=bold)
+    story = service._signature_story(
+        _possession(ended=False),
+        signature_summary=None,
+        include_personal=True,
+        styles=styles,
+    )
+
+    block = story[0]
+    assert isinstance(block, KeepTogether)
+    assert isinstance(block._content[0], Paragraph)
+    assert block._content[0].getPlainText() == "6. Assinaturas e ciência"
+    assert isinstance(block._content[1], Paragraph)
+    assert block._content[1].getPlainText().startswith("Declaração de ciência")
+    assert isinstance(block._content[-1], Table)
+
+
+def test_masked_pdf_does_not_render_route_locations(monkeypatch):
+    possession = _possession(ended=False)
+    possession.trips = [
+        SimpleNamespace(
+            sequence_number=1,
+            status="EM_ANDAMENTO",
+            origin="Endereço operacional secreto",
+            purpose="Finalidade reservada",
+            departure_at=datetime.now(timezone.utc),
+            return_at=None,
+            start_odometer_km=Decimal("100.0"),
+            end_odometer_km=None,
+            cancellation_reason=None,
+            destinations=[
+                SimpleNamespace(
+                    sequence_number=1,
+                    description="Destino reservado",
+                    address_reference="Rua sigilosa, 123",
+                    arrived_at=None,
+                    departed_at=None,
+                )
+            ],
+        )
+    ]
+    captured_text = []
+    original_paragraph = term_pdf_module.Paragraph
+
+    def capture_paragraph(text, *args, **kwargs):
+        captured_text.append(str(text))
+        return original_paragraph(text, *args, **kwargs)
+
+    monkeypatch.setattr(term_pdf_module, "Paragraph", capture_paragraph)
+    PossessionTermPdfService(AsyncMock())._build_pdf(possession, include_personal=False)
+    rendered_copy = " ".join(captured_text)
+    assert "localização protegida" in rendered_copy
+    assert "Endereço operacional secreto" not in rendered_copy
+    assert "Finalidade reservada" not in rendered_copy
+    assert "Destino reservado" not in rendered_copy
+    assert "Rua sigilosa" not in rendered_copy
+
+
+def test_completed_electronic_acceptance_is_printed_with_its_hash(monkeypatch):
+    possession = _possession(ended=False)
+    signed_at = datetime.now(timezone.utc)
+    summary = {
+        "document_id": uuid4(),
+        "status": "COMPLETED",
+        "content_hash": "a" * 64,
+        "signed_count": 1,
+        "required_signatures": 1,
+        "snapshot": {
+            "acceptance": {
+                "version": RESPONSIBILITY_ACCEPTANCE_VERSION,
+                "text": RESPONSIBILITY_ACCEPTANCE_TEXT,
+            }
+        },
+        "signatures": [
+            {
+                "signer_name": "Servidor responsável",
+                "signer_role": "PRODUCAO",
+                "signer_organization_name": "Secretaria Municipal",
+                "signer_cpf_masked": "123.***.***-01",
+                "signature_fingerprint": "b" * 64,
+                "signed_at": signed_at,
+            }
+        ],
+    }
+    captured_text = []
+    original_paragraph = term_pdf_module.Paragraph
+
+    def capture_paragraph(text, *args, **kwargs):
+        captured_text.append(str(text))
+        return original_paragraph(text, *args, **kwargs)
+
+    monkeypatch.setattr(term_pdf_module, "Paragraph", capture_paragraph)
+    PossessionTermPdfService(AsyncMock())._build_pdf(
+        possession,
+        include_personal=True,
+        signature_summary=summary,
+    )
+    rendered_copy = " ".join(captured_text)
+    assert "Servidor responsável" in rendered_copy
+    assert "Situação do registro eletrônico" in rendered_copy
+    assert "Concluída" in rendered_copy
+    assert "Código de integridade do conteúdo assinado" in rendered_copy
+    assert "a" * 16 in rendered_copy
+    assert "b" * 16 in rendered_copy
+
+
+def test_masked_pdf_hides_signature_people_and_technical_identifiers(monkeypatch):
+    possession = _possession(ended=False)
+    summary = {
+        "status": "COMPLETED",
+        "content_hash": "a" * 64,
+        "signed_count": 1,
+        "required_signatures": 1,
+        "signatures": [
+            {
+                "signer_name": "Nome restrito",
+                "signer_role": "ADMIN",
+                "signer_organization_name": "Unidade restrita",
+                "signer_cpf_masked": "123.***.***-01",
+                "signature_fingerprint": "b" * 64,
+                "signed_at": datetime.now(timezone.utc),
+            }
+        ],
+    }
+    captured_text = []
+    original_paragraph = term_pdf_module.Paragraph
+
+    def capture_paragraph(text, *args, **kwargs):
+        captured_text.append(str(text))
+        return original_paragraph(text, *args, **kwargs)
+
+    monkeypatch.setattr(term_pdf_module, "Paragraph", capture_paragraph)
+    PossessionTermPdfService(AsyncMock())._build_pdf(
+        possession,
+        include_personal=False,
+        signature_summary=summary,
+    )
+    rendered_copy = " ".join(captured_text)
+    assert "Concluída" in rendered_copy
+    assert "Nome restrito" not in rendered_copy
+    assert "Unidade restrita" not in rendered_copy
+    assert "Código de registro da assinatura" not in rendered_copy
+    assert "b" * 16 not in rendered_copy
+    assert "a" * 16 not in rendered_copy
+
+
+def test_masked_pdf_protects_driver_and_all_free_text_fields(monkeypatch):
+    possession = _possession(ended=True)
+    possession.driver_name = "Nome pessoal restrito"
+    possession.observation = "Observação com telefone 75999999999"
+    possession.trips = [
+        SimpleNamespace(
+            sequence_number=1,
+            status="CANCELADA",
+            origin="Origem restrita",
+            purpose="Finalidade restrita",
+            departure_at=datetime.now(timezone.utc),
+            return_at=None,
+            start_odometer_km=Decimal("100"),
+            end_odometer_km=None,
+            cancellation_reason="Justificativa com pessoa identificável",
+            destinations=[],
+        )
+    ]
+    possession.return_confirmations = [
+        SimpleNamespace(
+            version=1,
+            is_current=True,
+            confirmer_name="Confirmador restrito",
+            confirmer_role="ADMIN",
+            confirmed_at=datetime.now(timezone.utc),
+            final_odometer_km=Decimal("105"),
+            vehicle_condition_notes="Condições com endereço pessoal restrito",
+            canonical_payload_hash="c" * 64,
+            declaration_version=DECLARATION_VERSION,
+            declaration_text=DECLARATION_TEXT,
+        )
+    ]
+    captured_text = []
+    original_paragraph = term_pdf_module.Paragraph
+
+    def capture_paragraph(text, *args, **kwargs):
+        captured_text.append(str(text))
+        return original_paragraph(text, *args, **kwargs)
+
+    monkeypatch.setattr(term_pdf_module, "Paragraph", capture_paragraph)
+    PossessionTermPdfService(AsyncMock())._build_pdf(possession, include_personal=False)
+    rendered_copy = " ".join(captured_text)
+
+    for restricted in (
+        "Nome pessoal restrito",
+        "75999999999",
+        "Justificativa com pessoa identificável",
+        "Condições com endereço pessoal restrito",
+        "Confirmador restrito",
+    ):
+        assert restricted not in rendered_copy
+    assert "Identidade protegida" in rendered_copy
+    assert "Conteúdo protegido nesta via" in rendered_copy
+
+
+def test_legacy_end_without_versioned_confirmation_prints_persisted_facts(monkeypatch):
+    possession = _possession(ended=True)
+    captured_text = []
+    original_paragraph = term_pdf_module.Paragraph
+
+    def capture_paragraph(text, *args, **kwargs):
+        captured_text.append(str(text))
+        return original_paragraph(text, *args, **kwargs)
+
+    monkeypatch.setattr(term_pdf_module, "Paragraph", capture_paragraph)
+    PossessionTermPdfService(AsyncMock())._build_pdf(possession, include_personal=True)
+    rendered_copy = " ".join(captured_text)
+
+    assert "Encerramento administrativo" in rendered_copy
+    assert term_pdf_module._fmt_datetime(possession.end_date) in rendered_copy
+    assert "105,0 km" in rendered_copy
+
+
+def test_multipage_term_with_unicode_routes_and_signatures_keeps_document_structure():
+    possession = _possession(ended=True)
+    possession.driver_name = "João Łukasz Șerban"
+    possession.observation = "Registro administrativo extenso. " * 40
+    possession.trips = [
+        SimpleNamespace(
+            sequence_number=index,
+            status="ENCERRADA",
+            origin=f"Origem institucional {index}",
+            purpose=f"Atendimento público {index}",
+            departure_at=datetime.now(timezone.utc) - timedelta(hours=2),
+            return_at=datetime.now(timezone.utc) - timedelta(hours=1),
+            start_odometer_km=Decimal(100 + index),
+            end_odometer_km=Decimal(101 + index),
+            cancellation_reason=None,
+            destinations=[
+                SimpleNamespace(
+                    sequence_number=destination,
+                    description=f"Destino {index}.{destination}",
+                    address_reference=f"Referência administrativa {destination}",
+                    arrived_at=datetime.now(timezone.utc),
+                    departed_at=datetime.now(timezone.utc),
+                )
+                for destination in range(1, 4)
+            ],
+        )
+        for index in range(1, 31)
+    ]
+    possession.return_confirmations = [
+        SimpleNamespace(
+            version=1,
+            is_current=True,
+            confirmer_name="Agente responsável",
+            confirmer_role="ADMIN",
+            confirmed_at=datetime.now(timezone.utc),
+            final_odometer_km=Decimal("150"),
+            vehicle_condition_notes="Condições administrativas registradas. " * 80,
+            canonical_payload_hash="c" * 64,
+            declaration_version=DECLARATION_VERSION,
+            declaration_text=DECLARATION_TEXT,
+        )
+    ]
+    summary = {
+        "status": "COMPLETED",
+        "content_hash": "a" * 64,
+        "signed_count": 4,
+        "required_signatures": 4,
+        "snapshot": {
+            "acceptance": {
+                "version": RESPONSIBILITY_ACCEPTANCE_VERSION,
+                "text": RESPONSIBILITY_ACCEPTANCE_TEXT,
+            }
+        },
+        "signatures": [
+            {
+                "signer_name": f"Agente público {index}",
+                "signer_role": "PRODUCAO",
+                "signer_organization_name": "Setor de Frotas",
+                "signer_cpf_masked": "123.***.***-01",
+                "signature_fingerprint": str(index) * 64,
+                "signed_at": datetime.now(timezone.utc),
+            }
+            for index in range(1, 5)
+        ],
+    }
+
+    pdf = PossessionTermPdfService(AsyncMock())._build_pdf(
+        possession,
+        include_personal=True,
+        signature_summary=summary,
+    )
+    page_count = len(re.findall(rb"/Type\s*/Page\b", pdf))
+
+    assert page_count >= 4
+    assert b"/FontFile2" in pdf
+    assert b"/Subtype /Image" in pdf
 
 
 def test_active_and_legacy_possessions_generate_without_fabricating_confirmation():
@@ -316,8 +694,14 @@ async def test_masked_preview_is_generated_and_audited_for_standard_role():
     possession.return_confirmations = []
     service = PossessionTermPdfService(AsyncMock())
     service.possessions.get_term_graph = AsyncMock(return_value=possession)
+    service.signatures.get_validated_summary_for_source = AsyncMock(return_value={
+        "document_id": None,
+        "status": "UNSIGNED",
+        "signatures": [],
+    })
+    service.signatures.lock_source_for_consistent_read = AsyncMock()
     service.audit.record = AsyncMock()
-    service._build_pdf = lambda record, include_personal: b"%PDF-masked" if not include_personal else b"%PDF-full"
+    service._build_pdf = lambda record, include_personal, signature_summary=None: b"%PDF-masked" if not include_personal else b"%PDF-full"
     service_visibility = AsyncMock()
     original = PossessionTermPdfService.render.__globals__["PossessionService"]._ensure_possession_visible_to_user
     PossessionTermPdfService.render.__globals__["PossessionService"]._ensure_possession_visible_to_user = service_visibility
@@ -330,6 +714,35 @@ async def test_masked_preview_is_generated_and_audited_for_standard_role():
     assert service.audit.record.await_args.kwargs["action"] == "TERM_PREVIEW"
     assert service.audit.record.await_args.kwargs["details"]["masked"] is True
     service.db.commit.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_pdf_render_uses_only_the_fresh_graph_loaded_after_source_lock():
+    stale = _possession(ended=False)
+    fresh = _possession(ended=True)
+    fresh.id = stale.id
+    fresh.public_number = stale.public_number
+    service = PossessionTermPdfService(AsyncMock())
+    service.possessions.get_term_graph = AsyncMock(side_effect=[stale, fresh])
+    service.signatures.lock_source_for_consistent_read = AsyncMock()
+    service.signatures.get_validated_summary_for_source = AsyncMock(
+        return_value={"document_id": None, "status": "UNSIGNED", "signatures": []}
+    )
+    service.audit.record = AsyncMock()
+    captured = []
+    service._build_pdf = lambda record, **_kwargs: captured.append(record) or b"%PDF-fresh"
+    visibility = AsyncMock()
+    original = PossessionTermPdfService.render.__globals__["PossessionService"]._ensure_possession_visible_to_user
+    PossessionTermPdfService.render.__globals__["PossessionService"]._ensure_possession_visible_to_user = visibility
+    try:
+        content, _ = await service.render(stale.id, disposition="inline", current_user=_user(UserRole.ADMIN))
+    finally:
+        PossessionTermPdfService.render.__globals__["PossessionService"]._ensure_possession_visible_to_user = original
+
+    assert content == b"%PDF-fresh"
+    assert captured == [fresh]
+    assert service.possessions.get_term_graph.await_args_list[1].kwargs == {"populate_existing": True}
+    assert visibility.await_count == 2
 
 
 @pytest.mark.asyncio

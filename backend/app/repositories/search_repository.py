@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from sqlalchemy import and_, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import aliased, joinedload
+from sqlalchemy.orm import aliased, joinedload, load_only
 from app.models.location_history import LocationHistory
 from app.models.maintenance import MaintenanceRecord
 from app.models.master_data import Allocation, Department
@@ -19,29 +19,33 @@ class SearchRepository:
         query: str,
         limit: int,
         organization_id=None,
+        *,
+        include_personal_data: bool = False,
     ) -> list[tuple[Vehicle, LocationHistory | None, VehiclePossession | None]]:
         active_history = aliased(LocationHistory)
-        active_possession = aliased(VehiclePossession)
+        search_fields = [
+            Vehicle.plate.ilike(query),
+            Vehicle.chassis_number.ilike(query),
+            Vehicle.brand.ilike(query),
+            Vehicle.model.ilike(query),
+            active_history.department.ilike(query),
+        ]
+        if include_personal_data:
+            active_possession = aliased(VehiclePossession)
+            search_fields.append(active_possession.driver_name.ilike(query))
+            statement = select(Vehicle, active_history, active_possession).outerjoin(
+                active_possession,
+                and_(active_possession.vehicle_id == Vehicle.id, active_possession.end_date.is_(None)),
+            )
+        else:
+            statement = select(Vehicle, active_history)
         stmt = (
-            select(Vehicle, active_history, active_possession)
+            statement
             .outerjoin(
                 active_history,
                 and_(active_history.vehicle_id == Vehicle.id, active_history.end_date.is_(None)),
             )
-            .outerjoin(
-                active_possession,
-                and_(active_possession.vehicle_id == Vehicle.id, active_possession.end_date.is_(None)),
-            )
-            .where(
-                or_(
-                    Vehicle.plate.ilike(query),
-                    Vehicle.chassis_number.ilike(query),
-                    Vehicle.brand.ilike(query),
-                    Vehicle.model.ilike(query),
-                    active_history.department.ilike(query),
-                    active_possession.driver_name.ilike(query),
-                )
-            )
+            .where(or_(*search_fields))
             .order_by(Vehicle.updated_at.desc(), Vehicle.created_at.desc())
             .limit(limit)
         )
@@ -53,7 +57,10 @@ class SearchRepository:
                 .where(Department.organization_id == organization_id)
             )
         result = await self.db.execute(stmt)
-        return list(result.all())
+        rows = list(result.all())
+        if include_personal_data:
+            return rows
+        return [(vehicle, history, None) for vehicle, history in rows]
 
     async def search_possessions(
         self,
@@ -68,19 +75,29 @@ class SearchRepository:
             Vehicle.chassis_number.ilike(query),
             Vehicle.brand.ilike(query),
             Vehicle.model.ilike(query),
-            VehiclePossession.driver_name.ilike(query),
-            VehiclePossession.observation.ilike(query),
         ]
         if include_personal_data:
             search_fields.extend(
                 [
+                    VehiclePossession.driver_name.ilike(query),
+                    VehiclePossession.observation.ilike(query),
                     VehiclePossession.driver_document.ilike(query),
                     VehiclePossession.driver_contact.ilike(query),
                 ]
             )
+        possession_options = [joinedload(VehiclePossession.vehicle)]
+        if not include_personal_data:
+            possession_options.append(
+                load_only(
+                    VehiclePossession.id,
+                    VehiclePossession.public_number,
+                    VehiclePossession.vehicle_id,
+                    VehiclePossession.end_date,
+                )
+            )
         stmt = (
             select(VehiclePossession)
-            .options(joinedload(VehiclePossession.vehicle))
+            .options(*possession_options)
             .join(Vehicle, Vehicle.id == VehiclePossession.vehicle_id)
             .where(
                 or_(*search_fields)

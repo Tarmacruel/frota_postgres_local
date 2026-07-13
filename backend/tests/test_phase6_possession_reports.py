@@ -5,7 +5,7 @@ from datetime import datetime, timedelta, timezone
 from decimal import Decimal
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -15,6 +15,7 @@ from pydantic import ValidationError
 
 from app.api.routes import possession as possession_routes
 from app.models.user import UserRole
+from app.repositories.possession_report_repository import PossessionReportRepository
 from app.schemas.possession_report import (
     PossessionReportMode,
     PossessionReportFilters,
@@ -73,6 +74,16 @@ def test_summary_preset_is_minimized_and_registry_is_typed():
     assert not {"driver_document", "driver_contact", "capture_latitude", "return_request_id"} & set(keys)
     assert all(column.extractor and column.roles and column.modes for column in REPORT_COLUMN_BY_KEY.values())
 
+    standard_keys = {
+        column.key
+        for column in preset_columns(
+            UserRole.PADRAO,
+            PossessionReportMode.POSSESSION,
+            PossessionReportPreset.SUMMARY,
+        )
+    }
+    assert "driver_name" not in standard_keys
+
 
 def test_metadata_varies_by_role_and_never_sends_forbidden_columns():
     standard = PossessionReportService.metadata(_user(UserRole.PADRAO))
@@ -82,6 +93,7 @@ def test_metadata_varies_by_role_and_never_sends_forbidden_columns():
     production_mode = production["modes"][0]
     admin_mode = admin["modes"][0]
     assert "driver_document" not in {column["key"] for column in standard_mode["columns"]}
+    assert "driver_name" not in {column["key"] for column in standard_mode["columns"]}
     assert "driver_document" in {column["key"] for column in production_mode["columns"]}
     assert "return_request_id" not in {column["key"] for column in production_mode["columns"]}
     assert "return_request_id" in {column["key"] for column in admin_mode["columns"]}
@@ -123,6 +135,31 @@ def test_legacy_row_extractors_do_not_fabricate_return_confirmation():
     assert value == "ENCERRADA_SEM_CONFIRMAÇÃO_VERSIONADA"
 
 
+@pytest.mark.parametrize(
+    ("raw", "display"),
+    [
+        ("ATIVA", "Ativa"),
+        ("EM_ANDAMENTO", "Em andamento"),
+        ("DEVOLUÇÃO_CONFIRMADA", "Devolução confirmada"),
+        ("ENCERRADA_SEM_CONFIRMAÇÃO_VERSIONADA", "Encerrada sem confirmação eletrônica"),
+    ],
+)
+def test_official_report_status_values_are_humanized(raw, display):
+    column = REPORT_COLUMN_BY_KEY["return_status"]
+    prepared = PossessionReportService._prepare_cell(
+        column,
+        ReportRowContext(
+            possession=SimpleNamespace(
+                end_date=None,
+                return_confirmations=[],
+            )
+        ),
+    )
+    assert PossessionReportService._status_display(raw) == display
+    assert "_" not in PossessionReportService._status_display(raw)
+    assert "_" not in prepared.display
+
+
 def test_pdf_and_xlsx_use_same_prepared_column_order_and_dataset():
     request = PossessionReportRequest(mode="POSSESSION", preset="CUSTOM", column_keys=["vehicle_plate", "driver_name"])
     prepared = PreparedReport(
@@ -136,8 +173,35 @@ def test_pdf_and_xlsx_use_same_prepared_column_order_and_dataset():
     workbook = load_workbook(filename=__import__("io").BytesIO(xlsx), read_only=True)
     worksheet = workbook["Posses"]
     assert pdf.startswith(b"%PDF-")
+    assert b"/Subtype /Image" in pdf
     assert [worksheet.cell(1, index).value for index in (1, 2)] == ["Placa", "Condutor"]
     assert [worksheet.cell(2, index).value for index in (1, 2)] == ["ABC1D23", "Condutor teste"]
+    metadata = workbook["Metadados"]
+    assert metadata["B1"].value == "Prefeitura Municipal de Teixeira de Freitas"
+    assert metadata["B3"].value == "13.650.403/0001-28"
+    assert workbook.properties.creator == "Prefeitura Municipal de Teixeira de Freitas"
+
+
+def test_document_filter_summary_never_repeats_search_text_or_internal_ids():
+    vehicle_id = uuid4()
+    driver_id = uuid4()
+    request = PossessionReportRequest(
+        filters=PossessionReportFilters(
+            vehicle_id=vehicle_id,
+            driver_id=driver_id,
+            search="529.982.247-25",
+            has_return=True,
+        )
+    )
+
+    summary = PossessionReportService._plain_filter_summary(request)
+
+    assert str(vehicle_id) not in summary
+    assert str(driver_id) not in summary
+    assert "529.982.247-25" not in summary
+    assert "Veículo: selecionado" in summary
+    assert "Busca textual: aplicada" in summary
+    assert "Devolução registrada: Sim" in summary
 
 
 @pytest.mark.parametrize("payload", ["=1+1", "+SUM(A1:A2)", "-2+3", "@IMPORT", "\t=cmd"])
@@ -186,6 +250,41 @@ async def test_prepare_forwards_normalized_filters_to_bounded_server_query():
     service.reports.load.reset_mock()
     await service.prepare(request, _user(UserRole.PADRAO), row_limit=42)
     assert service.reports.load.await_args.kwargs["include_operational_search"] is False
+
+
+@pytest.mark.asyncio
+async def test_standard_report_rejects_driver_filter_before_querying():
+    service = PossessionReportService(AsyncMock())
+    service.reports.load = AsyncMock()
+    request = PossessionReportRequest(filters=PossessionReportFilters(driver_id=uuid4()))
+
+    with pytest.raises(HTTPException) as exc:
+        await service.prepare(request, _user(UserRole.PADRAO), row_limit=42)
+
+    assert exc.value.status_code == 403
+    assert exc.value.detail["code"] == "REPORT_FILTER_FORBIDDEN"
+    service.reports.load.assert_not_awaited()
+
+
+@pytest.mark.asyncio
+async def test_standard_report_search_predicate_excludes_driver_and_free_text():
+    db = AsyncMock()
+    result = MagicMock()
+    result.scalars.return_value.unique.return_value.all.return_value = []
+    db.execute.return_value = result
+
+    await PossessionReportRepository(db).load(
+        mode=PossessionReportMode.POSSESSION,
+        filters=PossessionReportFilters(search="Pessoa protegida"),
+        organization_id=None,
+        limit=10,
+        include_operational_search=False,
+    )
+
+    where_clause = str(db.execute.await_args.args[0].whereclause)
+    assert "plate" in where_clause
+    assert "driver_name" not in where_clause
+    assert "observation" not in where_clause
 
 
 @pytest.mark.asyncio

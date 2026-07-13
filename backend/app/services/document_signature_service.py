@@ -4,6 +4,7 @@ import hashlib
 import hmac
 import json
 from datetime import datetime, timezone
+from decimal import Decimal
 from uuid import UUID
 
 from fastapi import HTTPException, status
@@ -16,6 +17,12 @@ from sqlalchemy.orm import joinedload, selectinload
 from app.core.config import settings
 from app.core.cpf import hash_cpf, mask_cpf
 from app.core.organization_scope import production_scope_is_empty, scoped_organization_id
+from app.core.possession_responsibility import (
+    RESPONSIBILITY_ACCEPTANCE_SCOPE,
+    RESPONSIBILITY_ACCEPTANCE_TEXT,
+    RESPONSIBILITY_ACCEPTANCE_VERSION,
+    RESPONSIBILITY_TERM_MODEL_VERSION,
+)
 from app.core.security import verify_password
 from app.models.document_signature import (
     DigitalDocument,
@@ -26,7 +33,9 @@ from app.models.document_signature import (
     DocumentSignatureRequestStatus,
 )
 from app.models.fuel_supply_order import FuelSupplyOrder
+from app.models.possession import VehiclePossession
 from app.models.user import User, UserRole
+from app.models.vehicle import Vehicle
 from app.repositories.fuel_station_repository import FuelStationRepository
 from app.repositories.fuel_supply_order_repository import FuelSupplyOrderRepository
 from app.repositories.possession_repository import PossessionRepository
@@ -56,12 +65,19 @@ class DocumentSignatureService:
 
     async def create_document(self, data: DigitalDocumentCreate, current_user: User) -> dict:
         self._ensure_ready()
-        self._ensure_module_permission(current_user, data.document_type, "view")
+        self._ensure_module_permission(current_user, data.document_type, "edit")
         self._ensure_possession_term_mutation_allowed(current_user, data.document_type)
         context = await self._build_document_context(data.document_type, data.source_id, current_user=current_user)
+        await self._lock_source(data.document_type, data.source_id)
+        context = await self._build_document_context(
+            data.document_type,
+            data.source_id,
+            current_user=current_user,
+            refresh_source=True,
+        )
         now = datetime.now(timezone.utc)
 
-        existing = await self._get_active_document(data.document_type, data.source_id)
+        existing = await self._get_active_document(data.document_type, data.source_id, for_update=True)
         if existing and existing.content_hash == context["content_hash"]:
             return self._serialize_document(existing)
 
@@ -113,14 +129,33 @@ class DocumentSignatureService:
     async def get_document(self, document_id: UUID, current_user: User) -> dict:
         self._ensure_ready()
         document = await self._require_document(document_id)
+        self._ensure_module_permission(current_user, document.document_type, "view")
         await self._ensure_document_visible(document, current_user)
-        return self._serialize_document(document)
+        include_restricted = current_user.role in {UserRole.ADMIN, UserRole.PRODUCAO}
+        payload = self._serialize_document(
+            document,
+            include_snapshot=include_restricted,
+            include_evidence=include_restricted,
+        )
+        if include_restricted:
+            return payload
+        return self.sanitize_summary_for_restricted_view(payload)
 
     async def sign_document(self, document_id: UUID, data: DocumentSignInput, current_user: User) -> dict:
         self._ensure_ready()
         document = await self._require_document(document_id)
+        self._ensure_module_permission(current_user, document.document_type, "edit")
         await self._ensure_document_visible(document, current_user)
-        self._ensure_module_permission(current_user, document.document_type, "view")
+        self._ensure_possession_term_mutation_allowed(current_user, document.document_type)
+        await self._lock_source(document.document_type, document.source_id)
+        document = await self._require_document(document_id, for_update=True)
+        self._ensure_module_permission(current_user, document.document_type, "edit")
+        await self._ensure_document_visible(
+            document,
+            current_user,
+            refresh_source=True,
+            supersede_stale=True,
+        )
         self._ensure_possession_term_mutation_allowed(current_user, document.document_type)
 
         if document.status in {DigitalDocumentStatus.SUPERSEDED, DigitalDocumentStatus.CANCELLED}:
@@ -138,7 +173,6 @@ class DocumentSignatureService:
 
         now = datetime.now(timezone.utc)
         signature = DocumentSignature(
-            document_id=document.id,
             signer_user_id=current_user.id,
             signer_name=current_user.name,
             signer_email=current_user.email,
@@ -151,7 +185,7 @@ class DocumentSignatureService:
             signature_fingerprint=self._build_signature_fingerprint(document, current_user, now),
             signed_at=now,
         )
-        self.db.add(signature)
+        document.signatures.append(signature)
 
         for request in document.signature_requests:
             if request.status == DocumentSignatureRequestStatus.PENDING and request.requested_signer_user_id == current_user.id:
@@ -159,21 +193,28 @@ class DocumentSignatureService:
                 request.responded_at = now
                 request.updated_at = now
 
-        await self.db.flush()
-        await self._refresh_document_status(document, now=now)
-        await self._record_audit(
-            current_user,
-            action="SIGN",
-            document=document,
-            details={
-                "event": "SIGN_DIGITAL_DOCUMENT",
-                "document_type": document.document_type,
-                "source_type": document.source_type,
-                "source_id": str(document.source_id),
-                "content_hash": document.content_hash,
-            },
-        )
-        await self.db.commit()
+        try:
+            await self.db.flush()
+            await self._refresh_document_status(document, now=now)
+            await self._record_audit(
+                current_user,
+                action="SIGN",
+                document=document,
+                details={
+                    "event": "SIGN_DIGITAL_DOCUMENT",
+                    "document_type": document.document_type,
+                    "source_type": document.source_type,
+                    "source_id": str(document.source_id),
+                    "content_hash": document.content_hash,
+                },
+            )
+            await self.db.commit()
+        except IntegrityError as exc:
+            await self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="A assinatura já foi registrada ou o documento foi atualizado",
+            ) from exc
 
         updated = await self._require_document(document.id)
         return self._serialize_document(updated)
@@ -181,9 +222,19 @@ class DocumentSignatureService:
     async def request_joint_signature(self, document_id: UUID, data: JointSignatureRequestInput, current_user: User) -> dict:
         self._ensure_ready()
         document = await self._require_document(document_id)
-        await self._ensure_document_visible(document, current_user)
         self._ensure_module_permission(current_user, document.document_type, "edit")
         self._ensure_possession_term_mutation_allowed(current_user, document.document_type)
+        await self._ensure_document_visible(document, current_user)
+        await self._lock_source(document.document_type, document.source_id)
+        document = await self._require_document(document_id, for_update=True)
+        self._ensure_module_permission(current_user, document.document_type, "edit")
+        self._ensure_possession_term_mutation_allowed(current_user, document.document_type)
+        await self._ensure_document_visible(
+            document,
+            current_user,
+            refresh_source=True,
+            supersede_stale=True,
+        )
         if document.status in {DigitalDocumentStatus.SUPERSEDED, DigitalDocumentStatus.CANCELLED}:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Documento não está disponível para coassinatura")
         if data.requested_signer_user_id == current_user.id:
@@ -201,12 +252,12 @@ class DocumentSignatureService:
         if not signer:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Servidor selecionado não encontrado")
         self._ensure_signer_can_be_requested(current_user=current_user, requested_signer=signer)
-        self._ensure_module_permission(signer, document.document_type, "view")
+        self._ensure_module_permission(signer, document.document_type, "edit")
         self._ensure_possession_term_mutation_allowed(signer, document.document_type)
+        await self._ensure_document_visible(document, signer, refresh_source=True)
 
         now = datetime.now(timezone.utc)
         request = DocumentSignatureRequest(
-            document_id=document.id,
             requested_by_user_id=current_user.id,
             requested_signer_user_id=signer.id,
             status=DocumentSignatureRequestStatus.PENDING,
@@ -214,16 +265,8 @@ class DocumentSignatureService:
             created_at=now,
             updated_at=now,
         )
-        self.db.add(request)
-        document.status = DigitalDocumentStatus.PENDING
-        document.completed_at = None
-        active_request_count = sum(
-            1
-            for existing_request in document.signature_requests
-            if existing_request.status in {DocumentSignatureRequestStatus.PENDING, DocumentSignatureRequestStatus.DECLINED}
-        )
-        document.required_signatures = max(document.required_signatures, 2, len(document.signatures) + active_request_count + 1)
-        document.updated_at = now
+        document.signature_requests.append(request)
+        await self._refresh_document_status(document, now=now)
 
         await self._record_audit(
             current_user,
@@ -265,19 +308,55 @@ class DocumentSignatureService:
         for request in requests:
             if not request.document or request.document.status != DigitalDocumentStatus.PENDING:
                 continue
+            try:
+                self._ensure_module_permission(current_user, request.document.document_type, "edit")
+                self._ensure_possession_term_mutation_allowed(current_user, request.document.document_type)
+                await self._ensure_document_visible(request.document, current_user)
+            except HTTPException:
+                continue
             payloads.append(
                 {
-                    **self._serialize_request(request),
-                    "document": self._serialize_document(request.document, include_snapshot=False),
+                    "id": request.id,
+                    "requested_by_name": request.requester.name if request.requester else None,
+                    "status": request.status,
+                    "message": request.message,
+                    "created_at": request.created_at,
+                    "document": {
+                        "document_id": request.document.id,
+                        "document_type": request.document.document_type,
+                        "title": request.document.title,
+                        "status": request.document.status,
+                        "content_hash_short": request.document.content_hash[:12],
+                    },
                 }
             )
         return payloads
 
     async def decline_request(self, request_id: UUID, current_user: User) -> dict:
         self._ensure_ready()
-        request = await self._require_request(request_id)
+        initial_request = await self._require_request(request_id)
+        if not initial_request.document:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento digital não encontrado")
+        self._ensure_module_permission(current_user, initial_request.document.document_type, "edit")
+        self._ensure_possession_term_mutation_allowed(current_user, initial_request.document.document_type)
+        await self._ensure_document_visible(initial_request.document, current_user)
+        if initial_request.requested_signer_user_id != current_user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solicitação não pertence ao usuário atual")
+        if initial_request.status != DocumentSignatureRequestStatus.PENDING:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Solicitação não está pendente")
+        await self._lock_source(initial_request.document.document_type, initial_request.document.source_id)
+        await self._lock_document(initial_request.document.id)
+        await self._lock_request(request_id)
+        request = await self._require_request(request_id, populate_existing=True)
         if request.document:
+            self._ensure_module_permission(current_user, request.document.document_type, "edit")
             self._ensure_possession_term_mutation_allowed(current_user, request.document.document_type)
+            await self._ensure_document_visible(
+                request.document,
+                current_user,
+                refresh_source=True,
+                supersede_stale=True,
+            )
         if request.requested_signer_user_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Solicitação não pertence ao usuário atual")
         if request.status != DocumentSignatureRequestStatus.PENDING:
@@ -288,7 +367,7 @@ class DocumentSignatureService:
         request.responded_at = now
         request.updated_at = now
         if request.document:
-            request.document.updated_at = now
+            await self._refresh_document_status(request.document, now=now)
             await self._record_audit(
                 current_user,
                 action="DECLINE_SIGNATURE",
@@ -305,15 +384,34 @@ class DocumentSignatureService:
 
     async def cancel_request(self, request_id: UUID, current_user: User) -> dict:
         self._ensure_ready()
-        request = await self._require_request(request_id)
+        initial_request = await self._require_request(request_id)
+        if not initial_request.document:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento digital não encontrado")
+        self._ensure_module_permission(current_user, initial_request.document.document_type, "edit")
+        self._ensure_possession_term_mutation_allowed(current_user, initial_request.document.document_type)
+        await self._ensure_document_visible(initial_request.document, current_user)
+        if initial_request.status != DocumentSignatureRequestStatus.PENDING:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Solicitação não está pendente")
+        if current_user.role != UserRole.ADMIN and initial_request.requested_by_user_id != current_user.id:
+            raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas o solicitante ou administrador pode cancelar")
+        await self._lock_source(initial_request.document.document_type, initial_request.document.source_id)
+        await self._lock_document(initial_request.document.id)
+        await self._lock_request(request_id)
+        request = await self._require_request(request_id, populate_existing=True)
         if request.document:
+            self._ensure_module_permission(current_user, request.document.document_type, "edit")
             self._ensure_possession_term_mutation_allowed(current_user, request.document.document_type)
         if request.status != DocumentSignatureRequestStatus.PENDING:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Solicitação não está pendente")
         if current_user.role != UserRole.ADMIN and request.requested_by_user_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas o solicitante ou administrador pode cancelar")
         if request.document:
-            await self._ensure_document_visible(request.document, current_user)
+            await self._ensure_document_visible(
+                request.document,
+                current_user,
+                refresh_source=True,
+                supersede_stale=True,
+            )
 
         now = datetime.now(timezone.utc)
         request.status = DocumentSignatureRequestStatus.CANCELLED
@@ -343,6 +441,64 @@ class DocumentSignatureService:
             return self._unsigned_summary(document_type, source_id)
         return self._serialize_document(document, include_snapshot=False, include_evidence=False)
 
+    async def lock_source_for_consistent_read(
+        self,
+        document_type: str,
+        source_id: UUID,
+        *,
+        current_user: User,
+    ) -> None:
+        """Authorize and lock a source before composing an official document."""
+        self._ensure_module_permission(current_user, document_type, "view")
+        await self._build_document_context(document_type, source_id, current_user=current_user)
+        await self._lock_source(document_type, source_id)
+
+    async def get_validated_summary_for_source(
+        self,
+        document_type: str,
+        source_id: UUID | None,
+        *,
+        current_user: User,
+        supersede_stale: bool = True,
+        source_is_locked: bool = False,
+    ) -> dict:
+        """Return a signature only when it still matches the canonical source snapshot."""
+        if self.db is None or source_id is None:
+            return self._unsigned_summary(document_type, source_id)
+        self._ensure_module_permission(current_user, document_type, "view")
+        context = None
+        if supersede_stale or source_is_locked:
+            if not source_is_locked:
+                # The first context is an authorization/existence precheck only.
+                await self._build_document_context(document_type, source_id, current_user=current_user)
+                await self._lock_source(document_type, source_id)
+            context = await self._build_document_context(
+                document_type,
+                source_id,
+                current_user=current_user,
+                refresh_source=True,
+            )
+        document = await self._get_active_document(
+            document_type,
+            source_id,
+            for_update=supersede_stale or source_is_locked,
+        )
+        if not document:
+            return self._unsigned_summary(document_type, source_id)
+        if context is None:
+            context = await self._build_document_context(document_type, source_id, current_user=current_user)
+        if document.content_hash != context["content_hash"]:
+            if supersede_stale:
+                await self._supersede_document(
+                    document,
+                    current_user=current_user,
+                    reason="SOURCE_CHANGED",
+                    now=datetime.now(timezone.utc),
+                )
+                await self.db.flush()
+            return self._unsigned_summary(document_type, source_id)
+        return self._serialize_document(document, include_snapshot=True, include_evidence=False)
+
     async def mark_source_documents_superseded(
         self,
         *,
@@ -370,16 +526,126 @@ class DocumentSignatureService:
     def build_hash_for_snapshot(self, snapshot: dict) -> str:
         return hashlib.sha256(self._canonical_json(snapshot).encode("utf-8")).hexdigest()
 
-    async def _build_document_context(self, document_type: str, source_id: UUID, *, current_user: User) -> dict:
+    async def _build_document_context(
+        self,
+        document_type: str,
+        source_id: UUID,
+        *,
+        current_user: User,
+        refresh_source: bool = False,
+    ) -> dict:
         normalized_type = document_type.strip().upper()
+        if normalized_type == DigitalDocumentType.POSSESSION_RESPONSIBILITY_TERM:
+            return await self._build_possession_responsibility_context(
+                source_id,
+                current_user=current_user,
+                refresh_source=refresh_source,
+            )
         if normalized_type in {DigitalDocumentType.POSSESSION_LOAN_TERM, DigitalDocumentType.POSSESSION_RETURN_TERM}:
-            return await self._build_possession_context(normalized_type, source_id, current_user=current_user)
+            return await self._build_possession_context(
+                normalized_type,
+                source_id,
+                current_user=current_user,
+                refresh_source=refresh_source,
+            )
         if normalized_type == DigitalDocumentType.FUEL_SUPPLY_ORDER:
-            return await self._build_order_context(source_id, current_user=current_user)
+            return await self._build_order_context(
+                source_id,
+                current_user=current_user,
+                refresh_source=refresh_source,
+            )
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Tipo de documento não suportado")
 
-    async def _build_possession_context(self, document_type: str, source_id: UUID, *, current_user: User) -> dict:
-        record = await self.possessions.get_by_id(source_id)
+    async def _build_possession_responsibility_context(
+        self,
+        source_id: UUID,
+        *,
+        current_user: User,
+        refresh_source: bool = False,
+    ) -> dict:
+        """Build the stable delivery/acceptance scope signed by the current term.
+
+        Trips and the append-only return confirmation are intentionally outside this
+        snapshot: they are later events incorporated into the same official term and
+        must not force the delivery acknowledgement to be signed again.
+        """
+        record = await self.possessions.get_term_graph(
+            source_id,
+            populate_existing=refresh_source,
+        )
+        if not record:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
+        await self._ensure_vehicle_visible_to_user(record.vehicle_id, current_user)
+
+        title = f"Termo de Posse e Responsabilidade nº {record.public_number}"
+        organization_id = getattr(record.driver, "organization_id", None) or getattr(current_user, "organization_id", None)
+        evidence = sorted(
+            (
+                {
+                    "id": str(photo.id),
+                    "mime_type": photo.photo_mime_type,
+                    "size_bytes": photo.photo_size_bytes,
+                    "captured_at": photo.photo_captured_at,
+                    "created_at": photo.created_at,
+                }
+                for photo in record.photos
+            ),
+            key=lambda item: (str(item["created_at"]), item["id"]),
+        )
+        snapshot = {
+            "schema_version": "possession-responsibility-acceptance.v1",
+            "document_model_version": RESPONSIBILITY_TERM_MODEL_VERSION,
+            "document_type": DigitalDocumentType.POSSESSION_RESPONSIBILITY_TERM,
+            "source_type": SOURCE_POSSESSION,
+            "source_id": str(record.id),
+            "term_number": record.public_number,
+            "scope": RESPONSIBILITY_ACCEPTANCE_SCOPE,
+            "acceptance": {
+                "version": RESPONSIBILITY_ACCEPTANCE_VERSION,
+                "text": RESPONSIBILITY_ACCEPTANCE_TEXT,
+            },
+            "title": title,
+            "vehicle": {
+                "id": str(record.vehicle_id),
+                "plate": record.vehicle.plate if record.vehicle else None,
+                "brand": record.vehicle.brand if record.vehicle else None,
+                "model": record.vehicle.model if record.vehicle else None,
+            },
+            "responsible_driver": {
+                "id": str(record.driver_id) if record.driver_id else None,
+                "name": record.driver_name,
+                "document_masked": self._mask_document(record.driver_document),
+                "document_sha256": self._hash_optional_value(record.driver_document),
+                "contact_sha256": self._hash_optional_value(record.driver_contact),
+            },
+            "delivery": {
+                "delivered_at": record.start_date,
+                "odometer_km": self._canonical_decimal(record.start_odometer_km),
+                "observation": record.observation,
+                "evidence": evidence,
+            },
+        }
+        return self._build_context_payload(
+            snapshot=snapshot,
+            source_type=SOURCE_POSSESSION,
+            organization_id=organization_id,
+            title=title,
+            public_validation_code=None,
+            public_validation_path=None,
+        )
+
+    async def _build_possession_context(
+        self,
+        document_type: str,
+        source_id: UUID,
+        *,
+        current_user: User,
+        refresh_source: bool = False,
+    ) -> dict:
+        record = await self.possessions.get_by_id(
+            source_id,
+            populate_existing=refresh_source,
+        )
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
         await self._ensure_vehicle_visible_to_user(record.vehicle_id, current_user)
@@ -437,8 +703,17 @@ class DocumentSignatureService:
             public_validation_path=public_path,
         )
 
-    async def _build_order_context(self, source_id: UUID, *, current_user: User) -> dict:
-        order = await self.orders.get_by_id(source_id)
+    async def _build_order_context(
+        self,
+        source_id: UUID,
+        *,
+        current_user: User,
+        refresh_source: bool = False,
+    ) -> dict:
+        order = await self.orders.get_by_id(
+            source_id,
+            populate_existing=refresh_source,
+        )
         if not order:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento não encontrada")
         await self._ensure_order_visible_to_user(order, current_user)
@@ -538,17 +813,48 @@ class DocumentSignatureService:
         if not has_access:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Usuário não possui vínculo ativo com o posto da ordem")
 
-    async def _ensure_document_visible(self, document: DigitalDocument, current_user: User) -> None:
+    async def _ensure_document_visible(
+        self,
+        document: DigitalDocument,
+        current_user: User,
+        *,
+        refresh_source: bool = False,
+        supersede_stale: bool = False,
+    ) -> None:
         if document.source_type == SOURCE_POSSESSION:
-            context = await self._build_document_context(document.document_type, document.source_id, current_user=current_user)
+            context = await self._build_document_context(
+                document.document_type,
+                document.source_id,
+                current_user=current_user,
+                refresh_source=refresh_source,
+            )
         elif document.source_type == SOURCE_FUEL_SUPPLY_ORDER:
-            context = await self._build_document_context(document.document_type, document.source_id, current_user=current_user)
+            context = await self._build_document_context(
+                document.document_type,
+                document.source_id,
+                current_user=current_user,
+                refresh_source=refresh_source,
+            )
         else:
             context = None
         if context and document.status in {DigitalDocumentStatus.PENDING, DigitalDocumentStatus.COMPLETED}:
             if document.content_hash != context["content_hash"]:
-                await self._supersede_document(document, current_user=current_user, reason="SOURCE_CHANGED", now=datetime.now(timezone.utc))
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Documento foi alterado e precisa ser emitido novamente")
+                if supersede_stale:
+                    await self._supersede_document(
+                        document,
+                        current_user=current_user,
+                        reason="SOURCE_CHANGED",
+                        now=datetime.now(timezone.utc),
+                    )
+                    await self.db.flush()
+                    await self.db.commit()
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "code": "DIGITAL_DOCUMENT_SOURCE_CHANGED",
+                        "message": "O conteúdo do documento foi atualizado e precisa ser emitido novamente.",
+                    },
+                )
 
     def _ensure_module_permission(self, user: User, document_type: str, action: str) -> None:
         module = self._permission_module_for_document_type(document_type)
@@ -558,6 +864,7 @@ class DocumentSignatureService:
 
     def _ensure_possession_term_mutation_allowed(self, user: User, document_type: str) -> None:
         if document_type not in {
+            DigitalDocumentType.POSSESSION_RESPONSIBILITY_TERM,
             DigitalDocumentType.POSSESSION_LOAN_TERM,
             DigitalDocumentType.POSSESSION_RETURN_TERM,
         }:
@@ -613,27 +920,38 @@ class DocumentSignatureService:
         )
 
     async def _refresh_document_status(self, document: DigitalDocument, *, now: datetime) -> None:
-        pending_count = sum(1 for request in document.signature_requests if request.status == DocumentSignatureRequestStatus.PENDING)
-        declined_count = sum(1 for request in document.signature_requests if request.status == DocumentSignatureRequestStatus.DECLINED)
-        signed_count = len(document.signatures)
-        has_joint_flow = any(
-            request.status in {
+        joint_requests = [
+            request
+            for request in document.signature_requests
+            if request.status in {
                 DocumentSignatureRequestStatus.PENDING,
                 DocumentSignatureRequestStatus.SIGNED,
-                DocumentSignatureRequestStatus.DECLINED,
             }
-            for request in document.signature_requests
+        ]
+        pending_count = sum(
+            1 for request in joint_requests if request.status == DocumentSignatureRequestStatus.PENDING
         )
+        signed_count = len(document.signatures)
         creator_signed = bool(
             document.created_by_user_id
             and any(signature.signer_user_id == document.created_by_user_id for signature in document.signatures)
         )
-        required_signatures = max(1, signed_count + pending_count + declined_count)
-        if has_joint_flow and not creator_signed:
-            required_signatures += 1
-        document.required_signatures = required_signatures
+        signed_request_ids = {
+            getattr(request, "requested_signer_user_id", None)
+            for request in joint_requests
+            if request.status == DocumentSignatureRequestStatus.SIGNED
+        }
+        signed_request_ids.discard(None)
+        signer_ids = {getattr(signature, "signer_user_id", None) for signature in document.signatures}
+        all_joint_signatures_present = signed_request_ids.issubset(signer_ids)
+        document.required_signatures = 1 + len(joint_requests)
 
-        if signed_count >= document.required_signatures and pending_count == 0 and declined_count == 0:
+        if joint_requests:
+            is_complete = creator_signed and pending_count == 0 and all_joint_signatures_present
+        else:
+            is_complete = signed_count >= 1
+
+        if is_complete:
             document.status = DigitalDocumentStatus.COMPLETED
             document.completed_at = document.completed_at or now
         else:
@@ -641,8 +959,51 @@ class DocumentSignatureService:
             document.completed_at = None
         document.updated_at = now
 
-    async def _get_active_document(self, document_type: str, source_id: UUID) -> DigitalDocument | None:
+    async def _lock_source(self, document_type: str, source_id: UUID) -> None:
+        if document_type in {
+            DigitalDocumentType.POSSESSION_RESPONSIBILITY_TERM,
+            DigitalDocumentType.POSSESSION_LOAN_TERM,
+            DigitalDocumentType.POSSESSION_RETURN_TERM,
+        }:
+            source_model = VehiclePossession
+        else:
+            source_model = FuelSupplyOrder
         result = await self.db.execute(
+            select(source_model.vehicle_id).where(source_model.id == source_id)
+        )
+        vehicle_id = result.scalar_one_or_none()
+        if vehicle_id is not None:
+            await self.db.execute(
+                select(Vehicle.id).where(Vehicle.id == vehicle_id).with_for_update()
+            )
+        await self.db.execute(
+            select(source_model.id)
+            .where(source_model.id == source_id)
+            .with_for_update()
+        )
+
+    async def _lock_document(self, document_id: UUID) -> None:
+        await self.db.execute(
+            select(DigitalDocument.id)
+            .where(DigitalDocument.id == document_id)
+            .with_for_update()
+        )
+
+    async def _lock_request(self, request_id: UUID) -> None:
+        await self.db.execute(
+            select(DocumentSignatureRequest.id)
+            .where(DocumentSignatureRequest.id == request_id)
+            .with_for_update()
+        )
+
+    async def _get_active_document(
+        self,
+        document_type: str,
+        source_id: UUID,
+        *,
+        for_update: bool = False,
+    ) -> DigitalDocument | None:
+        statement = (
             select(DigitalDocument)
             .options(
                 selectinload(DigitalDocument.signatures),
@@ -656,10 +1017,13 @@ class DocumentSignatureService:
             )
             .order_by(DigitalDocument.created_at.desc())
         )
+        if for_update:
+            statement = statement.with_for_update().execution_options(populate_existing=True)
+        result = await self.db.execute(statement)
         return result.scalars().unique().first()
 
-    async def _get_document(self, document_id: UUID) -> DigitalDocument | None:
-        result = await self.db.execute(
+    async def _get_document(self, document_id: UUID, *, for_update: bool = False) -> DigitalDocument | None:
+        statement = (
             select(DigitalDocument)
             .options(
                 selectinload(DigitalDocument.signatures),
@@ -668,16 +1032,24 @@ class DocumentSignatureService:
             )
             .where(DigitalDocument.id == document_id)
         )
+        if for_update:
+            statement = statement.with_for_update().execution_options(populate_existing=True)
+        result = await self.db.execute(statement)
         return result.scalars().unique().first()
 
-    async def _require_document(self, document_id: UUID) -> DigitalDocument:
-        document = await self._get_document(document_id)
+    async def _require_document(self, document_id: UUID, *, for_update: bool = False) -> DigitalDocument:
+        document = await self._get_document(document_id, for_update=for_update)
         if not document:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento digital não encontrado")
         return document
 
-    async def _require_request(self, request_id: UUID) -> DocumentSignatureRequest:
-        result = await self.db.execute(
+    async def _require_request(
+        self,
+        request_id: UUID,
+        *,
+        populate_existing: bool = False,
+    ) -> DocumentSignatureRequest:
+        statement = (
             select(DocumentSignatureRequest)
             .options(
                 joinedload(DocumentSignatureRequest.document).selectinload(DigitalDocument.signatures),
@@ -688,6 +1060,9 @@ class DocumentSignatureService:
             )
             .where(DocumentSignatureRequest.id == request_id)
         )
+        if populate_existing:
+            statement = statement.execution_options(populate_existing=True)
+        result = await self.db.execute(statement)
         request = result.scalars().unique().first()
         if not request:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Solicitação de assinatura não encontrada")
@@ -741,6 +1116,55 @@ class DocumentSignatureService:
             payload["evidence_hmac"] = document.evidence_hmac
         if include_snapshot:
             payload["snapshot"] = document.snapshot
+        return payload
+
+    @staticmethod
+    def sanitize_summary_for_restricted_view(summary: dict) -> dict:
+        """Project a document summary without people, internal IDs or integrity metadata."""
+        return {
+            "document_id": None,
+            "document_type": summary.get("document_type"),
+            "source_id": None,
+            "status": summary.get("status", UNSIGNED_STATUS),
+            "title": summary.get("title"),
+            "content_hash": None,
+            "content_hash_short": None,
+            "public_validation_code": None,
+            "public_validation_path": None,
+            "required_signatures": summary.get("required_signatures", 1),
+            "signed_count": summary.get("signed_count", 0),
+            "pending_count": summary.get("pending_count", 0),
+            "declined_count": summary.get("declined_count", 0),
+            "is_complete": bool(summary.get("is_complete")),
+            "signatures": [],
+            "requests": [],
+        }
+
+    @staticmethod
+    def sanitize_summary_for_legacy_public_view(summary: dict) -> dict:
+        """Preserve historical public validation without exposing contact or request data."""
+        payload = {
+            **summary,
+            "signatures": [
+                {
+                    key: value
+                    for key, value in signature.items()
+                    if key in {
+                        "id",
+                        "signer_name",
+                        "signer_role",
+                        "content_hash",
+                        "signature_fingerprint",
+                        "signed_at",
+                    }
+                }
+                for signature in summary.get("signatures", [])
+            ],
+            "requests": [],
+        }
+        payload.pop("snapshot", None)
+        payload.pop("evidence_hmac", None)
+        payload.pop("created_by_user_id", None)
         return payload
 
     def _serialize_signature(self, signature: DocumentSignature) -> dict:
@@ -833,6 +1257,12 @@ class DocumentSignatureService:
             return None
         return round(float(end_odometer_km - start_odometer_km), 2)
 
+    @staticmethod
+    def _canonical_decimal(value) -> str | None:
+        if value is None:
+            return None
+        return format(Decimal(str(value)), "f")
+
     def _build_possession_public_path(self, validation_code: str | None, *, term_type: str) -> str | None:
         if not validation_code:
             return None
@@ -843,7 +1273,11 @@ class DocumentSignatureService:
         return f"AB-{str(order.id).split('-')[0].upper()}"
 
     def _permission_module_for_document_type(self, document_type: str) -> str:
-        if document_type in {DigitalDocumentType.POSSESSION_LOAN_TERM, DigitalDocumentType.POSSESSION_RETURN_TERM}:
+        if document_type in {
+            DigitalDocumentType.POSSESSION_RESPONSIBILITY_TERM,
+            DigitalDocumentType.POSSESSION_LOAN_TERM,
+            DigitalDocumentType.POSSESSION_RETURN_TERM,
+        }:
             return "possession"
         if document_type == DigitalDocumentType.FUEL_SUPPLY_ORDER:
             return "fuel_supply_orders"

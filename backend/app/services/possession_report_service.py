@@ -15,10 +15,23 @@ from reportlab.lib import colors
 from reportlab.lib.pagesizes import A4, landscape
 from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
-from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
+from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.organization_scope import production_scope_is_empty, scoped_organization_id
+from app.core.official_identity import (
+    ADMINISTRATION_SECRETARIAT,
+    COLOR_BORDER,
+    COLOR_MUTED,
+    COLOR_NAVY,
+    FLEET_DEPARTMENT,
+    MUNICIPALITY_ADDRESS,
+    MUNICIPALITY_CNPJ,
+    MUNICIPALITY_NAME,
+    crest_path,
+    ensure_pdf_fonts,
+    institutional_datetime,
+)
 from app.models.possession import VehiclePossession
 from app.models.possession_trip import VehiclePossessionTrip
 from app.models.user import User, UserRole
@@ -30,6 +43,7 @@ from app.schemas.possession_report import (
     PossessionReportPreferenceIn,
     PossessionReportPreset,
     PossessionReportRequest,
+    PossessionTemporalField,
 )
 from app.services.audit_service import AuditService
 from app.services.possession_report_registry import (
@@ -214,6 +228,14 @@ class PossessionReportService:
     ) -> PreparedReport:
         role = self._role(current_user)
         columns = self._resolve_columns(data, role)
+        if role == UserRole.PADRAO and data.filters.driver_id is not None:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail={
+                    "code": "REPORT_FILTER_FORBIDDEN",
+                    "message": "O perfil de consulta não pode filtrar relatórios por condutor.",
+                },
+            )
         if production_scope_is_empty(current_user):
             records: list[VehiclePossession | VehiclePossessionTrip] = []
         else:
@@ -402,6 +424,7 @@ class PossessionReportService:
 
     def _build_pdf(self, prepared: PreparedReport, current_user: User) -> bytes:
         buffer = BytesIO()
+        font_regular, font_bold = ensure_pdf_fonts()
         page_size = A4 if prepared.request.orientation == PossessionReportOrientation.PORTRAIT else landscape(A4)
         document = SimpleDocTemplate(
             buffer,
@@ -409,19 +432,60 @@ class PossessionReportService:
             leftMargin=12 * mm,
             rightMargin=12 * mm,
             topMargin=12 * mm,
-            bottomMargin=12 * mm,
+            bottomMargin=21 * mm,
             title="Relatório configurável de posses",
-            author="Frota PMTF",
+            author=MUNICIPALITY_NAME,
         )
         styles = getSampleStyleSheet()
-        small = ParagraphStyle("ReportSmall", parent=styles["BodyText"], fontSize=7, leading=9)
-        header = ParagraphStyle("ReportHeader", parent=small, textColor=colors.white, fontName="Helvetica-Bold")
+        styles["BodyText"].fontName = font_regular
+        small = ParagraphStyle("ReportSmall", parent=styles["BodyText"], fontName=font_regular, fontSize=7, leading=9)
+        header = ParagraphStyle("ReportHeader", parent=small, textColor=colors.white, fontName=font_bold)
+        institution = ParagraphStyle(
+            "ReportInstitution",
+            parent=styles["BodyText"],
+            fontName=font_bold,
+            fontSize=8.5,
+            leading=10,
+            textColor=colors.HexColor(COLOR_NAVY),
+        )
+        institution_detail = ParagraphStyle(
+            "ReportInstitutionDetail",
+            parent=small,
+            textColor=colors.HexColor("#20304A"),
+        )
+        title = ParagraphStyle(
+            "ReportTitle",
+            parent=styles["Title"],
+            fontName=font_bold,
+            fontSize=15,
+            leading=18,
+            textColor=colors.HexColor(COLOR_NAVY),
+            spaceAfter=2 * mm,
+        )
+        available_width = page_size[0] - 24 * mm
+        crest = Image(str(crest_path()), width=10 * mm, height=12.6 * mm)
+        identity = [
+            Paragraph(MUNICIPALITY_NAME.upper(), institution),
+            Paragraph(f"{ADMINISTRATION_SECRETARIAT} · {FLEET_DEPARTMENT}", institution_detail),
+        ]
+        identity_header = Table([[crest, identity]], colWidths=[14 * mm, available_width - 14 * mm], hAlign="LEFT")
+        identity_header.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+            ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+            ("TOPPADDING", (0, 0), (-1, -1), 0),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 3 * mm),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.8, colors.HexColor(COLOR_NAVY)),
+        ]))
+        issued_at = institutional_datetime(datetime.now(timezone.utc))
         story = [
-            Paragraph("Relatório de posses e rotas", styles["Title"]),
+            identity_header,
+            Spacer(1, 3 * mm),
+            Paragraph("RELATÓRIO DE POSSES E ROTAS", title),
             Paragraph(
-                f"Modo: {self._mode_title(prepared.request.mode)} · Preset: {self._preset_title(prepared.request.preset)} · "
-                f"Gerado em {datetime.now(timezone.utc).strftime('%d/%m/%Y %H:%M UTC')} · "
-                f"Usuário: {self._safe_pdf_text(current_user.name)} · Registros: {prepared.row_count}",
+                f"Modo: {self._mode_title(prepared.request.mode)} · Modelo: {self._preset_title(prepared.request.preset)} · "
+                f"Emissão: {issued_at.strftime('%d/%m/%Y às %H:%M')} · "
+                f"Emitido por: {self._safe_pdf_text(current_user.name)} · Registros: {prepared.row_count}",
                 styles["BodyText"],
             ),
             Paragraph(self._pdf_filter_summary(prepared.request), small),
@@ -434,14 +498,13 @@ class PossessionReportService:
                 for row in prepared.rows
             ],
         ]
-        available_width = page_size[0] - 24 * mm
         widths = self._pdf_widths(prepared.columns, available_width)
         table = Table(table_rows, colWidths=widths, repeatRows=1, hAlign="LEFT")
         table.setStyle(
             TableStyle(
                 [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#243447")),
-                    ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor("#B8C2CC")),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(COLOR_NAVY)),
+                    ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor(COLOR_BORDER)),
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
                     ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F5F7F9")]),
                     ("LEFTPADDING", (0, 0), (-1, -1), 3),
@@ -452,17 +515,44 @@ class PossessionReportService:
             )
         )
         story.append(table)
-        document.build(story)
+
+        def footer(canvas, doc):
+            canvas.saveState()
+            if doc.page > 1:
+                canvas.setFillColor(colors.HexColor(COLOR_NAVY))
+                canvas.setFont(font_bold, 7.2)
+                canvas.drawString(12 * mm, page_size[1] - 8 * mm, MUNICIPALITY_NAME.upper())
+                canvas.setFont(font_regular, 7.2)
+                canvas.drawRightString(
+                    page_size[0] - 12 * mm,
+                    page_size[1] - 8 * mm,
+                    "RELATÓRIO DE POSSES E ROTAS · CONTINUAÇÃO",
+                )
+            canvas.setStrokeColor(colors.HexColor(COLOR_NAVY))
+            canvas.setLineWidth(0.45)
+            canvas.line(12 * mm, 15 * mm, page_size[0] - 12 * mm, 15 * mm)
+            canvas.setFillColor(colors.HexColor(COLOR_MUTED))
+            canvas.setFont(font_regular, 6.2)
+            canvas.drawString(12 * mm, 11.5 * mm, f"{MUNICIPALITY_NAME} · CNPJ {MUNICIPALITY_CNPJ}")
+            canvas.drawString(12 * mm, 8.5 * mm, MUNICIPALITY_ADDRESS)
+            canvas.drawRightString(page_size[0] - 12 * mm, 11.5 * mm, f"Página {doc.page}")
+            canvas.restoreState()
+
+        document.build(story, onFirstPage=footer, onLaterPages=footer)
         return buffer.getvalue()
 
     def _build_xlsx(self, prepared: PreparedReport, current_user: User) -> bytes:
         workbook = Workbook()
+        workbook.properties.creator = MUNICIPALITY_NAME
+        workbook.properties.title = "Relatório de posses e rotas"
+        workbook.properties.subject = f"{ADMINISTRATION_SECRETARIAT} · {FLEET_DEPARTMENT}"
+        workbook.properties.description = "Documento oficial de gestão da frota municipal"
         worksheet = workbook.active
         worksheet.title = "Posses" if prepared.request.mode == PossessionReportMode.POSSESSION else "Rotas"
         for index, column in enumerate(prepared.columns, start=1):
             cell = worksheet.cell(row=1, column=index, value=column.title)
             cell.font = Font(bold=True, color="FFFFFF")
-            cell.fill = PatternFill("solid", fgColor="243447")
+            cell.fill = PatternFill("solid", fgColor="17365D")
             worksheet.column_dimensions[get_column_letter(index)].width = min(max(column.suggested_width, 10), 45)
         for row_index, row in enumerate(prepared.rows, start=2):
             for column_index, (column, prepared_cell) in enumerate(zip(prepared.columns, row, strict=True), start=1):
@@ -476,17 +566,24 @@ class PossessionReportService:
         if prepared.columns:
             worksheet.auto_filter.ref = f"A1:{get_column_letter(len(prepared.columns))}{max(prepared.row_count + 1, 1)}"
         metadata = workbook.create_sheet("Metadados")
+        issued_at = institutional_datetime(datetime.now(timezone.utc))
         metadata_rows = [
+            ("Órgão emissor", MUNICIPALITY_NAME),
+            ("Unidade", f"{ADMINISTRATION_SECRETARIAT} · {FLEET_DEPARTMENT}"),
+            ("CNPJ", MUNICIPALITY_CNPJ),
+            ("Endereço", MUNICIPALITY_ADDRESS),
             ("Relatório", "Posses e rotas"),
             ("Modo", self._mode_title(prepared.request.mode)),
-            ("Preset", self._preset_title(prepared.request.preset)),
-            ("Gerado em", datetime.now(timezone.utc).strftime("%d/%m/%Y %H:%M UTC")),
-            ("Usuário", current_user.name),
+            ("Modelo", self._preset_title(prepared.request.preset)),
+            ("Emissão", issued_at.strftime("%d/%m/%Y às %H:%M")),
+            ("Emitido por", current_user.name),
             ("Registros", prepared.row_count),
             ("Filtros", self._plain_filter_summary(prepared.request)),
         ]
         for row in metadata_rows:
             metadata.append([neutralize_spreadsheet_text(str(row[0])), self._xlsx_text(row[1])])
+        for cell in metadata["A"]:
+            cell.font = Font(bold=True, color="17365D")
         metadata.column_dimensions["A"].width = 22
         metadata.column_dimensions["B"].width = 80
         buffer = BytesIO()
@@ -499,22 +596,38 @@ class PossessionReportService:
         if raw is None or raw == "":
             return PreparedCell(raw=None, display="-")
         if column.value_kind == ReportValueKind.DATETIME and isinstance(raw, datetime):
-            normalized = raw.astimezone(timezone.utc) if raw.utcoffset() is not None else raw.replace(tzinfo=timezone.utc)
-            return PreparedCell(raw=normalized, display=normalized.strftime("%d/%m/%Y %H:%M UTC"))
+            aware = raw if raw.utcoffset() is not None else raw.replace(tzinfo=timezone.utc)
+            normalized = institutional_datetime(aware)
+            return PreparedCell(raw=normalized, display=normalized.strftime("%d/%m/%Y %H:%M"))
         if column.value_kind == ReportValueKind.DECIMAL:
             number = Decimal(str(raw))
             return PreparedCell(raw=number, display=f"{number:.1f}".replace(".", ","))
         if column.value_kind == ReportValueKind.INTEGER:
             return PreparedCell(raw=int(raw), display=str(int(raw)))
         text = str(getattr(raw, "value", raw))
+        if column.value_kind == ReportValueKind.STATUS:
+            text = PossessionReportService._status_display(text)
         return PreparedCell(raw=text, display=text)
+
+    @staticmethod
+    def _status_display(value: str) -> str:
+        return {
+            "ATIVA": "Ativa",
+            "ENCERRADA": "Encerrada",
+            "EM_ANDAMENTO": "Em andamento",
+            "CANCELADA": "Cancelada",
+            "DEVOLUÇÃO_CONFIRMADA": "Devolução confirmada",
+            "ENCERRADA_SEM_CONFIRMAÇÃO_VERSIONADA": "Encerrada sem confirmação eletrônica",
+            "AGUARDANDO_DEVOLUÇÃO": "Aguardando devolução",
+        }.get(value, value.replace("_", " ").strip().capitalize())
 
     @staticmethod
     def _xlsx_value(raw: Any, value_kind: ReportValueKind) -> Any:
         if raw is None:
             return None
         if value_kind == ReportValueKind.DATETIME and isinstance(raw, datetime):
-            normalized = raw.astimezone(timezone.utc) if raw.utcoffset() is not None else raw
+            aware = raw if raw.utcoffset() is not None else raw.replace(tzinfo=timezone.utc)
+            normalized = institutional_datetime(aware)
             return normalized.replace(tzinfo=None)
         if value_kind == ReportValueKind.DECIMAL:
             return float(raw)
@@ -591,21 +704,38 @@ class PossessionReportService:
     @staticmethod
     def _plain_filter_summary(request: PossessionReportRequest) -> str:
         filters = request.filters
-        values = [f"critério temporal={filters.temporal_field.value}"]
+        temporal_label = (
+            "Início da posse"
+            if filters.temporal_field == PossessionTemporalField.POSSESSION_START
+            else "Saída da rota"
+        )
+        values = [f"Critério temporal: {temporal_label}"]
+        possession_status = {
+            "ACTIVE": "Em andamento",
+            "CLOSED": "Encerrada",
+        }.get(getattr(filters.possession_status, "value", None))
+        trip_status = {
+            "EM_ANDAMENTO": "Em andamento",
+            "ENCERRADA": "Encerrada",
+            "CANCELADA": "Cancelada",
+        }.get(getattr(filters.trip_status, "value", None))
         for label, value in (
-            ("de", filters.date_from.isoformat() if filters.date_from else None),
-            ("até", filters.date_to.isoformat() if filters.date_to else None),
-            ("veículo", filters.vehicle_id),
-            ("condutor", filters.driver_id),
-            ("secretaria", filters.organization_id),
-            ("status da posse", getattr(filters.possession_status, "value", None)),
-            ("status da rota", getattr(filters.trip_status, "value", None)),
-            ("com retorno", filters.has_return),
-            ("com confirmação", filters.has_return_confirmation),
-            ("busca", filters.search),
+            ("De", institutional_datetime(filters.date_from).strftime("%d/%m/%Y às %H:%M") if filters.date_from else None),
+            ("Até", institutional_datetime(filters.date_to).strftime("%d/%m/%Y às %H:%M") if filters.date_to else None),
+            ("Veículo", "selecionado" if filters.vehicle_id else None),
+            ("Condutor", "selecionado" if filters.driver_id else None),
+            ("Secretaria", "selecionada" if filters.organization_id else None),
+            ("Situação da posse", possession_status),
+            ("Situação da rota", trip_status),
+            ("Devolução registrada", "Sim" if filters.has_return is True else "Não" if filters.has_return is False else None),
+            (
+                "Confirmação de devolução",
+                "Sim" if filters.has_return_confirmation is True else "Não" if filters.has_return_confirmation is False else None,
+            ),
+            ("Busca textual", "aplicada" if filters.search else None),
         ):
             if value is not None:
-                values.append(f"{label}={value}")
+                values.append(f"{label}: {value}")
         return "; ".join(values)
 
     @staticmethod

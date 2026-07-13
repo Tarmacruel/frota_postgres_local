@@ -171,7 +171,7 @@ async function buildPdfDocument({
   summaryMetrics = [],
   reportCode,
   referenceLabel,
-  responsibleSector = 'Departamento de Gestão da Frota',
+  responsibleSector = officialBrand.fleetDepartment,
   orientation,
   generatedBy = 'Sistema oficial da frota municipal',
 }) {

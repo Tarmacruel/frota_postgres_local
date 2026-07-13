@@ -268,7 +268,7 @@ export default function FuelSupplyOrdersPage() {
         open={Boolean(signatureOrder)}
         onClose={() => setSignatureOrder(null)}
         title="Assinatura da ordem"
-        description={signatureOrder ? `Assinatura digital interna da ordem ${formatOrderNumber(signatureOrder)}.` : ''}
+        description={signatureOrder ? `Assinatura eletrônica institucional da ordem ${formatOrderNumber(signatureOrder)}.` : ''}
       >
         {signatureOrder ? (
           <DocumentSignaturePanel

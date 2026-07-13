@@ -21,9 +21,15 @@ class SearchService:
         search_term = f"%{term}%"
         per_group_limit = min(max(limit, 1), 20)
         organization_id = scoped_organization_id(current_user)
+        include_personal_data = self._can_view_personal_data(current_user)
 
         vehicles = (
-            await self.search_repo.search_vehicles(search_term, per_group_limit, organization_id=organization_id)
+            await self.search_repo.search_vehicles(
+                search_term,
+                per_group_limit,
+                organization_id=organization_id,
+                include_personal_data=include_personal_data,
+            )
             if self._can_view(current_user, "vehicles")
             else []
         )
@@ -32,7 +38,7 @@ class SearchService:
                 search_term,
                 per_group_limit,
                 organization_id=organization_id,
-                include_personal_data=self._can_view_personal_data(current_user),
+                include_personal_data=include_personal_data,
             )
             if self._can_view(current_user, "possession")
             else []
@@ -44,7 +50,15 @@ class SearchService:
         )
 
         results = [
-            *[self._serialize_vehicle(vehicle, department, possession) for vehicle, department, possession in vehicles],
+            *[
+                self._serialize_vehicle(
+                    vehicle,
+                    department,
+                    possession,
+                    include_personal_data=include_personal_data,
+                )
+                for vehicle, department, possession in vehicles
+            ],
             *[self._serialize_possession(record, current_user=current_user) for record in possessions],
             *[self._serialize_maintenance(record) for record in maintenances],
         ]
@@ -61,8 +75,15 @@ class SearchService:
         deduped.sort(key=lambda item: self._sort_key(item, term))
         return deduped[:limit]
 
-    def _serialize_vehicle(self, vehicle, department, possession) -> dict:
-        driver_name = possession.driver_name if possession else None
+    def _serialize_vehicle(
+        self,
+        vehicle,
+        department,
+        possession,
+        *,
+        include_personal_data: bool,
+    ) -> dict:
+        driver_name = possession.driver_name if possession and include_personal_data else None
         current_department = department.department if department else None
         return {
             "type": "vehicle",
@@ -82,16 +103,21 @@ class SearchService:
     def _serialize_possession(self, record, *, current_user: User) -> dict:
         vehicle_plate = record.vehicle.plate if record.vehicle else ""
         can_view_personal_data = self._can_view_personal_data(current_user)
+        public_number = getattr(record, "public_number", None)
+        restricted_title = f"Posse nº {public_number}" if public_number is not None else "Registro de posse"
+        restricted_subtitle = f"Veículo {vehicle_plate}" if vehicle_plate else "Veículo vinculado"
         return {
             "type": "possession",
             "id": record.id,
-            "title": record.driver_name,
-            "subtitle": f"Condutor de {vehicle_plate}" if vehicle_plate else "Condutor",
+            "title": record.driver_name if can_view_personal_data else restricted_title,
+            "subtitle": (
+                f"Condutor de {vehicle_plate}" if vehicle_plate else "Condutor"
+            ) if can_view_personal_data else restricted_subtitle,
             "status": "ATIVA" if record.is_active else "ENCERRADA",
             "route": f"/posses?focus={record.id}",
             "context": {
                 "vehicle_plate": vehicle_plate,
-                "driver_document": record.driver_document if can_view_personal_data else self._mask_document(record.driver_document),
+                "driver_document": record.driver_document if can_view_personal_data else None,
                 "driver_contact": record.driver_contact if can_view_personal_data else None,
             },
         }
@@ -142,11 +168,3 @@ class SearchService:
 
     def _can_view_personal_data(self, current_user: User) -> bool:
         return current_user.role in {UserRole.ADMIN, UserRole.PRODUCAO}
-
-    def _mask_document(self, value: str | None) -> str | None:
-        if not value:
-            return None
-        digits = "".join(character for character in value if character.isdigit())
-        if len(digits) <= 4:
-            return "***"
-        return f"{digits[:3]}.***.***-{digits[-2:]}"

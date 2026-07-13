@@ -1,12 +1,14 @@
 from datetime import date
-from datetime import date
 from decimal import Decimal
+from io import BytesIO
 from pathlib import Path
 from types import SimpleNamespace
 from uuid import uuid4
 
 import pytest
+from openpyxl import load_workbook
 
+from app.core.official_identity import COLOR_NAVY, MUNICIPALITY_CNPJ, MUNICIPALITY_NAME
 from app.models.payment_process import PaymentChecklistStatus, PaymentContract, PaymentContractStatus, PaymentProcess, PaymentProcessChecklistItem, PaymentProcessKind, PaymentProcessStage
 from app.models.user import UserRole
 from app.schemas.payment_process import PaymentProcessDelete
@@ -172,6 +174,56 @@ def test_parses_real_payment_process_workbook():
     assert valid_rows[-1]["data"]["supplier_name"] == "PRIME CONSULTORIA E ASSESSORIA EMPRESARIAL LTDA"
     assert valid_rows[-1]["data"]["contract_number"] == "2-860-2022"
     assert all(row["data"]["kind"] == PaymentProcessKind.FUEL for row in valid_rows)
+
+
+def test_generated_payment_workbook_is_institutional_safe_and_import_compatible():
+    headers = ["Texto", "Data", "Valor", "Igual", "Mais", "Menos", "Arroba", "Seguro"]
+    content = PaymentProcessService(db=None)._build_workbook_bytes(
+        headers=headers,
+        rows=[
+            [
+                "Registro oficial",
+                date(2026, 7, 13),
+                Decimal("1250.75"),
+                "=1+1",
+                "   +SUM(A1:A2)",
+                "\t-2+3",
+                " @IMPORT('x')",
+                "Texto comum",
+            ]
+        ],
+        sheet_name="Processos",
+    )
+
+    workbook = load_workbook(BytesIO(content), data_only=False)
+    sheet = workbook["Processos"]
+    assert workbook.active.title == "Processos"
+    assert [cell.value for cell in sheet[1]] == headers
+    assert sheet.freeze_panes == "A2"
+    assert sheet.auto_filter.ref == "A1:H2"
+    assert sheet["A1"].font.bold is True
+    assert sheet["A1"].font.color.rgb.endswith("FFFFFF")
+    assert sheet["A1"].fill.fgColor.rgb.endswith(COLOR_NAVY.removeprefix("#"))
+
+    assert sheet["B2"].is_date is True
+    assert not isinstance(sheet["C2"].value, str)
+    assert sheet["C2"].value == pytest.approx(1250.75)
+    for coordinate in ("D2", "E2", "F2", "G2"):
+        assert sheet[coordinate].value.startswith("'")
+        assert sheet[coordinate].data_type == "s"
+    assert sheet["H2"].value == "Texto comum"
+
+    metadata = workbook["Metadados"]
+    metadata_values = {
+        metadata.cell(row=row, column=1).value: metadata.cell(row=row, column=2).value
+        for row in range(2, metadata.max_row + 1)
+    }
+    assert metadata_values["Instituição"] == MUNICIPALITY_NAME
+    assert metadata_values["CNPJ"] == MUNICIPALITY_CNPJ
+    assert metadata_values["Documento"] == "Planilha institucional de processos de pagamento"
+    assert metadata["B9"].is_date is True
+    assert workbook.properties.creator == MUNICIPALITY_NAME
+    assert workbook.properties.title == "Processos de pagamento"
 
 
 def test_maps_legacy_status_to_workflow_stage():

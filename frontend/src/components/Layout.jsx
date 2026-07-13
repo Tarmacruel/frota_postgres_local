@@ -507,7 +507,7 @@ export default function Layout() {
                 <div className="stack">
                   <strong>{request.document?.title || 'Documento digital'}</strong>
                   <span className="muted">Solicitado por {request.requested_by_name || 'usuário do sistema'}</span>
-                  <span className="muted">Hash: {request.document?.content_hash_short || '-'}</span>
+                  <span className="muted">Código de integridade: {request.document?.content_hash_short || '-'}</span>
                   {request.message ? <span>{request.message}</span> : null}
                 </div>
                 <div className="actions-inline" style={{ marginTop: 8 }}>

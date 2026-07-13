@@ -152,7 +152,7 @@ export default function PublicPossessionTermPage({ termType }) {
             {term.signature_summary?.document_id ? (
               <section className="public-order-notes">
                 <h2>Assinaturas digitais internas</h2>
-                <p>Hash SHA-256: <strong>{term.signature_summary.content_hash}</strong></p>
+                <p>Código de integridade: <strong>{term.signature_summary.content_hash}</strong></p>
                 <p>Status: {term.signature_summary.is_complete ? 'Concluída' : 'Pendente'}</p>
                 {(term.signature_summary.signatures || []).map((signature) => (
                   <p key={signature.id}>{signature.signer_name} assinou em {formatDate(signature.signed_at)}.</p>

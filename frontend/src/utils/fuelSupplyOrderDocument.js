@@ -1,5 +1,18 @@
 import { officialBrand } from '../constants/officialBrand'
 import { formatDateTimeLabel, loadOptimizedLogo } from './exportData'
+
+function formatInstitutionalDateTime(value) {
+  return formatDateTimeLabel(value).replace(' as ', ' às ')
+}
+
+function signatureStatusLabel(value) {
+  return {
+    COMPLETED: 'Concluída',
+    PENDING: 'Pendente',
+    SUPERSEDED: 'Substituída',
+    CANCELLED: 'Cancelada',
+  }[value] || value || '-'
+}
 import {
   formatOrderNumber,
   getOrderStatusLabel,
@@ -75,7 +88,7 @@ async function buildDocument(order) {
   const municipalityLineHeight = 11
   const titleLineHeight = 14
   const systemLineHeight = 9
-  const generatedAtLabel = `Emissão do documento: ${formatDateTimeLabel(new Date())}`
+  const generatedAtLabel = `Emissão do documento: ${formatInstitutionalDateTime(new Date())}`
   const validationCodeLabel = `Código de validação: ${buildReferenceCode(order)}`
   const footerPageLabelWidth = 104
 
@@ -261,8 +274,8 @@ async function buildDocument(order) {
   cursorY = addSection('Identificação da ordem', [
     ['Número da ordem', formatOrderNumber(order)],
     ['Situação atual', getOrderStatusLabel(order.status)],
-    ['Emitida em', formatDateTimeLabel(order.created_at)],
-    ['Valida até', formatDateTimeLabel(order.expires_at)],
+    ['Emitida em', formatInstitutionalDateTime(order.created_at)],
+    ['Valida até', formatInstitutionalDateTime(order.expires_at)],
     ['Código de validação', buildReferenceCode(order)],
   ], cursorY)
 
@@ -275,7 +288,7 @@ async function buildDocument(order) {
     ['Telefone do posto', order.fuel_station_phone || 'Não informado'],
     ['Localização do posto', order.fuel_station_maps_url || 'Não informado'],
     ['Servidor emissor', order.created_by_name || 'Não informado'],
-    ['Conclusão da ordem', order.confirmed_at ? formatDateTimeLabel(order.confirmed_at) : 'Pendente'],
+    ['Conclusão da ordem', order.confirmed_at ? formatInstitutionalDateTime(order.confirmed_at) : 'Pendente'],
   ], cursorY)
 
   cursorY = addSection('Controle autorizado', [
@@ -290,11 +303,11 @@ async function buildDocument(order) {
   if (signatureSummary?.document_id) {
     const signatures = signatureSummary.signatures || []
     const signatureLines = signatures.length > 0
-      ? signatures.map((signature) => `${signature.signer_name} - ${formatDateTimeLabel(signature.signed_at)}`)
-      : ['Documento digital emitido, aguardando assinatura.']
+      ? signatures.map((signature) => `${signature.signer_name} - ${formatInstitutionalDateTime(signature.signed_at)}`)
+      : ['Documento eletrônico emitido, aguardando assinatura.']
     const lines = doc.splitTextToSize([
-      `Status: ${signatureSummary.status || '-'}`,
-      `Hash SHA-256: ${signatureSummary.content_hash || '-'}`,
+      `Situação: ${signatureStatusLabel(signatureSummary.status)}`,
+      `Código de integridade: ${signatureSummary.content_hash || '-'}`,
       ...signatureLines,
     ].join('\n'), pageWidth - (marginX * 2) - 18)
     const blockHeight = Math.max(54, (lines.length * 9) + 22)
@@ -306,7 +319,7 @@ async function buildDocument(order) {
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(10)
     doc.setTextColor(32, 48, 74)
-    doc.text('ASSINATURAS DIGITAIS INTERNAS', marginX, cursorY)
+    doc.text('ASSINATURAS ELETRÔNICAS INSTITUCIONAIS', marginX, cursorY)
     doc.setDrawColor(36, 82, 232)
     doc.setLineWidth(0.7)
     doc.roundedRect(marginX, cursorY + 8, pageWidth - (marginX * 2), blockHeight, 12, 12)

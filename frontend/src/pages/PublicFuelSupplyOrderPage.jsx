@@ -140,7 +140,7 @@ export default function PublicFuelSupplyOrderPage() {
 
             {order.signature_summary?.document_id ? (
               <section className="public-order-notes">
-                <h2>Assinaturas digitais internas</h2>
+                <h2>Assinaturas eletrônicas institucionais</h2>
                 <p>Hash SHA-256: <strong>{order.signature_summary.content_hash}</strong></p>
                 <p>Status: {order.signature_summary.is_complete ? 'Concluída' : 'Pendente'}</p>
                 {(order.signature_summary.signatures || []).map((signature) => (

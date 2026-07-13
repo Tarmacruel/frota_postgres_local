@@ -80,7 +80,7 @@ class PossessionService:
                 can_view_location=can_view_location,
                 can_view_personal_data=can_view_personal_data,
             )
-            signature_summary = await self._build_possession_signature_summary(record)
+            signature_summary = await self._build_possession_signature_summary(record, current_user=current_user)
             payload["signature_summary"] = self._sanitize_signature_summaries(
                 signature_summary,
                 can_view_personal_data=can_view_personal_data,
@@ -103,23 +103,25 @@ class PossessionService:
             return PaginatedResponse[dict](data=[], pagination=build_pagination(page, limit, 0))
 
         organization_id = scoped_organization_id(current_user)
+        can_view_personal_data = self._can_view_personal_data(current_user)
         records, total = await self.possessions.list_paginated(
             page=page,
             limit=limit,
             vehicle_id=vehicle_id,
             active=active,
-            driver_id=driver_id,
+            driver_id=driver_id if can_view_personal_data else None,
             search=search,
             organization_id=organization_id,
+            include_personal_search=can_view_personal_data,
         )
         can_view_location = self._can_view_location(current_user)
-        can_view_personal_data = self._can_view_personal_data(current_user)
         return PaginatedResponse[dict](
             data=[
                 await self._serialize_with_signatures(
                     record,
                     can_view_location=can_view_location,
                     can_view_personal_data=can_view_personal_data,
+                    current_user=current_user,
                 )
                 for record in records
             ],
@@ -138,6 +140,7 @@ class PossessionService:
             record,
             can_view_location=self._can_view_location(current_user),
             can_view_personal_data=self._can_view_personal_data(current_user),
+            current_user=current_user,
         )
 
     async def start(
@@ -631,13 +634,27 @@ class PossessionService:
 
             await self._store_photo_payloads(possession, photo_payloads, stored_photo_paths)
 
+            responsibility_scope_changed = bool(photo_payloads) or any(
+                (
+                    before["driver_id"] != (str(possession.driver_id) if possession.driver_id else None),
+                    before["driver_name"] != possession.driver_name,
+                    before["driver_document"] != possession.driver_document,
+                    before["driver_contact"] != possession.driver_contact,
+                    before["start_date"] != (possession.start_date.isoformat() if possession.start_date else None),
+                    before["observation"] != possession.observation,
+                    before["start_odometer_km"] != possession.start_odometer_km,
+                )
+            )
+            superseded_document_types = [
+                DigitalDocumentType.POSSESSION_LOAN_TERM,
+                DigitalDocumentType.POSSESSION_RETURN_TERM,
+            ]
+            if responsibility_scope_changed:
+                superseded_document_types.insert(0, DigitalDocumentType.POSSESSION_RESPONSIBILITY_TERM)
             await DocumentSignatureService(self.db).mark_source_documents_superseded(
                 source_type=SOURCE_POSSESSION,
                 source_id=possession.id,
-                document_types=[
-                    DigitalDocumentType.POSSESSION_LOAN_TERM,
-                    DigitalDocumentType.POSSESSION_RETURN_TERM,
-                ],
+                document_types=superseded_document_types,
                 current_user=current_user,
                 reason="POSSESSION_ADMIN_EDIT",
             )
@@ -836,9 +853,8 @@ class PossessionService:
             DigitalDocumentType.POSSESSION_RETURN_TERM if term_type == "return" else DigitalDocumentType.POSSESSION_LOAN_TERM,
             record.id,
         )
-        payload["signature_summary"] = self._sanitize_signature_summary(
+        payload["signature_summary"] = DocumentSignatureService.sanitize_summary_for_legacy_public_view(
             signature_summary,
-            can_view_personal_data=False,
         )
         return payload
 
@@ -852,6 +868,7 @@ class PossessionService:
             record,
             can_view_location=self._can_view_location(current_user),
             can_view_personal_data=self._can_view_personal_data(current_user),
+            current_user=current_user,
         )
 
     async def _ensure_vehicle_exists(self, vehicle_id: UUID, current_user: User | None = None) -> Vehicle:
@@ -1190,7 +1207,12 @@ class PossessionService:
         can_view_location: bool,
         can_view_personal_data: bool,
     ) -> dict:
-        photos = self._serialize_photo_entries(record, can_view_location=can_view_location)
+        stored_photos = list(getattr(record, "photos", []) or [])
+        photos = (
+            self._serialize_photo_entries(record, can_view_location=can_view_location)
+            if can_view_personal_data
+            else []
+        )
         primary_photo = photos[0] if photos else None
         loan_term_url = f"/api/possession/{record.id}/documents/loan-term" if record.document_path and can_view_personal_data else None
         return_term_url = f"/api/possession/{record.id}/documents/return-term" if record.return_document_path and can_view_personal_data else None
@@ -1204,48 +1226,54 @@ class PossessionService:
             "vehicle_brand": record.vehicle.brand if record.vehicle else None,
             "vehicle_model": record.vehicle.model if record.vehicle else None,
             "vehicle_description": self._build_vehicle_description(record),
-            "driver_id": record.driver_id,
-            "driver_name": record.driver_name,
+            "driver_id": record.driver_id if can_view_personal_data else None,
+            "driver_name": record.driver_name if can_view_personal_data else "Identidade protegida",
             "driver_document": record.driver_document if can_view_personal_data else self._mask_document(record.driver_document),
             "driver_contact": record.driver_contact if can_view_personal_data else None,
             "start_date": record.start_date,
             "end_date": record.end_date,
-            "observation": record.observation,
+            "observation": record.observation if can_view_personal_data else None,
             "start_odometer_km": record.start_odometer_km,
             "end_odometer_km": record.end_odometer_km,
             "kilometers_driven": self._calculate_kilometers_driven(record.start_odometer_km, record.end_odometer_km),
             "created_at": record.created_at,
             "is_active": record.is_active,
-            "photo_available": bool(photos),
-            "photo_count": len(photos),
+            "photo_available": bool(stored_photos),
+            "photo_count": len(stored_photos),
             "photo_url": primary_photo["url"] if primary_photo else None,
             "photo_captured_at": primary_photo["captured_at"] if primary_photo else None,
             "photos": photos,
             "loan_term_available": bool(record.document_path),
-            "loan_term_name": record.document_name,
+            "loan_term_name": record.document_name if can_view_personal_data else None,
             "loan_term_url": loan_term_url,
-            "loan_term_uploaded_at": record.document_uploaded_at,
-            "loan_term_validation_code": record.loan_term_validation_code,
-            "loan_term_public_validation_path": self._build_public_validation_path(
-                record.loan_term_validation_code,
-                term_type="loan",
+            "loan_term_uploaded_at": record.document_uploaded_at if can_view_personal_data else None,
+            "loan_term_validation_code": record.loan_term_validation_code if can_view_personal_data else None,
+            "loan_term_public_validation_path": (
+                self._build_public_validation_path(record.loan_term_validation_code, term_type="loan")
+                if can_view_personal_data
+                else None
             ),
             "return_term_available": bool(record.return_document_path),
-            "return_term_name": record.return_document_name,
+            "return_term_name": record.return_document_name if can_view_personal_data else None,
             "return_term_url": return_term_url,
-            "return_term_uploaded_at": record.return_document_uploaded_at,
-            "return_term_validation_code": record.return_term_validation_code,
-            "return_term_public_validation_path": self._build_public_validation_path(
-                record.return_term_validation_code,
-                term_type="return",
+            "return_term_uploaded_at": record.return_document_uploaded_at if can_view_personal_data else None,
+            "return_term_validation_code": record.return_term_validation_code if can_view_personal_data else None,
+            "return_term_public_validation_path": (
+                self._build_public_validation_path(record.return_term_validation_code, term_type="return")
+                if can_view_personal_data
+                else None
             ),
             "return_confirmation_available": current_confirmation is not None,
             "return_confirmation_version": current_confirmation.version if current_confirmation else None,
-            "return_confirmation_hash": current_confirmation.canonical_payload_hash if current_confirmation else None,
+            "return_confirmation_hash": (
+                current_confirmation.canonical_payload_hash
+                if current_confirmation and can_view_personal_data
+                else None
+            ),
             "document_available": bool(record.document_path),
-            "document_name": record.document_name,
+            "document_name": record.document_name if can_view_personal_data else None,
             "document_url": f"/api/possession/{record.id}/document" if record.document_path and can_view_personal_data else None,
-            "document_uploaded_at": record.document_uploaded_at,
+            "document_uploaded_at": record.document_uploaded_at if can_view_personal_data else None,
             "capture_location": primary_photo["capture_location"] if primary_photo else None,
             "signature_summary": None,
         }
@@ -1256,22 +1284,42 @@ class PossessionService:
         *,
         can_view_location: bool,
         can_view_personal_data: bool,
+        current_user: User | None,
     ) -> dict:
         payload = self._serialize(
             record,
             can_view_location=can_view_location,
             can_view_personal_data=can_view_personal_data,
         )
-        signature_summary = await self._build_possession_signature_summary(record)
+        signature_summary = await self._build_possession_signature_summary(record, current_user=current_user)
         payload["signature_summary"] = self._sanitize_signature_summaries(
             signature_summary,
             can_view_personal_data=can_view_personal_data,
         )
         return payload
 
-    async def _build_possession_signature_summary(self, record: VehiclePossession) -> dict:
+    async def _build_possession_signature_summary(
+        self,
+        record: VehiclePossession,
+        *,
+        current_user: User | None,
+    ) -> dict:
         service = DocumentSignatureService(self.db)
+        responsibility = (
+            await service.get_validated_summary_for_source(
+                DigitalDocumentType.POSSESSION_RESPONSIBILITY_TERM,
+                record.id,
+                current_user=current_user,
+                supersede_stale=False,
+            )
+            if current_user is not None
+            else await service.get_summary_for_source(
+                DigitalDocumentType.POSSESSION_RESPONSIBILITY_TERM,
+                record.id,
+            )
+        )
         return {
+            "responsibility": responsibility,
             "loan": await service.get_summary_for_source(DigitalDocumentType.POSSESSION_LOAN_TERM, record.id),
             "return": await service.get_summary_for_source(DigitalDocumentType.POSSESSION_RETURN_TERM, record.id),
         }
@@ -1285,17 +1333,7 @@ class PossessionService:
     def _sanitize_signature_summary(self, summary: dict, *, can_view_personal_data: bool) -> dict:
         if can_view_personal_data:
             return summary
-
-        sanitized = {**summary}
-        sanitized["signatures"] = [
-            {key: value for key, value in signature.items() if key != "signer_email"}
-            for signature in summary.get("signatures", [])
-        ]
-        sanitized["requests"] = [
-            {key: value for key, value in request.items() if key != "requested_signer_email"}
-            for request in summary.get("requests", [])
-        ]
-        return sanitized
+        return DocumentSignatureService.sanitize_summary_for_restricted_view(summary)
 
     def _serialize_public_term(self, record: VehiclePossession, *, term_type: str) -> dict:
         validation_code = (

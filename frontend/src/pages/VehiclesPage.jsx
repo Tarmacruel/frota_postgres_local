@@ -714,7 +714,7 @@ export default function VehiclesPage() {
           { label: 'Sem condutor', value: visibleWithoutDriver, tone: 'slate' },
         ],
         referenceLabel: latestUpdate ? `Referência dos dados: atualizado até ${formatDate(latestUpdate)}` : 'Referência dos dados: painel operacional atual',
-        responsibleSector: 'Secretaria Municipal de Administração | Departamento de Gestão da Frota',
+        responsibleSector: 'Secretaria Municipal de Administração | Setor de Frotas',
         generatedBy: user?.name || user?.email || 'Usuário autenticado',
       })
       setFeedback('Pré-visualização do PDF aberta em nova guia.')
@@ -788,7 +788,7 @@ export default function VehiclesPage() {
           { label: 'Período', value: historyPeriodLabel },
         ],
         referenceLabel: selectedVehicle.updated_at ? `Referência dos dados: atualizado até ${formatDate(selectedVehicle.updated_at)}` : 'Histórico consolidado da frota municipal',
-        responsibleSector: 'Secretaria Municipal de Administração | Departamento de Gestão da Frota',
+        responsibleSector: 'Secretaria Municipal de Administração | Setor de Frotas',
         generatedBy: user?.name || user?.email || 'Usuário autenticado',
       })
       setFeedback(`Pré-visualização do histórico de ${selectedVehicle.plate} aberta em nova guia.`)

@@ -72,7 +72,7 @@ class PossessionTripService:
             possession_id=possession_id,
         )
         if trip is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rota nÃ£o encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rota não encontrada")
         return self._serialize(trip, current_user=current_user)
 
     async def create(self, possession_id: UUID, data: TripCreate, *, current_user: User) -> dict:
@@ -88,7 +88,7 @@ class PossessionTripService:
             raise
         except IntegrityError as exc:
             await self.db.rollback()
-            raise _conflict("TRIP_CONFLICT", "NÃ£o foi possÃ­vel iniciar a rota") from exc
+            raise _conflict("TRIP_CONFLICT", "Não foi possível iniciar a rota") from exc
         except Exception:
             await self.db.rollback()
             raise
@@ -107,19 +107,19 @@ class PossessionTripService:
             for_update=True,
         )
         if possession.end_date is not None:
-            raise _conflict("POSSESSION_ALREADY_ENDED", "Posse encerrada nÃ£o pode receber nova rota")
+            raise _conflict("POSSESSION_ALREADY_ENDED", "Posse encerrada não pode receber nova rota")
         if data.departure_at < possession.start_date:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail={"code": "TRIP_BEFORE_POSSESSION", "message": "A saÃ­da nÃ£o pode anteceder o inÃ­cio da posse"},
+                detail={"code": "TRIP_BEFORE_POSSESSION", "message": "A saída não pode anteceder o início da posse"},
             )
         if await self.trips.get_open_by_possession(possession_id, for_update=True):
-            raise _conflict("OPEN_TRIP_EXISTS", "JÃ¡ existe uma rota em andamento nesta posse")
+            raise _conflict("OPEN_TRIP_EXISTS", "Já existe uma rota em andamento nesta posse")
 
         await self._validate_start_odometer(possession, data.start_odometer_km)
         sequence_number = await self.trips.next_trip_sequence(possession_id)
         if sequence_number is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posse nÃ£o encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posse não encontrada")
 
         trip = VehiclePossessionTrip(
             possession_id=possession_id,
@@ -182,9 +182,9 @@ class PossessionTripService:
                 for_update=True,
             )
             if trip is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rota nÃ£o encontrada")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rota não encontrada")
             if possession.end_date is not None or trip.status != VehiclePossessionTripStatus.EM_ANDAMENTO:
-                raise _conflict("TRIP_NOT_OPEN", "Destinos sÃ³ podem ser adicionados a uma rota em andamento")
+                raise _conflict("TRIP_NOT_OPEN", "Destinos só podem ser adicionados a uma rota em andamento")
             created = await self._add_destinations_in_transaction(
                 trip,
                 destinations,
@@ -202,7 +202,7 @@ class PossessionTripService:
             raise
         except IntegrityError as exc:
             await self.db.rollback()
-            raise _conflict("TRIP_DESTINATION_CONFLICT", "NÃ£o foi possÃ­vel incluir os destinos") from exc
+            raise _conflict("TRIP_DESTINATION_CONFLICT", "Não foi possível incluir os destinos") from exc
         except Exception:
             await self.db.rollback()
             raise
@@ -228,18 +228,18 @@ class PossessionTripService:
                 for_update=True,
             )
             if trip is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rota nÃ£o encontrada")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rota não encontrada")
             if possession.end_date is not None or trip.status != VehiclePossessionTripStatus.EM_ANDAMENTO:
                 raise _conflict("TRIP_NOT_OPEN", "Somente uma rota em andamento pode ser encerrada")
             if data.return_at < trip.departure_at:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail={"code": "TRIP_RETURN_BEFORE_DEPARTURE", "message": "O retorno nÃ£o pode anteceder a saÃ­da"},
+                    detail={"code": "TRIP_RETURN_BEFORE_DEPARTURE", "message": "O retorno não pode anteceder a saída"},
                 )
             if data.end_odometer_km < trip.start_odometer_km:
                 raise HTTPException(
                     status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                    detail={"code": "TRIP_ODOMETER_REVERSED", "message": "O hodÃ´metro final nÃ£o pode ser inferior ao inicial"},
+                    detail={"code": "TRIP_ODOMETER_REVERSED", "message": "O hodômetro final não pode ser inferior ao inicial"},
                 )
 
             trip.status = VehiclePossessionTripStatus.ENCERRADA
@@ -271,7 +271,7 @@ class PossessionTripService:
             raise
         except IntegrityError as exc:
             await self.db.rollback()
-            raise _conflict("TRIP_END_CONFLICT", "NÃ£o foi possÃ­vel encerrar a rota") from exc
+            raise _conflict("TRIP_END_CONFLICT", "Não foi possível encerrar a rota") from exc
         except Exception:
             await self.db.rollback()
             raise
@@ -297,7 +297,7 @@ class PossessionTripService:
                 for_update=True,
             )
             if trip is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rota nÃ£o encontrada")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rota não encontrada")
             if possession.end_date is not None or trip.status != VehiclePossessionTripStatus.EM_ANDAMENTO:
                 raise _conflict("TRIP_NOT_OPEN", "Somente uma rota em andamento pode ser cancelada")
 
@@ -324,7 +324,7 @@ class PossessionTripService:
             raise
         except IntegrityError as exc:
             await self.db.rollback()
-            raise _conflict("TRIP_CANCEL_CONFLICT", "NÃ£o foi possÃ­vel cancelar a rota") from exc
+            raise _conflict("TRIP_CANCEL_CONFLICT", "Não foi possível cancelar a rota") from exc
         except Exception:
             await self.db.rollback()
             raise
@@ -341,7 +341,7 @@ class PossessionTripService:
         for data in destinations:
             sequence_number = await self.trips.next_destination_sequence(trip.id)
             if sequence_number is None:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rota nÃ£o encontrada")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Rota não encontrada")
             destination = VehiclePossessionTripDestination(
                 trip_id=trip.id,
                 sequence_number=sequence_number,
@@ -388,7 +388,7 @@ class PossessionTripService:
         if value != expected:
             raise _conflict(
                 "TRIP_ODOMETER_DIVERGENCE",
-                f"O hodÃ´metro inicial deve coincidir com o Ãºltimo valor conhecido ({expected} km)",
+                f"O hodômetro inicial deve coincidir com o último valor conhecido ({expected} km)",
             )
 
     async def _get_visible_possession(
@@ -404,14 +404,14 @@ class PossessionTripService:
             else await self.possessions.get_by_id(possession_id)
         )
         if possession is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posse nÃ£o encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posse não encontrada")
         organization_id = scoped_organization_id(current_user)
         if organization_id is None:
             if production_scope_is_empty(current_user):
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posse nÃ£o encontrada")
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posse não encontrada")
             return possession
         if not await self.vehicles.is_vehicle_in_organization(possession.vehicle_id, organization_id):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posse nÃ£o encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posse não encontrada")
         return possession
 
     def _serialize(self, trip: VehiclePossessionTrip, *, current_user: User) -> dict:
@@ -437,8 +437,8 @@ class PossessionTripService:
             "possession_id": trip.possession_id,
             "sequence_number": trip.sequence_number,
             "status": trip.status,
-            "origin": "InformaÃ§Ã£o restrita" if operational_details_restricted else trip.origin,
-            "purpose": trip.purpose,
+            "origin": "Informação restrita" if operational_details_restricted else trip.origin,
+            "purpose": None if operational_details_restricted else trip.purpose,
             "departure_at": trip.departure_at,
             "return_at": trip.return_at,
             "start_odometer_km": trip.start_odometer_km,

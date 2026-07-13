@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from datetime import datetime
 from uuid import UUID
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 from app.models.location_history import LocationHistory
@@ -16,12 +16,20 @@ class PossessionRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def get_by_id(self, possession_id: UUID) -> VehiclePossession | None:
-        result = await self.db.execute(
+    async def get_by_id(
+        self,
+        possession_id: UUID,
+        *,
+        populate_existing: bool = False,
+    ) -> VehiclePossession | None:
+        statement = (
             select(VehiclePossession)
             .options(joinedload(VehiclePossession.vehicle), joinedload(VehiclePossession.driver), selectinload(VehiclePossession.photos), selectinload(VehiclePossession.return_confirmations))
             .where(VehiclePossession.id == possession_id)
         )
+        if populate_existing:
+            statement = statement.execution_options(populate_existing=True)
+        result = await self.db.execute(statement)
         return result.scalar_one_or_none()
 
     async def get_by_id_for_update(self, possession_id: UUID) -> VehiclePossession | None:
@@ -29,12 +37,18 @@ class PossessionRepository:
             select(VehiclePossession)
             .where(VehiclePossession.id == possession_id)
             .with_for_update()
+            .execution_options(populate_existing=True)
         )
         return result.scalar_one_or_none()
 
-    async def get_term_graph(self, possession_id: UUID) -> VehiclePossession | None:
+    async def get_term_graph(
+        self,
+        possession_id: UUID,
+        *,
+        populate_existing: bool = False,
+    ) -> VehiclePossession | None:
         """Load the complete, ordered graph used by the official possession term."""
-        result = await self.db.execute(
+        statement = (
             select(VehiclePossession)
             .options(
                 joinedload(VehiclePossession.vehicle),
@@ -45,6 +59,9 @@ class PossessionRepository:
             )
             .where(VehiclePossession.id == possession_id)
         )
+        if populate_existing:
+            statement = statement.execution_options(populate_existing=True)
+        result = await self.db.execute(statement)
         return result.scalar_one_or_none()
 
     async def lock_vehicle(self, vehicle_id: UUID) -> bool:
@@ -114,6 +131,7 @@ class PossessionRepository:
         driver_id: UUID | None = None,
         search: str | None = None,
         organization_id: UUID | None = None,
+        include_personal_search: bool = True,
     ) -> tuple[list[VehiclePossession], int]:
         stmt = (
             select(VehiclePossession)
@@ -138,17 +156,24 @@ class PossessionRepository:
             stmt = stmt.where(VehiclePossession.end_date.is_not(None))
             count_stmt = count_stmt.where(VehiclePossession.end_date.is_not(None))
         if search:
-            term = f"%{search.strip()}%"
-            stmt = stmt.where(
-                VehiclePossession.driver_name.ilike(term)
-                | VehiclePossession.driver_document.ilike(term)
-                | VehiclePossession.driver_contact.ilike(term)
-            )
-            count_stmt = count_stmt.where(
-                VehiclePossession.driver_name.ilike(term)
-                | VehiclePossession.driver_document.ilike(term)
-                | VehiclePossession.driver_contact.ilike(term)
-            )
+            normalized_search = search.strip()
+            term = f"%{normalized_search}%"
+            search_conditions = [
+                VehiclePossession.vehicle.has(Vehicle.plate.ilike(term)),
+            ]
+            if normalized_search.isdecimal():
+                search_conditions.append(VehiclePossession.public_number == int(normalized_search))
+            if include_personal_search:
+                search_conditions.extend(
+                    [
+                        VehiclePossession.driver_name.ilike(term),
+                        VehiclePossession.driver_document.ilike(term),
+                        VehiclePossession.driver_contact.ilike(term),
+                    ]
+                )
+            search_predicate = or_(*search_conditions)
+            stmt = stmt.where(search_predicate)
+            count_stmt = count_stmt.where(search_predicate)
 
         stmt = stmt.offset((page - 1) * limit).limit(limit)
         total = int((await self.db.execute(count_stmt)).scalar_one())

@@ -116,7 +116,9 @@ def test_clean_migration_created_expected_schema_and_public_number_default():
             )
         ]
 
-    assert head == "0039_possession_trips"
+    # The clean-database proof runs the complete migration graph, whose
+    # production head moved to 0040 after the Phase 2 schema was introduced.
+    assert head == "0040_report_preferences"
     assert {
         "vehicle_possession",
         "vehicle_possession_photos",

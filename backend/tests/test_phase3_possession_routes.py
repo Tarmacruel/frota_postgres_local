@@ -18,11 +18,11 @@ from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 
 from app.api.deps import require_writer
 from app.core.config import settings
-from app.core.security import create_access_token
+from app.core.security import create_access_token, get_password_hash
 from app.db.session import get_db_session
 from app.main import app
 from app.models.user import User, UserRole
-from app.schemas.possession_trip import TripCreate, TripDestinationCreate
+from app.schemas.possession_trip import TripCreate, TripDestinationCreate, TripOut
 from app.repositories.possession_trip_repository import PossessionTripRepository
 from app.repositories.possession_repository import PossessionRepository
 from app.services.audit_service import AuditService
@@ -46,7 +46,14 @@ def _sync_database_url() -> str:
 
 
 def _unique_cpf() -> str:
-    return str(uuid4().int % 100_000_000_000).zfill(11)
+    base = str(uuid4().int % 1_000_000_000).zfill(9)
+    if len(set(base)) == 1:
+        base = "529982247"
+    numbers = [int(character) for character in base]
+    first = (sum(numbers[index] * (10 - index) for index in range(9)) * 10 % 11) % 10
+    numbers.append(first)
+    second = (sum(numbers[index] * (11 - index) for index in range(10)) * 10 % 11) % 10
+    return f"{base}{first}{second}"
 
 
 def _seed_user(connection, role: str = "ADMIN") -> UUID:
@@ -55,6 +62,20 @@ def _seed_user(connection, role: str = "ADMIN") -> UUID:
         "INSERT INTO users (name, email, cpf, password_hash, role, must_change_password) "
         "VALUES (%s, %s, %s, 'not-a-real-password-hash', %s, false) RETURNING id",
         (f"Usuário Fase 3 {suffix}", f"phase3-{suffix}@example.test", _unique_cpf(), role),
+    ).fetchone()[0]
+
+
+def _seed_signing_user(connection, *, password: str = "Senha-segura-123") -> UUID:
+    suffix = uuid4().hex[:12]
+    return connection.execute(
+        "INSERT INTO users (name, email, cpf, password_hash, role, must_change_password) "
+        "VALUES (%s, %s, %s, %s, 'ADMIN', false) RETURNING id",
+        (
+            f"Signatário Fase 3 {suffix}",
+            f"phase3-signature-{suffix}@example.test",
+            _unique_cpf(),
+            get_password_hash(password),
+        ),
     ).fetchone()[0]
 
 
@@ -87,6 +108,33 @@ def _seed_open_trip(connection, *, possession_id: UUID, user_id: UUID, start_odo
         "(possession_id, sequence_number, status, origin, purpose, departure_at, start_odometer_km, created_by_user_id) "
         "VALUES (%s, 1, 'EM_ANDAMENTO', 'Garagem', 'Rota de teste', NOW(), %s, %s) RETURNING id",
         (possession_id, start_odometer, user_id),
+    ).fetchone()[0]
+
+
+def _insert_closed_trip(
+    connection,
+    *,
+    possession_id: UUID,
+    user_id: UUID,
+    sequence_number: int = 1,
+) -> UUID:
+    departure_at = datetime.now(timezone.utc) - timedelta(hours=1)
+    return_at = departure_at + timedelta(minutes=30)
+    return connection.execute(
+        "INSERT INTO vehicle_possession_trip "
+        "(possession_id, sequence_number, status, origin, purpose, departure_at, return_at, "
+        "start_odometer_km, end_odometer_km, created_by_user_id, closed_by_user_id, closed_at) "
+        "VALUES (%s, %s, 'ENCERRADA', 'Garagem', 'Rota concluida', %s, %s, 100.0, 101.0, %s, %s, %s) "
+        "RETURNING id",
+        (
+            possession_id,
+            sequence_number,
+            departure_at,
+            return_at,
+            user_id,
+            user_id,
+            return_at,
+        ),
     ).fetchone()[0]
 
 
@@ -473,6 +521,7 @@ async def test_trip_lifecycle_idor_and_restricted_read(phase3_client):
     assert restricted.status_code == 200
     assert restricted.json()["origin"] != "Garagem sigilosa"
     assert restricted.json()["origin"].endswith("restrita")
+    assert restricted.json()["purpose"] is None
     assert restricted.json()["destinations"] == []
     assert restricted.json()["operational_details_restricted"] is True
     forbidden_mutation = await phase3_client.post(
@@ -665,3 +714,124 @@ async def test_concurrent_trip_and_destination_creation_are_serialized():
         assert sequences == [1, 2]
     finally:
         await engine.dispose()
+
+
+@requires_phase3_database
+@pytest.mark.asyncio
+async def test_unique_responsibility_term_signature_api_and_pdf_keep_delivery_scope_after_trip(
+    phase3_client: AsyncClient,
+):
+    password = "Senha-segura-123"
+    with psycopg.connect(_sync_database_url()) as connection:
+        user_id = _seed_signing_user(connection, password=password)
+        vehicle_id = _seed_vehicle(connection)
+        possession_id = _seed_possession(connection, vehicle_id=vehicle_id)
+        connection.commit()
+
+    _authenticate(phase3_client, user_id, "ADMIN")
+    document_payload = {
+        "document_type": "POSSESSION_RESPONSIBILITY_TERM",
+        "source_id": str(possession_id),
+    }
+    document_responses = await asyncio.gather(
+        phase3_client.post(
+            "/api/document-signatures/documents",
+            json=document_payload,
+            headers=CSRF_HEADERS,
+        ),
+        phase3_client.post(
+            "/api/document-signatures/documents",
+            json=document_payload,
+            headers=CSRF_HEADERS,
+        ),
+    )
+    assert [response.status_code for response in document_responses] == [200, 200]
+    document = document_responses[0].json()
+    assert document_responses[1].json()["document_id"] == document["document_id"]
+    assert document["document_type"] == "POSSESSION_RESPONSIBILITY_TERM"
+    assert document["public_validation_code"] is None
+    assert document["public_validation_path"] is None
+    assert document["snapshot"]["scope"] == "DELIVERY_AND_RESPONSIBILITY_ACCEPTANCE"
+    assert document["snapshot"]["acceptance"]["version"] == "1.0"
+    assert "trips" not in document["snapshot"]
+
+    sign_responses = await asyncio.gather(
+        phase3_client.post(
+            f"/api/document-signatures/documents/{document['document_id']}/sign",
+            json={"current_password": password},
+            headers=CSRF_HEADERS,
+        ),
+        phase3_client.post(
+            f"/api/document-signatures/documents/{document['document_id']}/sign",
+            json={"current_password": password},
+            headers=CSRF_HEADERS,
+        ),
+    )
+    assert sorted(response.status_code for response in sign_responses) == [200, 409]
+    signed = next(response.json() for response in sign_responses if response.status_code == 200)
+    assert signed["status"] == "COMPLETED"
+    assert signed["signed_count"] == 1
+    assert signed["signatures"][0]["content_hash"] == signed["content_hash"]
+
+    with psycopg.connect(_sync_database_url()) as connection:
+        _insert_closed_trip(
+            connection,
+            possession_id=possession_id,
+            user_id=user_id,
+            sequence_number=1,
+        )
+        connection.commit()
+
+    unchanged_response = await phase3_client.get(
+        f"/api/document-signatures/documents/{document['document_id']}",
+    )
+    assert unchanged_response.status_code == 200, unchanged_response.text
+    assert unchanged_response.json()["status"] == "COMPLETED"
+
+    pdf_response = await phase3_client.get(
+        f"/api/possession/{possession_id}/term?disposition=inline",
+    )
+    assert pdf_response.status_code == 200, pdf_response.text
+    assert pdf_response.content.startswith(b"%PDF-")
+    assert b"/Subtype /Image" in pdf_response.content
+    # The application-wide API middleware normalizes authenticated responses
+    # to the equally strict no-store directive.
+    assert "no-store" in pdf_response.headers["cache-control"]
+
+    with psycopg.connect(_sync_database_url()) as connection:
+        counts = connection.execute(
+            "SELECT "
+            "(SELECT count(*) FROM digital_documents WHERE id = %s), "
+            "(SELECT count(*) FROM document_signatures WHERE document_id = %s)",
+            (document["document_id"], document["document_id"]),
+        ).fetchone()
+    assert counts == (1, 1)
+
+
+def test_trip_output_accepts_restricted_purpose_without_breaking_response_contract():
+    now = datetime.now(timezone.utc)
+    output = TripOut.model_validate(
+        {
+            "id": uuid4(),
+            "possession_id": uuid4(),
+            "sequence_number": 1,
+            "status": "EM_ANDAMENTO",
+            "origin": "Informação restrita",
+            "purpose": None,
+            "departure_at": now,
+            "return_at": None,
+            "start_odometer_km": "100.0",
+            "end_odometer_km": None,
+            "kilometers_driven": None,
+            "observation": None,
+            "cancellation_reason": None,
+            "created_at": now,
+            "updated_at": now,
+            "closed_at": None,
+            "cancelled_at": None,
+            "destinations": [],
+            "operational_details_restricted": True,
+        }
+    )
+
+    assert output.purpose is None

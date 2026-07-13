@@ -27,7 +27,7 @@ class _StrictSchema(BaseModel):
     @staticmethod
     def _timezone_aware(value: datetime | None) -> datetime | None:
         if value is not None and (value.tzinfo is None or value.utcoffset() is None):
-            raise ValueError("Data e hora devem informar fuso horÃ¡rio")
+            raise ValueError("Data e hora devem informar fuso horário")
         return value
 
 
@@ -56,9 +56,9 @@ class TripDestinationCreate(_StrictSchema):
     @model_validator(mode="after")
     def validate_time_order(self):
         if self.departed_at is not None and self.arrived_at is None:
-            raise ValueError("A saÃ­da do destino exige data/hora de chegada")
+            raise ValueError("A saída do destino exige data/hora de chegada")
         if self.departed_at is not None and self.departed_at < self.arrived_at:
-            raise ValueError("A saÃ­da do destino nÃ£o pode anteceder a chegada")
+            raise ValueError("A saída do destino não pode anteceder a chegada")
         return self
 
 
@@ -136,7 +136,7 @@ class TripOut(BaseModel):
     sequence_number: int
     status: VehiclePossessionTripStatus
     origin: str
-    purpose: str
+    purpose: str | None
     departure_at: datetime
     return_at: datetime | None
     start_odometer_km: Decimal

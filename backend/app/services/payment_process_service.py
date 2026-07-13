@@ -16,6 +16,17 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.organization_scope import is_production_user, production_scope_is_empty, scoped_organization_id
+from app.core.official_identity import (
+    ADMINISTRATION_SECRETARIAT,
+    COLOR_BORDER,
+    COLOR_NAVY,
+    COLOR_SURFACE,
+    FLEET_DEPARTMENT,
+    MUNICIPALITY_ADDRESS,
+    MUNICIPALITY_CNPJ,
+    MUNICIPALITY_NAME,
+    institutional_datetime,
+)
 from app.models.master_data import Organization
 from app.models.payment_process import (
     PaymentChecklistStatus,
@@ -50,10 +61,14 @@ from app.services.audit_service import AuditService
 
 try:
     from openpyxl import Workbook, load_workbook
+    from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+    from openpyxl.utils import get_column_letter
     from openpyxl.utils.exceptions import InvalidFileException
 except ImportError:  # pragma: no cover - dependency is pinned in requirements.
     Workbook = None
     load_workbook = None
+    Alignment = Border = Font = PatternFill = Side = None
+    get_column_letter = None
     InvalidFileException = Exception
 
 
@@ -2223,16 +2238,93 @@ class PaymentProcessService:
         workbook = Workbook()
         sheet = workbook.active
         sheet.title = sheet_name
-        sheet.append(headers)
+        sheet.append([self._neutralize_workbook_text(value) for value in headers])
         for row in rows:
-            sheet.append(row)
+            sheet.append([self._neutralize_workbook_text(value) for value in row])
+
+        navy = COLOR_NAVY.removeprefix("#")
+        border_color = COLOR_BORDER.removeprefix("#")
+        surface = COLOR_SURFACE.removeprefix("#")
+        thin_border = Border(
+            left=Side(style="thin", color=border_color),
+            right=Side(style="thin", color=border_color),
+            top=Side(style="thin", color=border_color),
+            bottom=Side(style="thin", color=border_color),
+        )
+        for cell in sheet[1]:
+            cell.font = Font(name="Arial", size=10, bold=True, color="FFFFFF")
+            cell.fill = PatternFill(fill_type="solid", fgColor=navy)
+            cell.alignment = Alignment(horizontal="center", vertical="center", wrap_text=True)
+            cell.border = thin_border
+        sheet.row_dimensions[1].height = 30
         sheet.freeze_panes = "A2"
+        sheet.auto_filter.ref = f"A1:{get_column_letter(len(headers))}{max(sheet.max_row, 1)}"
+        sheet.print_title_rows = "1:1"
+        sheet.sheet_view.showGridLines = False
+        sheet.page_setup.orientation = "landscape"
+        sheet.page_setup.fitToWidth = 1
+        sheet.sheet_properties.pageSetUpPr.fitToPage = True
         for column_cells in sheet.columns:
             max_length = max((len(str(cell.value)) for cell in column_cells if cell.value is not None), default=10)
             sheet.column_dimensions[column_cells[0].column_letter].width = min(max(max_length + 2, 12), 42)
+
+        generated_at = institutional_datetime(datetime.now(timezone.utc)).replace(tzinfo=None)
+        metadata = workbook.create_sheet("Metadados")
+        metadata.merge_cells("A1:B1")
+        metadata["A1"] = "IDENTIFICAÇÃO INSTITUCIONAL"
+        metadata["A1"].font = Font(name="Arial", size=12, bold=True, color="FFFFFF")
+        metadata["A1"].fill = PatternFill(fill_type="solid", fgColor=navy)
+        metadata["A1"].alignment = Alignment(horizontal="left", vertical="center")
+        metadata.row_dimensions[1].height = 24
+        institutional_metadata = [
+            ("Instituição", MUNICIPALITY_NAME),
+            ("Secretaria", ADMINISTRATION_SECRETARIAT),
+            ("Unidade responsável", FLEET_DEPARTMENT),
+            ("CNPJ", MUNICIPALITY_CNPJ),
+            ("Endereço", MUNICIPALITY_ADDRESS),
+            ("Documento", "Planilha institucional de processos de pagamento"),
+            ("Conteúdo", sheet_name),
+            ("Emissão", generated_at),
+        ]
+        for label, value in institutional_metadata:
+            metadata.append(
+                [
+                    self._neutralize_workbook_text(label),
+                    self._neutralize_workbook_text(value),
+                ]
+            )
+        for row_index in range(2, metadata.max_row + 1):
+            label_cell = metadata.cell(row=row_index, column=1)
+            value_cell = metadata.cell(row=row_index, column=2)
+            label_cell.font = Font(name="Arial", size=10, bold=True, color=navy)
+            label_cell.fill = PatternFill(fill_type="solid", fgColor=surface)
+            label_cell.alignment = Alignment(vertical="top")
+            value_cell.alignment = Alignment(vertical="top", wrap_text=True)
+            label_cell.border = value_cell.border = thin_border
+        metadata["B9"].number_format = "dd/mm/yyyy hh:mm"
+        metadata.column_dimensions["A"].width = 24
+        metadata.column_dimensions["B"].width = 86
+        metadata.freeze_panes = "A2"
+        metadata.sheet_view.showGridLines = False
+
+        workbook.properties.creator = MUNICIPALITY_NAME
+        workbook.properties.lastModifiedBy = MUNICIPALITY_NAME
+        workbook.properties.title = "Processos de pagamento"
+        workbook.properties.subject = "Documento institucional de processos de pagamento"
+        workbook.properties.description = (
+            f"{MUNICIPALITY_NAME} — {ADMINISTRATION_SECRETARIAT} — {FLEET_DEPARTMENT}"
+        )
+        workbook.properties.category = "Documento institucional"
+        workbook.properties.keywords = "processos de pagamento, frota municipal"
         output = io.BytesIO()
         workbook.save(output)
         return output.getvalue()
+
+    @staticmethod
+    def _neutralize_workbook_text(value):
+        if isinstance(value, str) and value.lstrip().startswith(("=", "+", "-", "@")):
+            return f"'{value}"
+        return value
 
     def _extract_contract(self, text: str) -> str | None:
         match = re.search(r"\b\d+-\d+-\d{4}\b", text or "")

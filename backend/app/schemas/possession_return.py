@@ -38,17 +38,17 @@ class PossessionReturnCorrection(BaseModel):
 
 
 class PossessionReturnConfirmationOut(BaseModel):
-    id: UUID
+    id: UUID | None = None
     version: int
     is_current: bool
     declaration_version: str
     declaration_text: str
-    canonical_payload_hash: str
-    confirmer_name: str
-    confirmer_role: str
+    canonical_payload_hash: str | None = None
+    confirmer_name: str | None = None
+    confirmer_role: str | None = None
     confirmed_at: datetime
     final_odometer_km: float
-    vehicle_condition_notes: str
+    vehicle_condition_notes: str | None = None
     last_trip_id: UUID | None
     superseded_at: datetime | None
     superseded_by_confirmation_id: UUID | None

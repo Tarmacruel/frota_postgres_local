@@ -1,6 +1,6 @@
 from pathlib import Path
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from fastapi import HTTPException
@@ -8,7 +8,9 @@ from pydantic import ValidationError
 
 from app.core.config import Settings, settings
 from app.models.user import UserRole
+from app.repositories.search_repository import SearchRepository
 from app.services.possession_service import PossessionService
+from app.services.search_service import SearchService
 
 
 def production_settings(**overrides) -> Settings:
@@ -111,3 +113,91 @@ async def test_standard_profile_cannot_download_full_photo_evidence(monkeypatch)
             current_user=SimpleNamespace(role=UserRole.PADRAO),
         )
     assert denied.value.status_code == 403
+
+
+@pytest.mark.asyncio
+async def test_standard_global_search_does_not_query_personal_possession_fields():
+    db = SimpleNamespace(execute=AsyncMock())
+    result = MagicMock()
+    result.scalars.return_value.unique.return_value.all.return_value = []
+    db.execute.return_value = result
+
+    repository = SearchRepository(db)
+    await repository.search_vehicles(
+        "%ABC%",
+        10,
+        include_personal_data=False,
+    )
+    vehicle_statement = str(db.execute.await_args.args[0])
+    assert "driver_name" not in vehicle_statement
+
+    await repository.search_possessions(
+        "%ABC%",
+        10,
+        include_personal_data=False,
+    )
+
+    statement = str(db.execute.await_args.args[0])
+    assert "driver_name" not in statement
+    assert "observation" not in statement
+    assert "driver_document" not in statement
+    assert "driver_contact" not in statement
+    assert "vehicles.plate" in statement
+
+
+@pytest.mark.asyncio
+async def test_standard_global_search_does_not_return_driver_identity():
+    service = SearchService(None)
+    secret_name = "Nome pessoal restrito"
+    vehicle = SimpleNamespace(
+        id="vehicle-id",
+        plate="ABC1D23",
+        brand="Marca",
+        model="Modelo",
+        chassis_number="CHASSIS-PUBLICO-TESTE",
+        ownership_type=SimpleNamespace(value="PROPRIO"),
+        status=SimpleNamespace(value="ATIVO"),
+    )
+    possession = SimpleNamespace(
+        id="possession-id",
+        public_number=358,
+        driver_name=secret_name,
+        driver_document="12345678900",
+        driver_contact="73999999999",
+        vehicle=vehicle,
+        is_active=True,
+    )
+    service.search_repo.search_vehicles = AsyncMock(return_value=[(vehicle, None, possession)])
+    service.search_repo.search_possessions = AsyncMock(return_value=[possession])
+    service.search_repo.search_maintenances = AsyncMock(return_value=[])
+    current_user = SimpleNamespace(
+        role=UserRole.PADRAO,
+        permissions={
+            "vehicles": {"can_view": True},
+            "possession": {"can_view": True},
+            "maintenance": {"can_view": False},
+        },
+    )
+
+    payload = await service.search("ABC", 10, current_user)
+
+    service.search_repo.search_possessions.assert_awaited_once_with(
+        "%ABC%",
+        10,
+        organization_id=None,
+        include_personal_data=False,
+    )
+    service.search_repo.search_vehicles.assert_awaited_once_with(
+        "%ABC%",
+        10,
+        organization_id=None,
+        include_personal_data=False,
+    )
+    rendered = repr(payload)
+    assert secret_name not in rendered
+    assert "12345678900" not in rendered
+    assert "73999999999" not in rendered
+    vehicle_result = next(item for item in payload if item["type"] == "vehicle")
+    possession_result = next(item for item in payload if item["type"] == "possession")
+    assert vehicle_result["context"]["driver_name"] is None
+    assert possession_result["title"] == "Posse nº 358"

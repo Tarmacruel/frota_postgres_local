@@ -1,11 +1,13 @@
 from datetime import datetime, timezone
 from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
 
 from app.models.user import UserRole
+from app.repositories.possession_repository import PossessionRepository
 from app.services.possession_service import PossessionService
 
 
@@ -94,6 +96,50 @@ def build_record(*, active=False):
 
 
 @pytest.mark.asyncio
+async def test_standard_paginated_search_never_delegates_personal_filters():
+    service = PossessionService(db=None)
+    service.possessions = SimpleNamespace(list_paginated=AsyncMock(return_value=([], 0)))
+    driver_id = uuid4()
+    actor = SimpleNamespace(id=uuid4(), role=UserRole.PADRAO, organization_id=None)
+
+    result = await service.list_paginated(
+        page=1,
+        limit=10,
+        driver_id=driver_id,
+        search="Pessoa protegida",
+        current_user=actor,
+    )
+
+    assert result.pagination.total == 0
+    delegated = service.possessions.list_paginated.await_args.kwargs
+    assert delegated["driver_id"] is None
+    assert delegated["include_personal_search"] is False
+
+
+@pytest.mark.asyncio
+async def test_restricted_possession_repository_search_uses_only_non_personal_fields():
+    db = AsyncMock()
+    count_result = MagicMock()
+    count_result.scalar_one.return_value = 0
+    items_result = MagicMock()
+    items_result.scalars.return_value.unique.return_value.all.return_value = []
+    db.execute.side_effect = [count_result, items_result]
+
+    await PossessionRepository(db).list_paginated(
+        page=1,
+        limit=10,
+        search="Pessoa protegida",
+        include_personal_search=False,
+    )
+
+    where_clause = str(db.execute.await_args_list[0].args[0].whereclause)
+    assert "plate" in where_clause
+    assert "driver_name" not in where_clause
+    assert "driver_document" not in where_clause
+    assert "driver_contact" not in where_clause
+
+
+@pytest.mark.asyncio
 async def test_generate_validation_code_uses_requested_prefix():
     service = PossessionService(db=None)
     service.possessions = FakePossessionRepository()
@@ -160,6 +206,9 @@ async def test_delete_possession_is_denied_audited_and_preserves_record_and_file
 def test_possession_serialization_applies_role_data_exposure():
     service = PossessionService(db=None)
     record = build_record(active=False)
+    record.return_confirmations = [
+        SimpleNamespace(is_current=True, version=1, canonical_payload_hash="a" * 64)
+    ]
 
     restricted = service._serialize(
         record,
@@ -174,9 +223,28 @@ def test_possession_serialization_applies_role_data_exposure():
 
     assert restricted["driver_document"] == "430.***.***-98"
     assert restricted["driver_contact"] is None
+    assert restricted["driver_id"] is None
+    assert restricted["driver_name"] == "Identidade protegida"
+    assert restricted["observation"] is None
+    assert restricted["photos"] == []
+    assert restricted["photo_available"] is True
+    assert restricted["photo_count"] == 1
+    assert restricted["photo_url"] is None
+    assert restricted["photo_captured_at"] is None
     assert restricted["document_url"] is None
+    assert restricted["document_name"] is None
+    assert restricted["document_uploaded_at"] is None
     assert restricted["loan_term_url"] is None
+    assert restricted["loan_term_name"] is None
+    assert restricted["loan_term_uploaded_at"] is None
+    assert restricted["loan_term_validation_code"] is None
+    assert restricted["loan_term_public_validation_path"] is None
     assert restricted["return_term_url"] is None
+    assert restricted["return_term_name"] is None
+    assert restricted["return_term_uploaded_at"] is None
+    assert restricted["return_term_validation_code"] is None
+    assert restricted["return_term_public_validation_path"] is None
+    assert restricted["return_confirmation_hash"] is None
     assert restricted["capture_location"] is None
 
     assert operational["driver_document"] == record.driver_document
@@ -184,6 +252,7 @@ def test_possession_serialization_applies_role_data_exposure():
     assert operational["document_url"] == f"/api/possession/{record.id}/document"
     assert operational["loan_term_url"] == f"/api/possession/{record.id}/documents/loan-term"
     assert operational["return_term_url"] == f"/api/possession/{record.id}/documents/return-term"
+    assert operational["return_confirmation_hash"] == "a" * 64
     assert operational["capture_location"]["latitude"] == pytest.approx(-17.54)
 
 
@@ -207,16 +276,32 @@ def test_production_profile_has_operational_personal_data_and_location_access():
     assert service._can_view_location(actor) is True
 
 
-def test_restricted_signature_summary_omits_signer_emails():
+def test_restricted_signature_summary_omits_personal_and_request_details():
     service = PossessionService(db=None)
     summary = {
         "status": "PENDING",
-        "signatures": [{"signer_name": "Servidor", "signer_email": "servidor@frota.local"}],
-        "requests": [{"requested_signer_name": "Gestor", "requested_signer_email": "gestor@frota.local"}],
+        "signatures": [
+            {
+                "signer_name": "Servidor",
+                "signer_email": "servidor@frota.local",
+                "signer_cpf_masked": "***.123.456-**",
+                "signer_organization_name": "Unidade restrita",
+            }
+        ],
+        "requests": [
+            {
+                "requested_signer_name": "Gestor",
+                "requested_signer_email": "gestor@frota.local",
+                "message": "Mensagem interna",
+            }
+        ],
     }
 
     restricted = service._sanitize_signature_summary(summary, can_view_personal_data=False)
 
-    assert "signer_email" not in restricted["signatures"][0]
-    assert "requested_signer_email" not in restricted["requests"][0]
+    assert restricted["document_id"] is None
+    assert restricted["source_id"] is None
+    assert restricted["content_hash"] is None
+    assert restricted["signatures"] == []
+    assert restricted["requests"] == []
     assert summary["signatures"][0]["signer_email"] == "servidor@frota.local"

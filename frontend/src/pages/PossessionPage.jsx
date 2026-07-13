@@ -886,7 +886,7 @@ export default function PossessionPage() {
           <div className="filter-inline">
             <input
               className="app-input"
-              placeholder={(isAdmin || isProduction) ? 'Buscar por placa, secretaria, condutor ou contato' : 'Buscar por placa ou condutor'}
+              placeholder={(isAdmin || isProduction) ? 'Buscar por placa, secretaria, condutor ou contato' : 'Buscar por placa ou número da posse'}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
@@ -1299,7 +1299,7 @@ export default function PossessionPage() {
           <div className="evidence-gallery-grid">
             <article className="evidence-meta-card official-term-card">
               <strong>Termo único oficial</strong>
-              <p className="muted">Gerado pelo servidor a partir da entrega, das rotas, dos destinos, do status e da devolução persistidos. O navegador não monta o documento oficial.</p>
+              <p className="muted">Documento institucional que reúne a entrega, a responsabilidade, as rotas, os destinos e a devolução vinculados a esta posse.</p>
               <div className="actions-inline">
                 <button type="button" className="app-button" disabled={termBusy} onClick={() => handleOfficialTerm(termRecord, 'inline')}>
                   {termBusy ? 'Preparando…' : 'Pré-visualizar PDF'}
@@ -1316,6 +1316,15 @@ export default function PossessionPage() {
                 ) : null}
               </div>
               {!(isAdmin || isProduction) ? <span className="helper-text">Seu perfil recebe uma visualização mascarada; o download integral é restrito.</span> : null}
+              <DocumentSignaturePanel
+                documentType={DIGITAL_DOCUMENT_TYPES.POSSESSION_RESPONSIBILITY_TERM}
+                sourceId={termRecord.id}
+                summary={termRecord.signature_summary?.responsibility}
+                title="Assinatura eletrônica do responsável pela entrega"
+                description="Registra a declaração do agente que realizou ou conferiu administrativamente a entrega."
+                readOnly={!canEditPossession}
+                onChanged={(summary) => handleTermSignatureChanged('responsibility', summary)}
+              />
             </article>
 
             {(termRecord.loan_term_validation_code || termRecord.return_term_validation_code || termRecord.return_term_available) ? (
@@ -1359,12 +1368,7 @@ export default function PossessionPage() {
                 />
               ) : null}
             </article>
-            ) : (
-              <article className="evidence-meta-card">
-                <strong>Compatibilidade</strong>
-                <span className="muted">Esta posse usa exclusivamente o termo único autenticado e não possui termo público separado de devolução.</span>
-              </article>
-            )}
+            ) : null}
           </div>
         ) : null}
       </Modal>

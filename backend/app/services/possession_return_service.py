@@ -108,15 +108,16 @@ class PossessionReturnService:
         minimum = self._minimum_odometer(possession, latest_trip)
         serialized_current = self.serialize_confirmation(current) if current else None
         if serialized_current and current_user.role == UserRole.PADRAO:
-            serialized_current["confirmer_name"] = "Usuário autenticado (dados restritos)"
+            serialized_current = self.serialize_confirmation_restricted(current)
+        restricted = current_user.role == UserRole.PADRAO
         return {
             "possession_id": possession.id,
             "possession_public_number": possession.public_number,
             "vehicle_plate": possession.vehicle.plate,
-            "driver_name": possession.driver_name,
+            "driver_name": "Identidade protegida" if restricted else possession.driver_name,
             "start_date": possession.start_date,
             "start_odometer_km": possession.start_odometer_km,
-            "last_trip_id": latest_trip.id if latest_trip else None,
+            "last_trip_id": None if restricted else (latest_trip.id if latest_trip else None),
             "minimum_end_odometer_km": float(minimum),
             "has_open_trip": open_trip is not None,
             "declaration": {"version": DECLARATION_VERSION, "text": DECLARATION_TEXT},
@@ -387,4 +388,25 @@ class PossessionReturnService:
             "superseded_at": confirmation.superseded_at,
             "superseded_by_confirmation_id": confirmation.superseded_by_confirmation_id,
             "admin_correction_reason": confirmation.admin_correction_reason,
+        }
+
+    @staticmethod
+    def serialize_confirmation_restricted(confirmation: VehiclePossessionReturnConfirmation) -> dict:
+        """Expose only operational facts required by the masked consultation profile."""
+        return {
+            "id": None,
+            "version": confirmation.version,
+            "is_current": confirmation.is_current,
+            "declaration_version": confirmation.declaration_version,
+            "declaration_text": confirmation.declaration_text,
+            "canonical_payload_hash": None,
+            "confirmer_name": "Identidade protegida",
+            "confirmer_role": None,
+            "confirmed_at": confirmation.confirmed_at,
+            "final_odometer_km": float(confirmation.final_odometer_km),
+            "vehicle_condition_notes": None,
+            "last_trip_id": None,
+            "superseded_at": confirmation.superseded_at,
+            "superseded_by_confirmation_id": None,
+            "admin_correction_reason": None,
         }

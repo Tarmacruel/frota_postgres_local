@@ -19,8 +19,13 @@ class FuelSupplyOrderRepository:
         await self.db.flush()
         return record
 
-    async def get_by_id(self, order_id: UUID) -> FuelSupplyOrder | None:
-        result = await self.db.execute(
+    async def get_by_id(
+        self,
+        order_id: UUID,
+        *,
+        populate_existing: bool = False,
+    ) -> FuelSupplyOrder | None:
+        statement = (
             select(FuelSupplyOrder)
             .options(
                 joinedload(FuelSupplyOrder.vehicle),
@@ -33,6 +38,9 @@ class FuelSupplyOrderRepository:
             )
             .where(FuelSupplyOrder.id == order_id)
         )
+        if populate_existing:
+            statement = statement.execution_options(populate_existing=True)
+        result = await self.db.execute(statement)
         return result.scalar_one_or_none()
 
     async def get_by_validation_code(self, validation_code: str) -> FuelSupplyOrder | None:

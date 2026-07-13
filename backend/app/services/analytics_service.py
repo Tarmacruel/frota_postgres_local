@@ -1,15 +1,42 @@
 from __future__ import annotations
 
-import io
 from collections import defaultdict
 from dataclasses import dataclass
 from datetime import datetime, timedelta, timezone
 from decimal import Decimal
+from html import escape
+from io import BytesIO
+from typing import Any
 from uuid import UUID
+
 from fastapi import HTTPException, status
 from fastapi.responses import Response
+from openpyxl import Workbook
+from openpyxl.drawing.image import Image as WorksheetImage
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import A4, landscape
+from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
+from reportlab.lib.units import mm
+from reportlab.platypus import Image, LongTable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy import case, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.core.official_identity import (
+    ADMINISTRATION_SECRETARIAT,
+    COLOR_BORDER,
+    COLOR_MUTED,
+    COLOR_NAVY,
+    COLOR_SURFACE,
+    FLEET_DEPARTMENT,
+    MUNICIPALITY_ADDRESS,
+    MUNICIPALITY_CNPJ,
+    MUNICIPALITY_NAME,
+    crest_path,
+    ensure_pdf_fonts,
+    institutional_datetime,
+)
 from app.models.claim import Claim
 from app.models.driver import Driver
 from app.models.fine import Fine
@@ -21,6 +48,35 @@ from app.models.master_data import Allocation, Department
 from app.models.vehicle import Vehicle, VehicleStatus
 from app.repositories.analytics_repository import AnalyticsRepository
 
+
+ANALYTICS_EXPORT_NO_CACHE_HEADERS = {
+    "Cache-Control": "private, no-store, no-cache, max-age=0, must-revalidate",
+    "Pragma": "no-cache",
+    "Expires": "0",
+    "X-Content-Type-Options": "nosniff",
+}
+
+ANALYTICS_EXPORT_COLUMNS = (
+    ("metric", "metric", 28),
+    ("severity", "severity", 16),
+    ("current_value", "current_value", 18),
+    ("category_average", "category_average", 22),
+    ("variance_percentage", "variance_percentage", 22),
+    ("recommended_action", "recommended_action", 54),
+)
+
+ANALYTICS_METRIC_LABELS = {
+    "consumption_l_100km": "Consumo de combustível (L/100 km)",
+    "tco_cost_per_km": "Custo total por quilômetro",
+    "driver_risk_score": "Índice de risco do condutor",
+}
+
+ANALYTICS_SEVERITY_LABELS = {
+    "CRITICAL": "Crítica",
+    "HIGH": "Alta",
+    "MEDIUM": "Média",
+    "LOW": "Baixa",
+}
 
 MARKET_TCO_BENCHMARK_BY_TYPE = {
     "SEDAN": 1.35,
@@ -35,6 +91,38 @@ MARKET_TCO_BENCHMARK_BY_TYPE = {
     "MOTOCICLETA": 0.60,
     "MAQUINA": 5.50,
 }
+
+
+def neutralize_analytics_spreadsheet_text(value: str) -> str:
+    """Prevent spreadsheet formula execution, including whitespace-prefixed payloads."""
+    probe = value.lstrip(" \t\r\n")
+    if probe.startswith(("=", "+", "-", "@")):
+        return f"'{value}"
+    return value
+
+
+def _analytics_xlsx_value(value: Any) -> Any:
+    if value is None:
+        return None
+    if isinstance(value, bool):
+        return value
+    if isinstance(value, Decimal):
+        return float(value)
+    if isinstance(value, (int, float)):
+        return value
+    return neutralize_analytics_spreadsheet_text(str(value))
+
+
+def _analytics_pdf_text(value: Any, *, fallback: str = "-") -> str:
+    return escape(str(fallback if value is None or value == "" else value))
+
+
+def _institutional_timestamp(value: datetime) -> str:
+    local_value = institutional_datetime(value)
+    offset = local_value.strftime("%z")
+    formatted_offset = f"{offset[:3]}:{offset[3:]}" if offset else ""
+    suffix = f" (UTC{formatted_offset})" if formatted_offset else ""
+    return f"{local_value.strftime('%d/%m/%Y às %H:%M:%S')}{suffix}"
 
 
 def calculate_consumption_l_100km(total_liters: float, total_km: float) -> float | None:
@@ -576,6 +664,274 @@ class AnalyticsService:
 
         return timeline
 
+    @staticmethod
+    def _build_export_xlsx(insights: list[dict], period_days: int, issued_at: datetime) -> bytes:
+        workbook = Workbook()
+        workbook.properties.creator = MUNICIPALITY_NAME
+        workbook.properties.title = "Relatório de análises da frota"
+        workbook.properties.subject = f"{ADMINISTRATION_SECRETARIAT} · {FLEET_DEPARTMENT}"
+        workbook.properties.description = "Documento oficial de gestão da frota municipal"
+
+        worksheet = workbook.active
+        worksheet.title = "Análises"
+        worksheet.sheet_view.showGridLines = False
+        worksheet.merge_cells("B1:F1")
+        worksheet.merge_cells("B2:F2")
+        worksheet.merge_cells("A4:F4")
+        worksheet.merge_cells("A5:F5")
+        worksheet.merge_cells("A6:F6")
+
+        crest = WorksheetImage(str(crest_path()))
+        crest.width = 48
+        crest.height = 60
+        worksheet.add_image(crest, "A1")
+        worksheet.row_dimensions[1].height = 24
+        worksheet.row_dimensions[2].height = 21
+        worksheet.row_dimensions[3].height = 8
+        worksheet["B1"] = MUNICIPALITY_NAME.upper()
+        worksheet["B1"].font = Font(name="Roboto", size=13, bold=True, color=COLOR_NAVY.lstrip("#"))
+        worksheet["B1"].alignment = Alignment(vertical="bottom")
+        worksheet["B2"] = f"{ADMINISTRATION_SECRETARIAT} · {FLEET_DEPARTMENT}"
+        worksheet["B2"].font = Font(name="Roboto", size=9, color=COLOR_MUTED.lstrip("#"))
+        worksheet["B2"].alignment = Alignment(vertical="top")
+
+        worksheet["A4"] = "RELATÓRIO DE ANÁLISES DA FROTA"
+        worksheet["A4"].font = Font(name="Roboto", size=16, bold=True, color=COLOR_NAVY.lstrip("#"))
+        worksheet["A4"].alignment = Alignment(horizontal="left")
+        worksheet["A5"] = f"Período analisado: últimos {period_days} dias"
+        worksheet["A6"] = f"Emissão: {_institutional_timestamp(issued_at)} · Alertas identificados: {len(insights)}"
+        for coordinate in ("A5", "A6"):
+            worksheet[coordinate].font = Font(name="Roboto", size=9, color=COLOR_MUTED.lstrip("#"))
+
+        header_row = 8
+        navy_fill = PatternFill("solid", fgColor=COLOR_NAVY.lstrip("#"))
+        alternate_fill = PatternFill("solid", fgColor=COLOR_SURFACE.lstrip("#"))
+        border = Border(
+            left=Side(style="thin", color=COLOR_BORDER.lstrip("#")),
+            right=Side(style="thin", color=COLOR_BORDER.lstrip("#")),
+            top=Side(style="thin", color=COLOR_BORDER.lstrip("#")),
+            bottom=Side(style="thin", color=COLOR_BORDER.lstrip("#")),
+        )
+        for column_index, (_, header, width) in enumerate(ANALYTICS_EXPORT_COLUMNS, start=1):
+            cell = worksheet.cell(row=header_row, column=column_index, value=header)
+            cell.font = Font(name="Roboto", size=9, bold=True, color="FFFFFF")
+            cell.fill = navy_fill
+            cell.alignment = Alignment(vertical="center", wrap_text=True)
+            cell.border = border
+            worksheet.column_dimensions[get_column_letter(column_index)].width = width
+        worksheet.row_dimensions[header_row].height = 28
+
+        for row_index, item in enumerate(insights, start=header_row + 1):
+            for column_index, (key, _, _) in enumerate(ANALYTICS_EXPORT_COLUMNS, start=1):
+                value = _analytics_xlsx_value(item.get(key))
+                cell = worksheet.cell(row=row_index, column=column_index, value=value)
+                cell.font = Font(name="Roboto", size=9, color="20304A")
+                cell.alignment = Alignment(vertical="top", wrap_text=column_index in {1, 2, 6})
+                cell.border = border
+                if row_index % 2 == 0:
+                    cell.fill = alternate_fill
+                if key in {"current_value", "category_average", "variance_percentage"} and isinstance(value, (int, float)):
+                    cell.number_format = "0.00"
+
+        last_row = max(header_row, header_row + len(insights))
+        worksheet.freeze_panes = f"A{header_row + 1}"
+        worksheet.auto_filter.ref = f"A{header_row}:F{last_row}"
+        worksheet.print_title_rows = f"1:{header_row}"
+        worksheet.print_area = f"A1:F{last_row}"
+        worksheet.page_setup.orientation = "landscape"
+        worksheet.page_setup.fitToWidth = 1
+        worksheet.sheet_properties.pageSetUpPr.fitToPage = True
+        worksheet.oddFooter.center.text = f"{MUNICIPALITY_NAME} · CNPJ {MUNICIPALITY_CNPJ}"
+        worksheet.oddFooter.right.text = "Página &P de &N"
+
+        metadata = workbook.create_sheet("Informações")
+        metadata.sheet_view.showGridLines = False
+        metadata_rows = (
+            ("Órgão emissor", MUNICIPALITY_NAME),
+            ("Unidade", f"{ADMINISTRATION_SECRETARIAT} · {FLEET_DEPARTMENT}"),
+            ("CNPJ", MUNICIPALITY_CNPJ),
+            ("Endereço", MUNICIPALITY_ADDRESS),
+            ("Documento", "Relatório de análises da frota"),
+            ("Período", f"Últimos {period_days} dias"),
+            ("Emissão", _institutional_timestamp(issued_at)),
+            ("Alertas identificados", len(insights)),
+        )
+        for row_index, (label, value) in enumerate(metadata_rows, start=1):
+            label_cell = metadata.cell(row=row_index, column=1, value=label)
+            value_cell = metadata.cell(row=row_index, column=2, value=_analytics_xlsx_value(value))
+            label_cell.font = Font(name="Roboto", size=9, bold=True, color=COLOR_NAVY.lstrip("#"))
+            value_cell.font = Font(name="Roboto", size=9, color="20304A")
+            value_cell.alignment = Alignment(wrap_text=True, vertical="top")
+        metadata.column_dimensions["A"].width = 24
+        metadata.column_dimensions["B"].width = 86
+
+        output = BytesIO()
+        workbook.save(output)
+        return output.getvalue()
+
+    @staticmethod
+    def _build_export_pdf(insights: list[dict], period_days: int, issued_at: datetime) -> bytes:
+        output = BytesIO()
+        font_regular, font_bold = ensure_pdf_fonts()
+        page_size = landscape(A4)
+        document = SimpleDocTemplate(
+            output,
+            pagesize=page_size,
+            leftMargin=12 * mm,
+            rightMargin=12 * mm,
+            topMargin=11 * mm,
+            bottomMargin=21 * mm,
+            title="Relatório de análises da frota",
+            author=MUNICIPALITY_NAME,
+            subject=f"{ADMINISTRATION_SECRETARIAT} · {FLEET_DEPARTMENT}",
+        )
+        styles = getSampleStyleSheet()
+        body_style = ParagraphStyle(
+            "AnalyticsBody",
+            parent=styles["BodyText"],
+            fontName=font_regular,
+            fontSize=7.2,
+            leading=9.2,
+            textColor=colors.HexColor("#20304A"),
+        )
+        small_style = ParagraphStyle(
+            "AnalyticsSmall",
+            parent=body_style,
+            fontSize=6.5,
+            leading=8,
+            textColor=colors.HexColor(COLOR_MUTED),
+        )
+        institution_style = ParagraphStyle(
+            "AnalyticsInstitution",
+            parent=body_style,
+            fontName=font_bold,
+            fontSize=9,
+            leading=11,
+            textColor=colors.HexColor(COLOR_NAVY),
+        )
+        header_style = ParagraphStyle(
+            "AnalyticsHeader",
+            parent=body_style,
+            fontName=font_bold,
+            textColor=colors.white,
+        )
+        title_style = ParagraphStyle(
+            "AnalyticsTitle",
+            parent=styles["Title"],
+            fontName=font_bold,
+            fontSize=15,
+            leading=18,
+            textColor=colors.HexColor(COLOR_NAVY),
+            spaceAfter=2 * mm,
+        )
+        available_width = page_size[0] - 24 * mm
+        crest = Image(str(crest_path()), width=10 * mm, height=12.6 * mm)
+        identity = [
+            Paragraph(MUNICIPALITY_NAME.upper(), institution_style),
+            Paragraph(
+                _analytics_pdf_text(f"{ADMINISTRATION_SECRETARIAT} · {FLEET_DEPARTMENT}"),
+                small_style,
+            ),
+        ]
+        identity_header = Table([[crest, identity]], colWidths=[14 * mm, available_width - 14 * mm], hAlign="LEFT")
+        identity_header.setStyle(
+            TableStyle(
+                [
+                    ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+                    ("LEFTPADDING", (0, 0), (-1, -1), 0),
+                    ("RIGHTPADDING", (0, 0), (-1, -1), 0),
+                    ("TOPPADDING", (0, 0), (-1, -1), 0),
+                    ("BOTTOMPADDING", (0, 0), (-1, -1), 3 * mm),
+                    ("LINEBELOW", (0, 0), (-1, -1), 0.8, colors.HexColor(COLOR_NAVY)),
+                ]
+            )
+        )
+        story = [
+            identity_header,
+            Spacer(1, 3 * mm),
+            Paragraph("RELATÓRIO DE ANÁLISES DA FROTA", title_style),
+            Paragraph(
+                f"Período analisado: últimos {period_days} dias · "
+                f"Emissão: {_analytics_pdf_text(_institutional_timestamp(issued_at))} · "
+                f"Alertas identificados: {len(insights)}",
+                body_style,
+            ),
+            Spacer(1, 5 * mm),
+        ]
+
+        if insights:
+            table_rows = [
+                [
+                    Paragraph("Severidade", header_style),
+                    Paragraph("Métrica", header_style),
+                    Paragraph("Diagnóstico", header_style),
+                    Paragraph("Ação recomendada", header_style),
+                ]
+            ]
+            for item in insights:
+                severity = ANALYTICS_SEVERITY_LABELS.get(str(item.get("severity", "")), item.get("severity", "-"))
+                metric = ANALYTICS_METRIC_LABELS.get(str(item.get("metric", "")), item.get("metric", "-"))
+                measurements = (
+                    f"Valor atual: {_analytics_pdf_text(item.get('current_value'))} · "
+                    f"Referência: {_analytics_pdf_text(item.get('category_average'))} · "
+                    f"Variação: {_analytics_pdf_text(item.get('variance_percentage'))}%"
+                )
+                diagnosis = (
+                    f"{_analytics_pdf_text(item.get('message'))}<br/>"
+                    f"<font color='{COLOR_MUTED}' size='6.5'>{measurements}</font>"
+                )
+                table_rows.append(
+                    [
+                        Paragraph(_analytics_pdf_text(severity), body_style),
+                        Paragraph(_analytics_pdf_text(metric), body_style),
+                        Paragraph(diagnosis, body_style),
+                        Paragraph(_analytics_pdf_text(item.get("recommended_action")), body_style),
+                    ]
+                )
+            table = LongTable(
+                table_rows,
+                colWidths=[25 * mm, 44 * mm, 100 * mm, available_width - (169 * mm)],
+                repeatRows=1,
+                hAlign="LEFT",
+            )
+            table.setStyle(
+                TableStyle(
+                    [
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(COLOR_NAVY)),
+                        ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor(COLOR_BORDER)),
+                        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor(COLOR_SURFACE)]),
+                        ("LEFTPADDING", (0, 0), (-1, -1), 4),
+                        ("RIGHTPADDING", (0, 0), (-1, -1), 4),
+                        ("TOPPADDING", (0, 0), (-1, -1), 4),
+                        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+                    ]
+                )
+            )
+            story.append(table)
+        else:
+            story.append(
+                Paragraph(
+                    "Não foram identificados alertas analíticos para o período e os filtros informados.",
+                    body_style,
+                )
+            )
+
+        def footer(canvas, doc):
+            canvas.saveState()
+            canvas.setStrokeColor(colors.HexColor(COLOR_NAVY))
+            canvas.setLineWidth(0.45)
+            canvas.line(12 * mm, 15 * mm, page_size[0] - 12 * mm, 15 * mm)
+            canvas.setFillColor(colors.HexColor(COLOR_MUTED))
+            canvas.setFont(font_regular, 6.2)
+            canvas.drawString(12 * mm, 11.5 * mm, f"{MUNICIPALITY_NAME} · CNPJ {MUNICIPALITY_CNPJ}")
+            canvas.drawString(12 * mm, 8.5 * mm, MUNICIPALITY_ADDRESS)
+            canvas.drawRightString(page_size[0] - 12 * mm, 11.5 * mm, f"Página {doc.page}")
+            canvas.restoreState()
+
+        document.build(story, onFirstPage=footer, onLaterPages=footer)
+        return output.getvalue()
+
     async def export(
         self,
         period_days: int,
@@ -588,29 +944,19 @@ class AnalyticsService:
 
         insights = await self.insights(period_days, vehicle_type=vehicle_type, organization_id=organization_id)
         timestamp = datetime.now(timezone.utc)
+        headers = {
+            **ANALYTICS_EXPORT_NO_CACHE_HEADERS,
+            "Content-Disposition": f'attachment; filename="analytics-{period_days}d.{export_format}"',
+        }
         if export_format == "xlsx":
-            headers = "metric,severity,current_value,category_average,variance_percentage,recommended_action\n"
-            lines = [
-                f"{item['metric']},{item['severity']},{item['current_value']},{item.get('category_average','')},{item.get('variance_percentage','')},{item['recommended_action']}"
-                for item in insights
-            ]
-            content = (headers + "\n".join(lines)).encode("utf-8")
             return Response(
-                content=content,
+                content=self._build_export_xlsx(insights, period_days, timestamp),
                 media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-                headers={"Content-Disposition": f"attachment; filename=analytics-{period_days}d.xlsx"},
+                headers=headers,
             )
 
-        pdf_text = io.StringIO()
-        pdf_text.write("Relatório de Análises da Frota\n")
-        pdf_text.write(f"Período: últimos {period_days} dias\n")
-        pdf_text.write(f"Gerado em: {timestamp.isoformat()}\n\n")
-        for item in insights:
-            pdf_text.write(f"[{item['severity']}] {item['metric']} - {item['message']}\n")
-
-        body = pdf_text.getvalue().encode("utf-8")
         return Response(
-            content=body,
+            content=self._build_export_pdf(insights, period_days, timestamp),
             media_type="application/pdf",
-            headers={"Content-Disposition": f"attachment; filename=analytics-{period_days}d.pdf"},
+            headers=headers,
         )
