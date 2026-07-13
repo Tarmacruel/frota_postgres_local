@@ -55,7 +55,6 @@ function dateBoundary(value, boundary) {
   const date = new Date(`${value}${suffix}`)
   return Number.isNaN(date.getTime()) ? null : date
 }
-
 function formatTimestamp(value) {
   if (!value) return '-'
   return new Date(value).toLocaleString('pt-BR')
