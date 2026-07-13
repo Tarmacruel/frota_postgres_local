@@ -96,32 +96,32 @@
 - [x] Logs runtime removidos do índice Git e preservados localmente por `storage/logs/` no `.gitignore`.
 - [x] Escopo preservado: nenhuma tela, endpoint ou regra funcional da Fase 4 implementada nesta preparação.
 
-- [ ] Componentes extraídos de `PossessionPage` quando necessário.
-- [ ] Rota inicial opcional disponível na nova posse.
-- [ ] Destinos dinâmicos implementados.
-- [ ] Timeline de rotas implementada.
-- [ ] Ação “Adicionar destino” implementada.
-- [ ] Ação “Registrar retorno” implementada.
-- [ ] Ação “Encerrar posse” visualmente distinta.
-- [ ] Estados de loading, erro e conflito implementados.
-- [ ] Proteção por perfil aplicada no frontend.
-- [ ] Navegação por teclado validada.
-- [ ] Build frontend concluído.
-- [ ] Testes de componentes executados.
+- [x] Componentes extraídos de `PossessionPage` quando necessário. Evidência: `InitialTripFields`, `PossessionTripsModal`, `TripDestinationEditor` e `TripTimeline`.
+- [x] Rota inicial opcional disponível na nova posse. Evidência: multipart `initial_trip_json` testado, sem alterar evidências ou documentos existentes.
+- [x] Destinos dinâmicos implementados. Evidência: inclusão, remoção e reordenação por botões acessíveis.
+- [x] Timeline de rotas implementada. Evidência: paginação, estados textuais e vazio legado em `TripTimeline`.
+- [x] Ação “Adicionar destino” implementada. Evidência: contrato aninhado da Fase 3, lote de destinos e prevenção de duplo envio.
+- [x] Ação “Registrar retorno” implementada. Evidência: aviso e feedback afirmam que somente a rota termina e a posse continua ativa.
+- [x] Ação “Encerrar posse” visualmente distinta. Evidência: ação separada e bloqueada após consulta oficial quando há rota em andamento.
+- [x] Estados de loading, erro e conflito implementados. Evidência: testes de `401`, `403`, `409` e `422`, com recarga autoritativa no conflito.
+- [x] Proteção por perfil aplicada no frontend. Evidência: mutações por permissões granulares, retificação apenas `ADMIN`, resposta restrita sem origem/destinos.
+- [x] Navegação por teclado validada. Evidência: foco/escape/retorno no modal e reordenação de destinos por botões testados.
+- [x] Build frontend concluído. Evidência: Vite 8.1.4, 970 módulos em 10,56 s na execução final.
+- [x] Testes de componentes executados. Evidência: 8 arquivos e 15 testes aprovados em 92,19 s; falhas de inicialização anteriores registradas em `RELATORIO_FASE_4.md`.
 
 ## Fase 5 — Termo único e devolução
 
-- [ ] Declaração de devolução versionada.
-- [ ] Checkbox não pré-marcado.
-- [ ] Hodômetro final e condições exigidos.
-- [ ] Hash canônico persistido.
-- [ ] Confirmação autenticada auditada.
-- [ ] PDF gerado no backend a partir de dados persistidos.
-- [ ] Termo contém rotas e destinos.
-- [ ] Termo contém devolução quando aplicável.
-- [ ] Não existe termo separado de devolução.
-- [ ] Preview/download protegidos e auditados.
-- [ ] Testes do termo e da devolução executados.
+- [x] Declaração de devolução versionada. Evidência: constantes v1.0 persistidas por confirmação e teste de linguagem sem promessa criptográfica.
+- [x] Checkbox não pré-marcado. Evidência: componente e teste DOM aprovados na cópia local controlada.
+- [x] Hodômetro final e condições exigidos. Evidência: schema backend, validação de domínio e campos HTML obrigatórios.
+- [x] Hash canônico persistido. Evidência: JSON determinístico UTF-8/SHA-256 e testes de estabilidade/alteração.
+- [x] Confirmação autenticada auditada. Evidência: request context persistido e eventos `POSSESSION_RETURN_CONFIRMATION`/`POSSESSION_END` na transação.
+- [x] PDF gerado no backend a partir de dados persistidos. Evidência: ReportLab 5.0.0, grafo eager e teste de PDF válido.
+- [x] Termo contém rotas e destinos. Evidência: tabelas ordenadas por sequência no gerador backend.
+- [x] Termo contém devolução quando aplicável. Evidência: confirmação corrente, declaração, condições, hodômetro e hash; legado recebe aviso explícito.
+- [x] Não existe termo separado de devolução. Evidência: endpoint de encerramento agora aceita JSON versionado, novos códigos públicos são nulos e upload separado retorna conflito.
+- [x] Preview/download protegidos e auditados. Evidência: RBAC, mascaramento, headers no-cache e eventos `TERM_PREVIEW`/`TERM_DOWNLOAD` testados.
+- [x] Testes do termo e da devolução executados. Evidência: 11 testes backend direcionados e 4 testes frontend da Fase 5 aprovados; suíte frontend completa 22/22 na cópia local controlada.
 
 ## Fase 6 — Relatórios configuráveis
 
@@ -177,3 +177,5 @@
 | 2026-07-11 | 2 | `185066c` | `alembic heads/current/history`; upgrades clean e cópia; `pytest tests/test_phase2_possession_schema.py -q`; `pytest tests -q`; `npm run build`; consultas de catálogo/contagens/checksums; `alembic check`; `git diff --check` | 0039 aplicada nos dois bancos isolados; 11 testes PostgreSQL e 97 testes gerais aprovados; 350 posses e referências preservadas; falhas preexistentes de upgrade vazio/autogenerate registradas | Codex |
 | 2026-07-13 | 3 | `2f93d77` | `pytest tests/test_phase3_possession_routes.py -q`; `pytest tests -q`; `python -m compileall -q app`; `npm run build`; `alembic heads/current/history --verbose`; `alembic check`; `git diff --check` | 15 testes direcionados e 121 totais aprovados; build aprovado; código/clean em 0039, fonte em 0038; ruído preexistente do autogenerate preservado | Codex |
 | 2026-07-13 | Liberação Fase 4 | `abbf266` | backup/restore-list/hash; upgrade 0039; consultas de preservação; `alembic heads/current/history/check`; `pytest tests -q`; `npm test`; `npm run lint`; `npm run build`; `npm audit`; `git diff --check` | fonte em 0039; 357 posses e arquivos preservados; 121 testes backend e 5 frontend aprovados; lint sem erros; build aprovado; audit e Alembic limpos | Codex |
+| 2026-07-13 | 4 | árvore de trabalho sobre `4295b98` | `pytest tests -q` com bancos isolados; `compileall`; `alembic heads/current/history/check`; `npm test`; `npm run lint`; `npm run build`; `npm audit`; `git diff --check` | 121 backend e 15 frontend aprovados; head/current 0039; build de 970 módulos; lint sem erros e 45 warnings baseline; zero vulnerabilidades; nenhum schema/backend alterado | Codex |
+| 2026-07-13 | 5 | árvore de trabalho sobre `4295b98` | `pytest tests/test_phase5_possession_return.py -q`; `pytest -q`; `compileall`; Vitest no `Z:` e em cópia local controlada; `npm run lint`; `npm run build`; `npm audit`; `alembic heads/current/history/check`; `git diff --check`; versões do ambiente | 14 direcionados incluídos em 118 backend aprovados, 17 integrações PostgreSQL sem URL isolada puladas; 22/22 frontend aprovados localmente; build 974 módulos; lint 0 erros/45 warnings baseline; audit zero; head/current 0039 e nenhuma operação de upgrade nova | Codex |

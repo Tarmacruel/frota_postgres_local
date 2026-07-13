@@ -17,7 +17,7 @@ from app.models.user import User, UserRole
 from app.models.vehicle import Vehicle
 from app.repositories.driver_repository import DriverRepository
 from app.repositories.possession_repository import PossessionRepository
-from app.repositories.possession_trip_repository import PossessionTripRepository
+from app.repositories.possession_trip_repository import PossessionReturnConfirmationRepository, PossessionTripRepository
 from app.repositories.vehicle_repository import VehicleRepository
 from app.schemas.common import PaginatedResponse, build_pagination
 from app.schemas.possession import PossessionAdminUpdate, PossessionCreate, PossessionPhotoCreate, PossessionUpdate
@@ -59,6 +59,7 @@ class PossessionService:
         self.vehicles = VehicleRepository(db)
         self.drivers = DriverRepository(db)
         self.trips = PossessionTripRepository(db)
+        self.return_confirmations = PossessionReturnConfirmationRepository(db)
         self.audit = AuditService(db)
         self.admin_notifications = AdminNotificationService(db)
 
@@ -174,8 +175,9 @@ class PossessionService:
             document_mime_type=loan_term_payload["mime_type"] if loan_term_payload else None,
             document_size_bytes=loan_term_payload["size_bytes"] if loan_term_payload else None,
             document_uploaded_at=datetime.now(timezone.utc) if loan_term_payload else None,
-            loan_term_validation_code=await self._generate_validation_code("TE"),
-            return_term_validation_code=await self._generate_validation_code("TD"),
+            # New single terms are authenticated; public codes remain legacy-only.
+            loan_term_validation_code=None,
+            return_term_validation_code=None,
         )
 
         stored_loan_term_path: Path | None = None
@@ -346,6 +348,17 @@ class PossessionService:
         *,
         return_term_document: UploadFile | None = None,
     ) -> dict:
+        # Kept only as a non-mutating compatibility guard for internal callers.
+        # The HTTP contract uses PossessionReturnService and requires the authenticated declaration.
+        raise HTTPException(
+            status_code=status.HTTP_409_CONFLICT,
+            detail={
+                "code": "POSSESSION_END_REQUIRES_DECLARATION",
+                "message": "Use o encerramento com confirmação versionada e declaração autenticada.",
+            },
+        )
+
+        # Legacy body below is unreachable and retained only for source compatibility.
         visible_possession = await self.possessions.get_by_id(possession_id)
         if not visible_possession:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
@@ -471,6 +484,37 @@ class PossessionService:
         possession = await self.possessions.get_by_id_for_update(possession_id)
         if not possession:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
+        if return_term_document is not None:
+            await self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "LEGACY_RETURN_TERM_READ_ONLY",
+                    "message": "Anexos separados de devolução são somente leitura; use a confirmação versionada.",
+                },
+            )
+        current_confirmation = await self.return_confirmations.get_current(possession_id, for_update=True)
+        if possession.end_date is None and data.end_date is not None:
+            await self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "POSSESSION_END_REQUIRES_DECLARATION",
+                    "message": "Use o encerramento com declaração autenticada para finalizar uma posse ativa.",
+                },
+            )
+        if current_confirmation and (
+            data.end_date != possession.end_date
+            or data.end_odometer_km != possession.end_odometer_km
+        ):
+            await self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "RETURN_CONFIRMATION_CORRECTION_REQUIRED",
+                    "message": "Data ou hodômetro de devolução com confirmação exigem correção administrativa versionada.",
+                },
+            )
         if data.end_date is not None and data.end_date < data.start_date:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data final não pode ser anterior ao início da posse")
 
@@ -1110,6 +1154,7 @@ class PossessionService:
         primary_photo = photos[0] if photos else None
         loan_term_url = f"/api/possession/{record.id}/documents/loan-term" if record.document_path and can_view_personal_data else None
         return_term_url = f"/api/possession/{record.id}/documents/return-term" if record.return_document_path and can_view_personal_data else None
+        current_confirmation = next((item for item in getattr(record, "return_confirmations", []) if item.is_current), None)
 
         return {
             "id": record.id,
@@ -1154,6 +1199,9 @@ class PossessionService:
                 record.return_term_validation_code,
                 term_type="return",
             ),
+            "return_confirmation_available": current_confirmation is not None,
+            "return_confirmation_version": current_confirmation.version if current_confirmation else None,
+            "return_confirmation_hash": current_confirmation.canonical_payload_hash if current_confirmation else None,
             "document_available": bool(record.document_path),
             "document_name": record.document_name,
             "document_url": f"/api/possession/{record.id}/document" if record.document_path and can_view_personal_data else None,

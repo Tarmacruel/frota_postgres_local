@@ -166,6 +166,9 @@ class PossessionOut(BaseModel):
     return_term_uploaded_at: datetime | None
     return_term_validation_code: str | None
     return_term_public_validation_path: str | None
+    return_confirmation_available: bool
+    return_confirmation_version: int | None
+    return_confirmation_hash: str | None
     document_available: bool
     document_name: str | None
     document_url: str | None

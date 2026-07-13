@@ -16,12 +16,14 @@ import FuelSupplyOrdersPage from './pages/FuelSupplyOrdersPage'
 import LoginPage from './pages/LoginPage'
 import MaintenancePage from './pages/MaintenancePage'
 import PaymentProcessesPage from './pages/PaymentProcessesPage'
+import PossessionMaintenancePage from './pages/PossessionMaintenancePage'
 import PossessionPage from './pages/PossessionPage'
 import PublicFuelSupplyOrderPage from './pages/PublicFuelSupplyOrderPage'
 import PublicPossessionTermPage from './pages/PublicPossessionTermPage'
 import UsersPage from './pages/UsersPage'
 import VehiclesPage from './pages/VehiclesPage'
 import UnauthorizedPage from './pages/UnauthorizedPage'
+import { MODULE_AVAILABILITY } from './constants/moduleAvailability'
 
 function HomeRoute() {
   const { canView } = useAuth()
@@ -68,7 +70,7 @@ export default function App() {
               path="posses"
               element={(
                 <ProtectedRoute permission={{ module: 'possession', action: 'view' }}>
-                  <PossessionPage />
+                  {MODULE_AVAILABILITY.possession.maintenance ? <PossessionMaintenancePage /> : <PossessionPage />}
                 </ProtectedRoute>
               )}
             />

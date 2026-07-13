@@ -15,6 +15,7 @@ frontend/dist/
 backend/storage/
 storage/backups/
 storage/logs/
+storage/runtime/
 
 
 .playwright-mcp/

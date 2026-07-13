@@ -1,9 +1,12 @@
 import { useEffect, useRef, useState } from 'react'
 import { possessionAPI } from '../api/possession'
 import DriverSelect from './DriverSelect'
+import InitialTripFields from './InitialTripFields'
 import SearchableSelect from './SearchableSelect'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
+import { getApiErrorCode, getApiErrorDetail, getHttpStatus } from '../utils/httpError'
+import { serializeDestination } from '../utils/tripDestination'
 
 const MAX_DOCUMENT_SIZE_BYTES = 12 * 1024 * 1024
 const ALLOWED_DOCUMENT_TYPES = [
@@ -89,7 +92,7 @@ function revokePreviewUrl(url) {
   }
 }
 
-export default function PossessionForm({ vehicles, onClose, onSuccess }) {
+export default function PossessionForm({ vehicles, onClose, onSuccess, onUnauthorized }) {
   const [form, setForm] = useState({
     vehicle_id: '',
     driver_id: '',
@@ -102,6 +105,18 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
   })
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [initialTripEnabled, setInitialTripEnabled] = useState(false)
+  const [initialTrip, setInitialTrip] = useState({
+    origin: '',
+    purpose: '',
+    departure_at: '',
+    start_odometer_km: '',
+    observation: '',
+    destinations: [],
+  })
+  const [replacementConflict, setReplacementConflict] = useState(null)
+  const [replacementConfirmed, setReplacementConfirmed] = useState(false)
+  const [replacementReason, setReplacementReason] = useState('')
   const [captureError, setCaptureError] = useState('')
   const [captureState, setCaptureState] = useState('idle')
   const [capturedPhotos, setCapturedPhotos] = useState([])
@@ -116,6 +131,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
   const documentInputRef = useRef(null)
   const capturedPhotosRef = useRef([])
   const draftPreviewUrlRef = useRef('')
+  const submittingRef = useRef(false)
   const secureCaptureContext = isSecureCaptureContext()
 
   useEffect(() => {
@@ -188,7 +204,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
 
     if (!ALLOWED_DOCUMENT_TYPES.includes(nextFile.type)) {
       setLoanTermDocument(null)
-      setDocumentError('Anexe PDF, imagem, DOC ou DOCX para arquivar o termo de empréstimo.')
+      setDocumentError('Anexe PDF, imagem, DOC ou DOCX para arquivar o documento assinado da entrega.')
       if (documentInputRef.current) {
         documentInputRef.current.value = ''
       }
@@ -214,6 +230,32 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
     if (documentInputRef.current) {
       documentInputRef.current.value = ''
     }
+  }
+
+  function handleVehicleChange(value) {
+    const selectedVehicle = vehicles.find((vehicle) => vehicle.id === value)
+    setForm((current) => ({ ...current, vehicle_id: value }))
+    setReplacementConflict(null)
+    setReplacementConfirmed(false)
+    setReplacementReason('')
+    if (initialTripEnabled) {
+      setInitialTrip((current) => ({
+        ...current,
+        origin: selectedVehicle?.current_location?.display_name || '',
+      }))
+    }
+  }
+
+  function handleInitialTripEnabled(enabled) {
+    setInitialTripEnabled(enabled)
+    if (!enabled) return
+    const selectedVehicle = vehicles.find((vehicle) => vehicle.id === form.vehicle_id)
+    setInitialTrip((current) => ({
+      ...current,
+      origin: current.origin || selectedVehicle?.current_location?.display_name || '',
+      departure_at: current.departure_at || form.start_date,
+      start_odometer_km: current.start_odometer_km || form.start_odometer_km,
+    }))
   }
 
   async function startEvidenceCapture() {
@@ -336,6 +378,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if (submittingRef.current) return
 
     if (!form.vehicle_id) {
       setError('Selecione um veículo para continuar.')
@@ -347,7 +390,24 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       return
     }
 
+    if (initialTripEnabled) {
+      if (!initialTrip.origin.trim() || !initialTrip.purpose.trim() || !initialTrip.departure_at || initialTrip.start_odometer_km === '') {
+        setError('Preencha origem, finalidade, saída e hodômetro da rota inicial.')
+        return
+      }
+      if (initialTrip.destinations.some((destination) => !destination.description.trim())) {
+        setError('Preencha a descrição de todos os destinos da rota inicial.')
+        return
+      }
+    }
+
+    if (replacementConflict && (!replacementConfirmed || replacementReason.trim().length < 8)) {
+      setError('Confirme conscientemente a substituição e informe uma justificativa com pelo menos 8 caracteres.')
+      return
+    }
+
     try {
+      submittingRef.current = true
       setSubmitting(true)
       setError('')
       setCaptureError('')
@@ -361,6 +421,20 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       if (form.start_date) payload.append('start_date', new Date(form.start_date).toISOString())
       if (form.start_odometer_km !== '') payload.append('start_odometer_km', String(Number(form.start_odometer_km)))
       if (form.observation) payload.append('observation', form.observation)
+      if (initialTripEnabled) {
+        payload.append('initial_trip_json', JSON.stringify({
+          origin: initialTrip.origin.trim(),
+          purpose: initialTrip.purpose.trim(),
+          departure_at: new Date(initialTrip.departure_at).toISOString(),
+          start_odometer_km: String(initialTrip.start_odometer_km),
+          observation: initialTrip.observation.trim() || null,
+          destinations: initialTrip.destinations.map(serializeDestination),
+        }))
+      }
+      if (replacementConflict && replacementConfirmed) {
+        payload.append('replace_active', 'true')
+        payload.append('replacement_reason', replacementReason.trim())
+      }
       if (capturedPhotos.length > 0) {
         payload.append(
           'photo_metadata_json',
@@ -382,11 +456,35 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       }
 
       await possessionAPI.create(payload)
-      onSuccess?.('Posse registrada com sucesso. Se havia posse ativa, ela foi encerrada automaticamente.')
+      onSuccess?.(replacementConflict
+        ? 'Nova posse registrada após substituição explícita e justificada da posse anterior.'
+        : initialTripEnabled
+          ? 'Posse e rota inicial registradas na mesma operação.'
+          : 'Posse registrada sem rota inicial.')
       onClose?.()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível registrar a posse.'))
+      const status = getHttpStatus(err)
+      const code = getApiErrorCode(err)
+      const detail = getApiErrorDetail(err)
+      if (status === 401) {
+        setError('Sua sessão expirou. Entre novamente para continuar.')
+        await onUnauthorized?.()
+      } else if (status === 403) {
+        setError('Seu perfil não possui permissão para registrar posses.')
+      } else if (status === 409 && code === 'ACTIVE_POSSESSION_EXISTS') {
+        setReplacementConflict(detail?.active_possession || {})
+        setReplacementConfirmed(false)
+        setReplacementReason('')
+        setError('Já existe uma posse ativa. Revise os dados abaixo antes de decidir pela substituição.')
+      } else if (status === 409) {
+        setError(getApiErrorMessage(err, 'O estado do veículo mudou. Atualize os dados e tente novamente.'))
+      } else if (status === 422) {
+        setError(getApiErrorMessage(err, 'Revise os campos informados antes de registrar a posse.'))
+      } else {
+        setError(getApiErrorMessage(err, 'Não foi possível registrar a posse.'))
+      }
     } finally {
+      submittingRef.current = false
       setSubmitting(false)
     }
   }
@@ -400,13 +498,48 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
 
   return (
     <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
-      {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
+      <div className="sr-status" aria-live="assertive" aria-atomic="true">{error}</div>
+      {error ? <div className="alert alert-error modal-field-span" role="alert">{error}</div> : null}
+
+      {replacementConflict ? (
+        <section className="replacement-conflict modal-field-span" aria-labelledby="replacement-conflict-title">
+          <div>
+            <span className="trip-eyebrow">Conflito de posse ativa</span>
+            <h4 id="replacement-conflict-title">Substituir a posse atual?</h4>
+            <p>A substituição encerrará a responsabilidade anterior na data de início da nova posse. Ela não será repetida automaticamente.</p>
+          </div>
+          <dl className="replacement-summary">
+            <div><dt>Posse atual</dt><dd>#{replacementConflict.public_number || 'sem número'}</dd></div>
+            <div><dt>Início</dt><dd>{formatDateTime(replacementConflict.start_date)}</dd></div>
+            <div><dt>Veículo</dt><dd>{vehicles.find((vehicle) => vehicle.id === form.vehicle_id)?.plate || 'Selecionado'}</dd></div>
+          </dl>
+          <label className="critical-confirmation" htmlFor="replacement-confirmed">
+            <input id="replacement-confirmed" type="checkbox" checked={replacementConfirmed} onChange={(event) => setReplacementConfirmed(event.target.checked)} disabled={submitting} />
+            <span>Confirmo que revisei a posse ativa e desejo substituí-la.</span>
+          </label>
+          <div className="form-field">
+            <label htmlFor="replacement-reason">Justificativa da substituição</label>
+            <textarea
+              id="replacement-reason"
+              className="app-textarea"
+              rows="3"
+              minLength={8}
+              maxLength={1000}
+              value={replacementReason}
+              onChange={(event) => setReplacementReason(event.target.value)}
+              aria-describedby="replacement-reason-help"
+              disabled={submitting}
+            />
+            <span id="replacement-reason-help" className="helper-text">Entre 8 e 1.000 caracteres. A justificativa será auditada.</span>
+          </div>
+        </section>
+      ) : null}
 
       <div className="form-field">
         <label>Veículo</label>
         <SearchableSelect
           value={form.vehicle_id}
-          onChange={(value) => setForm({ ...form, vehicle_id: value })}
+          onChange={handleVehicleChange}
           options={vehicles.map(buildVehicleOption)}
           placeholder="Selecione o veículo"
           searchPlaceholder="Buscar veículo por placa, modelo, chassi ou lotação"
@@ -474,6 +607,14 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
           readOnly
         />
       </div>
+
+      <InitialTripFields
+        enabled={initialTripEnabled}
+        onEnabledChange={handleInitialTripEnabled}
+        trip={initialTrip}
+        onChange={setInitialTrip}
+        disabled={submitting}
+      />
 
       <div className="form-field modal-field-span">
         <label htmlFor="possession-observation">Observação</label>
@@ -572,10 +713,10 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       </div>
 
       <div className="form-field modal-field-span">
-        <label htmlFor="signed-document">Termo de empréstimo assinado</label>
+        <label htmlFor="signed-document">Documento assinado da entrega</label>
         <div className="evidence-shell">
           <div className="evidence-copy">
-            <strong>Anexe o termo de empréstimo assinado pelo responsável, se ele já estiver pronto.</strong>
+            <strong>Anexe o documento original assinado na entrega, se ele já estiver pronto.</strong>
             <span>O arquivo fica vinculado ao início da posse para consulta posterior no módulo de condutores.</span>
           </div>
 
@@ -607,8 +748,12 @@ export default function PossessionForm({ vehicles, onClose, onSuccess }) {
       </div>
 
       <div className="actions-inline modal-actions">
-        <button className="app-button" type="submit" disabled={submitting || vehicles.length === 0 || !form.driver_id}>
-          {submitting ? 'Salvando...' : 'Registrar posse'}
+        <button
+          className="app-button"
+          type="submit"
+          disabled={submitting || vehicles.length === 0 || !form.driver_id || (replacementConflict && (!replacementConfirmed || replacementReason.trim().length < 8))}
+        >
+          {submitting ? 'Salvando...' : replacementConflict ? 'Confirmar substituição e registrar posse' : 'Registrar posse'}
         </button>
         <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>
       </div>

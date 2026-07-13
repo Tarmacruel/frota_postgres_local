@@ -6,6 +6,9 @@ import Modal from '../components/Modal'
 import DriverBadge from '../components/DriverBadge'
 import Pagination from '../components/Pagination'
 import PossessionForm from '../components/PossessionForm'
+import PossessionEndModal from '../components/PossessionEndModal'
+import PossessionReturnCorrectionModal from '../components/PossessionReturnCorrectionModal'
+import PossessionTripsModal from '../components/PossessionTripsModal'
 import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
 import { DIGITAL_DOCUMENT_TYPES } from '../api/documentSignatures'
@@ -16,8 +19,8 @@ import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 import { toDateTimeLocalValue } from '../utils/datetime'
+import { getApiErrorCode, getHttpStatus } from '../utils/httpError'
 import {
-  previewPossessionTermDocument,
   resolvePossessionTermValidationUrl,
 } from '../utils/possessionTermDocument'
 
@@ -103,7 +106,8 @@ function buildEndState(record) {
   return {
     end_date: toDateTimeLocalValue(new Date()),
     end_odometer_km: record?.end_odometer_km ?? '',
-    observation: record?.observation || '',
+    vehicle_condition_notes: '',
+    declaration_accepted: false,
   }
 }
 
@@ -124,7 +128,7 @@ function normalizeUploadList(fileList) {
 }
 
 export default function PossessionPage() {
-  const { canCreate, canEdit, isAdmin } = useAuth()
+  const { canCreate, canEdit, isAdmin, isProduction, reload } = useAuth()
   const canCreatePossession = canCreate('possession')
   const canEditPossession = canEdit('possession')
   const [searchParams, setSearchParams] = useSearchParams()
@@ -140,7 +144,11 @@ export default function PossessionPage() {
   const [startDateTo, setStartDateTo] = useState('')
   const [viewFilter, setViewFilter] = useState('ATIVAS')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
+  const [tripsDialog, setTripsDialog] = useState(null)
+  const [tripOverview, setTripOverview] = useState({})
   const [endingRecord, setEndingRecord] = useState(null)
+  const [returnContext, setReturnContext] = useState(null)
+  const [endError, setEndError] = useState('')
   const [endForm, setEndForm] = useState(buildEndState(null))
   const [ending, setEnding] = useState(false)
   const [editingRecord, setEditingRecord] = useState(null)
@@ -159,20 +167,21 @@ export default function PossessionPage() {
   const [savingEdit, setSavingEdit] = useState(false)
   const [editDocumentFile, setEditDocumentFile] = useState(null)
   const [editDocumentError, setEditDocumentError] = useState('')
-  const [editReturnDocumentFile, setEditReturnDocumentFile] = useState(null)
-  const [editReturnDocumentError, setEditReturnDocumentError] = useState('')
-  const [endReturnDocumentFile, setEndReturnDocumentFile] = useState(null)
-  const [endReturnDocumentError, setEndReturnDocumentError] = useState('')
   const [editPhotoFiles, setEditPhotoFiles] = useState([])
   const [editPhotoError, setEditPhotoError] = useState('')
   const [photoRecord, setPhotoRecord] = useState(null)
   const [locationRecord, setLocationRecord] = useState(null)
   const [termRecord, setTermRecord] = useState(null)
+  const [termBusy, setTermBusy] = useState(false)
+  const [correctionRecord, setCorrectionRecord] = useState(null)
+  const [correctionContext, setCorrectionContext] = useState(null)
+  const [correctionForm, setCorrectionForm] = useState({ end_odometer_km: '', vehicle_condition_notes: '', correction_reason: '', declaration_accepted: false })
+  const [correctionSaving, setCorrectionSaving] = useState(false)
+  const [correctionError, setCorrectionError] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
   const editDocumentInputRef = useRef(null)
-  const editReturnDocumentInputRef = useRef(null)
-  const endReturnDocumentInputRef = useRef(null)
   const editPhotoInputRef = useRef(null)
+  const endingSubmitRef = useRef(false)
   const focusRecordId = searchParams.get('focus')
   const { organizations } = useMasterDataCatalog()
 
@@ -212,7 +221,7 @@ export default function PossessionPage() {
     { header: 'Km final', value: (record) => record.end_odometer_km ?? '-' },
     { header: 'Km rodados', value: (record) => record.kilometers_driven ?? '-' },
     { header: 'Termo empréstimo', value: (record) => (record.loan_term_available ?? record.document_available) ? 'Anexado' : 'Pendente' },
-    { header: 'Termo devolução', value: (record) => record.return_term_available ? 'Anexado' : record.is_active ? 'Aguardando devolução' : 'Pendente' },
+    { header: 'Confirmação de devolução', value: (record) => record.return_confirmation_available ? `Versão ${record.return_confirmation_version}` : record.is_active ? 'Aguardando devolução' : 'Registro legado/sem confirmação' },
     { header: 'Observação', value: (record) => record.observation || 'Sem observação' },
   ]
 
@@ -311,6 +320,54 @@ export default function PossessionPage() {
   const filteredRecords = focusedRecord ? [focusedRecord] : baseFilteredRecords
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / 10))
   const paginatedRecords = focusedRecord ? filteredRecords : filteredRecords.slice((currentPage - 1) * 10, currentPage * 10)
+  const activePageRecordIds = paginatedRecords.filter((record) => record.is_active).map((record) => record.id).join('|')
+
+  async function loadOpenTripState(record, signal) {
+    setTripOverview((current) => ({
+      ...current,
+      [record.id]: { ...(current[record.id] || {}), loading: true, error: '' },
+    }))
+    try {
+      const response = await possessionAPI.listTrips(
+        record.id,
+        { page: 1, limit: 1, status: 'EM_ANDAMENTO' },
+        { signal },
+      )
+      const nextState = {
+        openTrip: response.data.data[0] || null,
+        loading: false,
+        loaded: true,
+        error: '',
+      }
+      setTripOverview((current) => ({ ...current, [record.id]: nextState }))
+      return nextState
+    } catch (requestError) {
+      if (signal?.aborted) return null
+      const message = getHttpStatus(requestError) === 401
+        ? 'Sua sessão expirou. Entre novamente para continuar.'
+        : getApiErrorMessage(requestError, 'Não foi possível verificar se há rota em andamento.')
+      setTripOverview((current) => ({
+        ...current,
+        [record.id]: { openTrip: null, loading: false, loaded: false, error: message },
+      }))
+      if (getHttpStatus(requestError) === 401) {
+        setError(message)
+        await reload?.()
+      }
+      return null
+    }
+  }
+
+  useEffect(() => {
+    if (!activePageRecordIds) return undefined
+    const controller = new AbortController()
+    paginatedRecords
+      .filter((record) => record.is_active)
+      .forEach((record) => loadOpenTripState(record, controller.signal))
+    return () => controller.abort()
+  // O identificador agregado muda apenas quando o conjunto visível de posses ativas muda.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activePageRecordIds])
 
   useEffect(() => {
     setCurrentPage(1)
@@ -348,9 +405,50 @@ export default function PossessionPage() {
     patchSearchParams({ focus: null })
   }
 
-  function openEndModal(record) {
-    setEndingRecord(record)
-    setEndForm(buildEndState(record))
+  async function openEndModal(record) {
+    let currentTripState = tripOverview[record.id]
+    if (!currentTripState?.loaded && !currentTripState?.loading) {
+      currentTripState = await loadOpenTripState(record)
+    }
+    if (!currentTripState?.loaded) {
+      setError(currentTripState?.error || 'Aguarde a verificação das rotas antes de encerrar a posse.')
+      return
+    }
+    if (currentTripState.openTrip) {
+      setError('A posse não pode ser encerrada enquanto houver rota em andamento. Registre o retorno ou cancele a rota primeiro.')
+      setTripsDialog({ possession: record, action: 'timeline' })
+      return
+    }
+    try {
+      const { data } = await possessionAPI.getReturnContext(record.id)
+      if (data.has_open_trip) {
+        setError('O servidor bloqueou o encerramento porque existe uma rota em andamento.')
+        openTrips(record)
+        return
+      }
+      setReturnContext(data)
+      setEndError('')
+      setEndingRecord(record)
+      setEndForm({
+        ...buildEndState(record),
+        end_odometer_km: data.minimum_end_odometer_km ?? record.end_odometer_km ?? '',
+      })
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Não foi possível carregar a declaração oficial de devolução.'))
+    }
+  }
+
+  async function handleUnauthorized() {
+    setTripsDialog(null)
+    setIsCreateModalOpen(false)
+    closeEndModal()
+    await reload?.()
+  }
+
+  function openTrips(record, action = 'timeline') {
+    setError('')
+    setFeedback('')
+    setTripsDialog({ possession: record, action })
   }
 
   function openEditModal(record) {
@@ -369,15 +467,10 @@ export default function PossessionPage() {
     })
     setEditDocumentFile(null)
     setEditDocumentError('')
-    setEditReturnDocumentFile(null)
-    setEditReturnDocumentError('')
     setEditPhotoFiles([])
     setEditPhotoError('')
     if (editDocumentInputRef.current) {
       editDocumentInputRef.current.value = ''
-    }
-    if (editReturnDocumentInputRef.current) {
-      editReturnDocumentInputRef.current.value = ''
     }
     if (editPhotoInputRef.current) {
       editPhotoInputRef.current.value = ''
@@ -386,12 +479,9 @@ export default function PossessionPage() {
 
   function closeEndModal() {
     setEndingRecord(null)
+    setReturnContext(null)
+    setEndError('')
     setEndForm(buildEndState(null))
-    setEndReturnDocumentFile(null)
-    setEndReturnDocumentError('')
-    if (endReturnDocumentInputRef.current) {
-      endReturnDocumentInputRef.current.value = ''
-    }
   }
 
   function closeEditModal() {
@@ -410,15 +500,10 @@ export default function PossessionPage() {
     })
     setEditDocumentFile(null)
     setEditDocumentError('')
-    setEditReturnDocumentFile(null)
-    setEditReturnDocumentError('')
     setEditPhotoFiles([])
     setEditPhotoError('')
     if (editDocumentInputRef.current) {
       editDocumentInputRef.current.value = ''
-    }
-    if (editReturnDocumentInputRef.current) {
-      editReturnDocumentInputRef.current.value = ''
     }
     if (editPhotoInputRef.current) {
       editPhotoInputRef.current.value = ''
@@ -447,7 +532,7 @@ export default function PossessionPage() {
 
     if (!ALLOWED_DOCUMENT_TYPES.includes(nextFile.type)) {
       setEditDocumentFile(null)
-      setEditDocumentError('Anexe PDF, imagem, DOC ou DOCX no termo de empréstimo.')
+      setEditDocumentError('Anexe PDF, imagem, DOC ou DOCX no documento assinado da entrega.')
       if (editDocumentInputRef.current) {
         editDocumentInputRef.current.value = ''
       }
@@ -472,82 +557,6 @@ export default function PossessionPage() {
     setEditDocumentError('')
     if (editDocumentInputRef.current) {
       editDocumentInputRef.current.value = ''
-    }
-  }
-
-  function handleEditReturnDocumentChange(event) {
-    const nextFile = event.target.files?.[0] || null
-    if (!nextFile) {
-      setEditReturnDocumentFile(null)
-      setEditReturnDocumentError('')
-      return
-    }
-
-    if (!ALLOWED_DOCUMENT_TYPES.includes(nextFile.type)) {
-      setEditReturnDocumentFile(null)
-      setEditReturnDocumentError('Anexe PDF, imagem, DOC ou DOCX no termo de devolução.')
-      if (editReturnDocumentInputRef.current) {
-        editReturnDocumentInputRef.current.value = ''
-      }
-      return
-    }
-
-    if (nextFile.size > MAX_DOCUMENT_SIZE_BYTES) {
-      setEditReturnDocumentFile(null)
-      setEditReturnDocumentError('O termo de devolução precisa ter no máximo 12 MB.')
-      if (editReturnDocumentInputRef.current) {
-        editReturnDocumentInputRef.current.value = ''
-      }
-      return
-    }
-
-    setEditReturnDocumentFile(nextFile)
-    setEditReturnDocumentError('')
-  }
-
-  function clearEditReturnDocument() {
-    setEditReturnDocumentFile(null)
-    setEditReturnDocumentError('')
-    if (editReturnDocumentInputRef.current) {
-      editReturnDocumentInputRef.current.value = ''
-    }
-  }
-
-  function handleEndReturnDocumentChange(event) {
-    const nextFile = event.target.files?.[0] || null
-    if (!nextFile) {
-      setEndReturnDocumentFile(null)
-      setEndReturnDocumentError('')
-      return
-    }
-
-    if (!ALLOWED_DOCUMENT_TYPES.includes(nextFile.type)) {
-      setEndReturnDocumentFile(null)
-      setEndReturnDocumentError('Anexe PDF, imagem, DOC ou DOCX no termo de devolução.')
-      if (endReturnDocumentInputRef.current) {
-        endReturnDocumentInputRef.current.value = ''
-      }
-      return
-    }
-
-    if (nextFile.size > MAX_DOCUMENT_SIZE_BYTES) {
-      setEndReturnDocumentFile(null)
-      setEndReturnDocumentError('O termo de devolução precisa ter no máximo 12 MB.')
-      if (endReturnDocumentInputRef.current) {
-        endReturnDocumentInputRef.current.value = ''
-      }
-      return
-    }
-
-    setEndReturnDocumentFile(nextFile)
-    setEndReturnDocumentError('')
-  }
-
-  function clearEndReturnDocument() {
-    setEndReturnDocumentFile(null)
-    setEndReturnDocumentError('')
-    if (endReturnDocumentInputRef.current) {
-      endReturnDocumentInputRef.current.value = ''
     }
   }
 
@@ -593,27 +602,49 @@ export default function PossessionPage() {
 
   async function handleEndPossession(event) {
     event.preventDefault()
-    if (!endingRecord) return
+    if (!endingRecord || endingSubmitRef.current) return
     if (!canEditPossession) {
       setError('Você não tem permissão para encerrar posses.')
       return
     }
 
     try {
+      endingSubmitRef.current = true
       setEnding(true)
       setError('')
-      const payload = new FormData()
-      if (endForm.end_date) payload.append('end_date', new Date(endForm.end_date).toISOString())
-      if (endForm.end_odometer_km !== '') payload.append('end_odometer_km', String(Number(endForm.end_odometer_km)))
-      if (endForm.observation) payload.append('observation', endForm.observation)
-      if (endReturnDocumentFile) payload.append('return_term_document', endReturnDocumentFile, endReturnDocumentFile.name)
+      setEndError('')
+      const payload = {
+        end_date: new Date(endForm.end_date).toISOString(),
+        end_odometer_km: Number(endForm.end_odometer_km),
+        vehicle_condition_notes: endForm.vehicle_condition_notes,
+        declaration_accepted: endForm.declaration_accepted,
+      }
       await possessionAPI.end(endingRecord.id, payload)
-      setFeedback('Posse encerrada com sucesso.')
+      setFeedback('Devolução confirmada e posse encerrada com sucesso.')
       closeEndModal()
       await loadPossessions()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível encerrar a posse.'))
+      const status = getHttpStatus(err)
+      const code = getApiErrorCode(err)
+      if (status === 401) {
+        setEndError('Sua sessão expirou. Entre novamente para continuar.')
+        await handleUnauthorized()
+      } else if (status === 403) {
+        setEndError('Seu perfil não possui permissão para encerrar posses.')
+      } else if (status === 409 && code === 'POSSESSION_HAS_OPEN_TRIP') {
+        const record = endingRecord
+        closeEndModal()
+        if (record) openTrips(record)
+        setError('O servidor bloqueou o encerramento porque existe uma rota em andamento.')
+      } else if (status === 409) {
+        setEndError(getApiErrorMessage(err, 'O estado da posse mudou. Atualize os dados antes de encerrar.'))
+      } else if (status === 422) {
+        setEndError(getApiErrorMessage(err, 'Revise os dados e confirme integralmente a declaração.'))
+      } else {
+        setEndError(getApiErrorMessage(err, 'Não foi possível encerrar a posse.'))
+      }
     } finally {
+      endingSubmitRef.current = false
       setEnding(false)
     }
   }
@@ -642,9 +673,6 @@ export default function PossessionPage() {
       payload.append('edit_reason', editForm.edit_reason)
       if (editDocumentFile) {
         payload.append('loan_term_document', editDocumentFile, editDocumentFile.name)
-      }
-      if (editReturnDocumentFile) {
-        payload.append('return_term_document', editReturnDocumentFile, editReturnDocumentFile.name)
       }
       editPhotoFiles.forEach((file) => {
         payload.append('new_photos', file, file.name)
@@ -706,12 +734,80 @@ export default function PossessionPage() {
     }
   }
 
-  async function handlePreviewTerm(record, termType) {
+  async function handleOfficialTerm(record, disposition) {
+    const previewWindow = disposition === 'inline' ? window.open('about:blank', '_blank') : null
+    if (previewWindow) previewWindow.opener = null
     try {
       setError('')
-      await previewPossessionTermDocument(record, termType)
+      setTermBusy(true)
+      const response = await possessionAPI.getOfficialTerm(record.id, disposition)
+      const objectUrl = URL.createObjectURL(response.data)
+      if (disposition === 'attachment') {
+        const link = document.createElement('a')
+        link.href = objectUrl
+        link.download = `termo-posse-${record.public_number}.pdf`
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+      } else {
+        if (previewWindow) previewWindow.location.replace(objectUrl)
+        else window.location.assign(objectUrl)
+      }
+      window.setTimeout(() => URL.revokeObjectURL(objectUrl), 60_000)
+      setFeedback(disposition === 'attachment' ? 'Download protegido iniciado.' : 'Pré-visualização protegida aberta.')
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível gerar o PDF do termo.'))
+      previewWindow?.close()
+      setError(getApiErrorMessage(err, 'Não foi possível obter o termo oficial.'))
+    } finally {
+      setTermBusy(false)
+    }
+  }
+
+  async function openReturnCorrection(record) {
+    try {
+      setCorrectionError('')
+      const { data } = await possessionAPI.getReturnContext(record.id)
+      if (!data.current_confirmation) {
+        setError('Esta posse não possui confirmação versionada para retificar.')
+        return
+      }
+      setCorrectionRecord(record)
+      setCorrectionContext(data)
+      setCorrectionForm({
+        end_odometer_km: data.current_confirmation.final_odometer_km,
+        vehicle_condition_notes: data.current_confirmation.vehicle_condition_notes,
+        correction_reason: '',
+        declaration_accepted: false,
+      })
+    } catch (err) {
+      setError(getApiErrorMessage(err, 'Não foi possível carregar a confirmação atual.'))
+    }
+  }
+
+  function closeReturnCorrection(force = false) {
+    if (correctionSaving && !force) return
+    setCorrectionRecord(null)
+    setCorrectionContext(null)
+    setCorrectionError('')
+  }
+
+  async function handleReturnCorrection(event) {
+    event.preventDefault()
+    if (!correctionRecord || correctionSaving) return
+    try {
+      setCorrectionSaving(true)
+      setCorrectionError('')
+      const { data } = await possessionAPI.correctReturnConfirmation(correctionRecord.id, {
+        ...correctionForm,
+        end_odometer_km: Number(correctionForm.end_odometer_km),
+      })
+      setFeedback(`Confirmação de devolução retificada na versão ${data.version}; a versão anterior foi preservada.`)
+      closeReturnCorrection(true)
+      await loadPossessions()
+    } catch (err) {
+      setCorrectionError(getApiErrorMessage(err, 'Não foi possível criar a nova versão da confirmação.'))
+    } finally {
+      setCorrectionSaving(false)
     }
   }
 
@@ -750,6 +846,48 @@ export default function PossessionPage() {
         ? { ...record, signature_summary: nextSignatureSummary }
         : record
     )))
+  }
+
+  function renderTripActions(record) {
+    const overview = tripOverview[record.id]
+    return (
+      <>
+        <button type="button" className="mini-button" onClick={() => openTrips(record)}>
+          Rotas
+        </button>
+        {record.is_active && (canCreatePossession || canEditPossession) ? (
+          overview?.loading || !overview ? (
+            <span className="route-state-text" role="status">Verificando rota...</span>
+          ) : overview.error ? (
+            <button type="button" className="mini-button" onClick={() => loadOpenTripState(record)}>
+              Verificar rota novamente
+            </button>
+          ) : overview.openTrip ? (
+            <>
+              {canEditPossession ? (
+                <>
+                  <button type="button" className="mini-button" onClick={() => openTrips(record, 'add')}>Adicionar destino</button>
+                  <button type="button" className="mini-button route-return-button" onClick={() => openTrips(record, 'end')}>Registrar retorno</button>
+                  <button type="button" className="mini-button route-cancel-button" onClick={() => openTrips(record, 'cancel')}>Cancelar rota</button>
+                </>
+              ) : null}
+              <button type="button" className="mini-button" disabled title="Registre o retorno ou cancele a rota antes de encerrar a posse.">
+                Encerrar posse bloqueado
+              </button>
+            </>
+          ) : (
+            <>
+              {canCreatePossession ? (
+                <button type="button" className="mini-button" onClick={() => openTrips(record, 'create')}>Iniciar rota</button>
+              ) : null}
+              {canEditPossession ? (
+                <button type="button" className="mini-button possession-end-button" onClick={() => openEndModal(record)}>Encerrar posse</button>
+              ) : null}
+            </>
+          )
+        ) : null}
+      </>
+    )
   }
 
   const activeCount = filteredRecords.filter((item) => item.is_active).length
@@ -854,8 +992,9 @@ export default function PossessionPage() {
         </div>
       ) : null}
 
-      {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
-      {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
+      <div className="sr-status" aria-live="polite" aria-atomic="true">{error || feedback}</div>
+      {error ? <div className="alert alert-error" role="alert" style={{ marginBottom: 16 }}>{error}</div> : null}
+      {feedback ? <div className="alert alert-info" role="status" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
       <div className="surface-panel panel-nested">
         <div className="table-wrap table-wrap-wide">
@@ -891,6 +1030,7 @@ export default function PossessionPage() {
                     <td data-label="Veículo">
                       <div className="stack">
                         <strong>{record.vehicle_plate}</strong>
+                        {record.public_number ? <span className="muted">Posse #{record.public_number}</span> : null}
                         <span className="muted">{getRecordOrganizationName(record)}</span>
                       </div>
                     </td>
@@ -915,18 +1055,17 @@ export default function PossessionPage() {
                         )}
                         {(record.loan_term_available ?? record.document_available) ? (
                           <span className="muted">
-                            Termo de empréstimo: {record.loan_term_name || record.document_name || 'Anexado'} | {formatTimestamp(record.loan_term_uploaded_at || record.document_uploaded_at)}
+                            Anexo assinado da entrega: {record.loan_term_name || record.document_name || 'Anexado'} | {formatTimestamp(record.loan_term_uploaded_at || record.document_uploaded_at)}
                           </span>
                         ) : (
-                          <span className="muted">Sem termo de empréstimo anexado</span>
+                          <span className="muted">Sem anexo assinado da entrega</span>
                         )}
-                        {record.return_term_available ? (
-                          <span className="muted">
-                            Termo de devolução: {record.return_term_name || 'Anexado'} | {formatTimestamp(record.return_term_uploaded_at)}
-                          </span>
+                        {record.return_confirmation_available ? (
+                          <span className="muted">Devolução confirmada · versão {record.return_confirmation_version}</span>
                         ) : (
-                          <span className="muted">{record.is_active ? 'Termo de devolução aguardando encerramento' : 'Sem termo de devolução anexado'}</span>
+                          <span className="muted">{record.is_active ? 'Devolução aguardando encerramento' : 'Registro encerrado sem confirmação versionada'}</span>
                         )}
+                        {record.return_term_available ? <span className="muted">Anexo legado de devolução: {record.return_term_name || 'Disponível'}</span> : null}
                         {isAdmin ? <span className="muted">Criado em {formatDate(record.created_at)}</span> : null}
                       </div>
                     </td>
@@ -950,16 +1089,12 @@ export default function PossessionPage() {
                         <button type="button" className="mini-button" onClick={() => setTermRecord(record)}>
                           Termos
                         </button>
-                        {canEditPossession ? (
+                        {isAdmin && canEditPossession ? (
                           <button type="button" className="mini-button" onClick={() => openEditModal(record)}>
                             Retificar
                           </button>
                         ) : null}
-                        {record.is_active && canEditPossession ? (
-                          <button type="button" className="mini-button" onClick={() => openEndModal(record)}>
-                            Encerrar
-                          </button>
-                        ) : null}
+                        {renderTripActions(record)}
                       </div>
                     </td>
                   </tr>
@@ -975,18 +1110,34 @@ export default function PossessionPage() {
       <Modal
         open={isCreateModalOpen}
         title="Nova posse"
-        description="Ao registrar um novo condutor, qualquer posse ativa do mesmo veículo será encerrada automaticamente. Foto e localização são opcionais, você pode capturar várias fotos, e o termo de empréstimo pode ser anexado no mesmo fluxo."
+        description="Registre a posse com ou sem rota inicial. Se já houver posse ativa, o sistema pedirá confirmação consciente e justificativa antes de qualquer substituição. Evidências e documento assinado da entrega continuam opcionais."
         onClose={() => setIsCreateModalOpen(false)}
       >
         <PossessionForm
           vehicles={vehicles}
           onClose={() => setIsCreateModalOpen(false)}
+          onUnauthorized={handleUnauthorized}
           onSuccess={async (message) => {
             setFeedback(message)
             await loadPossessions()
           }}
         />
       </Modal>
+
+      <PossessionTripsModal
+        possession={tripsDialog?.possession || null}
+        suggestedOrigin={tripsDialog ? getRecordVehicle(tripsDialog.possession)?.current_location?.display_name || '' : ''}
+        initialAction={tripsDialog?.action || 'timeline'}
+        canCreate={canCreatePossession}
+        canEdit={canEditPossession}
+        onClose={() => setTripsDialog(null)}
+        onUnauthorized={handleUnauthorized}
+        onStateChange={(nextState) => {
+          const possessionId = tripsDialog?.possession?.id
+          if (!possessionId) return
+          setTripOverview((current) => ({ ...current, [possessionId]: { ...nextState, loaded: !nextState.error } }))
+        }}
+      />
 
       <Modal
         open={Boolean(editingRecord)}
@@ -1095,11 +1246,11 @@ export default function PossessionPage() {
             />
           </div>
           <div className="form-field modal-field-span">
-            <label htmlFor="edit-possession-document-file">Termo de empréstimo assinado</label>
+            <label htmlFor="edit-possession-document-file">Documento assinado da entrega</label>
             <div className="evidence-shell">
               <div className="evidence-copy">
-                <strong>Anexe ou substitua o termo de empréstimo da posse, se necessário.</strong>
-                <span>{(editingRecord?.loan_term_available ?? editingRecord?.document_available) ? `Termo atual: ${editingRecord.loan_term_name || editingRecord.document_name || 'Documento anexado'}.` : 'Ainda não há termo de empréstimo anexado neste registro.'}</span>
+                <strong>Anexe ou substitua o documento original da entrega, se necessário.</strong>
+                <span>{(editingRecord?.loan_term_available ?? editingRecord?.document_available) ? `Anexo atual: ${editingRecord.loan_term_name || editingRecord.document_name || 'Documento anexado'}.` : 'Ainda não há documento de entrega anexado neste registro.'}</span>
               </div>
               <input
                 ref={editDocumentInputRef}
@@ -1117,33 +1268,6 @@ export default function PossessionPage() {
                     <span className="muted">Tipo: {editDocumentFile.type || 'Arquivo compativel'} | Tamanho: {formatFileSize(editDocumentFile.size)}</span>
                   </div>
                   <button className="ghost-button" type="button" onClick={clearEditDocument}>Remover anexo</button>
-                </div>
-              ) : null}
-            </div>
-          </div>
-          <div className="form-field modal-field-span">
-            <label htmlFor="edit-possession-return-document-file">Termo de devolução assinado</label>
-            <div className="evidence-shell">
-              <div className="evidence-copy">
-                <strong>Anexe ou substitua o termo de devolução da posse, se necessário.</strong>
-                <span>{editingRecord?.return_term_available ? `Termo atual: ${editingRecord.return_term_name || 'Documento anexado'}.` : 'Ainda não há termo de devolução anexado neste registro.'}</span>
-              </div>
-              <input
-                ref={editReturnDocumentInputRef}
-                id="edit-possession-return-document-file"
-                type="file"
-                className="app-input"
-                accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                onChange={handleEditReturnDocumentChange}
-              />
-              {editReturnDocumentError ? <div className="alert alert-error evidence-alert">{editReturnDocumentError}</div> : null}
-              {editReturnDocumentFile ? (
-                <div className="camera-stage-footer">
-                  <div className="stack">
-                    <strong>{editReturnDocumentFile.name}</strong>
-                    <span className="muted">Tipo: {editReturnDocumentFile.type || 'Arquivo compativel'} | Tamanho: {formatFileSize(editReturnDocumentFile.size)}</span>
-                  </div>
-                  <button className="ghost-button" type="button" onClick={clearEditReturnDocument}>Remover anexo</button>
                 </div>
               ) : null}
             </div>
@@ -1188,163 +1312,107 @@ export default function PossessionPage() {
         </form>
       </Modal>
 
-      <Modal
-        open={Boolean(endingRecord)}
-        title="Encerrar posse"
-        description={endingRecord ? `Finalize a posse ativa de ${endingRecord.driver_name} no veículo ${endingRecord.vehicle_plate}.` : ''}
+      <PossessionEndModal
+        record={endingRecord}
+        context={returnContext}
+        form={endForm}
+        ending={ending}
+        error={endError}
+        onChange={(patch) => setEndForm((current) => ({ ...current, ...patch }))}
         onClose={closeEndModal}
-      >
-        <form onSubmit={handleEndPossession} className="form-grid modal-form-grid">
-          <div className="form-field">
-            <label htmlFor="end-possession-date">Data de encerramento</label>
-            <input
-              id="end-possession-date"
-              type="datetime-local"
-              className="app-input"
-              value={endForm.end_date}
-              onChange={(event) => setEndForm({ ...endForm, end_date: event.target.value })}
-            />
-          </div>
-          <div className="form-field">
-            <label htmlFor="end-possession-odometer">Odômetro final (km)</label>
-            <input
-              id="end-possession-odometer"
-              type="number"
-              min="0"
-              step="0.1"
-              className="app-input"
-              value={endForm.end_odometer_km}
-              onChange={(event) => setEndForm({ ...endForm, end_odometer_km: event.target.value })}
-            />
-          </div>
-
-          <div className="form-field modal-field-span">
-            <label htmlFor="end-possession-note">Observação</label>
-            <textarea
-              id="end-possession-note"
-              className="app-textarea"
-              rows="4"
-              value={endForm.observation}
-              onChange={(event) => setEndForm({ ...endForm, observation: event.target.value })}
-            />
-          </div>
-          <div className="form-field modal-field-span">
-            <label htmlFor="end-possession-return-document">Termo de devolução assinado</label>
-            <div className="evidence-shell">
-              <div className="evidence-copy">
-                <strong>Anexe o termo de devolução assinado no encerramento da posse.</strong>
-                <span>O arquivo fica vinculado ao registro encerrado para consulta posterior.</span>
-              </div>
-              <input
-                ref={endReturnDocumentInputRef}
-                id="end-possession-return-document"
-                type="file"
-                className="app-input"
-                accept=".pdf,.jpg,.jpeg,.png,.webp,.doc,.docx,application/pdf,image/jpeg,image/png,image/webp,application/msword,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
-                onChange={handleEndReturnDocumentChange}
-              />
-              {endReturnDocumentError ? <div className="alert alert-error evidence-alert">{endReturnDocumentError}</div> : null}
-              {endReturnDocumentFile ? (
-                <div className="camera-stage-footer">
-                  <div className="stack">
-                    <strong>{endReturnDocumentFile.name}</strong>
-                    <span className="muted">Tipo: {endReturnDocumentFile.type || 'Arquivo compativel'} | Tamanho: {formatFileSize(endReturnDocumentFile.size)}</span>
-                  </div>
-                  <button className="ghost-button" type="button" onClick={clearEndReturnDocument}>Remover anexo</button>
-                </div>
-              ) : (
-                <span className="helper-text">Aceita PDF, imagem, DOC e DOCX. O anexo e opcional.</span>
-              )}
-            </div>
-          </div>
-          <div className="actions-inline modal-actions">
-            <button className="app-button" type="submit" disabled={ending}>
-              {ending ? 'Salvando...' : 'Encerrar posse'}
-            </button>
-            <button className="ghost-button" type="button" onClick={closeEndModal}>Cancelar</button>
-          </div>
-        </form>
-      </Modal>
+        onSubmit={handleEndPossession}
+      />
 
       <Modal
         open={Boolean(termRecord)}
-        title="Termos da posse"
-        description={termRecord ? `Documentos gerados e anexos assinados da posse de ${termRecord.driver_name} no veículo ${termRecord.vehicle_plate}.` : ''}
+        title="Termo de Posse e Responsabilidade"
+        description={termRecord ? `Documento único oficial da posse nº ${termRecord.public_number} · ${termRecord.vehicle_plate}.` : ''}
         onClose={closeTermModal}
       >
         {termRecord ? (
           <div className="evidence-gallery-grid">
-            <article className="evidence-meta-card">
-              <strong>Termo de empréstimo</strong>
-              <div className="stack">
-                <span className="muted">Código: {termRecord.loan_term_validation_code || '-'}</span>
-                <span className="muted">
-                  Anexo assinado: {(termRecord.loan_term_available ?? termRecord.document_available) ? (termRecord.loan_term_name || termRecord.document_name || 'Documento anexado') : 'Pendente'}
-                </span>
-              </div>
+            <article className="evidence-meta-card official-term-card">
+              <strong>Termo único oficial</strong>
+              <p className="muted">Gerado pelo servidor a partir da entrega, das rotas, dos destinos, do status e da devolução persistidos. O navegador não monta o documento oficial.</p>
               <div className="actions-inline">
-                <button type="button" className="app-button" onClick={() => handlePreviewTerm(termRecord, 'loan')}>
-                  Gerar empréstimo
+                <button type="button" className="app-button" disabled={termBusy} onClick={() => handleOfficialTerm(termRecord, 'inline')}>
+                  {termBusy ? 'Preparando…' : 'Pré-visualizar PDF'}
                 </button>
-                <button type="button" className="secondary-button" onClick={() => handleCopyTermLink(termRecord, 'loan')}>
-                  Copiar link empréstimo
-                </button>
-                {(termRecord.loan_term_url || termRecord.document_url) ? (
-                  <button type="button" className="ghost-button" onClick={() => openProtectedFile(termRecord.loan_term_url || termRecord.document_url)}>
-                    Abrir anexo empréstimo
+                {(isAdmin || isProduction) ? (
+                  <button type="button" className="secondary-button" disabled={termBusy} onClick={() => handleOfficialTerm(termRecord, 'attachment')}>
+                    Baixar PDF oficial
                   </button>
                 ) : null}
+                {isAdmin && !termRecord.is_active ? (
+                  <button type="button" className="ghost-button" disabled={termBusy} onClick={() => openReturnCorrection(termRecord)}>
+                    Retificar devolução
+                  </button>
+                ) : null}
+              </div>
+              {!(isAdmin || isProduction) ? <span className="helper-text">Seu perfil recebe uma visualização mascarada; o download integral é restrito.</span> : null}
+            </article>
+
+            {(termRecord.loan_term_validation_code || termRecord.return_term_validation_code || termRecord.return_term_available) ? (
+            <article className="evidence-meta-card legacy-term-card">
+              <strong>Registros legados</strong>
+              <p className="muted">Códigos públicos, anexos separados e confirmações históricas abaixo permanecem somente para consulta.</p>
+              <div className="stack">
+                <span className="muted">Código de empréstimo: {termRecord.loan_term_validation_code || '—'}</span>
+                <span className="muted">Código de devolução: {termRecord.return_term_validation_code || '—'}</span>
+                <span className="muted">
+                  Anexo de entrega: {(termRecord.loan_term_available ?? termRecord.document_available) ? (termRecord.loan_term_name || termRecord.document_name || 'Documento anexado') : 'Não disponível'}
+                </span>
+                <span className="muted">Anexo de devolução: {termRecord.return_term_available ? (termRecord.return_term_name || 'Documento anexado') : 'Não disponível'}</span>
+              </div>
+              <div className="actions-inline">
+                {termRecord.loan_term_public_validation_path ? <button type="button" className="secondary-button" onClick={() => handleCopyTermLink(termRecord, 'loan')}>Copiar link legado de empréstimo</button> : null}
+                {termRecord.return_term_public_validation_path ? <button type="button" className="secondary-button" onClick={() => handleCopyTermLink(termRecord, 'return')}>Copiar link legado de devolução</button> : null}
+                {(termRecord.loan_term_url || termRecord.document_url) ? (
+                  <button type="button" className="ghost-button" onClick={() => openProtectedFile(termRecord.loan_term_url || termRecord.document_url)}>
+                    Abrir anexo legado de entrega
+                  </button>
+                ) : null}
+                {termRecord.return_term_url ? <button type="button" className="ghost-button" onClick={() => openProtectedFile(termRecord.return_term_url)}>Abrir anexo legado de devolução</button> : null}
               </div>
               <DocumentSignaturePanel
                 documentType={DIGITAL_DOCUMENT_TYPES.POSSESSION_LOAN_TERM}
                 sourceId={termRecord.id}
                 summary={termRecord.signature_summary?.loan}
-                title="Assinatura do termo de empréstimo"
-                readOnly={!canEditPossession}
+                title="Confirmação histórica do termo de empréstimo"
+                readOnly
                 onChanged={(summary) => handleTermSignatureChanged('loan', summary)}
               />
-            </article>
-
-            {!termRecord.is_active ? (
-              <article className="evidence-meta-card">
-                <strong>Termo de devolução</strong>
-                <div className="stack">
-                  <span className="muted">Código: {termRecord.return_term_validation_code || '-'}</span>
-                  <span className="muted">
-                    Anexo assinado: {termRecord.return_term_available ? (termRecord.return_term_name || 'Documento anexado') : 'Pendente'}
-                  </span>
-                </div>
-                <div className="actions-inline">
-                  <button type="button" className="app-button" onClick={() => handlePreviewTerm(termRecord, 'return')}>
-                    Gerar devolução
-                  </button>
-                  <button type="button" className="secondary-button" onClick={() => handleCopyTermLink(termRecord, 'return')}>
-                    Copiar link devolução
-                  </button>
-                  {termRecord.return_term_url ? (
-                    <button type="button" className="ghost-button" onClick={() => openProtectedFile(termRecord.return_term_url)}>
-                      Abrir anexo devolução
-                    </button>
-                  ) : null}
-                </div>
+              {termRecord.return_term_validation_code ? (
                 <DocumentSignaturePanel
                   documentType={DIGITAL_DOCUMENT_TYPES.POSSESSION_RETURN_TERM}
                   sourceId={termRecord.id}
                   summary={termRecord.signature_summary?.return}
-                  title="Assinatura do termo de devolução"
-                  readOnly={!canEditPossession}
+                  title="Confirmação histórica do termo de devolução"
+                  readOnly
                   onChanged={(summary) => handleTermSignatureChanged('return', summary)}
                 />
-              </article>
+              ) : null}
+            </article>
             ) : (
               <article className="evidence-meta-card">
-                <strong>Termo de devolução</strong>
-                <span className="muted">Disponível após o encerramento da posse.</span>
+                <strong>Compatibilidade</strong>
+                <span className="muted">Esta posse usa exclusivamente o termo único autenticado e não possui termo público separado de devolução.</span>
               </article>
             )}
           </div>
         ) : null}
       </Modal>
+
+      <PossessionReturnCorrectionModal
+        record={correctionRecord}
+        context={correctionContext}
+        form={correctionForm}
+        saving={correctionSaving}
+        error={correctionError}
+        onChange={(patch) => setCorrectionForm((current) => ({ ...current, ...patch }))}
+        onClose={closeReturnCorrection}
+        onSubmit={handleReturnCorrection}
+      />
 
       <Modal
         open={Boolean(photoRecord)}

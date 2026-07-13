@@ -175,6 +175,17 @@ class PossessionReturnConfirmationRepository:
         result = await self.db.execute(statement)
         return result.scalar_one_or_none()
 
+    async def list_by_possession(
+        self,
+        possession_id: UUID,
+    ) -> list[VehiclePossessionReturnConfirmation]:
+        result = await self.db.execute(
+            select(VehiclePossessionReturnConfirmation)
+            .where(VehiclePossessionReturnConfirmation.possession_id == possession_id)
+            .order_by(VehiclePossessionReturnConfirmation.version.asc())
+        )
+        return list(result.scalars().all())
+
     async def next_version(self, possession_id: UUID) -> int | None:
         locked = await self.db.execute(
             select(VehiclePossession.id)

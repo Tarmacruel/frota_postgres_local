@@ -80,6 +80,40 @@ Escopo obrigatório da própria Fase 4, não bloqueio de entrada:
 
 O lint possui 45 warnings legados sem erros. Não existe `typecheck` porque o frontend atual é JavaScript sem contrato de tipos; não foi criado um comando fictício. Evidências completas: `RELATORIO_PRONTIDAO_FASE_4.md`.
 
+## Atualização da Fase 4 — 2026-07-13
+
+| Risco | Situação após a Fase 4 |
+|---|---|
+| R-012 | **Resolvido:** ações acompanham permissões efetivas; `PADRAO` não recebe mutações e retificação é exclusiva de `ADMIN` |
+| R-013 | **Mitigado no fluxo principal:** modal controla foco/Tab/Escape/retorno; labels, `aria-live`, status textual e reordenação por teclado foram testados; auditoria WCAG transversal permanece na Fase 7 |
+| R-016 | **Mitigado:** testes frontend cobrem contrato, conflito, perfis, erros HTTP, duplo submit e bloqueio de encerramento; suíte backend permanece em 121 aprovados |
+| R-017 | **Resolvido para a infraestrutura prevista:** Vitest/RTL e ESLint são executáveis; a suíte usa um único `vmThreads` worker por estabilidade no volume de rede |
+| R-018 | **Parcialmente mitigado:** workspace, timeline, rota inicial e editor de destinos foram extraídos; a página legada continua grande porque termos, evidências e relatórios não foram reescritos fora do escopo |
+
+Débitos identificados:
+
+- a página consulta a rota aberta de cada posse ativa visível porque o contrato da Fase 3 não contém resumo; são no máximo dez consultas por página, e qualquer otimização exige contrato backend explícito;
+- a primeira suíte Vitest paralela expirou ao iniciar workers no volume `Z:`; a execução serial é estável e a falha foi preservada no relatório;
+- os termos separados e a confirmação append-only continuam intocados até a Fase 5;
+- a validação visual autenticada em navegador real permanece para o smoke test de rollout; a Fase 4 produziu descrição verificável e testes de DOM acessível.
+
+## Atualização da Fase 5 — 2026-07-13
+
+| Risco | Situação após a Fase 5 |
+|---|---|
+| R-010 | **Resolvido no novo fluxo:** termo único autenticado ativado; códigos, anexos e confirmações antigas aparecem somente como legado |
+| R-016 | **Mitigado:** testes cobrem transação/rollback, hash, concorrência lógica, versionamento, RBAC, PDF, legado, headers e auditoria |
+| R-017 | **Mitigado com ressalva operacional:** 22 testes frontend passam em cópia local controlada; execução direta no volume `Z:` ainda perde o controlador antes da coleta |
+| R-018 | **Mitigado no encerramento:** modal e retificação foram extraídos; `PossessionPage` continua concentrando a orquestração documental |
+
+Débitos/riscos residuais para a Fase 6:
+
+- a substituição explícita de posse ativa encerra o registro anterior sem criar confirmação de devolução; relatórios devem distinguir “encerrada por substituição” de “devolução confirmada”;
+- a registry de relatórios deve aplicar no backend o mesmo mascaramento de documento/contato/localização e não expor request ID, IP ou User-Agent;
+- o PDF oficial não deve ser reutilizado como relatório configurável nem voltar a ser gerado a partir do estado do navegador;
+- estabilizar Vitest no volume de rede ou institucionalizar workspace local/CI para repetibilidade;
+- anexos separados de devolução legados permanecem armazenados e consultáveis conforme ADR 002; retenção e descarte continuam fora do escopo até política institucional.
+
 ## Críticos
 
 | ID | Achado/evidência | Impacto | Tratamento antes/depois |

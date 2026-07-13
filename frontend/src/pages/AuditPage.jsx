@@ -5,8 +5,8 @@ import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 import { getRoleLabel } from '../utils/roles'
 
-const actionOptions = ['TODAS', 'CREATE', 'UPDATE', 'DELETE', 'ORDER_CREATED', 'ORDER_CONFIRMED', 'ORDER_CANCELLED', 'ORDER_EXPIRED']
-const entityOptions = ['TODOS', 'USER', 'VEHICLE', 'MAINTENANCE', 'POSSESSION', 'FUEL_STATION', 'FUEL_STATION_USER', 'FUEL_SUPPLY', 'FUEL_SUPPLY_ORDER']
+const actionOptions = ['TODAS', 'CREATE', 'UPDATE', 'DELETE', 'POSSESSION_CREATE', 'POSSESSION_REPLACE_ACTIVE', 'POSSESSION_RETURN_CONFIRMATION', 'POSSESSION_RETURN_CORRECTION', 'TERM_PREVIEW', 'TERM_DOWNLOAD', 'TRIP_CREATE', 'TRIP_DESTINATION_ADD', 'TRIP_END', 'TRIP_CANCEL', 'DELETE_DENIED', 'ORDER_CREATED', 'ORDER_CONFIRMED', 'ORDER_CANCELLED', 'ORDER_EXPIRED']
+const entityOptions = ['TODOS', 'USER', 'VEHICLE', 'MAINTENANCE', 'POSSESSION', 'POSSESSION_TRIP', 'FUEL_STATION', 'FUEL_STATION_USER', 'FUEL_SUPPLY', 'FUEL_SUPPLY_ORDER']
 
 function formatDate(value) {
   if (!value) return '-'
@@ -17,6 +17,12 @@ function summarizeDetails(details) {
   if (!details) return 'Sem detalhes adicionais'
   if (details.event === 'END_POSSESSION') {
     return `Encerramento registrado para ${details.end_date ? formatDate(details.end_date) : 'agora'}`
+  }
+  if (details.trip_sequence && details.return_at) {
+    return `Retorno da rota ${details.trip_sequence} em ${formatDate(details.return_at)} · ${details.kilometers_driven || '-'} km`
+  }
+  if (details.trip_sequence && details.destination_count !== undefined) {
+    return `Rota ${details.trip_sequence} · ${details.destination_count} destino(s)`
   }
   if (details.reason) {
     return `Justificativa: ${details.reason}`

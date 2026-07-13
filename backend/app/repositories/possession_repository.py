@@ -8,6 +8,7 @@ from sqlalchemy.orm import joinedload, selectinload
 from app.models.location_history import LocationHistory
 from app.models.master_data import Allocation, Department
 from app.models.possession import VehiclePossession
+from app.models.possession_trip import VehiclePossessionTrip
 from app.models.vehicle import Vehicle
 
 
@@ -18,7 +19,7 @@ class PossessionRepository:
     async def get_by_id(self, possession_id: UUID) -> VehiclePossession | None:
         result = await self.db.execute(
             select(VehiclePossession)
-            .options(joinedload(VehiclePossession.vehicle), joinedload(VehiclePossession.driver), selectinload(VehiclePossession.photos))
+            .options(joinedload(VehiclePossession.vehicle), joinedload(VehiclePossession.driver), selectinload(VehiclePossession.photos), selectinload(VehiclePossession.return_confirmations))
             .where(VehiclePossession.id == possession_id)
         )
         return result.scalar_one_or_none()
@@ -28,6 +29,21 @@ class PossessionRepository:
             select(VehiclePossession)
             .where(VehiclePossession.id == possession_id)
             .with_for_update()
+        )
+        return result.scalar_one_or_none()
+
+    async def get_term_graph(self, possession_id: UUID) -> VehiclePossession | None:
+        """Load the complete, ordered graph used by the official possession term."""
+        result = await self.db.execute(
+            select(VehiclePossession)
+            .options(
+                joinedload(VehiclePossession.vehicle),
+                joinedload(VehiclePossession.driver),
+                selectinload(VehiclePossession.photos),
+                selectinload(VehiclePossession.trips).selectinload(VehiclePossessionTrip.destinations),
+                selectinload(VehiclePossession.return_confirmations),
+            )
+            .where(VehiclePossession.id == possession_id)
         )
         return result.scalar_one_or_none()
 
@@ -42,7 +58,7 @@ class PossessionRepository:
     async def get_by_loan_term_validation_code(self, validation_code: str) -> VehiclePossession | None:
         result = await self.db.execute(
             select(VehiclePossession)
-            .options(joinedload(VehiclePossession.vehicle), joinedload(VehiclePossession.driver), selectinload(VehiclePossession.photos))
+            .options(joinedload(VehiclePossession.vehicle), joinedload(VehiclePossession.driver), selectinload(VehiclePossession.photos), selectinload(VehiclePossession.return_confirmations))
             .where(VehiclePossession.loan_term_validation_code == validation_code)
         )
         return result.scalar_one_or_none()
@@ -50,7 +66,7 @@ class PossessionRepository:
     async def get_by_return_term_validation_code(self, validation_code: str) -> VehiclePossession | None:
         result = await self.db.execute(
             select(VehiclePossession)
-            .options(joinedload(VehiclePossession.vehicle), joinedload(VehiclePossession.driver), selectinload(VehiclePossession.photos))
+            .options(joinedload(VehiclePossession.vehicle), joinedload(VehiclePossession.driver), selectinload(VehiclePossession.photos), selectinload(VehiclePossession.return_confirmations))
             .where(VehiclePossession.return_term_validation_code == validation_code)
         )
         return result.scalar_one_or_none()
@@ -72,7 +88,7 @@ class PossessionRepository:
     ) -> list[VehiclePossession]:
         stmt = (
             select(VehiclePossession)
-            .options(joinedload(VehiclePossession.vehicle), joinedload(VehiclePossession.driver), selectinload(VehiclePossession.photos))
+            .options(joinedload(VehiclePossession.vehicle), joinedload(VehiclePossession.driver), selectinload(VehiclePossession.photos), selectinload(VehiclePossession.return_confirmations))
             .order_by(VehiclePossession.start_date.desc(), VehiclePossession.created_at.desc())
         )
 
@@ -101,7 +117,7 @@ class PossessionRepository:
     ) -> tuple[list[VehiclePossession], int]:
         stmt = (
             select(VehiclePossession)
-            .options(joinedload(VehiclePossession.vehicle), joinedload(VehiclePossession.driver), selectinload(VehiclePossession.photos))
+            .options(joinedload(VehiclePossession.vehicle), joinedload(VehiclePossession.driver), selectinload(VehiclePossession.photos), selectinload(VehiclePossession.return_confirmations))
             .order_by(VehiclePossession.start_date.desc(), VehiclePossession.created_at.desc())
         )
         count_stmt = select(func.count(VehiclePossession.id))
@@ -169,6 +185,7 @@ class PossessionRepository:
                 joinedload(VehiclePossession.vehicle),
                 joinedload(VehiclePossession.driver),
                 selectinload(VehiclePossession.photos),
+                selectinload(VehiclePossession.return_confirmations),
             )
         result = await self.db.execute(statement)
         return result.scalar_one_or_none()

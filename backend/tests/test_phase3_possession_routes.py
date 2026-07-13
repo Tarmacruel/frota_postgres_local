@@ -324,7 +324,12 @@ async def test_replacement_and_possession_end_are_blocked_by_open_trip(phase3_cl
 
     end_response = await phase3_client.put(
         f"/api/possession/{possession_id}/end",
-        json={"end_date": datetime.now(timezone.utc).isoformat(), "end_odometer_km": 101.0},
+        json={
+            "end_date": datetime.now(timezone.utc).isoformat(),
+            "end_odometer_km": 101.0,
+            "vehicle_condition_notes": "Sem ressalvas no teste de bloqueio",
+            "declaration_accepted": True,
+        },
         headers=CSRF_HEADERS,
     )
     assert end_response.status_code == 409

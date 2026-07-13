@@ -5485,3 +5485,591 @@ button {
     border-radius: 14px;
   }
 }
+
+.possession-return-form {
+  gap: 1rem;
+}
+
+.possession-return-context {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: .55rem;
+  padding: .8rem 0;
+  border-block: 1px solid var(--border-color, #d7dee8);
+  color: var(--text-muted, #536273);
+  font-size: .9rem;
+}
+
+.possession-return-declaration {
+  padding: 1rem;
+  border: 1px solid #9fb0c5;
+  border-left: 4px solid #17365d;
+  border-radius: .55rem;
+  background: #f7f9fc;
+}
+
+.possession-return-declaration-heading {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  color: #17365d;
+}
+
+.possession-return-declaration p {
+  margin: .75rem 0 1rem;
+  line-height: 1.55;
+}
+
+.possession-return-acceptance {
+  align-items: flex-start;
+  font-weight: 650;
+}
+
+.official-term-card {
+  border-left: 4px solid #17365d;
+}
+
+.legacy-term-card {
+  border-style: dashed;
+}
+
+@media (max-width: 720px) {
+  .possession-return-context {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Posses e rotas: superfície operacional mobile first. */
+.sr-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+
+.trip-workspace,
+.trip-timeline,
+.trip-destination-drafts {
+  display: grid;
+  gap: 16px;
+}
+
+.trip-workspace-summary {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 4px 0 18px;
+  border-bottom: 1px solid var(--line);
+}
+
+.trip-workspace-summary > div:first-child,
+.trip-section-heading > div,
+.evidence-copy {
+  display: grid;
+  gap: 4px;
+}
+
+.trip-workspace-summary strong {
+  color: var(--ink-strong);
+  font-size: 1.05rem;
+}
+
+.trip-workspace-summary small,
+.trip-section-heading p,
+.trip-empty-copy {
+  color: var(--ink-soft);
+}
+
+.trip-eyebrow {
+  color: var(--navy);
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.trip-timeline,
+.trip-destination-drafts,
+.trip-destinations-readonly ol {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.trip-timeline {
+  position: relative;
+}
+
+.trip-timeline::before {
+  content: '';
+  position: absolute;
+  top: 22px;
+  bottom: 22px;
+  left: 17px;
+  width: 2px;
+  background: var(--line);
+}
+
+.trip-timeline-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 12px;
+}
+
+.trip-timeline-marker,
+.trip-destination-index {
+  display: grid;
+  place-items: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--surface-strong);
+  border: 2px solid var(--navy);
+  color: var(--navy);
+  font-weight: 800;
+  z-index: 1;
+}
+
+.trip-status-CANCELADA .trip-timeline-marker {
+  border-color: var(--danger);
+  color: var(--danger);
+}
+
+.trip-status-ENCERRADA .trip-timeline-marker {
+  border-color: var(--success);
+  color: var(--success);
+}
+
+.trip-timeline-content {
+  min-width: 0;
+  padding: 0 0 22px;
+  border-bottom: 1px solid var(--line-soft);
+}
+
+.trip-timeline-heading,
+.trip-section-heading {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  align-items: flex-start;
+  justify-content: space-between;
+}
+
+.trip-timeline-heading h4,
+.trip-section-heading h4 {
+  margin: 2px 0 0;
+  color: var(--ink-strong);
+}
+
+.trip-status-badge {
+  white-space: nowrap;
+}
+
+.trip-facts,
+.replacement-summary {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 8px;
+  margin: 14px 0;
+}
+
+.trip-facts div,
+.replacement-summary div {
+  display: grid;
+  gap: 2px;
+}
+
+.trip-facts dt,
+.replacement-summary dt {
+  color: var(--ink-soft);
+  font-size: 0.76rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.trip-facts dd,
+.replacement-summary dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.trip-destinations-readonly {
+  display: grid;
+  gap: 9px;
+  margin: 14px 0;
+}
+
+.trip-destinations-readonly ol {
+  display: grid;
+  gap: 8px;
+}
+
+.trip-destinations-readonly li {
+  display: grid;
+  grid-template-columns: 28px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+
+.trip-destinations-readonly li > span {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  border-radius: 8px;
+  background: var(--chip-surface);
+  color: var(--navy);
+  font-weight: 800;
+}
+
+.trip-destinations-readonly li > div {
+  display: grid;
+  gap: 2px;
+}
+
+.trip-destinations-readonly small {
+  color: var(--ink-soft);
+}
+
+.trip-operational-actions,
+.trip-pagination {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  margin-top: 14px;
+}
+
+.trip-pagination {
+  justify-content: space-between;
+  padding-top: 12px;
+  border-top: 1px solid var(--line);
+}
+
+.trip-return-notice,
+.trip-critical-notice,
+.replacement-conflict,
+.trip-restricted-note,
+.trip-action-context {
+  padding: 14px 16px;
+  border-left: 4px solid var(--navy);
+  border-radius: 0 12px 12px 0;
+  background: color-mix(in srgb, var(--navy) 7%, var(--surface-strong));
+}
+
+.trip-return-notice,
+.trip-critical-notice {
+  display: grid;
+  gap: 4px;
+}
+
+.trip-critical-notice,
+.replacement-conflict {
+  border-left-color: var(--danger);
+  background: color-mix(in srgb, var(--danger) 7%, var(--surface-strong));
+}
+
+.trip-restricted-note {
+  color: var(--ink-soft);
+}
+
+.replacement-conflict {
+  display: grid;
+  gap: 14px;
+}
+
+.replacement-conflict h4,
+.replacement-conflict p {
+  margin: 0;
+}
+
+.critical-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  font-weight: 700;
+}
+
+.critical-confirmation input {
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
+.trip-destination-editor {
+  grid-column: 1 / -1;
+  display: grid;
+  gap: 14px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line);
+}
+
+.initial-trip-section {
+  display: grid;
+  gap: 16px;
+  padding: 16px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--navy) 4%, var(--surface-strong));
+}
+
+.trip-toggle {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+}
+
+.trip-toggle input {
+  width: 22px;
+  height: 22px;
+  flex: 0 0 auto;
+}
+
+.trip-toggle span {
+  display: grid;
+  gap: 3px;
+}
+
+.trip-toggle small {
+  color: var(--ink-soft);
+}
+
+.initial-trip-fields {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--line);
+}
+
+.trip-destination-draft {
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr);
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-muted);
+}
+
+.trip-destination-fields,
+.trip-destination-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.trip-destination-actions {
+  grid-column: 1 / -1;
+  grid-template-columns: 1fr;
+}
+
+.trip-destination-actions .mini-button,
+.trip-operational-actions button {
+  min-height: 42px;
+}
+
+.route-return-button {
+  background: color-mix(in srgb, var(--navy) 10%, var(--surface-strong));
+  border-color: color-mix(in srgb, var(--navy) 30%, var(--line));
+}
+
+.route-cancel-button,
+.danger-text {
+  color: var(--danger);
+}
+
+.possession-end-button {
+  border-color: color-mix(in srgb, var(--danger) 35%, var(--line));
+  color: var(--danger);
+}
+
+.route-state-text {
+  align-self: center;
+  color: var(--ink-soft);
+  font-size: 0.8rem;
+}
+
+.field-error {
+  color: var(--danger);
+  font-size: 0.82rem;
+  font-weight: 700;
+}
+
+.trip-empty-state {
+  padding: 28px 16px;
+  text-align: center;
+  border-block: 1px solid var(--line);
+}
+
+.trip-empty-state p {
+  margin-bottom: 0;
+  color: var(--ink-soft);
+}
+
+@media (min-width: 721px) {
+  .trip-workspace-summary,
+  .trip-timeline-heading,
+  .trip-section-heading {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  .trip-facts {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .replacement-summary {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .trip-destination-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .initial-trip-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .trip-destination-observation {
+    grid-column: 1 / -1;
+  }
+
+  .trip-destination-actions {
+    grid-template-columns: repeat(3, max-content);
+    justify-content: end;
+  }
+}
+
+.possession-maintenance-page {
+  min-height: min(620px, calc(100dvh - 180px));
+  display: grid;
+  align-items: center;
+  overflow: hidden;
+  background:
+    radial-gradient(circle at 92% 8%, color-mix(in srgb, var(--navy) 14%, transparent), transparent 30%),
+    var(--surface);
+}
+
+.possession-maintenance-content {
+  width: min(720px, 100%);
+  display: grid;
+  gap: 22px;
+  padding: clamp(18px, 5vw, 52px);
+}
+
+.possession-maintenance-icon {
+  width: 58px;
+  height: 58px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  color: var(--navy);
+  background: color-mix(in srgb, var(--navy) 10%, var(--surface-strong));
+  border: 1px solid color-mix(in srgb, var(--navy) 22%, var(--line));
+}
+
+.possession-maintenance-icon svg {
+  width: 28px;
+  height: 28px;
+}
+
+.possession-maintenance-copy,
+.possession-maintenance-modal-copy {
+  display: grid;
+  gap: 14px;
+}
+
+.possession-maintenance-copy .section-copy,
+.possession-maintenance-modal-copy p {
+  max-width: 62ch;
+  margin: 0;
+  color: var(--ink-soft);
+  line-height: 1.65;
+}
+
+.module-status-label {
+  display: inline-flex;
+  width: fit-content;
+  align-items: center;
+  gap: 8px;
+  color: var(--navy);
+  font-size: 0.76rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.module-status-label::before {
+  content: '';
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--amber);
+  box-shadow: 0 0 0 5px color-mix(in srgb, var(--amber) 17%, transparent);
+}
+
+.possession-maintenance-deadline {
+  width: fit-content;
+  display: grid;
+  gap: 3px;
+  margin: 2px 0 0;
+  padding: 13px 16px;
+  border-left: 4px solid var(--amber);
+  border-radius: 0 12px 12px 0;
+  background: color-mix(in srgb, var(--amber) 9%, var(--surface-strong));
+}
+
+.possession-maintenance-deadline span {
+  color: var(--ink-soft);
+  font-size: 0.78rem;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.possession-maintenance-deadline strong {
+  color: var(--ink-strong);
+  font-size: 1.06rem;
+}
+
+.possession-maintenance-assurance {
+  margin: 0;
+  color: var(--success);
+  font-weight: 700;
+  line-height: 1.5;
+}
+
+.possession-maintenance-actions,
+.possession-maintenance-modal-actions {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 10px;
+}
+
+.possession-maintenance-actions .app-button,
+.possession-maintenance-actions .secondary-button,
+.possession-maintenance-modal-actions .app-button,
+.possession-maintenance-modal-actions .ghost-button {
+  justify-content: center;
+  min-height: 44px;
+}
+
+.possession-maintenance-modal-actions {
+  margin-top: 6px;
+}
+
+@media (min-width: 560px) {
+  .possession-maintenance-actions,
+  .possession-maintenance-modal-actions {
+    flex-direction: row;
+    align-items: center;
+  }
+}

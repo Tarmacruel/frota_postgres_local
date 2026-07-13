@@ -13,6 +13,9 @@ export default defineConfig({
     environment: 'jsdom',
     setupFiles: './src/test/setup.js',
     restoreMocks: true,
+    fileParallelism: false,
+    maxWorkers: 1,
+    pool: 'vmThreads',
   },
   optimizeDeps: {
     include: [

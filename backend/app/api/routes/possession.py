@@ -5,7 +5,7 @@ from datetime import datetime
 from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
 from fastapi.exceptions import RequestValidationError
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, Response
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_admin, require_permission, require_writer
@@ -30,7 +30,15 @@ from app.schemas.possession_trip import (
     TripEnd,
     TripOut,
 )
+from app.schemas.possession_return import (
+    PossessionEndWithConfirmation,
+    PossessionReturnConfirmationOut,
+    PossessionReturnContextOut,
+    PossessionReturnCorrection,
+)
 from app.services.possession_service import PossessionService
+from app.services.possession_return_service import PossessionReturnService
+from app.services.possession_term_pdf_service import NO_CACHE_HEADERS, PossessionTermPdfService
 from app.services.possession_trip_service import PossessionTripService
 
 router = APIRouter(prefix="/api/possession", tags=["Possession"])
@@ -267,6 +275,62 @@ async def create_possession(
     )
 
 
+@router.get("/{possession_id}/return-context", response_model=PossessionReturnContextOut)
+async def get_possession_return_context(
+    possession_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("possession", "view")),
+):
+    return await PossessionReturnService(db).get_context(possession_id, current_user)
+
+
+@router.get("/{possession_id}/return-confirmations", response_model=list[PossessionReturnConfirmationOut])
+async def list_possession_return_confirmations(
+    possession_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_admin),
+):
+    return await PossessionReturnService(db).history(possession_id, current_user)
+
+
+@router.post(
+    "/{possession_id}/return-confirmations/corrections",
+    response_model=PossessionReturnConfirmationOut,
+    status_code=201,
+)
+async def correct_possession_return_confirmation(
+    possession_id: UUID,
+    data: PossessionReturnCorrection,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_admin),
+    _permission: User = Depends(require_permission("possession", "edit")),
+):
+    confirmation = await PossessionReturnService(db).correct(possession_id, data, current_user)
+    return PossessionReturnService.serialize_confirmation(confirmation)
+
+
+@router.get("/{possession_id}/term")
+async def get_official_possession_term(
+    possession_id: UUID,
+    disposition: str = Query(default="inline", pattern="^(inline|attachment)$"),
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("possession", "view")),
+) -> Response:
+    content, filename = await PossessionTermPdfService(db).render(
+        possession_id,
+        disposition=disposition,
+        current_user=current_user,
+    )
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={
+            **NO_CACHE_HEADERS,
+            "Content-Disposition": f'{disposition}; filename="{filename}"',
+        },
+    )
+
+
 @router.get("/{possession_id}/trips", response_model=TripListResponse)
 async def list_possession_trips(
     possession_id: UUID,
@@ -406,18 +470,13 @@ async def get_possession_return_term_document(
 @router.put("/{possession_id}/end", response_model=PossessionOut)
 async def end_possession(
     possession_id: UUID,
-    parsed: tuple[PossessionUpdate, UploadFile | None] = Depends(parse_possession_end_request),
+    data: PossessionEndWithConfirmation,
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_writer),
     _permission: User = Depends(require_permission("possession", "edit")),
 ):
-    data, return_term_document = parsed
-    return await PossessionService(db).end(
-        possession_id,
-        data,
-        current_user,
-        return_term_document=return_term_document,
-    )
+    await PossessionReturnService(db).end(possession_id, data, current_user)
+    return await PossessionService(db)._get_by_id(possession_id, current_user)
 
 
 @router.put("/{possession_id}", response_model=PossessionOut)
