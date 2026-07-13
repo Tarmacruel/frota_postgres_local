@@ -6,6 +6,7 @@ import Modal from '../components/Modal'
 import DriverBadge from '../components/DriverBadge'
 import Pagination from '../components/Pagination'
 import PossessionForm from '../components/PossessionForm'
+import PossessionReportBuilder from '../components/PossessionReportBuilder'
 import PossessionEndModal from '../components/PossessionEndModal'
 import PossessionReturnCorrectionModal from '../components/PossessionReturnCorrectionModal'
 import PossessionTripsModal from '../components/PossessionTripsModal'
@@ -17,7 +18,6 @@ import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
-import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 import { toDateTimeLocalValue } from '../utils/datetime'
 import { getApiErrorCode, getHttpStatus } from '../utils/httpError'
 import {
@@ -47,14 +47,6 @@ const ALLOWED_PHOTO_TYPES = ['image/jpeg', 'image/png', 'image/webp']
 function formatDate(value) {
   if (!value) return 'Atual'
   return new Date(value).toLocaleString('pt-BR')
-}
-
-function formatDateOnly(value) {
-  if (!value) return '-'
-  const normalized = String(value).length === 10 ? `${value}T00:00:00` : value
-  const date = new Date(normalized)
-  if (Number.isNaN(date.getTime())) return '-'
-  return new Intl.DateTimeFormat('pt-BR').format(date)
 }
 
 function dateBoundary(value, boundary) {
@@ -208,23 +200,6 @@ export default function PossessionPage() {
     return getRecordVehicle(record)?.current_location?.organization_name || 'Sem secretaria'
   }
 
-  const exportColumns = [
-    { header: 'Veículo', value: (record) => record.vehicle_plate },
-    { header: 'Secretaria', value: (record) => getRecordOrganizationName(record) },
-    { header: 'Condutor', value: (record) => record.driver_name },
-    { header: 'Documento', value: (record) => record.driver_document || '-' },
-    { header: 'Contato', value: (record) => record.driver_contact || '-' },
-    { header: 'Início', value: (record) => formatDate(record.start_date) },
-    { header: 'Fim', value: (record) => formatDate(record.end_date) },
-    { header: 'Status', value: (record) => (record.is_active ? 'ATIVA' : 'ENCERRADA') },
-    { header: 'Km inicial', value: (record) => record.start_odometer_km ?? '-' },
-    { header: 'Km final', value: (record) => record.end_odometer_km ?? '-' },
-    { header: 'Km rodados', value: (record) => record.kilometers_driven ?? '-' },
-    { header: 'Termo empréstimo', value: (record) => (record.loan_term_available ?? record.document_available) ? 'Anexado' : 'Pendente' },
-    { header: 'Confirmação de devolução', value: (record) => record.return_confirmation_available ? `Versão ${record.return_confirmation_version}` : record.is_active ? 'Aguardando devolução' : 'Registro legado/sem confirmação' },
-    { header: 'Observação', value: (record) => record.observation || 'Sem observação' },
-  ]
-
   async function loadVehicles() {
     const { data } = await api.get('/vehicles', { params: { limit: VEHICLE_LIST_LIMIT } })
     setVehicles(data)
@@ -318,6 +293,14 @@ export default function PossessionPage() {
 
   const focusedRecord = focusRecordId ? records.find((record) => record.id === focusRecordId) || null : null
   const filteredRecords = focusedRecord ? [focusedRecord] : baseFilteredRecords
+  const reportInitialFilters = useMemo(() => ({
+    date_from: startDateFrom ? `${startDateFrom}T00:00` : '',
+    date_to: startDateTo ? `${startDateTo}T23:59` : '',
+    vehicle_id: vehicleFilter,
+    organization_id: organizationFilter && organizationFilter !== unassignedOrganizationFilter ? organizationFilter : '',
+    possession_status: viewFilter === 'ATIVAS' ? 'ACTIVE' : viewFilter === 'ENCERRADAS' ? 'CLOSED' : '',
+    search: search.trim(),
+  }), [organizationFilter, search, startDateFrom, startDateTo, vehicleFilter, viewFilter])
   const totalPages = Math.max(1, Math.ceil(filteredRecords.length / 10))
   const paginatedRecords = focusedRecord ? filteredRecords : filteredRecords.slice((currentPage - 1) * 10, currentPage * 10)
   const activePageRecordIds = paginatedRecords.filter((record) => record.is_active).map((record) => record.id).join('|')
@@ -372,22 +355,6 @@ export default function PossessionPage() {
   useEffect(() => {
     setCurrentPage(1)
   }, [search, organizationFilter, vehicleFilter, startDateFrom, startDateTo, viewFilter, focusRecordId, records.length])
-
-  function buildFilterSummary() {
-    return [
-      { label: 'Status', value: viewOptions.find((option) => option.value === viewFilter)?.label || 'Todas' },
-      ...(organizationFilter ? [{
-        label: 'Secretaria',
-        value: organizationFilter === unassignedOrganizationFilter
-          ? 'Sem secretaria'
-          : organizationFilterOptions.find((option) => option.value === organizationFilter)?.label || 'Selecionada',
-      }] : []),
-      ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((vehicle) => vehicle.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
-      ...(startDateFrom ? [{ label: 'Início da posse a partir de', value: formatDateOnly(startDateFrom) }] : []),
-      ...(startDateTo ? [{ label: 'Início da posse até', value: formatDateOnly(startDateTo) }] : []),
-      ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
-    ]
-  }
 
   function patchSearchParams(updates) {
     const next = new URLSearchParams(searchParams)
@@ -689,51 +656,6 @@ export default function PossessionPage() {
     }
   }
 
-  async function handlePreviewPdf() {
-    if (filteredRecords.length === 0) {
-      setFeedback('Não há registros de posse filtrados para pré-visualizar.')
-      return
-    }
-
-    try {
-      setError('')
-      setFeedback('')
-      await previewRowsToPdf({
-        title: 'Frota PMTF - Posses de veículos',
-        fileName: 'frota-pmtf-posses',
-        subtitle: 'Relatório das posses filtradas no painel operacional.',
-        columns: exportColumns,
-        rows: filteredRecords,
-        filters: buildFilterSummary(),
-      })
-      setFeedback('Pré-visualização do PDF de posses aberta em nova guia.')
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível gerar o PDF dos condutores.'))
-    }
-  }
-
-  async function handleExportXlsx() {
-    if (filteredRecords.length === 0) {
-      setFeedback('Não há registros de posse filtrados para exportar.')
-      return
-    }
-
-    try {
-      setError('')
-      setFeedback('')
-      await exportRowsToXlsx({
-        fileName: 'frota-pmtf-posses',
-        sheetName: 'Posses',
-        columns: exportColumns,
-        rows: filteredRecords,
-        filters: buildFilterSummary(),
-      })
-      setFeedback('Exportação de posses em XLSX iniciada com sucesso.')
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível exportar os condutores em XLSX.'))
-    }
-  }
-
   async function handleOfficialTerm(record, disposition) {
     const previewWindow = disposition === 'inline' ? window.open('about:blank', '_blank') : null
     if (previewWindow) previewWindow.opener = null
@@ -905,8 +827,7 @@ export default function PossessionPage() {
               Nova posse
             </button>
           ) : null}
-          <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
-          <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
+          <PossessionReportBuilder vehicles={vehicles} initialFilters={reportInitialFilters} />
         </div>
       </div>
 

@@ -13,7 +13,7 @@ function buildOption(driver) {
   }
 }
 
-export default function DriverSelect({ value, onChange, disabled = false, placeholder = 'Selecione o condutor' }) {
+export default function DriverSelect({ value, onChange, disabled = false, placeholder = 'Selecione o condutor', ariaLabel = 'Condutor' }) {
   const [drivers, setDrivers] = useState([])
   const [loading, setLoading] = useState(true)
 
@@ -48,6 +48,7 @@ export default function DriverSelect({ value, onChange, disabled = false, placeh
       searchPlaceholder="Buscar por nome, documento ou contato"
       emptyLabel="Nenhum condutor ativo encontrado."
       disabled={disabled || loading}
+      ariaLabel={ariaLabel}
     />
   )
 }

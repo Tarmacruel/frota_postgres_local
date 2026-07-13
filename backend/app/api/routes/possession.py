@@ -36,7 +36,12 @@ from app.schemas.possession_return import (
     PossessionReturnContextOut,
     PossessionReturnCorrection,
 )
+from app.schemas.possession_report import PossessionReportRequest
 from app.services.possession_service import PossessionService
+from app.services.possession_report_service import (
+    REPORT_NO_CACHE_HEADERS,
+    PossessionReportService,
+)
 from app.services.possession_return_service import PossessionReturnService
 from app.services.possession_term_pdf_service import NO_CACHE_HEADERS, PossessionTermPdfService
 from app.services.possession_trip_service import PossessionTripService
@@ -247,6 +252,47 @@ async def list_active_possession(
     current_user: User = Depends(require_permission("possession", "view")),
 ):
     return await PossessionService(db).list_active(current_user=current_user)
+
+
+@router.get("/reports/metadata")
+async def get_possession_report_metadata(
+    current_user: User = Depends(require_permission("possession", "view")),
+):
+    return PossessionReportService.metadata(current_user)
+
+
+@router.post("/reports/preview-pdf")
+async def preview_possession_report_pdf(
+    data: PossessionReportRequest,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("possession", "view")),
+) -> Response:
+    content, filename = await PossessionReportService(db).render_pdf(data, current_user)
+    return Response(
+        content=content,
+        media_type="application/pdf",
+        headers={
+            **REPORT_NO_CACHE_HEADERS,
+            "Content-Disposition": f'inline; filename="{filename}"',
+        },
+    )
+
+
+@router.post("/reports/export-xlsx")
+async def export_possession_report_xlsx(
+    data: PossessionReportRequest,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("possession", "view")),
+) -> Response:
+    content, filename = await PossessionReportService(db).render_xlsx(data, current_user)
+    return Response(
+        content=content,
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={
+            **REPORT_NO_CACHE_HEADERS,
+            "Content-Disposition": f'attachment; filename="{filename}"',
+        },
+    )
 
 
 @router.post("", response_model=PossessionOut)

@@ -33,10 +33,10 @@ vi.mock('../hooks/useMasterDataCatalog', () => ({ useMasterDataCatalog: () => ({
 vi.mock('../components/DriverBadge', () => ({ default: ({ name }) => <span>{name}</span> }))
 vi.mock('../components/Pagination', () => ({ default: () => null }))
 vi.mock('../components/PossessionTripsModal', () => ({ default: () => null }))
+vi.mock('../components/PossessionReportBuilder', () => ({ default: () => <button type="button">Mais opções</button> }))
 vi.mock('../components/SearchableSelect', () => ({
   default: ({ placeholder }) => <button type="button">{placeholder}</button>,
 }))
-vi.mock('../utils/exportData', () => ({ exportRowsToXlsx: vi.fn(), previewRowsToPdf: vi.fn() }))
 
 const vehicle = {
   id: 'vehicle-1',

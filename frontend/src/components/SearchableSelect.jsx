@@ -12,6 +12,7 @@ export default function SearchableSelect({
   disabled = false,
   allowClear = false,
   clearLabel = 'Limpar seleção',
+  ariaLabel,
 }) {
   const rootRef = useRef(null)
   const inputRef = useRef(null)
@@ -117,6 +118,7 @@ export default function SearchableSelect({
         className="searchable-select-trigger"
         onClick={() => !disabled && setOpen((current) => !current)}
         disabled={disabled}
+        aria-label={ariaLabel}
       >
         <span className={`searchable-select-value${selectedOption ? '' : ' is-placeholder'}`}>
           {selectedOption?.label || placeholder}

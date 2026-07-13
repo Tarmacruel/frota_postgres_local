@@ -3,11 +3,13 @@ from __future__ import annotations
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import get_current_user_ready, require_admin
+from app.api.deps import get_current_user_ready, require_admin, require_permission
 from app.db.session import get_db_session
 from app.models.user import User
 from app.schemas.auth import MessageOut
 from app.schemas.user import UserCreate, UserOut, UserPermissionsOut, UserPermissionsUpdate, UserSignerOut, UserUpdate
+from app.schemas.possession_report import PossessionReportPreferenceIn, PossessionReportPreferenceOut
+from app.services.possession_report_service import PossessionReportService
 from app.services.user_service import UserService
 
 router = APIRouter(prefix="/api/users", tags=["Users"])
@@ -37,6 +39,23 @@ async def create_user(
     current_user: User = Depends(require_admin),
 ):
     return await UserService(db).create(data, current_user)
+
+
+@router.get("/me/report-preferences/possession", response_model=PossessionReportPreferenceOut)
+async def get_my_possession_report_preference(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("possession", "view")),
+):
+    return await PossessionReportService(db).get_preference(current_user)
+
+
+@router.put("/me/report-preferences/possession", response_model=PossessionReportPreferenceOut)
+async def update_my_possession_report_preference(
+    data: PossessionReportPreferenceIn,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("possession", "view")),
+):
+    return await PossessionReportService(db).update_preference(data, current_user)
 
 
 @router.put("/{user_id}", response_model=UserOut)

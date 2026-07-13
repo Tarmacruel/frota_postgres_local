@@ -5486,6 +5486,201 @@ button {
   }
 }
 
+/* Fase 6: configurador de relatórios de posse */
+.possession-report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+  align-items: center;
+}
+
+.report-builder {
+  display: grid;
+  gap: 1.1rem;
+  width: 100%;
+  min-width: 0;
+}
+
+.report-builder-summary {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 0.5rem 1rem;
+  padding-bottom: 0.8rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.report-builder-summary p,
+.report-data-note,
+.report-data-warning,
+.report-keyboard-help,
+.report-builder-live {
+  margin: 0;
+}
+
+.report-builder-live {
+  min-height: 1.25rem;
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
+.report-builder-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.85rem;
+}
+
+.report-builder-grid > label,
+.report-driver-filter {
+  display: grid;
+  gap: 0.4rem;
+  align-content: start;
+  color: var(--ink-strong);
+  font-weight: 600;
+}
+
+.report-filter-section,
+.report-column-section {
+  display: grid;
+  gap: 0.85rem;
+  min-width: 0;
+  margin: 0;
+  padding: 1rem 0 0;
+  border: 0;
+  border-top: 1px solid var(--line);
+}
+
+.report-filter-section legend,
+.report-column-section legend {
+  padding: 0 0.55rem 0 0;
+  color: var(--ink-strong);
+  font-weight: 800;
+}
+
+.report-search-field {
+  grid-column: span 2;
+}
+
+.report-column-toolbar,
+.report-builder-footer,
+.report-column-order {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  align-items: center;
+}
+
+.report-data-warning {
+  padding: 0.75rem 0.85rem;
+  border-left: 4px solid #b7791f;
+  background: color-mix(in srgb, #f6ad55 14%, transparent);
+  color: var(--ink-strong);
+}
+
+.report-data-note,
+.report-keyboard-help {
+  color: var(--ink-soft);
+  font-size: 0.88rem;
+}
+
+.report-column-list {
+  display: grid;
+  gap: 0;
+  max-height: min(45vh, 31rem);
+  margin: 0;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  border-top: 1px solid var(--line);
+}
+
+.report-column-list li {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 3.5rem;
+  padding: 0.65rem 0.2rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.report-column-list li.selected {
+  background: color-mix(in srgb, var(--navy) 6%, transparent);
+}
+
+.report-column-list label {
+  display: flex;
+  flex: 1;
+  gap: 0.65rem;
+  align-items: flex-start;
+  min-width: 0;
+  cursor: pointer;
+}
+
+.report-column-list input[type='checkbox'] {
+  width: 1.2rem;
+  height: 1.2rem;
+  margin-top: 0.15rem;
+}
+
+.report-column-list label span {
+  display: grid;
+  gap: 0.15rem;
+  min-width: 0;
+}
+
+.report-column-list small {
+  color: var(--ink-soft);
+  font-weight: 500;
+}
+
+.report-column-order {
+  flex-wrap: nowrap;
+}
+
+.report-column-order > span {
+  min-width: 1.8rem;
+  color: var(--ink-soft);
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+
+.report-builder-footer {
+  position: sticky;
+  bottom: -1rem;
+  justify-content: flex-end;
+  padding: 0.85rem 0 0;
+  background: var(--surface-strong);
+  border-top: 1px solid var(--line);
+}
+
+@media (max-width: 840px) {
+  .report-builder-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .report-search-field {
+    grid-column: auto;
+  }
+}
+
+@media (max-width: 560px) {
+  .possession-report-actions,
+  .possession-report-actions > button,
+  .report-builder-footer,
+  .report-builder-footer > button {
+    width: 100%;
+  }
+
+  .report-column-list li {
+    align-items: flex-start;
+  }
+
+  .report-column-order {
+    align-self: center;
+  }
+}
+
 .possession-return-form {
   gap: 1rem;
 }

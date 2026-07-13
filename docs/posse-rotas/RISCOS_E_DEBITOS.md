@@ -114,6 +114,26 @@ Débitos/riscos residuais para a Fase 6:
 - estabilizar Vitest no volume de rede ou institucionalizar workspace local/CI para repetibilidade;
 - anexos separados de devolução legados permanecem armazenados e consultáveis conforme ADR 002; retenção e descarte continuam fora do escopo até política institucional.
 
+## Atualização da Fase 6 — 2026-07-13
+
+| Risco | Situação após a Fase 6 |
+|---|---|
+| R-004 | **Mitigado nos relatórios de posse:** preset padrão minimizado; documento/contato não são enviados a `PADRAO`; coordenadas exigem seleção manual operacional. Revisão transversal permanece na Fase 7. |
+| R-014 | **Resolvido no módulo de posses:** as listas fixas e a geração oficial no navegador foram removidas; backend fornece registry, dataset, PDF/XLSX, RBAC e auditoria. |
+| R-015 | **Resolvido no módulo de posses:** textos iniciados por `=`, `+`, `-`, `@`, inclusive após whitespace, recebem apóstrofo no XLSX; função e arquivo final foram testados. |
+| R-016 | **Mitigado:** 19 testes direcionados e 137 testes backend totais cobrem registry, RBAC, filtros, formatos, legado, preferência, formula injection, headers e auditoria. |
+| R-017 | **Mitigado com ressalva operacional:** 25 testes frontend passam em cópia local controlada; o controlador Vitest ainda trava antes da coleta no volume `Z:`. |
+
+Débitos/riscos residuais para a Fase 7:
+
+- o banco existente permanece deliberadamente em `0039_possession_trips`; aplicar `0040_report_preferences` é pré-condição de deploy do configurador e deve ocorrer antes de remover o bloqueio de manutenção;
+- o upgrade integral de banco vazio em uma única transação continua falhando na migration legada `0034` pelo uso do enum `PRODUCAO`; o ensaio seguro exigiu a fronteira `upgrade 0033` e depois `upgrade head`, sem editar migration aplicada ou usar `stamp`;
+- PDF e XLSX são gerados em memória com limites de 1.500 e 5.000 linhas; streaming e teste de estresse acima desses limites continuam fora do escopo;
+- o preload elimina N+1 (5 posses/3 `SELECT`s no probe), mas posses com quantidade excepcional de rotas/destinos ainda podem elevar memória dentro do teto de linhas;
+- auditorias de falha são best-effort quando a própria transação/conexão de banco está indisponível;
+- o módulo de posse continua atrás do bloqueio temporário `MODULE_AVAILABILITY.possession.maintenance=true`; smoke test autenticado em navegador real e decisão de ativação permanecem necessários;
+- revisão transversal de logs, CORS, cookies, headers, retenção de relatórios e acessibilidade WCAG/eMAG continua exclusivamente na Fase 7.
+
 ## Críticos
 
 | ID | Achado/evidência | Impacto | Tratamento antes/depois |

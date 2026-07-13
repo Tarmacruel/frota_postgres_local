@@ -125,17 +125,17 @@
 
 ## Fase 6 — Relatórios configuráveis
 
-- [ ] Registry única de colunas criada no backend.
-- [ ] Endpoint de metadados autorizado criado.
-- [ ] Presets implementados.
-- [ ] “Mais opções” implementado.
-- [ ] Filtros implementados.
-- [ ] PDF respeita seleção.
-- [ ] XLSX respeita a mesma seleção.
-- [ ] Colunas restritas bloqueadas no backend.
-- [ ] Preferência do usuário persistida sem dados pessoais.
-- [ ] Preview e exportação auditados.
-- [ ] Testes de consistência PDF/XLSX executados.
+- [x] Registry única de colunas criada no backend. Evidência: 37 descritores tipados em `possession_report_registry.py`, com extrator fixo, modo, classificação, perfis, presets, máscara e largura.
+- [x] Endpoint de metadados autorizado criado. Evidência: `GET /api/possession/reports/metadata` usa `possession.view` e retorna apenas colunas/presets do teto do perfil.
+- [x] Presets implementados. Evidência: Resumido, Operacional, Completo e Personalizado são resolvidos exclusivamente pela registry; `PADRAO` recebe apenas Resumido/Personalizado seguro.
+- [x] “Mais opções” implementado. Evidência: `PossessionReportBuilder` com modo, preset, filtros, orientação, colunas, restauração e ações oficiais.
+- [x] Filtros implementados. Evidência: período/critério temporal, veículo, condutor, status, retorno, confirmação e busca parametrizada são executados no repository backend, com intervalo máximo de 366 dias.
+- [x] PDF respeita seleção. Evidência: ReportLab consome `PreparedReport`, repete cabeçalhos, aplica limite de colunas/linhas e retorna arquivo autenticado `no-store`.
+- [x] XLSX respeita a mesma seleção. Evidência: openpyxl consome o mesmo `PreparedReport`, preserva ordem/tipos, congela cabeçalho, aplica autofiltro e neutraliza fórmulas.
+- [x] Colunas restritas bloqueadas no backend. Evidência: testes de chave desconhecida, incompatível e `driver_document` forjado por `PADRAO` retornam erro seguro antes da consulta.
+- [x] Preferência do usuário persistida sem dados pessoais. Evidência: migration `0040_report_preferences`; payload contém somente modo, preset e chaves validadas, com `REPORT_PREFERENCE_UPDATE`.
+- [x] Preview e exportação auditados. Evidência: `REPORT_PREVIEW` e `REPORT_EXPORT_XLSX` registram filtros normalizados, chaves, contagem, duração e resultado, sem linhas integrais.
+- [x] Testes de consistência PDF/XLSX executados. Evidência: 19 testes backend direcionados e 3 testes frontend do configurador; suíte completa registrada em `RELATORIO_FASE_6.md`.
 
 ## Fase 7 — Hardening, LGPD e acessibilidade
 
@@ -179,3 +179,4 @@
 | 2026-07-13 | Liberação Fase 4 | `abbf266` | backup/restore-list/hash; upgrade 0039; consultas de preservação; `alembic heads/current/history/check`; `pytest tests -q`; `npm test`; `npm run lint`; `npm run build`; `npm audit`; `git diff --check` | fonte em 0039; 357 posses e arquivos preservados; 121 testes backend e 5 frontend aprovados; lint sem erros; build aprovado; audit e Alembic limpos | Codex |
 | 2026-07-13 | 4 | árvore de trabalho sobre `4295b98` | `pytest tests -q` com bancos isolados; `compileall`; `alembic heads/current/history/check`; `npm test`; `npm run lint`; `npm run build`; `npm audit`; `git diff --check` | 121 backend e 15 frontend aprovados; head/current 0039; build de 970 módulos; lint sem erros e 45 warnings baseline; zero vulnerabilidades; nenhum schema/backend alterado | Codex |
 | 2026-07-13 | 5 | árvore de trabalho sobre `4295b98` | `pytest tests/test_phase5_possession_return.py -q`; `pytest -q`; `compileall`; Vitest no `Z:` e em cópia local controlada; `npm run lint`; `npm run build`; `npm audit`; `alembic heads/current/history/check`; `git diff --check`; versões do ambiente | 14 direcionados incluídos em 118 backend aprovados, 17 integrações PostgreSQL sem URL isolada puladas; 22/22 frontend aprovados localmente; build 974 módulos; lint 0 erros/45 warnings baseline; audit zero; head/current 0039 e nenhuma operação de upgrade nova | Codex |
+| 2026-07-13 | 6 | árvore sobre commit `d86ce42` | `alembic heads/current/history`; upgrade/downgrade/reupgrade e `alembic check` em bancos efêmeros; `pytest tests/test_phase6_possession_reports.py -q`; `pytest -q`; Vitest em `Z:` e cópia local; `npm run lint`; `npm run build`; `npm audit`; probes SQL read-only | migration 0040 validada e bancos efêmeros removidos; 19 direcionados incluídos em 137 backend aprovados/17 pulados; 25/25 frontend; build 975 módulos; lint 0 erros/45 warnings baseline; audit zero; posse em 5 linhas/3 SELECTs; banco existente preservado em 0039 | Codex |
