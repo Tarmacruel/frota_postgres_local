@@ -11,8 +11,8 @@
 - [x] Ensaio de migration concluído. Evidência: Fase 2 em banco limpo e cópia controlada, registrada em `RELATORIO_FASE_2.md`.
 - [x] Validação funcional concluída. Evidência: 152 backend, 24 frontend, build e smoke técnico público aprovados.
 - [x] Revisão de segurança/LGPD concluída. Evidência: threat model, inventário, matriz e auditorias de dependência.
-- [ ] Pull Request final aberto para `main`.
-- [ ] Merge autorizado por revisão humana.
+- [x] Integração final aplicada diretamente em `main`. Evidência: fast-forward remoto até `f4abcef`, por autorização expressa do solicitante.
+- [x] Merge autorizado pelo solicitante nesta conversa; revisão humana/PR original foram excepcionalmente substituídos.
 
 ## Fase 0 — Baseline e governança
 
@@ -163,9 +163,9 @@
 - [x] Rollback documentado. Evidência: `PLANO_ROLLBACK.md` com retorno de app, restauração e preservação pós-backup.
 - [x] Branch sincronizada com `módulo-analytics`. Evidência: ambas as grafias remotas são ancestrais da feature.
 - [x] Divergência com `main` analisada. Evidência: `origin/main` incorporada em `961bb6e`, feature 151/0 antes do commit final.
-- [ ] Promoção para `main` concluída. Substitui PR/revisão por autorização expressa do solicitante neste rollout.
+- [x] Promoção para `main` concluída. Evidência: `origin/main` avançou de `359ecc8` para `f4abcef` sem force-push.
 - [x] Evidências públicas pós-deploy registradas em `RELATORIO_VALIDACAO_FINAL.md`.
-- [ ] Merge automático realizado conforme autorização excepcional do solicitante.
+- [x] Merge automático realizado conforme autorização excepcional do solicitante. Integração foi fast-forward e preservou `origin/main` como ancestral.
 
 ## Registro de evidências
 

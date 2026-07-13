@@ -55,6 +55,7 @@ O fluxo crítico possui labels, foco controlado, Tab/Escape, `aria-live`, estado
 ## Rollout efetivo
 
 - commit de aplicação publicado: `d0f9e06`;
+- commit de evidências e ponta promovida à `main`: `f4abcef`; promoção fast-forward, sem force-push;
 - `alembic heads` e `alembic current`: `0040_report_preferences`; `alembic check`: `No new upgrade operations detected`;
 - upgrade real executado de `0039` para `0040` sem `stamp`, downgrade ou alteração de migration aplicada;
 - contagens pós-upgrade: 35 usuários, 223 veículos, 357 posses, 0 rotas, 0 destinos, 0 confirmações, 0 preferências e 2.211 auditorias. As entidades de negócio permaneceram iguais ao backup; oito auditorias novas foram acumuladas durante a janela de operação;
