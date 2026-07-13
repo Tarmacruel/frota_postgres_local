@@ -44,7 +44,7 @@ class Driver(Base):
     )
     contato = mapped_column(String(50), nullable=True)
     email = mapped_column(CITEXT(), nullable=True)
-    cnh_numero = mapped_column(String(30), nullable=True, index=True)
+    cnh_numero = mapped_column(String(30), nullable=True)
     cnh_categoria: Mapped[DriverLicenseCategory] = mapped_column(
         Enum(DriverLicenseCategory, name="driver_license_category"),
         nullable=False,

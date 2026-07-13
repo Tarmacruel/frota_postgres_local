@@ -37,7 +37,7 @@ class FuelSupplyOrder(Base):
         nullable=True,
     )
     fuel_station_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("fuel_stations.id", ondelete="SET NULL"), nullable=True)
-    validation_code: Mapped[str] = mapped_column(String(24), nullable=False, unique=True)
+    validation_code: Mapped[str] = mapped_column(String(24), nullable=False)
 
     status: Mapped[FuelSupplyOrderStatus] = mapped_column(
         Enum(FuelSupplyOrderStatus, name="fuel_supply_order_status"),

@@ -55,12 +55,14 @@ class Fine(Base):
         Index("idx_fines_driver", "driver_id"),
         Index("idx_fines_due_date", "due_date"),
         Index("idx_fines_status", "status"),
+        Index("idx_fines_infraction_type_id", "infraction_type_id"),
+        Index("idx_fines_source_import_row_id", "source_import_row_id"),
     )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
     vehicle_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False)
     driver_id = mapped_column(PGUUID(as_uuid=True), ForeignKey("drivers.id", ondelete="SET NULL"), nullable=True)
-    infraction_type_id = mapped_column(PGUUID(as_uuid=True), ForeignKey("fine_infractions.id", ondelete="SET NULL"), nullable=True, index=True)
+    infraction_type_id = mapped_column(PGUUID(as_uuid=True), ForeignKey("fine_infractions.id", ondelete="SET NULL"), nullable=True)
     ticket_number: Mapped[str] = mapped_column(String(50), nullable=False)
     infraction_date: Mapped[date] = mapped_column(Date, nullable=False)
     infraction_time: Mapped[time | None] = mapped_column(Time, nullable=True)
@@ -75,8 +77,8 @@ class Fine(Base):
     source_status = mapped_column(String(80), nullable=True)
     imported_driver_name = mapped_column(String(150), nullable=True)
     notes = mapped_column(Text, nullable=True)
-    source_import_row_id = mapped_column(PGUUID(as_uuid=True), ForeignKey("data_import_rows.id", ondelete="SET NULL"), nullable=True, index=True)
-    created_by: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="RESTRICT"), nullable=False)
+    source_import_row_id = mapped_column(PGUUID(as_uuid=True), ForeignKey("data_import_rows.id", ondelete="SET NULL"), nullable=True)
+    created_by: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=False)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
 

@@ -37,6 +37,7 @@ class DigitalDocument(Base):
         Index("idx_digital_documents_source", "source_type", "source_id", "document_type"),
         Index("idx_digital_documents_status", "status"),
         Index("idx_digital_documents_content_hash", "content_hash"),
+        Index("idx_digital_documents_organization_id", "organization_id"),
     )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
@@ -47,7 +48,6 @@ class DigitalDocument(Base):
         PGUUID(as_uuid=True),
         ForeignKey("master_organizations.id", ondelete="SET NULL", onupdate="CASCADE"),
         nullable=True,
-        index=True,
     )
     title: Mapped[str] = mapped_column(String(220), nullable=False)
     public_validation_code = mapped_column(String(32), nullable=True)

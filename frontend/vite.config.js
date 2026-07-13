@@ -9,6 +9,11 @@ const projectRoot = fileURLToPath(new URL('.', import.meta.url))
 
 export default defineConfig({
   plugins: [react()],
+  test: {
+    environment: 'jsdom',
+    setupFiles: './src/test/setup.js',
+    restoreMocks: true,
+  },
   optimizeDeps: {
     include: [
       'react',
@@ -33,6 +38,14 @@ export default defineConfig({
         manualChunks(id) {
           if (id.includes('node_modules/recharts')) return 'analytics-charts'
           if (id.includes('node_modules/jspdf') || id.includes('node_modules/jspdf-autotable')) return 'export-pdf'
+          if (
+            id.includes('node_modules/react/')
+            || id.includes('node_modules/react-dom/')
+            || id.includes('node_modules/react-router')
+          ) return 'react-vendor'
+          if (id.includes('node_modules/leaflet')) return 'maps'
+          if (id.includes('node_modules/axios')) return 'api-client'
+          if (id.includes('node_modules/qrcode') || id.includes('node_modules/zipcelx')) return 'export-utils'
           return undefined
         },
       },
