@@ -69,18 +69,18 @@
 
 ## Fase 3 — Backend de posses e rotas
 
-- [ ] Criação de posse sem rota funcionando.
-- [ ] Criação atômica de posse com rota inicial funcionando.
-- [ ] Substituição de posse ativa exige confirmação e justificativa.
-- [ ] Criação de rota funcionando.
-- [ ] Inclusão de destino funcionando.
-- [ ] Encerramento de rota funcionando.
-- [ ] Cancelamento de rota funcionando.
-- [ ] Encerramento de posse bloqueado com rota aberta.
-- [ ] IDOR bloqueado.
-- [ ] Paginação e filtros server-side implementados.
-- [ ] Auditoria das mutações validada.
-- [ ] Testes de serviços e endpoints executados.
+- [x] Criação de posse sem rota funcionando. Evidência: teste PostgreSQL/API no commit `2f93d77`.
+- [x] Criação atômica de posse com rota inicial funcionando. Evidência: múltiplos destinos persistidos no mesmo commit e rollback forçado do segundo destino.
+- [x] Substituição de posse ativa exige confirmação e justificativa. Evidência: `409 ACTIVE_POSSESSION_EXISTS`, lock do veículo/posse e evento `POSSESSION_REPLACE_ACTIVE`.
+- [x] Criação de rota funcionando. Evidência: `POST /api/possession/{possession_id}/trips` e teste de posse ativa/encerrada.
+- [x] Inclusão de destino funcionando. Evidência: lote, sequência 1–2 e concorrência real validada.
+- [x] Encerramento de rota funcionando. Evidência: retorno/hodômetro válidos e inválidos cobertos.
+- [x] Cancelamento de rota funcionando. Evidência: justificativa obrigatória e histórico preservado.
+- [x] Encerramento de posse bloqueado com rota aberta. Evidência: endpoint legado e retificação administrativa respondem `409 POSSESSION_HAS_OPEN_TRIP`.
+- [x] IDOR bloqueado. Evidência: rota existente consultada sob outra posse retorna 404.
+- [x] Paginação e filtros server-side implementados. Evidência: `page`, `limit`, filtro `status` e contagem consultados no repository.
+- [x] Auditoria das mutações validada. Evidência: seis eventos, request ID e rollback sem auditoria de sucesso testados.
+- [x] Testes de serviços e endpoints executados. Evidência: 15 testes direcionados e suíte completa com 121 aprovados.
 
 ## Fase 4 — Frontend de posses e rotas
 
@@ -163,3 +163,4 @@
 | 2026-07-10 | Desbloqueio Fase 1 | `6127290`, `9611f38`, `7942826` | merge explícito; consultas de schema; `alembic heads/current/history --verbose`; `pytest tests -q`; `npm run build`; `git diff --check` | Produção sincronizada; Alembic em `0038`; 81 testes e build passaram; nenhuma migration/schema alterados | Codex |
 | 2026-07-11 | 1 | `61d3433` | `python -m pytest tests -q`; `npm run build`; `python -m alembic heads`; `python -m alembic current`; `python -m alembic history --verbose`; `git diff --check` | 95 testes e build aprovados; head/current `0038_require_user_cpf`; request context, CSRF/Origin, auditoria, erros e headers validados; nenhuma migration | Codex |
 | 2026-07-11 | 2 | `185066c` | `alembic heads/current/history`; upgrades clean e cópia; `pytest tests/test_phase2_possession_schema.py -q`; `pytest tests -q`; `npm run build`; consultas de catálogo/contagens/checksums; `alembic check`; `git diff --check` | 0039 aplicada nos dois bancos isolados; 11 testes PostgreSQL e 97 testes gerais aprovados; 350 posses e referências preservadas; falhas preexistentes de upgrade vazio/autogenerate registradas | Codex |
+| 2026-07-13 | 3 | `2f93d77` | `pytest tests/test_phase3_possession_routes.py -q`; `pytest tests -q`; `python -m compileall -q app`; `npm run build`; `alembic heads/current/history --verbose`; `alembic check`; `git diff --check` | 15 testes direcionados e 121 totais aprovados; build aprovado; código/clean em 0039, fonte em 0038; ruído preexistente do autogenerate preservado | Codex |

@@ -47,6 +47,24 @@ Débitos encontrados no ensaio:
 - os bancos isolados `frota_phase2_clean_20260711_01` e `frota_phase2_copy_20260711_01` foram preservados como evidência; a cópia deve manter acesso restrito até remoção autorizada;
 - o banco fonte permanece em 0038 e deve receber a 0039 antes da publicação do código da Fase 3.
 
+## Atualização da Fase 3 — 2026-07-13
+
+| Risco | Situação após a Fase 3 |
+|---|---|
+| R-005 | **Resolvido no backend:** substituição exige flag, justificativa, lock do veículo/posse e auditoria; rota aberta bloqueia a operação |
+| R-016 | **Mitigado:** 15 testes direcionados e 121 testes totais cobrem domínio, API, CSRF, RBAC, IDOR, rollback, auditoria e concorrência PostgreSQL |
+| R-019 | **Mitigado no fluxo:** rotas usam `Decimal`; criação exige continuidade do último hodômetro e encerramentos rejeitam regressão |
+| R-020 | **Mitigado no módulo:** criação/substituição bloqueia veículo e posse; rota/destino usam locks dos pais e constraints como última barreira |
+| R-021 | **Mitigado para falhas tratadas:** compensação de arquivos foi validada com falha forçada; queda abrupta entre filesystem e banco continua risco residual da Fase 7 |
+
+Riscos para a Fase 4:
+
+- o banco fonte continua em 0038 e deve receber a 0039 antes de publicar o backend que consulta `public_number` e tabelas de rota;
+- o frontend atual não confirma substituição: recebe `409 ACTIVE_POSSESSION_EXISTS` até a interface da Fase 4 implementar confirmação e justificativa;
+- os filtros da tela de auditoria não enumeram os seis novos eventos, embora a listagem “TODAS” já os exiba;
+- não há testes frontend, lint ou typecheck; o build continua sendo a única validação automatizada disponível;
+- o `alembic check` mantém os mesmos diffs preexistentes de outros módulos, sem alteração de schema na Fase 3.
+
 ## Críticos
 
 | ID | Achado/evidência | Impacto | Tratamento antes/depois |
