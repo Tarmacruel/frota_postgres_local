@@ -29,6 +29,7 @@ class PossessionTripRepository:
         statement = (
             select(VehiclePossessionTrip)
             .options(selectinload(VehiclePossessionTrip.destinations))
+            .execution_options(populate_existing=True)
             .where(
                 VehiclePossessionTrip.id == trip_id,
                 VehiclePossessionTrip.possession_id == possession_id,
@@ -48,6 +49,7 @@ class PossessionTripRepository:
         statement = (
             select(VehiclePossessionTrip)
             .options(selectinload(VehiclePossessionTrip.destinations))
+            .execution_options(populate_existing=True)
             .where(
                 VehiclePossessionTrip.possession_id == possession_id,
                 VehiclePossessionTrip.status == VehiclePossessionTripStatus.EM_ANDAMENTO,
@@ -62,10 +64,53 @@ class PossessionTripRepository:
         result = await self.db.execute(
             select(VehiclePossessionTrip)
             .options(selectinload(VehiclePossessionTrip.destinations))
+            .execution_options(populate_existing=True)
             .where(VehiclePossessionTrip.possession_id == possession_id)
             .order_by(VehiclePossessionTrip.sequence_number.asc())
         )
         return list(result.scalars().unique().all())
+
+    async def list_paginated_by_possession(
+        self,
+        possession_id: UUID,
+        *,
+        page: int,
+        limit: int,
+        status: VehiclePossessionTripStatus | None = None,
+    ) -> tuple[list[VehiclePossessionTrip], int]:
+        statement = (
+            select(VehiclePossessionTrip)
+            .options(selectinload(VehiclePossessionTrip.destinations))
+            .execution_options(populate_existing=True)
+            .where(VehiclePossessionTrip.possession_id == possession_id)
+        )
+        count_statement = select(func.count(VehiclePossessionTrip.id)).where(
+            VehiclePossessionTrip.possession_id == possession_id
+        )
+        if status is not None:
+            statement = statement.where(VehiclePossessionTrip.status == status)
+            count_statement = count_statement.where(VehiclePossessionTrip.status == status)
+        statement = (
+            statement
+            .order_by(VehiclePossessionTrip.sequence_number.desc())
+            .offset((page - 1) * limit)
+            .limit(limit)
+        )
+        total = int((await self.db.execute(count_statement)).scalar_one())
+        items = list((await self.db.execute(statement)).scalars().unique().all())
+        return items, total
+
+    async def get_latest_completed(self, possession_id: UUID) -> VehiclePossessionTrip | None:
+        result = await self.db.execute(
+            select(VehiclePossessionTrip)
+            .where(
+                VehiclePossessionTrip.possession_id == possession_id,
+                VehiclePossessionTrip.status == VehiclePossessionTripStatus.ENCERRADA,
+            )
+            .order_by(VehiclePossessionTrip.sequence_number.desc())
+            .limit(1)
+        )
+        return result.scalar_one_or_none()
 
     async def next_trip_sequence(self, possession_id: UUID) -> int | None:
         locked = await self.db.execute(

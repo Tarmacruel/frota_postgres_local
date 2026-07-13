@@ -12,16 +12,20 @@ from app.core.config import settings
 from app.core.organization_scope import production_scope_is_empty, scoped_organization_id
 from app.models.possession import VehiclePossession
 from app.models.possession_photo import VehiclePossessionPhoto
+from app.models.possession_trip import VehiclePossessionTripStatus
 from app.models.user import User, UserRole
 from app.models.vehicle import Vehicle
 from app.repositories.driver_repository import DriverRepository
 from app.repositories.possession_repository import PossessionRepository
+from app.repositories.possession_trip_repository import PossessionTripRepository
 from app.repositories.vehicle_repository import VehicleRepository
 from app.schemas.common import PaginatedResponse, build_pagination
 from app.schemas.possession import PossessionAdminUpdate, PossessionCreate, PossessionPhotoCreate, PossessionUpdate
+from app.schemas.possession_trip import TripCreate
 from app.services.admin_notification_service import AdminNotificationService
 from app.services.audit_service import AuditService
 from app.services.document_signature_service import DocumentSignatureService, SOURCE_POSSESSION
+from app.services.possession_trip_service import PossessionTripService
 from app.models.document_signature import DigitalDocumentType
 
 MAX_PHOTO_SIZE_BYTES = 8 * 1024 * 1024
@@ -54,6 +58,7 @@ class PossessionService:
         self.possessions = PossessionRepository(db)
         self.vehicles = VehicleRepository(db)
         self.drivers = DriverRepository(db)
+        self.trips = PossessionTripRepository(db)
         self.audit = AuditService(db)
         self.admin_notifications = AdminNotificationService(db)
 
@@ -139,6 +144,9 @@ class PossessionService:
         photos: list[UploadFile],
         photo_metadata: list[PossessionPhotoCreate],
         loan_term_document: UploadFile | None,
+        initial_trip: TripCreate | None = None,
+        replace_active: bool = False,
+        replacement_reason: str | None = None,
         current_user: User,
     ) -> dict:
         vehicle = await self._ensure_vehicle_exists(data.vehicle_id, current_user=current_user)
@@ -153,31 +161,6 @@ class PossessionService:
         loan_term_payload = await self._read_and_validate_document(loan_term_document)
 
         effective_start = data.start_date or datetime.now(timezone.utc)
-        current_active = await self.possessions.get_active_by_vehicle(data.vehicle_id)
-        if current_active and effective_start < current_active.start_date:
-            raise HTTPException(
-                status_code=status.HTTP_400_BAD_REQUEST,
-                detail="Nova posse não pode iniciar antes da posse ativa atual",
-            )
-
-        auto_close_end_odometer = data.start_odometer_km
-        pending_admin_notification_payload: dict | None = None
-        if current_active and data.start_odometer_km is not None:
-            if current_active.end_odometer_km is None:
-                auto_close_end_odometer = data.start_odometer_km
-            else:
-                auto_close_end_odometer = current_active.end_odometer_km
-                gap_km = round(float(data.start_odometer_km - current_active.end_odometer_km), 2)
-                if abs(gap_km) > 0:
-                    pending_admin_notification_payload = {
-                        "vehicle_id": str(data.vehicle_id),
-                        "previous_possession_id": str(current_active.id),
-                        "previous_end_odometer_km": current_active.end_odometer_km,
-                        "new_start_odometer_km": data.start_odometer_km,
-                        "gap_km": gap_km,
-                        "auto_closed_at": effective_start.isoformat(),
-                    }
-
         possession = VehiclePossession(
             vehicle_id=data.vehicle_id,
             driver_id=selected_driver["driver_id"],
@@ -198,12 +181,76 @@ class PossessionService:
         stored_loan_term_path: Path | None = None
         stored_photo_paths: list[Path] = []
         try:
-            await self.possessions.end_active_for_vehicle(
-                data.vehicle_id,
-                effective_start,
-                end_odometer_km=auto_close_end_odometer,
-            )
+            if not await self.possessions.lock_vehicle(data.vehicle_id):
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
+            current_active = await self.possessions.get_active_by_vehicle(data.vehicle_id, for_update=True)
+            normalized_reason = replacement_reason.strip() if replacement_reason else None
+            pending_admin_notification_payload: dict | None = None
+
+            if current_active is not None and not replace_active:
+                raise HTTPException(
+                    status_code=status.HTTP_409_CONFLICT,
+                    detail={
+                        "code": "ACTIVE_POSSESSION_EXISTS",
+                        "message": "O veículo já possui uma posse ativa; confirme a substituição explicitamente.",
+                        "active_possession": {
+                            "id": str(current_active.id),
+                            "public_number": current_active.public_number,
+                            "start_date": current_active.start_date.isoformat(),
+                        },
+                    },
+                )
+
+            if current_active is not None:
+                if not normalized_reason or len(normalized_reason) < 8 or len(normalized_reason) > 1000:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail={
+                            "code": "REPLACEMENT_REASON_REQUIRED",
+                            "message": "A substituição exige justificativa entre 8 e 1000 caracteres.",
+                        },
+                    )
+                if effective_start < current_active.start_date:
+                    raise HTTPException(
+                        status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                        detail={
+                            "code": "POSSESSION_START_BEFORE_ACTIVE",
+                            "message": "A nova posse não pode iniciar antes da posse ativa atual.",
+                        },
+                    )
+                if await self.trips.get_open_by_possession(current_active.id, for_update=True):
+                    raise HTTPException(
+                        status_code=status.HTTP_409_CONFLICT,
+                        detail={
+                            "code": "ACTIVE_POSSESSION_HAS_OPEN_TRIP",
+                            "message": "A posse ativa possui rota em andamento e não pode ser substituída.",
+                        },
+                    )
+
+                previous_end_odometer = current_active.end_odometer_km
+                current_active.end_date = effective_start
+                if current_active.end_odometer_km is None and data.start_odometer_km is not None:
+                    current_active.end_odometer_km = data.start_odometer_km
+                if previous_end_odometer is not None and data.start_odometer_km is not None:
+                    gap_km = round(float(data.start_odometer_km - previous_end_odometer), 2)
+                    if abs(gap_km) > 0:
+                        pending_admin_notification_payload = {
+                            "vehicle_id": str(data.vehicle_id),
+                            "previous_possession_id": str(current_active.id),
+                            "previous_end_odometer_km": previous_end_odometer,
+                            "new_start_odometer_km": data.start_odometer_km,
+                            "gap_km": gap_km,
+                            "replaced_at": effective_start.isoformat(),
+                        }
+
             await self.possessions.create(possession)
+
+            if initial_trip is not None:
+                await PossessionTripService(self.db).create_in_transaction(
+                    possession.id,
+                    initial_trip,
+                    current_user=current_user,
+                )
 
             if loan_term_payload:
                 relative_document_path, stored_loan_term_path = self._build_document_storage_paths(
@@ -218,7 +265,7 @@ class PossessionService:
 
             await self.audit.record(
                 actor=current_user,
-                action="CREATE",
+                action="POSSESSION_CREATE",
                 entity_type="POSSESSION",
                 entity_id=possession.id,
                 entity_label=f"{vehicle.plate} - {possession.driver_name}",
@@ -227,25 +274,37 @@ class PossessionService:
                     "driver_document": possession.driver_document,
                     "driver_contact": possession.driver_contact,
                     "start_date": possession.start_date.isoformat(),
-                    "observation": possession.observation,
                     "start_odometer_km": possession.start_odometer_km,
                     "kilometers_driven": self._calculate_kilometers_driven(possession.start_odometer_km, possession.end_odometer_km),
                     "photo_count": len(photo_payloads),
                     "loan_term_attached": bool(loan_term_payload),
-                    "loan_term_name": possession.document_name,
                     "loan_term_mime_type": possession.document_mime_type,
                     "loan_term_size_bytes": possession.document_size_bytes,
                     "signed_document_attached": bool(loan_term_payload),
-                    "signed_document_name": possession.document_name,
-                    "capture_accuracy_meters": [payload["capture_accuracy_meters"] for payload in photo_payloads],
+                    "initial_trip_created": initial_trip is not None,
                 },
             )
+            if current_active is not None:
+                await self.audit.record(
+                    actor=current_user,
+                    action="POSSESSION_REPLACE_ACTIVE",
+                    entity_type="POSSESSION",
+                    entity_id=possession.id,
+                    entity_label=f"{vehicle.plate} - {possession.driver_name}",
+                    details={
+                        "vehicle_id": str(possession.vehicle_id),
+                        "previous_possession_id": str(current_active.id),
+                        "new_possession_id": str(possession.id),
+                        "replacement_reason": normalized_reason,
+                        "previous_ended_at": effective_start.isoformat(),
+                    },
+                )
             if pending_admin_notification_payload:
                 await self.admin_notifications.notify(
                     title="Divergência de quilometragem entre posses",
                     message=(
                         f"Veículo {vehicle.plate}: nova posse iniciou em {data.start_odometer_km:.1f} km "
-                        f"e a posse anterior encerrada tinha {current_active.end_odometer_km:.1f} km."
+                        f"e a posse anterior tinha {pending_admin_notification_payload['previous_end_odometer_km']:.1f} km."
                     ),
                     event_type="POSSESSION_ODOMETER_GAP",
                     severity="WARNING",
@@ -253,6 +312,11 @@ class PossessionService:
                 )
             await self.db.flush()
             await self.db.commit()
+        except HTTPException:
+            await self.db.rollback()
+            self._cleanup_file(stored_loan_term_path)
+            self._cleanup_files(stored_photo_paths)
+            raise
         except IntegrityError as exc:
             await self.db.rollback()
             self._cleanup_file(stored_loan_term_path)
@@ -282,18 +346,42 @@ class PossessionService:
         *,
         return_term_document: UploadFile | None = None,
     ) -> dict:
-        possession = await self.possessions.get_by_id(possession_id)
+        visible_possession = await self.possessions.get_by_id(possession_id)
+        if not visible_possession:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
+        await self._ensure_possession_visible_to_user(visible_possession, current_user)
+        possession = await self.possessions.get_by_id_for_update(possession_id)
         if not possession:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
-        await self._ensure_possession_visible_to_user(possession, current_user)
         if possession.end_date is not None:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Registro de posse já encerrado")
+        if await self.trips.get_open_by_possession(possession_id, for_update=True):
+            await self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "POSSESSION_HAS_OPEN_TRIP",
+                    "message": "A posse não pode ser encerrada enquanto houver rota em andamento.",
+                },
+            )
 
         return_term_payload = await self._read_and_validate_document(return_term_document)
         payload = data.model_dump(exclude_unset=True)
         effective_end = payload.get("end_date") or datetime.now(timezone.utc)
         if effective_end < possession.start_date:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data final não pode ser anterior ao início da posse")
+        if (
+            payload.get("end_odometer_km") is not None
+            and possession.start_odometer_km is not None
+            and payload["end_odometer_km"] < possession.start_odometer_km
+        ):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail={
+                    "code": "POSSESSION_ODOMETER_REVERSED",
+                    "message": "O hodômetro final não pode ser inferior ao inicial.",
+                },
+            )
 
         possession.end_date = effective_end
         if "observation" in payload:
@@ -373,13 +461,47 @@ class PossessionService:
         new_photos: list[UploadFile] | None = None,
         new_photo_metadata: list[PossessionPhotoCreate] | None = None,
     ) -> dict:
-        possession = await self.possessions.get_by_id(possession_id)
-        if not possession:
+        visible_possession = await self.possessions.get_by_id(possession_id)
+        if not visible_possession:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
 
-        await self._ensure_possession_visible_to_user(possession, current_user)
+        await self._ensure_possession_visible_to_user(visible_possession, current_user)
+        if not await self.possessions.lock_vehicle(visible_possession.vehicle_id):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
+        possession = await self.possessions.get_by_id_for_update(possession_id)
+        if not possession:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
         if data.end_date is not None and data.end_date < data.start_date:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data final não pode ser anterior ao início da posse")
+
+        existing_trips = await self.trips.list_by_possession(possession_id)
+        if data.end_date is not None and any(
+            trip.status == VehiclePossessionTripStatus.EM_ANDAMENTO for trip in existing_trips
+        ):
+            await self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "POSSESSION_HAS_OPEN_TRIP",
+                    "message": "A posse não pode ser encerrada enquanto houver rota em andamento.",
+                },
+            )
+        if any(
+            trip.departure_at < data.start_date
+            or (
+                data.end_date is not None
+                and (trip.return_at or trip.departure_at) > data.end_date
+            )
+            for trip in existing_trips
+        ):
+            await self.db.rollback()
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "POSSESSION_PERIOD_CONFLICTS_WITH_TRIPS",
+                    "message": "O período informado não contém todas as rotas registradas.",
+                },
+            )
 
         selected_driver = await self._resolve_driver_snapshot(
             driver_id=data.driver_id,
@@ -991,6 +1113,7 @@ class PossessionService:
 
         return {
             "id": record.id,
+            "public_number": record.public_number,
             "vehicle_id": record.vehicle_id,
             "vehicle_plate": record.vehicle.plate if record.vehicle else "",
             "vehicle_brand": record.vehicle.brand if record.vehicle else None,

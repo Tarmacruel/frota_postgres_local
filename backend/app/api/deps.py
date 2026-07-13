@@ -62,6 +62,12 @@ async def require_admin(current_user: User = Depends(get_current_user_ready)) ->
     return current_user
 
 
+async def require_writer(current_user: User = Depends(get_current_user_ready)) -> User:
+    if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso restrito a operadores de posse")
+    return current_user
+
+
 def require_permission(module: str, action: str):
     permission_column = action_to_column(action)
 

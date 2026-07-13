@@ -131,6 +131,7 @@ class PossessionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID
+    public_number: int
     vehicle_id: UUID
     vehicle_plate: str
     vehicle_brand: str | None

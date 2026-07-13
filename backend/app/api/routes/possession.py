@@ -8,8 +8,9 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import require_admin, require_permission
+from app.api.deps import require_admin, require_permission, require_writer
 from app.db.session import get_db_session
+from app.models.possession_trip import VehiclePossessionTripStatus
 from app.models.user import User
 from app.schemas.auth import MessageOut
 from app.schemas.possession import (
@@ -21,7 +22,16 @@ from app.schemas.possession import (
     PossessionTermPublicOut,
     PossessionUpdate,
 )
+from app.schemas.possession_trip import (
+    TripCancel,
+    TripCreate,
+    TripDestinationBatchCreate,
+    TripListResponse,
+    TripEnd,
+    TripOut,
+)
 from app.services.possession_service import PossessionService
+from app.services.possession_trip_service import PossessionTripService
 
 router = APIRouter(prefix="/api/possession", tags=["Possession"])
 public_router = APIRouter(prefix="/api/public/possession-terms", tags=["PublicPossessionTerms"])
@@ -95,6 +105,23 @@ def parse_possession_photo_metadata(
     photo_metadata_json: str | None = Form(default=None),
 ) -> list[PossessionPhotoCreate]:
     return _parse_photo_metadata(photo_metadata_json, required=False)
+
+
+def parse_initial_trip(
+    initial_trip_json: str | None = Form(default=None),
+) -> TripCreate | None:
+    if not initial_trip_json:
+        return None
+    try:
+        payload = json.loads(initial_trip_json)
+    except json.JSONDecodeError:
+        _raise_form_error("initial_trip_json", "A rota inicial estÃ¡ em formato invÃ¡lido.")
+    if not isinstance(payload, dict):
+        _raise_form_error("initial_trip_json", "A rota inicial deve ser um objeto JSON.")
+    try:
+        return TripCreate.model_validate(payload)
+    except ValidationError as exc:
+        raise RequestValidationError(exc.errors()) from exc
 
 
 def parse_admin_update_form(
@@ -218,17 +245,114 @@ async def list_active_possession(
 async def create_possession(
     data: PossessionCreate = Depends(parse_possession_form),
     photo_metadata: list[PossessionPhotoCreate] = Depends(parse_possession_photo_metadata),
+    initial_trip: TripCreate | None = Depends(parse_initial_trip),
+    replace_active: bool = Form(default=False),
+    replacement_reason: str | None = Form(default=None),
     photos: list[UploadFile] | None = File(default=None),
     loan_term_document: UploadFile | None = File(default=None),
     signed_document: UploadFile | None = File(default=None),
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_permission("possession", "create")),
+    current_user: User = Depends(require_writer),
+    _permission: User = Depends(require_permission("possession", "create")),
 ):
     return await PossessionService(db).start(
         data,
         photos=photos or [],
         photo_metadata=photo_metadata,
         loan_term_document=loan_term_document or signed_document,
+        initial_trip=initial_trip,
+        replace_active=replace_active,
+        replacement_reason=replacement_reason,
+        current_user=current_user,
+    )
+
+
+@router.get("/{possession_id}/trips", response_model=TripListResponse)
+async def list_possession_trips(
+    possession_id: UUID,
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=20, ge=1, le=100),
+    trip_status: VehiclePossessionTripStatus | None = Query(default=None, alias="status"),
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("possession", "view")),
+):
+    return await PossessionTripService(db).list_paginated(
+        possession_id,
+        page=page,
+        limit=limit,
+        trip_status=trip_status,
+        current_user=current_user,
+    )
+
+
+@router.post("/{possession_id}/trips", response_model=TripOut, status_code=201)
+async def create_possession_trip(
+    possession_id: UUID,
+    data: TripCreate,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_writer),
+    _permission: User = Depends(require_permission("possession", "create")),
+):
+    return await PossessionTripService(db).create(possession_id, data, current_user=current_user)
+
+
+@router.get("/{possession_id}/trips/{trip_id}", response_model=TripOut)
+async def get_possession_trip(
+    possession_id: UUID,
+    trip_id: UUID,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("possession", "view")),
+):
+    return await PossessionTripService(db).get(possession_id, trip_id, current_user=current_user)
+
+
+@router.post("/{possession_id}/trips/{trip_id}/destinations", response_model=TripOut)
+async def add_possession_trip_destinations(
+    possession_id: UUID,
+    trip_id: UUID,
+    data: TripDestinationBatchCreate,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_writer),
+    _permission: User = Depends(require_permission("possession", "edit")),
+):
+    return await PossessionTripService(db).add_destinations(
+        possession_id,
+        trip_id,
+        data.destinations,
+        current_user=current_user,
+    )
+
+
+@router.put("/{possession_id}/trips/{trip_id}/end", response_model=TripOut)
+async def end_possession_trip(
+    possession_id: UUID,
+    trip_id: UUID,
+    data: TripEnd,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_writer),
+    _permission: User = Depends(require_permission("possession", "edit")),
+):
+    return await PossessionTripService(db).end(
+        possession_id,
+        trip_id,
+        data,
+        current_user=current_user,
+    )
+
+
+@router.put("/{possession_id}/trips/{trip_id}/cancel", response_model=TripOut)
+async def cancel_possession_trip(
+    possession_id: UUID,
+    trip_id: UUID,
+    data: TripCancel,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_writer),
+    _permission: User = Depends(require_permission("possession", "edit")),
+):
+    return await PossessionTripService(db).cancel(
+        possession_id,
+        trip_id,
+        data,
         current_user=current_user,
     )
 
@@ -284,7 +408,8 @@ async def end_possession(
     possession_id: UUID,
     parsed: tuple[PossessionUpdate, UploadFile | None] = Depends(parse_possession_end_request),
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_permission("possession", "edit")),
+    current_user: User = Depends(require_writer),
+    _permission: User = Depends(require_permission("possession", "edit")),
 ):
     data, return_term_document = parsed
     return await PossessionService(db).end(
@@ -305,7 +430,8 @@ async def update_possession(
     return_term_document: UploadFile | None = File(default=None),
     new_photos: list[UploadFile] | None = File(default=None),
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_permission("possession", "edit")),
+    current_user: User = Depends(require_admin),
+    _permission: User = Depends(require_permission("possession", "edit")),
 ):
     return await PossessionService(db).admin_update(
         possession_id,

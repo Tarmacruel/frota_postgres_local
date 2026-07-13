@@ -53,6 +53,7 @@ class FakeDbSession:
 def build_record(*, active=False):
     return SimpleNamespace(
         id=uuid4(),
+        public_number=123,
         vehicle_id=uuid4(),
         driver_id=None,
         vehicle=SimpleNamespace(plate="TOA5G07", brand="VW", model="Nova Track"),
