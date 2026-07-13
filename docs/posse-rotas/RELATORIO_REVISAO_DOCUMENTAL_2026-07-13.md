@@ -86,4 +86,11 @@ As decisões de identidade e assinatura estão formalizadas em `ADR_003_IDENTIDA
 
 ## Publicação
 
-Esta seção deve receber o SHA final, o horário do reinício e os resultados dos smoke tests pós-publicação. Nenhuma afirmação de deploy é feita antes dessa evidência.
+- Commit funcional publicado: `f5d9a88` (`fix(documents): restore institutional identity and signatures`).
+- `origin/main` avançou de `1619fbf` para `f5d9a88` sem force-push.
+- Backend reiniciado em modo de produção, Uvicorn sem reload em `127.0.0.1:8000`.
+- Frontend reconstruído com 974 módulos e reiniciado em modo preview de produção em `127.0.0.1:3000`.
+- Smoke público: `/login = 200`, `/api/health = 200`, `/docs = 404`, listagem de posses sem sessão `= 401` e termo protegido sem sessão `= 401`.
+- Bundle público confirmado: `assets/index-BJ6IfKLM.js`, contendo o novo tipo de termo e `Setor de Frotas`, sem a mensagem de melhorias em implantação.
+- Headers públicos confirmados: HSTS, CSP, `X-Content-Type-Options: nosniff` e `X-Frame-Options: DENY`.
+- PostgreSQL não foi reiniciado ou migrado nesta publicação; permaneceu em `0040_report_preferences`.
