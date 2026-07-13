@@ -44,6 +44,7 @@ Documentos de apoio:
 - `RELATORIO_FASE_1.md`: implementação, testes, deploy, riscos residuais e rollback da camada transversal de segurança.
 - `RELATORIO_FASE_2.md`: schema, migration, ensaios limpo/cópia, contagens, downgrade e riscos para serviços.
 - `RELATORIO_FASE_3.md`: contratos REST, transações, locks, auditoria, testes e compatibilidade com o frontend atual.
+- `RELATORIO_PRONTIDAO_FASE_4.md`: backup e upgrade do banco fonte, reconciliação Alembic, preparação de testes frontend e critérios de liberação.
 
 ## 4. Regras não negociáveis
 

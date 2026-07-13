@@ -84,6 +84,18 @@
 
 ## Fase 4 — Frontend de posses e rotas
 
+### Liberação de entrada — 2026-07-13
+
+- [x] Backup pré-upgrade criado e validado. Evidência: dump custom de 1.324.309 bytes, SHA-256 registrado e catálogo aprovado.
+- [x] Banco fonte atualizado para `0039_possession_trips`. Evidência: `alembic heads/current` convergentes.
+- [x] Legado preservado no upgrade. Evidência: 357 posses, 27 ativas, checksums idênticos e 10/10 arquivos presentes.
+- [x] Drift do metadata reconciliado sem migration. Evidência: `alembic check` sem novas operações.
+- [x] Testes e lint frontend disponíveis. Evidência: Vitest/Testing Library/ESLint no commit `abbf266`.
+- [x] Dependências auditadas. Evidência: `npm audit --audit-level=low` com zero vulnerabilidades.
+- [x] Suíte/backend e build repetidos. Evidência: 121 testes backend, 5 frontend e build de 964 módulos aprovados.
+- [x] Logs runtime removidos do índice Git e preservados localmente por `storage/logs/` no `.gitignore`.
+- [x] Escopo preservado: nenhuma tela, endpoint ou regra funcional da Fase 4 implementada nesta preparação.
+
 - [ ] Componentes extraídos de `PossessionPage` quando necessário.
 - [ ] Rota inicial opcional disponível na nova posse.
 - [ ] Destinos dinâmicos implementados.
@@ -164,3 +176,4 @@
 | 2026-07-11 | 1 | `61d3433` | `python -m pytest tests -q`; `npm run build`; `python -m alembic heads`; `python -m alembic current`; `python -m alembic history --verbose`; `git diff --check` | 95 testes e build aprovados; head/current `0038_require_user_cpf`; request context, CSRF/Origin, auditoria, erros e headers validados; nenhuma migration | Codex |
 | 2026-07-11 | 2 | `185066c` | `alembic heads/current/history`; upgrades clean e cópia; `pytest tests/test_phase2_possession_schema.py -q`; `pytest tests -q`; `npm run build`; consultas de catálogo/contagens/checksums; `alembic check`; `git diff --check` | 0039 aplicada nos dois bancos isolados; 11 testes PostgreSQL e 97 testes gerais aprovados; 350 posses e referências preservadas; falhas preexistentes de upgrade vazio/autogenerate registradas | Codex |
 | 2026-07-13 | 3 | `2f93d77` | `pytest tests/test_phase3_possession_routes.py -q`; `pytest tests -q`; `python -m compileall -q app`; `npm run build`; `alembic heads/current/history --verbose`; `alembic check`; `git diff --check` | 15 testes direcionados e 121 totais aprovados; build aprovado; código/clean em 0039, fonte em 0038; ruído preexistente do autogenerate preservado | Codex |
+| 2026-07-13 | Liberação Fase 4 | `abbf266` | backup/restore-list/hash; upgrade 0039; consultas de preservação; `alembic heads/current/history/check`; `pytest tests -q`; `npm test`; `npm run lint`; `npm run build`; `npm audit`; `git diff --check` | fonte em 0039; 357 posses e arquivos preservados; 121 testes backend e 5 frontend aprovados; lint sem erros; build aprovado; audit e Alembic limpos | Codex |

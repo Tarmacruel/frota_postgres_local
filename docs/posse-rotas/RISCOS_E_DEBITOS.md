@@ -57,13 +57,28 @@ Débitos encontrados no ensaio:
 | R-020 | **Mitigado no módulo:** criação/substituição bloqueia veículo e posse; rota/destino usam locks dos pais e constraints como última barreira |
 | R-021 | **Mitigado para falhas tratadas:** compensação de arquivos foi validada com falha forçada; queda abrupta entre filesystem e banco continua risco residual da Fase 7 |
 
-Riscos para a Fase 4:
+## Liberação da Fase 4 — 2026-07-13
 
-- o banco fonte continua em 0038 e deve receber a 0039 antes de publicar o backend que consulta `public_number` e tabelas de rota;
-- o frontend atual não confirma substituição: recebe `409 ACTIVE_POSSESSION_EXISTS` até a interface da Fase 4 implementar confirmação e justificativa;
-- os filtros da tela de auditoria não enumeram os seis novos eventos, embora a listagem “TODAS” já os exiba;
-- não há testes frontend, lint ou typecheck; o build continua sendo a única validação automatizada disponível;
-- o `alembic check` mantém os mesmos diffs preexistentes de outros módulos, sem alteração de schema na Fase 3.
+| Risco | Situação após a preparação |
+|---|---|
+| Banco fonte em 0038 | **Resolvido:** backup custom validado e 0039 aplicada; head/current convergem em `0039_possession_trips` |
+| Dados/arquivos durante o upgrade | **Resolvido:** 357 posses, 27 ativas, checksums e 10/10 arquivos preservados |
+| Ruído do `alembic check` | **Resolvido sem migration:** metadata ORM reconciliado com o schema aplicado; `No new upgrade operations detected` |
+| R-017 — validação frontend | **Mitigado:** Vitest, jsdom, React Testing Library e ESLint implantados; 5 testes e lint executados |
+| Dependências frontend vulneráveis | **Resolvido:** 9 achados iniciais, incluindo 1 crítico, reduzidos a zero após upgrades validados por testes/build |
+| R-028 — escopo de fixture assíncrona | **Resolvido:** `asyncio_default_fixture_loop_scope=function` fixado e 121 testes aprovados |
+| R-029 — lock/dependências | **Resolvido:** lockfile regenerado, árvore sem `extraneous` e auditoria limpa |
+| Logs runtime no Git | **Resolvido:** `storage/logs/` ignorado e arquivos preservados localmente |
+
+Escopo obrigatório da própria Fase 4, não bloqueio de entrada:
+
+- tratar `409 ACTIVE_POSSESSION_EXISTS` com confirmação e justificativa;
+- consumir rotas paginadas e respeitar `operational_details_restricted`;
+- ocultar ações conforme o perfil sem substituir a autorização do backend;
+- adicionar os seis eventos da Fase 3 aos filtros de auditoria;
+- criar testes de componentes dos novos fluxos.
+
+O lint possui 45 warnings legados sem erros. Não existe `typecheck` porque o frontend atual é JavaScript sem contrato de tipos; não foi criado um comando fictício. Evidências completas: `RELATORIO_PRONTIDAO_FASE_4.md`.
 
 ## Críticos
 
