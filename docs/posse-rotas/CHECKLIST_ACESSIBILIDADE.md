@@ -6,7 +6,7 @@ Referência: WCAG 2.1 AA e eMAG. Revisão de código/RTL em 2026-07-13; a homolo
 |---|---|---|
 | Labels associados a campos, inclusive rota inicial, justificativa e declaração | componentes de formulário e testes RTL | Conforme |
 | Foco inicial, contenção de Tab, Escape e retorno de foco nos modais | `Modal`, encerramento e `GuidedTour` | Conforme |
-| Tour pode ser ignorado, navegado para frente/trás e reaberto | 9 testes focados do `GuidedTour` e reprodução Playwright desktop/mobile | Conforme |
+| Tour pode ser ignorado, navegado para frente/trás e reaberto | 11 testes focados do `GuidedTour` e reprodução Playwright desktop/mobile | Conforme |
 | Destaque do tour não depende só de cor | spotlight separado com contorno/sombra e balão ancorado com título, texto e progresso | Conforme |
 | Estado assíncrono e erros 401/403/409/422 possuem texto e `aria-live` | `PossessionPage`, formulários e testes | Conforme |
 | Duplo submit impedido e botão comunica processamento | fluxos de criação, rota e encerramento | Conforme |
@@ -14,7 +14,7 @@ Referência: WCAG 2.1 AA e eMAG. Revisão de código/RTL em 2026-07-13; a homolo
 | Reordenação de destinos/colunas por botões acessíveis | subir/descer com rótulo; não depende de drag-and-drop | Conforme |
 | Tabelas têm cabeçalhos e status textual | timeline e relatórios | Conforme |
 | Foco visível e área mínima de ação em mobile | CSS compartilhado e media queries | Conforme na revisão |
-| Zoom/reflow em 320 px e desktop | Playwright em 320×568, 390×844 e 1280×720, sem interseção entre balão e alvo | Conforme na reprodução visual |
+| Zoom/reflow em 320 px e desktop | Playwright em 320×568, 390×844, 700×320, 900×320 e 1280×720, sem interseção entre balão e alvo | Conforme na reprodução visual |
 | Movimento respeita preferência reduzida | `prefers-reduced-motion` desativa transições do tour | Conforme |
 | Contraste de texto/controles | variáveis visuais existentes, overlay/diálogo com contraste reforçado | Sem achado automático; validar em homologação visual |
 | Leitor de tela real (NVDA/JAWS) | não disponível no ambiente automatizado | Pendente não bloqueante; teste institucional recomendado |
@@ -29,4 +29,4 @@ Referência: WCAG 2.1 AA e eMAG. Revisão de código/RTL em 2026-07-13; a homolo
 6. Encerrar sem rota aberta, percorrer integralmente a declaração e marcar o checkbox inicialmente desmarcado.
 7. Abrir “Mais opções”, selecionar e reordenar colunas pelos botões, gerar preview/download.
 
-Os 35 testes frontend passaram em cópia local controlada. O tour foi reproduzido em navegador real com reposicionamento acima/abaixo, troca de alvo após atualização do DOM, foco inicial e ações sempre visíveis. Os avisos do React Router referem-se à futura v7 e não alteram o fluxo atual.
+Os 37 testes frontend passaram em cópia local controlada. O tour foi reproduzido em navegador real com reposicionamento acima/abaixo/lateral, fallback central em viewport restrita, troca de alvo após atualização do DOM, foco inicial e ações sempre visíveis. Os avisos do React Router referem-se à futura v7 e não alteram o fluxo atual.

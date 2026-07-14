@@ -1,6 +1,8 @@
 const TOUR_MARGIN = 12
 const TOUR_GAP = 14
 const SPOTLIGHT_PADDING = 8
+const MINIMUM_ANCHORED_DIALOG_WIDTH = 300
+const MINIMUM_ANCHORED_DIALOG_HEIGHT = 220
 
 function clamp(value, minimum, maximum) {
   return Math.min(Math.max(value, minimum), Math.max(minimum, maximum))
@@ -117,7 +119,7 @@ export function calculateTourLayout({
   const maximumTop = normalizedViewport.top + normalizedViewport.height - TOUR_MARGIN - dialogHeight
   const spotlight = buildSpotlightRect(targetRect, normalizedViewport)
 
-  if (!spotlight) {
+  function centeredLayout() {
     return {
       placement: 'center',
       spotlight: null,
@@ -139,6 +141,8 @@ export function calculateTourLayout({
     }
   }
 
+  if (!spotlight) return centeredLayout()
+
   const candidates = placementCandidates(
     spotlight,
     dialogWidth,
@@ -158,14 +162,26 @@ export function calculateTourLayout({
         (second.space / Math.max(1, second.required)) - (first.space / Math.max(1, first.required))
       ))[0]
   const isVerticalPlacement = selected.placement === 'top' || selected.placement === 'bottom'
-  const constrainedDialogHeight = !fittingPlacement && isVerticalPlacement && selected.space >= 120
+  const minimumAnchoredSize = isVerticalPlacement
+    ? MINIMUM_ANCHORED_DIALOG_HEIGHT
+    : MINIMUM_ANCHORED_DIALOG_WIDTH
+  if (!fittingPlacement && selected.space < minimumAnchoredSize) return centeredLayout()
+
+  const constrainedDialogWidth = !fittingPlacement && !isVerticalPlacement
+    ? Math.min(dialogWidth, Math.floor(selected.space))
+    : dialogWidth
+  const constrainedDialogHeight = !fittingPlacement && isVerticalPlacement
     ? Math.min(dialogHeight, Math.floor(selected.space))
     : dialogHeight
+  const effectiveMaximumLeft = normalizedViewport.left + normalizedViewport.width - TOUR_MARGIN - constrainedDialogWidth
   const effectiveMaximumTop = normalizedViewport.top + normalizedViewport.height - TOUR_MARGIN - constrainedDialogHeight
+  const selectedLeft = selected.placement === 'left'
+    ? spotlight.left - TOUR_GAP - constrainedDialogWidth
+    : selected.left
   const selectedTop = selected.placement === 'top'
     ? spotlight.top - TOUR_GAP - constrainedDialogHeight
     : selected.top
-  const left = clamp(selected.left, minimumLeft, maximumLeft)
+  const left = clamp(selectedLeft, minimumLeft, effectiveMaximumLeft)
   const top = clamp(selectedTop, minimumTop, effectiveMaximumTop)
   const targetCenterX = spotlight.left + (spotlight.width / 2)
   const targetCenterY = spotlight.top + (spotlight.height / 2)
@@ -179,7 +195,7 @@ export function calculateTourLayout({
     dialog: roundedRect({
       left,
       top,
-      maxWidth: dialogWidth < rawDialogWidth ? dialogWidth : null,
+      maxWidth: constrainedDialogWidth < rawDialogWidth ? constrainedDialogWidth : null,
       maxHeight: constrainedDialogHeight < rawDialogHeight ? constrainedDialogHeight : null,
     }),
     arrowOffset: Math.round(arrowOffset),

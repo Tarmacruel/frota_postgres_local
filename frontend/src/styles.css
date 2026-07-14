@@ -6358,6 +6358,12 @@ button {
   scrollbar-gutter: stable;
 }
 
+.guided-tour-copy:focus-visible {
+  border-radius: 8px;
+  outline: 3px solid var(--navy);
+  outline-offset: 3px;
+}
+
 .guided-tour-progress {
   color: var(--navy);
   font-size: 0.78rem;

@@ -62,6 +62,35 @@ describe('calculateTourLayout', () => {
     expect(layout.spotlight.right).toBeLessThanOrEqual(308)
   })
 
+  it('restringe a largura quando o melhor espaço fica ao lado do alvo', () => {
+    const layout = calculateTourLayout({
+      targetRect: rectangle({ left: 400, top: 140, width: 100, height: 40 }),
+      dialogRect: rectangle({ left: 0, top: 0, width: 400, height: 220 }),
+      viewport: { left: 0, top: 0, width: 900, height: 320 },
+    })
+
+    expect(layout.placement).toBe('right')
+    expect(layout.dialog.maxWidth).toBe(366)
+    expect(layout.dialog.left).toBeGreaterThan(layout.spotlight.right)
+    expect(layout.dialog.left + layout.dialog.maxWidth).toBeLessThanOrEqual(888)
+  })
+
+  it('usa modo central quando a viewport não comporta ancoragem segura', () => {
+    const landscape = calculateTourLayout({
+      targetRect: rectangle({ left: 300, top: 140, width: 100, height: 40 }),
+      dialogRect: rectangle({ left: 0, top: 0, width: 400, height: 220 }),
+      viewport: { left: 0, top: 0, width: 700, height: 320 },
+    })
+    const shortPortrait = calculateTourLayout({
+      targetRect: rectangle({ left: 90, top: 150, width: 140, height: 48 }),
+      dialogRect: rectangle({ left: 0, top: 0, width: 296, height: 300 }),
+      viewport: { left: 0, top: 0, width: 320, height: 360 },
+    })
+
+    expect(landscape).toMatchObject({ placement: 'center', spotlight: null })
+    expect(shortPortrait).toMatchObject({ placement: 'center', spotlight: null })
+  })
+
   it('limita o destaque de alvos extensos à área realmente visível', () => {
     const layout = calculateTourLayout({
       targetRect: rectangle({ left: 0, top: -200, width: 900, height: 1400 }),
@@ -145,6 +174,7 @@ describe('GuidedTour', () => {
     const layer = screen.getByTestId('guided-tour-layer')
     expect(layer.parentElement).toBe(document.body)
     expect(appRoot).toHaveAttribute('inert')
+    expect(screen.getByLabelText('Conteúdo do passo atual')).toHaveAttribute('tabindex', '0')
     await waitFor(() => expect(screen.getByRole('button', { name: 'Encerrar tour' })).toHaveFocus())
 
     fireEvent.click(screen.getByRole('button', { name: 'Pular tour' }))
@@ -182,6 +212,9 @@ describe('GuidedTour', () => {
     }]
     const { container, rerender } = render(
       <>
+        <div style={{ display: 'none' }}>
+          <button type="button" data-tour="missing">Alvo oculto</button>
+        </div>
         <div data-tour="fallback">Alvo encontrado</div>
         <GuidedTour steps={fallbackSteps} storageKey="tour-fallback" />
       </>,

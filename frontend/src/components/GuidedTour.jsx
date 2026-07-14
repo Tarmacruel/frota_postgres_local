@@ -22,10 +22,16 @@ function persistCompleted(storageKey) {
 
 function isUsableTourTarget(target) {
   if (!target?.isConnected) return false
-  const styles = target.ownerDocument?.defaultView?.getComputedStyle?.(target)
-  return styles?.display !== 'none'
-    && styles?.visibility !== 'hidden'
-    && styles?.visibility !== 'collapse'
+  const view = target.ownerDocument?.defaultView
+  let current = target
+  while (current) {
+    const styles = view?.getComputedStyle?.(current)
+    if (styles?.display === 'none' || styles?.visibility === 'hidden' || styles?.visibility === 'collapse') {
+      return false
+    }
+    current = current.parentElement
+  }
+  return true
 }
 
 function resolveStepTarget(step) {
@@ -303,7 +309,7 @@ export default function GuidedTour({ steps = [], storageKey, replayToken = 0 }) 
         aria-labelledby="guided-tour-title"
         aria-describedby="guided-tour-description"
       >
-        <div className="guided-tour-copy">
+        <div className="guided-tour-copy" tabIndex="0" aria-label="Conteúdo do passo atual">
           <div className="guided-tour-progress" aria-live="polite" aria-atomic="true">
             Passo {activeStepIndex + 1} de {validSteps.length}
           </div>
