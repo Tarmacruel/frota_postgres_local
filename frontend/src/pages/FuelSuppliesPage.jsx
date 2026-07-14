@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
@@ -107,6 +108,7 @@ function asArray(payload) {
 }
 
 export default function FuelSuppliesPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
   const { canCreate, canEdit, canView } = useAuth()
   const canViewOrders = canView('fuel_supply_orders')
   const canCreateOrder = canCreate('fuel_supply_orders')
@@ -128,6 +130,15 @@ export default function FuelSuppliesPage() {
   const [currentHistoryPage, setCurrentHistoryPage] = useState(1)
   const [currentOrdersPage, setCurrentOrdersPage] = useState(1)
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
+
+  useEffect(() => {
+    if (searchParams.get('acao') !== 'nova-ordem') return
+    if (canCreateOrder) setIsOrderModalOpen(true)
+
+    const nextSearchParams = new URLSearchParams(searchParams)
+    nextSearchParams.delete('acao')
+    setSearchParams(nextSearchParams, { replace: true })
+  }, [canCreateOrder, searchParams, setSearchParams])
 
   useEffect(() => {
     async function loadDependencies() {

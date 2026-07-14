@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
+import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { officialBrand } from '../constants/officialBrand'
 import { useAuth } from '../context/AuthContext'
 import { AppIcon, getInitials } from './AppIcon'
@@ -17,7 +17,7 @@ function readStorage(key, fallback) {
 }
 
 export default function Layout() {
-  const { user, logout, changePassword, registerCpf, mustChangePassword, mustRegisterCpf, isAdmin, canView, roleLabel } = useAuth()
+  const { user, logout, changePassword, registerCpf, mustChangePassword, mustRegisterCpf, isAdmin, canView, canCreate, roleLabel } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const passwordChangeRequired = Boolean(mustChangePassword)
@@ -64,7 +64,7 @@ export default function Layout() {
           { to: '/sinistros', label: 'Sinistros', description: 'Ocorrências', icon: 'audit' },
           { to: '/multas', label: 'Multas', description: 'Autos', icon: 'catalog' },
           ...(canView('fuel_supplies') ? [{ to: '/abastecimentos', label: 'Abastecimentos', description: 'Consumo', icon: 'maintenance' }] : []),
-          ...(canView('fuel_supply_orders') ? [{ to: '/ordens-abastecimento', label: 'Ordens abertas', mobileLabel: 'Ordens', mobileAriaLabel: 'Ordens de abastecimento', description: 'Pendentes', icon: 'maintenance' }] : []),
+          ...(canView('fuel_supply_orders') ? [{ to: '/ordens-abastecimento', label: 'Ordens abertas', description: 'Pendentes', icon: 'maintenance' }] : []),
         ],
       },
     ]
@@ -115,8 +115,18 @@ export default function Layout() {
   }, [isAdmin, canView])
 
   const mobileTabs = navSections.flatMap((section) => section.items).filter((item) =>
-    ['/', '/vehicles', '/posses', '/condutores', '/ordens-abastecimento'].includes(item.to),
+    ['/', '/vehicles', '/posses', '/condutores'].includes(item.to),
   )
+  const fuelSuppliesItem = navSections.flatMap((section) => section.items).find((item) => item.to === '/abastecimentos')
+  if (fuelSuppliesItem && canCreate('fuel_supply_orders')) {
+    mobileTabs.push({
+      ...fuelSuppliesItem,
+      to: '/abastecimentos?acao=nova-ordem',
+      mobileLabel: 'Nova ordem',
+      mobileAriaLabel: 'Registrar ordem de abastecimento',
+      isAction: true,
+    })
+  }
 
   const currentItem =
     navSections
@@ -462,12 +472,18 @@ export default function Layout() {
       </div>
 
       <nav className="mobile-bottom-bar" aria-label="Navegação móvel">
-        {mobileTabs.map((item) => (
-          <NavLink key={item.to} to={item.to} end={item.to === '/'} aria-label={item.mobileAriaLabel ?? item.label} className={({ isActive }) => `mobile-bottom-link${isActive ? ' active' : ''}`}>
-            <AppIcon name={item.icon} className="app-icon" />
-            <span>{item.mobileLabel ?? item.label}</span>
-          </NavLink>
-        ))}
+        {mobileTabs.map((item) => {
+          const content = (
+            <>
+              <AppIcon name={item.icon} className="app-icon" />
+              <span>{item.mobileLabel ?? item.label}</span>
+            </>
+          )
+          if (item.isAction) {
+            return <Link key={item.to} to={item.to} aria-label={item.mobileAriaLabel ?? item.label} className="mobile-bottom-link">{content}</Link>
+          }
+          return <NavLink key={item.to} to={item.to} end={item.to === '/'} aria-label={item.mobileAriaLabel ?? item.label} className={({ isActive }) => `mobile-bottom-link${isActive ? ' active' : ''}`}>{content}</NavLink>
+        })}
       </nav>
 
       <Modal open={notificationsOpen} title="Central de notificações" description="Ocorrências administrativas de divergência de quilometragem entre posses." onClose={() => setNotificationsOpen(false)}>

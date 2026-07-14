@@ -5,7 +5,9 @@ import Layout from './Layout'
 
 const mocks = vi.hoisted(() => ({
   allowedModules: new Set(),
+  creatableModules: new Set(),
   canView: vi.fn(),
+  canCreate: vi.fn(),
   logout: vi.fn(),
   changePassword: vi.fn(),
   registerCpf: vi.fn(),
@@ -22,6 +24,7 @@ vi.mock('../context/AuthContext', () => ({
     mustRegisterCpf: false,
     isAdmin: false,
     canView: mocks.canView,
+    canCreate: mocks.canCreate,
     roleLabel: 'Produção',
   }),
 }))
@@ -44,9 +47,9 @@ vi.mock('../api/documentSignatures', () => ({
 vi.mock('./SearchOverlay', () => ({ default: () => null }))
 vi.mock('./Modal', () => ({ default: () => null }))
 
-function renderLayout() {
+function renderLayout(initialEntry = '/') {
   return render(
-    <MemoryRouter>
+    <MemoryRouter initialEntries={[initialEntry]}>
       <Layout />
     </MemoryRouter>,
   )
@@ -70,36 +73,49 @@ describe('Layout mobile quick actions', () => {
       'fuel_supplies',
       'fuel_supply_orders',
     ])
+    mocks.creatableModules = new Set(['fuel_supply_orders'])
     mocks.canView.mockImplementation((module) => mocks.allowedModules.has(module))
+    mocks.canCreate.mockImplementation((module) => mocks.creatableModules.has(module))
     window.scrollTo = vi.fn()
   })
 
-  it('prioriza posses e ordens sem remover manutenção do menu principal', () => {
-    renderLayout()
+  it('abre o registro de ordem sem remover as listagens do menu principal', () => {
+    renderLayout('/abastecimentos')
 
     expect(mobileRoutes()).toEqual([
       '/',
       '/vehicles',
       '/posses',
       '/condutores',
-      '/ordens-abastecimento',
+      '/abastecimentos?acao=nova-ordem',
     ])
 
     const mobileNavigation = screen.getByRole('navigation', { name: 'Navegação móvel' })
-    expect(within(mobileNavigation).getByText('Ordens')).toBeInTheDocument()
-    expect(within(mobileNavigation).getByRole('link', { name: 'Ordens de abastecimento' })).toHaveAttribute('href', '/ordens-abastecimento')
+    expect(within(mobileNavigation).getByText('Nova ordem')).toBeInTheDocument()
+    const createOrderLink = within(mobileNavigation).getByRole('link', { name: 'Registrar ordem de abastecimento' })
+    expect(createOrderLink).toHaveAttribute('href', '/abastecimentos?acao=nova-ordem')
+    expect(createOrderLink).not.toHaveAttribute('aria-current')
     expect(within(mobileNavigation).getByRole('link', { name: 'Condutores' })).toHaveTextContent('Condut.')
     expect(within(mobileNavigation).queryByText('Manutenções')).not.toBeInTheDocument()
 
     const operationalNavigation = screen.getByRole('navigation', { name: 'Operacional' })
     expect(within(operationalNavigation).getByRole('link', { name: 'Manutenções. Custos' })).toHaveAttribute('href', '/manutencoes')
+    expect(within(operationalNavigation).getByRole('link', { name: 'Ordens abertas. Pendentes' })).toHaveAttribute('href', '/ordens-abastecimento')
   })
 
   it('mantém os atalhos condicionados às permissões de visualização', () => {
-    mocks.allowedModules = new Set(['vehicles', 'drivers', 'maintenance'])
+    mocks.allowedModules = new Set(['vehicles', 'drivers', 'maintenance', 'fuel_supply_orders'])
 
     renderLayout()
 
     expect(mobileRoutes()).toEqual(['/', '/vehicles', '/condutores'])
+  })
+
+  it('não oferece registro de ordem sem permissão de criação', () => {
+    mocks.creatableModules = new Set()
+
+    renderLayout()
+
+    expect(mobileRoutes()).toEqual(['/', '/vehicles', '/posses', '/condutores'])
   })
 })
