@@ -59,12 +59,12 @@ export default function Layout() {
         items: [
           { to: '/vehicles', label: 'Veículos', description: 'Frota', icon: 'vehicles' },
           { to: '/posses', label: 'Posses', description: 'Responsáveis', icon: 'drivers' },
-          { to: '/condutores', label: 'Condutores', description: 'Motoristas', icon: 'users' },
+          { to: '/condutores', label: 'Condutores', mobileLabel: 'Condut.', description: 'Motoristas', icon: 'users' },
           { to: '/manutencoes', label: 'Manutenções', description: 'Custos', icon: 'maintenance' },
           { to: '/sinistros', label: 'Sinistros', description: 'Ocorrências', icon: 'audit' },
           { to: '/multas', label: 'Multas', description: 'Autos', icon: 'catalog' },
           ...(canView('fuel_supplies') ? [{ to: '/abastecimentos', label: 'Abastecimentos', description: 'Consumo', icon: 'maintenance' }] : []),
-          ...(canView('fuel_supply_orders') ? [{ to: '/ordens-abastecimento', label: 'Ordens abertas', description: 'Pendentes', icon: 'maintenance' }] : []),
+          ...(canView('fuel_supply_orders') ? [{ to: '/ordens-abastecimento', label: 'Ordens abertas', mobileLabel: 'Ordens', mobileAriaLabel: 'Ordens de abastecimento', description: 'Pendentes', icon: 'maintenance' }] : []),
         ],
       },
     ]
@@ -115,8 +115,8 @@ export default function Layout() {
   }, [isAdmin, canView])
 
   const mobileTabs = navSections.flatMap((section) => section.items).filter((item) =>
-    ['/', '/vehicles', '/manutencoes', '/condutores', '/ordens-abastecimento'].includes(item.to),
-  ).slice(0, 4)
+    ['/', '/vehicles', '/posses', '/condutores', '/ordens-abastecimento'].includes(item.to),
+  )
 
   const currentItem =
     navSections
@@ -463,9 +463,9 @@ export default function Layout() {
 
       <nav className="mobile-bottom-bar" aria-label="Navegação móvel">
         {mobileTabs.map((item) => (
-          <NavLink key={item.to} to={item.to} end={item.to === '/'} className={({ isActive }) => `mobile-bottom-link${isActive ? ' active' : ''}`}>
+          <NavLink key={item.to} to={item.to} end={item.to === '/'} aria-label={item.mobileAriaLabel ?? item.label} className={({ isActive }) => `mobile-bottom-link${isActive ? ' active' : ''}`}>
             <AppIcon name={item.icon} className="app-icon" />
-            <span>{item.label}</span>
+            <span>{item.mobileLabel ?? item.label}</span>
           </NavLink>
         ))}
       </nav>
