@@ -6271,29 +6271,73 @@ button {
 .guided-tour-layer {
   position: fixed;
   inset: 0;
-  z-index: 3000;
-  pointer-events: none;
+  z-index: 6000;
+  isolation: isolate;
+  pointer-events: auto;
+  overscroll-behavior: contain;
 }
 
 .guided-tour-backdrop {
-  position: absolute;
+  position: fixed;
   inset: 0;
-  background: rgb(15 23 42 / 0.58);
-  backdrop-filter: blur(1px);
+  z-index: 0;
+  background: rgb(15 23 42 / 0.62);
+  backdrop-filter: blur(2px);
+}
+
+.guided-tour-spotlight {
+  position: fixed;
+  z-index: 0;
+  border: 3px solid var(--navy);
+  border-radius: 14px;
+  background: transparent;
+  box-shadow:
+    0 0 0 6px rgb(255 255 255 / 0.96),
+    0 0 0 9999px rgb(15 23 42 / 0.62);
+  pointer-events: none;
+  transition: left 160ms ease, top 160ms ease, width 160ms ease, height 160ms ease;
 }
 
 .guided-tour-dialog {
-  position: absolute;
-  right: clamp(16px, 4vw, 48px);
-  bottom: clamp(16px, 4vw, 48px);
-  width: min(430px, calc(100vw - 32px));
+  position: fixed;
+  z-index: 2;
+  width: min(400px, calc(100vw - 24px));
+  max-height: calc(100dvh - 24px);
   padding: 24px;
   border: 1px solid var(--line);
   border-radius: 18px;
   background: var(--surface-strong);
   color: var(--ink-strong);
   box-shadow: 0 24px 70px rgb(15 23 42 / 0.32);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  overscroll-behavior: contain;
   pointer-events: auto;
+}
+
+.guided-tour-dialog.is-measuring {
+  top: 50%;
+  left: 50%;
+  visibility: hidden;
+  transform: translate(-50%, -50%);
+}
+
+.guided-tour-dialog.is-positioned {
+  visibility: visible;
+  animation: guided-tour-dialog-in 160ms ease-out both;
+}
+
+@keyframes guided-tour-dialog-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 .guided-tour-dialog h2 {
@@ -6307,6 +6351,13 @@ button {
   line-height: 1.55;
 }
 
+.guided-tour-copy {
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+}
+
 .guided-tour-progress {
   color: var(--navy);
   font-size: 0.78rem;
@@ -6317,26 +6368,22 @@ button {
 
 .guided-tour-actions {
   display: flex;
+  flex: 0 0 auto;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
-  margin-top: 22px;
+  margin: 22px -24px -24px;
+  padding: 14px 24px 18px;
+  border-top: 1px solid var(--line-soft);
+  background: var(--surface-strong);
 }
 
 .guided-tour-highlight {
-  position: relative;
-  z-index: 3001 !important;
-  border-radius: 10px;
-  outline: 4px solid var(--navy);
-  outline-offset: 5px;
-  background: var(--surface-strong);
-  box-shadow: 0 0 0 10px rgb(255 255 255 / 0.92);
+  scroll-margin-block: 96px;
 }
 
 @media (max-width: 640px) {
   .guided-tour-dialog {
-    right: 12px;
-    bottom: 12px;
     width: calc(100vw - 24px);
     padding: 20px;
     border-radius: 16px;
@@ -6345,17 +6392,32 @@ button {
   .guided-tour-actions {
     align-items: stretch;
     flex-direction: column-reverse;
+    margin: 20px -20px -20px;
+    padding: 14px 20px max(16px, env(safe-area-inset-bottom));
   }
 
-  .guided-tour-actions > .actions-inline,
-  .guided-tour-actions button {
+  .guided-tour-actions > .actions-inline {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1.15fr);
+    gap: 8px;
     width: 100%;
+  }
+
+  .guided-tour-actions > .actions-inline button,
+  .guided-tour-actions > button {
+    width: 100%;
+  }
+
+  .guided-tour-actions > .actions-inline button {
+    padding-inline: 10px;
   }
 }
 
 @media (prefers-reduced-motion: reduce) {
   .guided-tour-dialog,
+  .guided-tour-spotlight,
   .guided-tour-highlight {
+    animation: none !important;
     scroll-behavior: auto;
     transition: none !important;
   }

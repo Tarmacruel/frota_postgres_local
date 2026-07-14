@@ -775,7 +775,7 @@ export default function PossessionPage() {
     const overview = tripOverview[record.id]
     return (
       <>
-        <button type="button" className="mini-button" onClick={() => openTrips(record)}>
+        <button type="button" className="mini-button" data-tour="possession-routes" onClick={() => openTrips(record)}>
           Rotas
         </button>
         {record.is_active && (canCreatePossession || canEditPossession) ? (
@@ -790,21 +790,21 @@ export default function PossessionPage() {
               {canEditPossession ? (
                 <>
                   <button type="button" className="mini-button" onClick={() => openTrips(record, 'add')}>Adicionar destino</button>
-                  <button type="button" className="mini-button route-return-button" onClick={() => openTrips(record, 'end')}>Registrar retorno</button>
+                  <button type="button" className="mini-button route-return-button" data-tour="possession-route-return" onClick={() => openTrips(record, 'end')}>Registrar retorno</button>
                   <button type="button" className="mini-button route-cancel-button" onClick={() => openTrips(record, 'cancel')}>Cancelar rota</button>
                 </>
               ) : null}
-              <button type="button" className="mini-button" disabled title="Registre o retorno ou cancele a rota antes de encerrar a posse.">
+              <button type="button" className="mini-button" data-tour="possession-end" disabled title="Registre o retorno ou cancele a rota antes de encerrar a posse.">
                 Encerrar posse bloqueado
               </button>
             </>
           ) : (
             <>
               {canCreatePossession ? (
-                <button type="button" className="mini-button" onClick={() => openTrips(record, 'create')}>Iniciar rota</button>
+                <button type="button" className="mini-button" data-tour="possession-route-start" onClick={() => openTrips(record, 'create')}>Iniciar rota</button>
               ) : null}
               {canEditPossession ? (
-                <button type="button" className="mini-button possession-end-button" onClick={() => openEndModal(record)}>Encerrar posse</button>
+                <button type="button" className="mini-button possession-end-button" data-tour="possession-end" onClick={() => openEndModal(record)}>Encerrar posse</button>
               ) : null}
             </>
           )
@@ -829,12 +829,18 @@ export default function PossessionPage() {
         : 'Seu perfil tem acesso de consulta. Documento, contato e localização seguem o mascaramento definido pelo backend.',
     },
     {
-      selector: '[data-tour="possession-records"]',
+      selectors: ['[data-tour="possession-routes"]', '[data-tour="possession-records"]'],
       title: 'Acompanhe a timeline de rotas',
       description: 'Em Rotas você inicia deslocamentos, inclui destinos e consulta cada etapa na ordem em que ocorreu.',
     },
     {
-      selector: '[data-tour="possession-records"]',
+      selectors: [
+        '[data-tour="possession-route-return"]',
+        '[data-tour="possession-end"]',
+        '[data-tour="possession-route-start"]',
+        '[data-tour="possession-routes"]',
+        '[data-tour="possession-records"]',
+      ],
       title: 'Retorno não encerra a posse',
       description: 'Registrar retorno fecha somente a rota. Encerrar posse finaliza a responsabilidade e exige a declaração de devolução.',
     },
