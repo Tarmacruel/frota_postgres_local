@@ -4,6 +4,8 @@ import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
 import FuelSupplyOrderCreateForm from '../components/FuelSupplyOrderCreateForm'
+import FuelSupplyOrderDeadlineForm from '../components/FuelSupplyOrderDeadlineForm'
+import FuelSupplyRectifyForm from '../components/FuelSupplyRectifyForm'
 import api from '../api/client'
 import { fuelStationsAPI } from '../api/fuelStations'
 import { masterDataAPI } from '../api/masterData'
@@ -109,10 +111,12 @@ function asArray(payload) {
 
 export default function FuelSuppliesPage() {
   const [searchParams, setSearchParams] = useSearchParams()
-  const { canCreate, canEdit, canView } = useAuth()
+  const { canCreate, canEdit, canView, isAdmin, isProduction } = useAuth()
   const canViewOrders = canView('fuel_supply_orders')
   const canCreateOrder = canCreate('fuel_supply_orders')
   const canEditOrder = canEdit('fuel_supply_orders')
+  const canRectifySupply = canEdit('fuel_supplies') && (isAdmin || isProduction)
+  const canAdjustOrderDeadline = canEditOrder && (isAdmin || isProduction)
   const [records, setRecords] = useState([])
   const [orders, setOrders] = useState([])
   const [vehicles, setVehicles] = useState([])
@@ -130,6 +134,8 @@ export default function FuelSuppliesPage() {
   const [currentHistoryPage, setCurrentHistoryPage] = useState(1)
   const [currentOrdersPage, setCurrentOrdersPage] = useState(1)
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
+  const [supplyToRectify, setSupplyToRectify] = useState(null)
+  const [orderToAdjust, setOrderToAdjust] = useState(null)
 
   useEffect(() => {
     if (searchParams.get('acao') !== 'nova-ordem') return
@@ -601,6 +607,11 @@ export default function FuelSuppliesPage() {
                       <button type="button" className="mini-button" onClick={() => handlePreviewOrderDocument(order)}>Comprovante</button>
                       <button type="button" className="mini-button" onClick={() => handleCopyPublicLink(order)}>Link público</button>
                       <button type="button" className="mini-button" onClick={() => handleDownloadOrderDocument(order)}>Baixar PDF</button>
+                      {canAdjustOrderDeadline && ['OPEN', 'EXPIRED'].includes(order.status) ? (
+                        <button type="button" className="mini-button" onClick={() => setOrderToAdjust(order)}>
+                          {order.status === 'EXPIRED' ? 'Reabrir prazo' : 'Prorrogar prazo'}
+                        </button>
+                      ) : null}
                       {order.status === 'OPEN' && canEditOrder ? <button type="button" className="mini-button danger" onClick={() => handleCancelOrder(order)}>Cancelar</button> : null}
                     </div>
                   </td>
@@ -646,7 +657,7 @@ export default function FuelSuppliesPage() {
                 <th>Aditivo</th>
                 <th>Km/l</th>
                 <th>Alerta</th>
-                <th>Comprovante</th>
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
@@ -664,7 +675,14 @@ export default function FuelSuppliesPage() {
                   <td data-label="Aditivo">{formatAdditiveDetails(record, formatNumber)}</td>
                   <td data-label="Km/l">{formatNumber(record.consumption_km_l)}</td>
                   <td data-label="Alerta">{record.is_consumption_anomaly ? <span className="status-chip warning">Alerta</span> : '-'}</td>
-                  <td data-label="Comprovante"><a className="link-inline" href={record.receipt_url} target="_blank" rel="noreferrer">Abrir</a></td>
+                  <td data-label="Ações">
+                    <div className="actions-inline">
+                      <a className="mini-button" href={record.receipt_url} target="_blank" rel="noreferrer">Comprovante</a>
+                      {canRectifySupply && record.fuel_supply_order_id ? (
+                        <button className="mini-button" type="button" onClick={() => setSupplyToRectify(record)}>Retificar</button>
+                      ) : null}
+                    </div>
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -685,6 +703,43 @@ export default function FuelSuppliesPage() {
             loadOrders()
           }}
         />
+      </Modal>
+
+      <Modal
+        open={Boolean(supplyToRectify) && canRectifySupply}
+        onClose={() => setSupplyToRectify(null)}
+        title="Retificar confirmação de abastecimento"
+        description="Corrija os dados confirmados mantendo os valores anteriores e a justificativa na auditoria."
+      >
+        {supplyToRectify ? (
+          <FuelSupplyRectifyForm
+            record={supplyToRectify}
+            onClose={() => setSupplyToRectify(null)}
+            onSuccess={(message) => {
+              setFeedback(message)
+              loadRecords()
+              loadOrders()
+            }}
+          />
+        ) : null}
+      </Modal>
+
+      <Modal
+        open={Boolean(orderToAdjust) && canAdjustOrderDeadline}
+        onClose={() => setOrderToAdjust(null)}
+        title={orderToAdjust?.status === 'EXPIRED' ? 'Reabrir prazo da ordem' : 'Prorrogar prazo da ordem'}
+        description="Defina um novo prazo e informe a justificativa obrigatória para a auditoria."
+      >
+        {orderToAdjust ? (
+          <FuelSupplyOrderDeadlineForm
+            order={orderToAdjust}
+            onClose={() => setOrderToAdjust(null)}
+            onSuccess={(message) => {
+              setFeedback(message)
+              loadOrders()
+            }}
+          />
+        ) : null}
       </Modal>
     </div>
   )

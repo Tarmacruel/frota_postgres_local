@@ -17,7 +17,12 @@ from app.repositories.fuel_supply_repository import FuelSupplyRepository
 from app.repositories.master_data_repository import MasterDataRepository
 from app.repositories.vehicle_repository import VehicleRepository
 from app.schemas.common import PaginatedResponse, build_pagination
-from app.schemas.fuel_supply import FuelSupplyOrderCancel, FuelSupplyOrderConfirm, FuelSupplyOrderCreate
+from app.schemas.fuel_supply import (
+    FuelSupplyOrderCancel,
+    FuelSupplyOrderConfirm,
+    FuelSupplyOrderCreate,
+    FuelSupplyOrderDeadlineUpdate,
+)
 from app.services.audit_service import AuditService
 from app.services.document_signature_service import DocumentSignatureService, SOURCE_FUEL_SUPPLY_ORDER
 from app.models.document_signature import DigitalDocumentType
@@ -324,6 +329,57 @@ class FuelSupplyOrderService:
         await self.db.commit()
         return await self.get_order(order.id, current_user=current_user)
 
+    async def update_deadline(
+        self,
+        order_id: UUID,
+        payload: FuelSupplyOrderDeadlineUpdate,
+        current_user: User,
+    ) -> dict:
+        self._ensure_operational_adjustment_role(current_user)
+        order = await self.orders.get_by_id(order_id)
+        if not order:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento nao encontrada")
+        await self._ensure_order_visible_to_user(order, current_user)
+        if order.status == FuelSupplyOrderStatus.COMPLETED:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem ja confirmada")
+        if order.status == FuelSupplyOrderStatus.CANCELLED:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem cancelada")
+
+        now = datetime.now(timezone.utc)
+        if payload.expires_at <= now:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="O novo prazo deve estar no futuro")
+
+        was_expired = order.status == FuelSupplyOrderStatus.EXPIRED or order.expires_at <= now
+        if not was_expired and payload.expires_at <= order.expires_at:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail="O novo prazo deve ser posterior ao prazo atual",
+            )
+
+        previous_status = order.status
+        previous_expires_at = order.expires_at
+        order.status = FuelSupplyOrderStatus.OPEN
+        order.expires_at = payload.expires_at
+        order.updated_at = now
+        action = "ORDER_REOPENED" if was_expired else "ORDER_DEADLINE_EXTENDED"
+
+        await self.audit.record(
+            actor=current_user,
+            action=action,
+            entity_type="FUEL_SUPPLY_ORDER",
+            entity_id=order.id,
+            entity_label=f"{order.vehicle.plate if order.vehicle else order.vehicle_id} - {order.id}",
+            details={
+                "reason": payload.reason,
+                "previous_status": previous_status.value,
+                "new_status": FuelSupplyOrderStatus.OPEN.value,
+                "previous_expires_at": previous_expires_at,
+                "new_expires_at": payload.expires_at,
+            },
+        )
+        await self.db.commit()
+        return await self.get_order(order.id, current_user=current_user)
+
     async def _expire_overdue_orders(self) -> None:
         expired = await self.orders.expire_overdue(reference_time=datetime.now(timezone.utc))
         if expired:
@@ -338,6 +394,13 @@ class FuelSupplyOrderService:
         if order.organization_id == organization_id:
             return
         await self._ensure_vehicle_visible_to_user(order.vehicle_id, current_user)
+
+    def _ensure_operational_adjustment_role(self, current_user: User) -> None:
+        if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Ajuste de prazo restrito a administradores e operadores de producao",
+            )
 
     async def _ensure_vehicle_visible_to_user(self, vehicle_id: UUID, current_user: User | None) -> None:
         organization_id = scoped_organization_id(current_user)

@@ -16,6 +16,7 @@ from app.schemas.fuel_supply import (
     FuelSupplyCreate,
     FuelSupplyListResponse,
     FuelSupplyOut,
+    FuelSupplyRectify,
 )
 from app.services.fuel_supply_service import FuelSupplyService
 
@@ -122,6 +123,16 @@ async def get_fuel_supply(
     current_user: User = Depends(require_permission("fuel_supplies", "view")),
 ):
     return await FuelSupplyService(db).get(supply_id, current_user=current_user)
+
+
+@router.patch("/{supply_id}", response_model=FuelSupplyOut)
+async def rectify_fuel_supply(
+    supply_id: UUID,
+    payload: FuelSupplyRectify,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("fuel_supplies", "edit")),
+):
+    return await FuelSupplyService(db).rectify(supply_id, payload, current_user)
 
 
 @router.get("/{supply_id}/receipt")

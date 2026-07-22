@@ -73,6 +73,7 @@ class FuelSupplyOut(BaseModel):
     additive_type: str | None
     additive_quantity_liters: float | None
     fuel_station_id: UUID | None
+    fuel_supply_order_id: UUID | None
     fuel_station_name: str | None
     fuel_station: str | None
     notes: str | None
@@ -171,6 +172,67 @@ class FuelSupplyOrderCancel(BaseModel):
             return None
         normalized = value.strip()
         return normalized or None
+
+
+class FuelSupplyRectify(BaseModel):
+    supplied_at: datetime
+    odometer_km: float = Field(gt=0)
+    liters: float = Field(gt=0)
+    total_amount: float = Field(gt=0)
+    fuel_type: str = Field(min_length=1, max_length=80)
+    additive_type: str | None = Field(default=None, max_length=80)
+    additive_quantity_liters: float | None = Field(default=None, gt=0)
+    notes: str | None = Field(default=None, max_length=4000)
+    reason: str = Field(min_length=10, max_length=1000)
+
+    @field_validator("supplied_at")
+    @classmethod
+    def require_rectification_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("Data/hora deve incluir o fuso horario")
+        return value
+
+    @field_validator("fuel_type", "reason")
+    @classmethod
+    def normalize_required_rectification_text(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Campo obrigatorio")
+        return normalized
+
+    @field_validator("additive_type", "notes")
+    @classmethod
+    def normalize_optional_rectification_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    @model_validator(mode="after")
+    def validate_rectification_additive_details(self) -> "FuelSupplyRectify":
+        if self.additive_quantity_liters is not None and not self.additive_type:
+            raise ValueError("Tipo do aditivo deve ser informado quando houver quantidade de aditivo")
+        return self
+
+
+class FuelSupplyOrderDeadlineUpdate(BaseModel):
+    expires_at: datetime
+    reason: str = Field(min_length=10, max_length=1000)
+
+    @field_validator("expires_at")
+    @classmethod
+    def require_deadline_timezone(cls, value: datetime) -> datetime:
+        if value.tzinfo is None or value.utcoffset() is None:
+            raise ValueError("Prazo deve incluir o fuso horario")
+        return value
+
+    @field_validator("reason")
+    @classmethod
+    def normalize_deadline_reason(cls, value: str) -> str:
+        normalized = value.strip()
+        if not normalized:
+            raise ValueError("Justificativa obrigatoria")
+        return normalized
 
 
 class FuelSupplyOrderOut(BaseModel):

@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FuelSuppliesPage from './FuelSuppliesPage'
@@ -34,6 +34,8 @@ vi.mock('../context/AuthContext', () => ({
     canCreate: mocks.canCreate,
     canEdit: () => true,
     canView: () => true,
+    isAdmin: true,
+    isProduction: false,
   }),
 }))
 vi.mock('../components/Modal', () => ({
@@ -92,5 +94,65 @@ describe('FuelSuppliesPage quick order action', () => {
 
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/abastecimentos$/))
     expect(screen.queryByRole('dialog', { name: 'Nova ordem de abastecimento' })).not.toBeInTheDocument()
+  })
+})
+
+describe('FuelSuppliesPage administrative adjustments', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.canCreate.mockReturnValue(true)
+    mocks.get.mockResolvedValue({ data: [] })
+    mocks.listOrganizations.mockResolvedValue({ data: [] })
+    mocks.listStations.mockResolvedValue({ data: [] })
+    mocks.listSupplies.mockResolvedValue({ data: { data: [] } })
+    mocks.listOrders.mockResolvedValue({ data: { data: [] } })
+  })
+
+  it('oferece retificação auditável para abastecimento confirmado por ordem', async () => {
+    mocks.listSupplies.mockResolvedValue({
+      data: {
+        data: [{
+          id: 'supply-1',
+          fuel_supply_order_id: 'order-1',
+          vehicle_plate: 'THE3C94',
+          supplied_at: '2026-07-10T17:45:00Z',
+          organization_name: 'Secretaria de Segurança e Transporte',
+          fuel_station_name: 'LJ POSTO',
+          liters: 30,
+          total_amount: 225.30,
+          odometer_km: 9278,
+          fuel_type: 'Gasolina comum',
+          receipt_url: '/api/fuel-supplies/supply-1/receipt',
+        }],
+      },
+    })
+
+    renderPage('/abastecimentos')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Retificar' }))
+    expect(screen.getByRole('dialog', { name: 'Retificar confirmação de abastecimento' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Valor total (R$)')).toHaveValue(225.3)
+    expect(screen.getByLabelText('Justificativa da retificação')).toBeRequired()
+  })
+
+  it('oferece reabertura auditável para ordem expirada', async () => {
+    mocks.listOrders.mockResolvedValue({
+      data: {
+        data: [{
+          id: 'order-expired',
+          status: 'EXPIRED',
+          vehicle_plate: 'THE3C94',
+          expires_at: '2026-07-10T17:45:00Z',
+          requested_liters: 30,
+        }],
+      },
+    })
+
+    renderPage('/abastecimentos')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Reabrir prazo' }))
+    expect(screen.getByRole('dialog', { name: 'Reabrir prazo da ordem' })).toBeInTheDocument()
+    expect(screen.getByLabelText('Novo prazo')).toBeRequired()
+    expect(screen.getByLabelText('Justificativa')).toBeRequired()
   })
 })

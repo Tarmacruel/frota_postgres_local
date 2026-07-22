@@ -95,6 +95,14 @@ class FuelSupplyRepository:
         value = result.scalar_one_or_none()
         return float(value) if value is not None else None
 
+    async def list_for_vehicle_chronological(self, vehicle_id: UUID) -> list[FuelSupply]:
+        result = await self.db.execute(
+            select(FuelSupply)
+            .where(FuelSupply.vehicle_id == vehicle_id)
+            .order_by(FuelSupply.supplied_at.asc(), FuelSupply.created_at.asc(), FuelSupply.id.asc())
+        )
+        return list(result.scalars().all())
+
     async def list_consumption_report(
         self,
         start_date: datetime | None = None,

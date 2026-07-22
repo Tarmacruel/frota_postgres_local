@@ -14,6 +14,7 @@ from app.schemas.fuel_supply import (
     FuelSupplyOrderCancel,
     FuelSupplyOrderConfirm,
     FuelSupplyOrderCreate,
+    FuelSupplyOrderDeadlineUpdate,
     FuelSupplyOrderListResponse,
     FuelSupplyOrderOut,
     FuelSupplyOrderPublicOut,
@@ -116,6 +117,16 @@ async def cancel_fuel_supply_order(
     current_user: User = Depends(require_permission("fuel_supply_orders", "edit")),
 ):
     return await FuelSupplyOrderService(db).cancel_order(order_id, payload, current_user)
+
+
+@router.patch("/{order_id}/deadline", response_model=FuelSupplyOrderOut)
+async def update_fuel_supply_order_deadline(
+    order_id: UUID,
+    payload: FuelSupplyOrderDeadlineUpdate,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("fuel_supply_orders", "edit")),
+):
+    return await FuelSupplyOrderService(db).update_deadline(order_id, payload, current_user)
 
 
 @public_router.get("/{validation_code}", response_model=FuelSupplyOrderPublicOut)

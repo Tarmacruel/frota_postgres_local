@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from decimal import Decimal
 from pathlib import Path
 from uuid import UUID
 from fastapi import HTTPException, UploadFile, status
@@ -10,14 +11,14 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.organization_scope import ensure_organization_access, production_scope_is_empty, scoped_organization_id
 from app.core.config import settings
 from app.models.fuel_supply import FuelSupply
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.repositories.driver_repository import DriverRepository
 from app.repositories.fuel_station_repository import FuelStationRepository
 from app.repositories.fuel_supply_repository import FuelSupplyRepository
 from app.repositories.master_data_repository import MasterDataRepository
 from app.repositories.vehicle_repository import VehicleRepository
 from app.schemas.common import PaginatedResponse, build_pagination
-from app.schemas.fuel_supply import FuelSupplyCreate
+from app.schemas.fuel_supply import FuelSupplyCreate, FuelSupplyRectify
 from app.services.audit_service import AuditService
 
 MAX_RECEIPT_SIZE_BYTES = 8 * 1024 * 1024
@@ -56,6 +57,65 @@ class FuelSupplyService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abastecimento não encontrado")
         await self._ensure_supply_visible_to_user(supply, current_user)
         return self._serialize(supply)
+
+    async def rectify(self, supply_id: UUID, payload: FuelSupplyRectify, current_user: User) -> dict:
+        self._ensure_operational_adjustment_role(current_user)
+        supply = await self.supplies.get_by_id(supply_id)
+        if not supply:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abastecimento nao encontrado")
+        await self._ensure_supply_visible_to_user(supply, current_user)
+        if not supply.fuel_supply_order_id:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Apenas confirmacoes vinculadas a uma ordem podem ser retificadas",
+            )
+
+        editable_fields = (
+            "supplied_at",
+            "odometer_km",
+            "liters",
+            "total_amount",
+            "fuel_type",
+            "additive_type",
+            "additive_quantity_liters",
+            "notes",
+        )
+        before = {field: getattr(supply, field) for field in editable_fields}
+        new_values = payload.model_dump(exclude={"reason"})
+        new_values["total_amount"] = Decimal(str(payload.total_amount))
+        changes = {
+            field: {"before": before[field], "after": new_values[field]}
+            for field in editable_fields
+            if before[field] != new_values[field]
+        }
+        if not changes:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nenhuma alteracao foi informada")
+
+        for field, value in new_values.items():
+            setattr(supply, field, value)
+        supply.updated_at = datetime.now(timezone.utc)
+        consumption_inputs = {"supplied_at", "odometer_km", "liters"}
+        recalculated_supply_ids = (
+            await self._recalculate_vehicle_consumption(supply.vehicle_id)
+            if consumption_inputs.intersection(changes)
+            else []
+        )
+
+        await self.audit.record(
+            actor=current_user,
+            action="ORDER_CONFIRM_RECTIFIED",
+            entity_type="FUEL_SUPPLY_ORDER",
+            entity_id=supply.fuel_supply_order_id,
+            entity_label=f"{supply.vehicle.plate if supply.vehicle else supply.vehicle_id} - {supply.fuel_supply_order_id}",
+            details={
+                "supply_id": str(supply.id),
+                "reason": payload.reason,
+                "changes": changes,
+                "recalculated_supply_ids": [str(item_id) for item_id in recalculated_supply_ids],
+            },
+        )
+        await self.db.commit()
+        return await self.get(supply.id, current_user=current_user)
 
     async def get_for_station(self, *, supply_id: UUID, fuel_station: str) -> dict:
         supply = await self.supplies.get_by_id(supply_id)
@@ -257,6 +317,50 @@ class FuelSupplyService:
             return
         await self._ensure_vehicle_visible_to_user(supply.vehicle_id, current_user)
 
+    def _ensure_operational_adjustment_role(self, current_user: User) -> None:
+        if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Retificacao restrita a administradores e operadores de producao",
+            )
+
+    async def _recalculate_vehicle_consumption(self, vehicle_id: UUID) -> list[UUID]:
+        supplies = await self.supplies.list_for_vehicle_chronological(vehicle_id)
+        previous: FuelSupply | None = None
+        historical_consumptions: list[float] = []
+        recalculated_ids: list[UUID] = []
+
+        for item in supplies:
+            previous_derived_values = (
+                item.consumption_km_l,
+                item.is_consumption_anomaly,
+                item.anomaly_details,
+            )
+            consumption = None
+            if previous is not None:
+                km_delta = item.odometer_km - previous.odometer_km
+                if km_delta > 0 and item.liters > 0:
+                    consumption = km_delta / item.liters
+
+            historical_average = (
+                sum(historical_consumptions) / len(historical_consumptions)
+                if historical_consumptions
+                else None
+            )
+            is_anomaly, anomaly_details = self._detect_anomaly(consumption, historical_average)
+            item.consumption_km_l = consumption
+            item.is_consumption_anomaly = is_anomaly
+            item.anomaly_details = anomaly_details
+            current_derived_values = (consumption, is_anomaly, anomaly_details)
+            if previous_derived_values != current_derived_values:
+                item.updated_at = datetime.now(timezone.utc)
+                recalculated_ids.append(item.id)
+            if consumption is not None:
+                historical_consumptions.append(consumption)
+            previous = item
+
+        return recalculated_ids
+
     async def _ensure_vehicle_visible_to_user(self, vehicle_id: UUID, current_user: User | None) -> None:
         organization_id = scoped_organization_id(current_user)
         if organization_id is None:
@@ -349,6 +453,7 @@ class FuelSupplyService:
             "additive_type": item.additive_type,
             "additive_quantity_liters": item.additive_quantity_liters,
             "fuel_station_id": item.fuel_station_id,
+            "fuel_supply_order_id": item.fuel_supply_order_id,
             "fuel_station_name": item.fuel_station_ref.name if item.fuel_station_ref else None,
             "fuel_station": item.fuel_station,
             "notes": item.notes,

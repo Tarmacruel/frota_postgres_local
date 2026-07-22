@@ -58,6 +58,8 @@ async def test_openapi_contains_new_routes(client):
     assert "/api/fuel-supply-orders/{order_id}" in paths
     assert "/api/fuel-supply-orders/{order_id}/confirm" in paths
     assert "/api/fuel-supply-orders/{order_id}/cancel" in paths
+    assert "/api/fuel-supply-orders/{order_id}/deadline" in paths
+    assert "/api/fuel-supplies/{supply_id}" in paths
     assert "/api/public/fuel-supply-orders/{validation_code}" in paths
     assert "/api/document-signatures/pending" in paths
     assert "/api/document-signatures/documents" in paths

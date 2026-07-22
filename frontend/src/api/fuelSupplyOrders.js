@@ -26,4 +26,5 @@ export const fuelSupplyOrdersAPI = {
   getPublic: (validationCode) => api.get(`/public/fuel-supply-orders/${validationCode}`),
   confirmSupply: (id, data) => api.post(`/fuel-supply-orders/${id}/confirm`, data),
   cancel: (id, data) => api.post(`/fuel-supply-orders/${id}/cancel`, data),
+  updateDeadline: (id, data) => api.patch(`/fuel-supply-orders/${id}/deadline`, data),
 }
