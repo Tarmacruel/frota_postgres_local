@@ -3,7 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import joinedload
+from sqlalchemy.orm import joinedload, selectinload
 from app.models.claim import Claim, ClaimStatus, ClaimType
 from app.models.location_history import LocationHistory
 from app.models.master_data import Allocation, Department
@@ -16,8 +16,17 @@ class ClaimRepository:
     async def get_by_id(self, claim_id: UUID) -> Claim | None:
         result = await self.db.execute(
             select(Claim)
-            .options(joinedload(Claim.vehicle), joinedload(Claim.driver))
+            .options(joinedload(Claim.vehicle), joinedload(Claim.driver), selectinload(Claim.attachments))
             .where(Claim.id == claim_id)
+        )
+        return result.scalar_one_or_none()
+
+    async def get_by_id_for_update(self, claim_id: UUID) -> Claim | None:
+        result = await self.db.execute(
+            select(Claim)
+            .options(joinedload(Claim.vehicle), joinedload(Claim.driver), selectinload(Claim.attachments))
+            .where(Claim.id == claim_id)
+            .with_for_update(of=Claim)
         )
         return result.scalar_one_or_none()
 
@@ -32,7 +41,11 @@ class ClaimRepository:
         tipo: ClaimType | None = None,
         search: str | None = None,
     ) -> tuple[list[Claim], int]:
-        stmt = select(Claim).options(joinedload(Claim.vehicle), joinedload(Claim.driver))
+        stmt = select(Claim).options(
+            joinedload(Claim.vehicle),
+            joinedload(Claim.driver),
+            selectinload(Claim.attachments),
+        )
         count_stmt = select(func.count(Claim.id))
 
         if vehicle_id:

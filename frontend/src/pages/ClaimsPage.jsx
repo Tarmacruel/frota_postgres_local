@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import ClaimAttachmentsField from '../components/ClaimAttachmentsField'
 import ClaimForm from '../components/ClaimForm'
 import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
@@ -33,6 +34,10 @@ function vehicleOption(vehicle) {
   }
 }
 
+function hasClaimAttachments(record) {
+  return Boolean(record?.attachments?.length || record?.anexos?.length)
+}
+
 export default function ClaimsPage() {
   const { canCreate, canEdit } = useAuth()
   const canCreateClaim = canCreate('claims')
@@ -50,6 +55,8 @@ export default function ClaimsPage() {
   const [typeFilter, setTypeFilter] = useState('TODOS')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState(null)
+  const [viewingAttachmentsRecord, setViewingAttachmentsRecord] = useState(null)
+  const [claimFormBusy, setClaimFormBusy] = useState(false)
   const { organizations } = useMasterDataCatalog()
 
   const organizationOptions = organizations.map((organization) => ({
@@ -149,7 +156,7 @@ export default function ClaimsPage() {
           <p className="section-copy">Registre ocorrências, acompanhe o status e mantenha o histórico de prejuízos e análises da frota.</p>
         </div>
         <div className="actions-inline">
-          {canCreateClaim ? <button className="app-button" type="button" onClick={() => { setEditingRecord(null); setIsModalOpen(true) }}>Novo sinistro</button> : null}
+          {canCreateClaim ? <button className="app-button" type="button" onClick={() => { setEditingRecord(null); setClaimFormBusy(false); setIsModalOpen(true) }}>Novo sinistro</button> : null}
           <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
         </div>
@@ -205,14 +212,14 @@ export default function ClaimsPage() {
                 <th>Status</th>
                 <th>Local</th>
                 <th>Valor</th>
-                {canEditClaim ? <th>Ações</th> : null}
+                <th>Ações</th>
               </tr>
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={canEditClaim ? 8 : 7} className="muted">Carregando sinistros...</td></tr>
+                <tr><td colSpan={8} className="muted">Carregando sinistros...</td></tr>
               ) : !records.length ? (
-                <tr><td colSpan={canEditClaim ? 8 : 7}><div className="empty-state">Nenhum sinistro encontrado para os filtros aplicados.</div></td></tr>
+                <tr><td colSpan={8}><div className="empty-state">Nenhum sinistro encontrado para os filtros aplicados.</div></td></tr>
               ) : (
                 records.map((record) => (
                   <tr key={record.id}>
@@ -228,11 +235,13 @@ export default function ClaimsPage() {
                     <td data-label="Status"><span className={`status-badge status-${record.status === 'ENCERRADO' ? 'ATIVO' : 'MANUTENCAO'}`}>{record.status}</span></td>
                     <td data-label="Local">{record.local}</td>
                     <td data-label="Valor">{formatMoney(record.valor_estimado)}</td>
-                    {canEditClaim ? (
-                      <td data-label="Ações">
-                        <button type="button" className="mini-button" onClick={() => { setEditingRecord(record); setIsModalOpen(true) }}>Editar</button>
-                      </td>
-                    ) : null}
+                    <td data-label="Ações">
+                      {canEditClaim ? (
+                        <button type="button" className="mini-button" onClick={() => { setEditingRecord(record); setClaimFormBusy(false); setIsModalOpen(true) }}>Editar</button>
+                      ) : hasClaimAttachments(record) ? (
+                        <button type="button" className="mini-button" onClick={() => setViewingAttachmentsRecord(record)}>Ver anexos</button>
+                      ) : <span className="muted">-</span>}
+                    </td>
                   </tr>
                 ))
               )}
@@ -248,6 +257,7 @@ export default function ClaimsPage() {
         title={editingRecord ? 'Editar sinistro' : 'Novo sinistro'}
         description="Relacione o veículo, o condutor quando conhecido e os dados operacionais da ocorrência."
         onClose={() => setIsModalOpen(false)}
+        canClose={!claimFormBusy}
       >
         <ClaimForm
           vehicles={vehicles}
@@ -258,7 +268,33 @@ export default function ClaimsPage() {
             await loadClaims(editingRecord ? pagination.page : 1)
           }}
           canSubmit={editingRecord ? canEditClaim : canCreateClaim}
+          onSubmittingChange={setClaimFormBusy}
         />
+      </Modal>
+
+      <Modal
+        open={Boolean(viewingAttachmentsRecord)}
+        title="Anexos do sinistro"
+        description="Consulte as fotos, documentos e referências vinculados à ocorrência."
+        onClose={() => setViewingAttachmentsRecord(null)}
+      >
+        {viewingAttachmentsRecord ? (
+          <>
+            <ClaimAttachmentsField
+              claimId={viewingAttachmentsRecord.id}
+              existingAttachments={viewingAttachmentsRecord.attachments || []}
+              legacyReferences={viewingAttachmentsRecord.anexos || []}
+              pendingAttachments={[]}
+              onPendingAttachmentsChange={() => {}}
+              removedAttachmentIds={[]}
+              onRemovedAttachmentIdsChange={() => {}}
+              canManage={false}
+            />
+            <div className="actions-inline claim-attachment-view-actions">
+              <button className="ghost-button" type="button" onClick={() => setViewingAttachmentsRecord(null)}>Fechar</button>
+            </div>
+          </>
+        ) : null}
       </Modal>
     </div>
   )

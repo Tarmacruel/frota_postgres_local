@@ -40,6 +40,7 @@ from app.core.request_context import (
     reset_request_audit_context,
     set_request_audit_context,
 )
+from app.core.request_body_limit import RequestBodyLimitMiddleware
 
 
 logger = logging.getLogger(__name__)
@@ -79,6 +80,7 @@ app.add_middleware(
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", REQUEST_ID_HEADER],
     expose_headers=[REQUEST_ID_HEADER],
 )
+app.add_middleware(RequestBodyLimitMiddleware, max_body_bytes=settings.MAX_REQUEST_BODY_BYTES)
 
 
 @app.middleware("http")
@@ -127,18 +129,7 @@ async def request_context_middleware(request: Request, call_next):
     context_token = set_request_audit_context(context)
     try:
         try:
-            content_length = request.headers.get("content-length")
-            if content_length and content_length.isdecimal() and int(content_length) > settings.MAX_REQUEST_BODY_BYTES:
-                response = JSONResponse(
-                    status_code=413,
-                    content={
-                        "detail": "Corpo da requisicao excede o limite permitido",
-                        "code": "REQUEST_BODY_TOO_LARGE",
-                        "request_id": context.request_id,
-                    },
-                )
-            else:
-                response = await call_next(request)
+            response = await call_next(request)
         except Exception as exc:
             stack = " > ".join(
                 f"{Path(frame.filename).name}:{frame.lineno}:{frame.name}"

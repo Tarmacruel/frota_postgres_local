@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { claimsAPI } from '../api/claims'
+import ClaimAttachmentsField from './ClaimAttachmentsField'
 import DriverSelect from './DriverSelect'
 import SearchableSelect from './SearchableSelect'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -18,7 +19,14 @@ function vehicleOption(vehicle) {
   }
 }
 
-export default function ClaimForm({ vehicles, initialData = null, onSuccess, onClose, canSubmit = true }) {
+export default function ClaimForm({
+  vehicles,
+  initialData = null,
+  onSuccess,
+  onClose,
+  onSubmittingChange,
+  canSubmit = true,
+}) {
   const [form, setForm] = useState({
     vehicle_id: initialData?.vehicle_id || '',
     driver_id: initialData?.driver_id || '',
@@ -30,10 +38,21 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
     valor_estimado: initialData?.valor_estimado || '',
     status: initialData?.status || 'ABERTO',
     justificativa_encerramento: initialData?.justificativa_encerramento || '',
-    anexos: Array.isArray(initialData?.anexos) ? initialData.anexos.join('\n') : '',
   })
+  const [pendingAttachments, setPendingAttachments] = useState([])
+  const [removedAttachmentIds, setRemovedAttachmentIds] = useState([])
+  const [legacyReferenceValue, setLegacyReferenceValue] = useState(
+    Array.isArray(initialData?.anexos) ? initialData.anexos.join('\n') : '',
+  )
   const [submitting, setSubmitting] = useState(false)
+  const [uploadProgress, setUploadProgress] = useState(0)
   const [error, setError] = useState('')
+
+  const existingAttachments = Array.isArray(initialData?.attachments) ? initialData.attachments : []
+  const legacyReferences = legacyReferenceValue
+    .split('\n')
+    .map((value) => value.trim())
+    .filter(Boolean)
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -43,6 +62,8 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
     }
     try {
       setSubmitting(true)
+      onSubmittingChange?.(true)
+      setUploadProgress(0)
       setError('')
       const payload = {
         vehicle_id: form.vehicle_id,
@@ -55,17 +76,34 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
         valor_estimado: form.valor_estimado ? Number(form.valor_estimado) : null,
         status: form.status,
         justificativa_encerramento: form.justificativa_encerramento || null,
-        anexos: form.anexos
-          .split('\n')
-          .map((value) => value.trim())
-          .filter(Boolean),
+        anexos: legacyReferences,
+      }
+
+      const files = pendingAttachments.map((attachment) => attachment.file)
+      const handleUploadProgress = (progressEvent) => {
+        const total = progressEvent.total || 0
+        if (total > 0) setUploadProgress(Math.min(100, Math.round((progressEvent.loaded / total) * 100)))
       }
 
       if (initialData?.id) {
-        await claimsAPI.update(initialData.id, payload)
+        if (files.length || removedAttachmentIds.length) {
+          await claimsAPI.updateWithAttachments(
+            initialData.id,
+            payload,
+            files,
+            removedAttachmentIds,
+            handleUploadProgress,
+          )
+        } else {
+          await claimsAPI.update(initialData.id, payload)
+        }
         onSuccess?.('Sinistro atualizado com sucesso.')
       } else {
-        await claimsAPI.create(payload)
+        if (files.length) {
+          await claimsAPI.createWithAttachments(payload, files, handleUploadProgress)
+        } else {
+          await claimsAPI.create(payload)
+        }
         onSuccess?.('Sinistro registrado com sucesso.')
       }
       onClose?.()
@@ -73,6 +111,8 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
       setError(getApiErrorMessage(err, 'Não foi possível salvar o sinistro.'))
     } finally {
       setSubmitting(false)
+      onSubmittingChange?.(false)
+      setUploadProgress(0)
     }
   }
 
@@ -145,15 +185,28 @@ export default function ClaimForm({ vehicles, initialData = null, onSuccess, onC
       </div>
 
       <div className="form-field modal-field-span">
-        <label htmlFor="claim-attachments">Anexos (URLs ou referências, uma por linha)</label>
-        <textarea id="claim-attachments" className="app-textarea" rows="3" value={form.anexos} onChange={(event) => setForm({ ...form, anexos: event.target.value })} />
+        <ClaimAttachmentsField
+          claimId={initialData?.id}
+          existingAttachments={existingAttachments}
+          legacyReferences={legacyReferences}
+          legacyReferenceValue={legacyReferenceValue}
+          onLegacyReferenceValueChange={setLegacyReferenceValue}
+          pendingAttachments={pendingAttachments}
+          onPendingAttachmentsChange={setPendingAttachments}
+          removedAttachmentIds={removedAttachmentIds}
+          onRemovedAttachmentIdsChange={setRemovedAttachmentIds}
+          disabled={submitting}
+          canManage={canSubmit}
+        />
       </div>
 
       <div className="actions-inline modal-actions">
         <button className="app-button" type="submit" disabled={submitting || !form.vehicle_id || !canSubmit}>
-          {submitting ? 'Salvando...' : initialData?.id ? 'Atualizar sinistro' : 'Registrar sinistro'}
+          {submitting
+            ? uploadProgress > 0 && uploadProgress < 100 ? `Enviando anexos ${uploadProgress}%` : 'Salvando...'
+            : initialData?.id ? 'Atualizar sinistro' : 'Registrar sinistro'}
         </button>
-        <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>
+        <button className="ghost-button" type="button" disabled={submitting} onClick={onClose}>Cancelar</button>
       </div>
     </form>
   )

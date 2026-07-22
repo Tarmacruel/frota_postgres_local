@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import logging
 from datetime import datetime, timezone
+from pathlib import Path
 from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
+from app.core.config import settings
 from app.core.organization_scope import ensure_organization_access, production_scope_is_empty, scoped_organization_id
 from app.models.audit_log import AuditLog
+from app.models.claim import Claim
+from app.models.claim_attachment import ClaimAttachment
 from app.models.location_history import LocationHistory
 from app.models.master_data import Allocation
 from app.models.user import User
@@ -34,6 +39,8 @@ VEHICLE_OPTIONAL_FIELDS = (
     "is_provisional",
     "provisional_source",
 )
+
+logger = logging.getLogger(__name__)
 
 
 class VehicleService:
@@ -268,12 +275,13 @@ class VehicleService:
         return self._serialize_vehicle(vehicle, active, possession)
 
     async def delete(self, vehicle_id: UUID, current_user: User) -> None:
-        vehicle = await self.vehicles.get_by_id(vehicle_id)
+        vehicle = await self.vehicles.get_by_id_for_update(vehicle_id)
         if not vehicle:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
         active = await self.vehicles.get_active_history(vehicle.id)
         possession = await self.vehicles.get_active_possession(vehicle.id)
+        attachment_paths = await self._claim_attachment_paths_for_vehicle(vehicle.id)
 
         try:
             await self.audit.record(
@@ -299,6 +307,39 @@ class VehicleService:
         except IntegrityError as exc:
             await self.db.rollback()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível remover o veículo") from exc
+
+        self._cleanup_claim_attachment_paths(attachment_paths)
+
+    async def _claim_attachment_paths_for_vehicle(self, vehicle_id: UUID) -> list[Path]:
+        await self.db.execute(
+            select(Claim.id)
+            .where(Claim.vehicle_id == vehicle_id)
+            .with_for_update(of=Claim)
+        )
+        result = await self.db.execute(
+            select(ClaimAttachment.storage_path)
+            .join(Claim, Claim.id == ClaimAttachment.claim_id)
+            .where(Claim.vehicle_id == vehicle_id)
+        )
+        storage_root = Path(settings.STORAGE_DIR).resolve()
+        paths: list[Path] = []
+        for relative_path in result.scalars().all():
+            candidate = (storage_root / Path(relative_path)).resolve()
+            try:
+                candidate.relative_to(storage_root)
+            except ValueError:
+                logger.warning("Caminho inválido de anexo ignorado durante exclusão do veículo %s", vehicle_id)
+                continue
+            paths.append(candidate)
+        return paths
+
+    @staticmethod
+    def _cleanup_claim_attachment_paths(attachment_paths: list[Path]) -> None:
+        for attachment_path in attachment_paths:
+            try:
+                attachment_path.unlink(missing_ok=True)
+            except OSError as exc:
+                logger.warning("Não foi possível remover anexo órfão em %s: %s", attachment_path, exc)
 
     async def _get_by_chassis(self, chassis_number: str | None) -> Vehicle | None:
         if not chassis_number:

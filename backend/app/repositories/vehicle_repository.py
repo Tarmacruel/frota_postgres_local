@@ -21,6 +21,14 @@ class VehicleRepository:
         result = await self.db.execute(select(Vehicle).where(Vehicle.id == vehicle_id))
         return result.scalar_one_or_none()
 
+    async def get_by_id_for_update(self, vehicle_id: UUID) -> Vehicle | None:
+        result = await self.db.execute(
+            select(Vehicle)
+            .where(Vehicle.id == vehicle_id)
+            .with_for_update(of=Vehicle)
+        )
+        return result.scalar_one_or_none()
+
     async def get_by_plate(self, plate: str) -> Vehicle | None:
         result = await self.db.execute(select(Vehicle).where(Vehicle.plate == plate.upper()))
         return result.scalar_one_or_none()

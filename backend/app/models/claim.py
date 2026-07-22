@@ -69,3 +69,9 @@ class Claim(Base):
     vehicle: Mapped["Vehicle"] = relationship(back_populates="claims")
     driver: Mapped["Driver | None"] = relationship(back_populates="claims")
     creator: Mapped["User"] = relationship(foreign_keys=[created_by])
+    attachments: Mapped[list["ClaimAttachment"]] = relationship(
+        back_populates="claim",
+        cascade="all, delete-orphan",
+        passive_deletes=True,
+        order_by="ClaimAttachment.created_at",
+    )

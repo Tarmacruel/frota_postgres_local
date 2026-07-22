@@ -1,6 +1,7 @@
 from app.models.admin_notification import AdminNotification
 from app.models.audit_log import AuditLog
 from app.models.claim import Claim, ClaimStatus, ClaimType
+from app.models.claim_attachment import ClaimAttachment
 from app.models.data_import import (
     DataImportBatch,
     DataImportBatchStatus,
@@ -57,6 +58,7 @@ __all__ = [
     "AdminNotification",
     "AuditLog",
     "Claim",
+    "ClaimAttachment",
     "ClaimStatus",
     "ClaimType",
     "DataImportBatch",

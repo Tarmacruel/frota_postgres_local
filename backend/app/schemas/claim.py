@@ -57,6 +57,15 @@ class ClaimUpdate(BaseModel):
         return normalized or None
 
 
+class ClaimAttachmentOut(BaseModel):
+    id: UUID
+    filename: str
+    mime_type: str
+    size_bytes: int
+    kind: str
+    created_at: datetime
+
+
 class ClaimOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
@@ -74,6 +83,7 @@ class ClaimOut(BaseModel):
     status: ClaimStatus
     justificativa_encerramento: str | None
     anexos: list[str] | None
+    attachments: list[ClaimAttachmentOut] = Field(default_factory=list)
     created_by: UUID
     created_at: datetime
     updated_at: datetime
