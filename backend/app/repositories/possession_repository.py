@@ -35,6 +35,10 @@ class PossessionRepository:
     async def get_by_id_for_update(self, possession_id: UUID) -> VehiclePossession | None:
         result = await self.db.execute(
             select(VehiclePossession)
+            .options(
+                selectinload(VehiclePossession.vehicle),
+                selectinload(VehiclePossession.photos),
+            )
             .where(VehiclePossession.id == possession_id)
             .with_for_update()
             .execution_options(populate_existing=True)

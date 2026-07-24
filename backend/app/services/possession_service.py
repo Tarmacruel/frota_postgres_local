@@ -700,7 +700,13 @@ class PossessionService:
             self._cleanup_file(stored_loan_term_path)
             self._cleanup_file(stored_return_term_path)
             self._cleanup_files(stored_photo_paths)
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível atualizar a posse") from exc
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail={
+                    "code": "POSSESSION_CONFLICT",
+                    "message": "Não foi possível atualizar a posse porque a alteração conflita com outro registro deste veículo.",
+                },
+            ) from exc
         except OSError as exc:
             await self.db.rollback()
             self._cleanup_file(stored_loan_term_path)

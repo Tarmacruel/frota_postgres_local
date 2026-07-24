@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import hmac
 import logging
-import traceback
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -131,17 +130,12 @@ async def request_context_middleware(request: Request, call_next):
         try:
             response = await call_next(request)
         except Exception as exc:
-            stack = " > ".join(
-                f"{Path(frame.filename).name}:{frame.lineno}:{frame.name}"
-                for frame in traceback.extract_tb(exc.__traceback__, limit=20)
-            )
-            logger.error(
-                "Erro interno request_id=%s method=%s path=%s exception_type=%s stack=%s",
+            logger.exception(
+                "Erro interno request_id=%s method=%s path=%s exception_type=%s",
                 context.request_id,
                 context.method,
                 context.path,
                 type(exc).__name__,
-                stack,
             )
             response = JSONResponse(
                 status_code=500,
