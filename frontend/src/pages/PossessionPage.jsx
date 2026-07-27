@@ -697,6 +697,7 @@ export default function PossessionPage() {
       setCorrectionRecord(record)
       setCorrectionContext(data)
       setCorrectionForm({
+        end_date: toDateTimeLocalValue(data.end_date),
         end_odometer_km: data.current_confirmation.final_odometer_km,
         vehicle_condition_notes: data.current_confirmation.vehicle_condition_notes,
         correction_reason: '',
@@ -722,6 +723,7 @@ export default function PossessionPage() {
       setCorrectionError('')
       const { data } = await possessionAPI.correctReturnConfirmation(correctionRecord.id, {
         ...correctionForm,
+        end_date: new Date(correctionForm.end_date).toISOString(),
         end_odometer_km: Number(correctionForm.end_odometer_km),
       })
       setFeedback(`Confirmação de devolução retificada na versão ${data.version}; a versão anterior foi preservada.`)

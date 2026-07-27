@@ -204,6 +204,7 @@ async def test_concurrent_confirmation_conflict_is_reported_without_second_commi
 @pytest.mark.asyncio
 async def test_admin_correction_supersedes_without_changing_previous_payload():
     possession = _possession(ended=True)
+    corrected_end_date = possession.end_date + timedelta(minutes=30)
     service = _service(possession)
     previous = SimpleNamespace(
         id=uuid4(), version=1, is_current=True, canonical_payload_hash="a" * 64,
@@ -214,6 +215,7 @@ async def test_admin_correction_supersedes_without_changing_previous_payload():
     confirmation = await service.correct(
         possession.id,
         PossessionReturnCorrection(
+            end_date=corrected_end_date,
             end_odometer_km=106,
             vehicle_condition_notes="Ressalva corrigida",
             correction_reason="Correção após conferência administrativa",
@@ -226,6 +228,7 @@ async def test_admin_correction_supersedes_without_changing_previous_payload():
     assert previous.canonical_payload_hash == "a" * 64
     assert confirmation.version == 2
     assert confirmation.admin_correction_reason.startswith("Correção")
+    assert possession.end_date == corrected_end_date
 
 
 @pytest.mark.asyncio

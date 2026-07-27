@@ -26,6 +26,7 @@ class PossessionEndWithConfirmation(BaseModel):
 
 class PossessionReturnCorrection(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    end_date: datetime
     end_odometer_km: float = Field(ge=0)
     vehicle_condition_notes: str = Field(min_length=3, max_length=4000)
     correction_reason: str = Field(min_length=8, max_length=1000)
@@ -61,6 +62,7 @@ class PossessionReturnContextOut(BaseModel):
     vehicle_plate: str
     driver_name: str
     start_date: datetime
+    end_date: datetime | None
     start_odometer_km: float | None
     last_trip_id: UUID | None
     minimum_end_odometer_km: float

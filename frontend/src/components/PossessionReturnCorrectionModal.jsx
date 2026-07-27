@@ -2,10 +2,11 @@ import { useRef } from 'react'
 import Modal from './Modal'
 
 export default function PossessionReturnCorrectionModal({ record, context, form, saving, error, onChange, onClose, onSubmit }) {
-  const odometerRef = useRef(null)
+  const endDateRef = useRef(null)
   if (!record || !context) return null
   const current = context.current_confirmation
-  const ready = form.end_odometer_km !== ''
+  const ready = form.end_date
+    && form.end_odometer_km !== ''
     && form.vehicle_condition_notes.trim().length >= 3
     && form.correction_reason.trim().length >= 8
     && form.declaration_accepted
@@ -17,15 +18,19 @@ export default function PossessionReturnCorrectionModal({ record, context, form,
       description={`Posse nº ${context.possession_public_number} · versão atual ${current?.version ?? '—'}`}
       onClose={onClose}
       canClose={!saving}
-      initialFocusRef={odometerRef}
+      initialFocusRef={endDateRef}
     >
       <form onSubmit={onSubmit} className="form-grid modal-form-grid possession-return-form">
         <div className="alert alert-warning modal-field-span">
           A versão atual não será alterada nem apagada. A correção criará uma nova versão e registrará a justificativa na auditoria.
         </div>
         <div className="form-field">
+          <label htmlFor="correction-end-date">Data e hora da devolução corrigidas</label>
+          <input ref={endDateRef} id="correction-end-date" className="app-input" type="datetime-local" required value={form.end_date} onChange={(event) => onChange({ end_date: event.target.value })} disabled={saving} />
+        </div>
+        <div className="form-field">
           <label htmlFor="correction-end-odometer">Hodômetro final corrigido (km)</label>
-          <input ref={odometerRef} id="correction-end-odometer" className="app-input" type="number" min={context.minimum_end_odometer_km} step="0.1" required value={form.end_odometer_km} onChange={(event) => onChange({ end_odometer_km: event.target.value })} disabled={saving} />
+          <input id="correction-end-odometer" className="app-input" type="number" min={context.minimum_end_odometer_km} step="0.1" required value={form.end_odometer_km} onChange={(event) => onChange({ end_odometer_km: event.target.value })} disabled={saving} />
         </div>
         <div className="form-field modal-field-span">
           <label htmlFor="correction-condition">Condições do veículo corrigidas</label>

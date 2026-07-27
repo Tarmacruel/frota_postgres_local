@@ -12,7 +12,7 @@ it('explica o append-only e exige novo aceite na correção administrativa', () 
         declaration: { version: '1.0', text: 'Declaração canônica da devolução.' },
         current_confirmation: { version: 2 },
       }}
-      form={{ end_odometer_km: '105', vehicle_condition_notes: 'Sem ressalvas', correction_reason: 'Correção administrativa', declaration_accepted: false }}
+      form={{ end_date: '2026-07-27T17:00', end_odometer_km: '105', vehicle_condition_notes: 'Sem ressalvas', correction_reason: 'Correção administrativa', declaration_accepted: false }}
       saving={false}
       error=""
       onChange={vi.fn()}
@@ -22,6 +22,7 @@ it('explica o append-only e exige novo aceite na correção administrativa', () 
   )
   expect(screen.getByText(/versão atual 2/)).toBeInTheDocument()
   expect(screen.getByText(/não será alterada nem apagada/)).toBeInTheDocument()
+  expect(screen.getByLabelText(/Data e hora da devolução corrigidas/)).toHaveValue('2026-07-27T17:00')
   expect(screen.getByRole('checkbox')).not.toBeChecked()
   expect(screen.getByRole('button', { name: 'Criar nova versão' })).toBeDisabled()
 })

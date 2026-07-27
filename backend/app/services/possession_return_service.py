@@ -116,6 +116,7 @@ class PossessionReturnService:
             "vehicle_plate": possession.vehicle.plate,
             "driver_name": "Identidade protegida" if restricted else possession.driver_name,
             "start_date": possession.start_date,
+            "end_date": possession.end_date,
             "start_odometer_km": possession.start_odometer_km,
             "last_trip_id": None if restricted else (latest_trip.id if latest_trip else None),
             "minimum_end_odometer_km": float(minimum),
@@ -248,6 +249,7 @@ class PossessionReturnService:
         if data.declaration_accepted is not True:
             raise HTTPException(status_code=422, detail={"code": "RETURN_DECLARATION_REQUIRED", "message": "Confirme integralmente a declaração para registrar a correção."})
         await self._visible_possession(possession_id, current_user)
+        self._require_aware_datetime(data.end_date)
         context = self._request_context()
         confirmed_at = datetime.now(timezone.utc)
         final_odometer = _decimal_odometer(data.end_odometer_km)
@@ -260,14 +262,14 @@ class PossessionReturnService:
             if current is None:
                 raise HTTPException(status_code=409, detail={"code": "RETURN_CONFIRMATION_NOT_FOUND", "message": "A posse não possui confirmação versionada para corrigir."})
             latest_trip = await self.trips.get_latest_completed(possession_id)
-            self._validate_return_values(possession, latest_trip, possession.end_date, final_odometer)
+            self._validate_return_values(possession, latest_trip, data.end_date, final_odometer)
             version = await self.confirmations.next_version(possession_id)
             new_id = uuid4()
             payload = build_canonical_return_payload(
                 possession=possession,
                 user=current_user,
                 confirmed_at=confirmed_at,
-                returned_at=possession.end_date,
+                returned_at=data.end_date,
                 final_odometer_km=final_odometer,
                 vehicle_condition_notes=data.vehicle_condition_notes,
                 last_trip_id=latest_trip.id if latest_trip else None,
@@ -300,6 +302,8 @@ class PossessionReturnService:
                 last_trip_id=latest_trip.id if latest_trip else None,
                 admin_correction_reason=data.correction_reason,
             )
+            previous_end_date = possession.end_date
+            possession.end_date = data.end_date
             possession.end_odometer_km = float(final_odometer)
             await self.confirmations.create(confirmation)
             await self.audit.record(
@@ -314,6 +318,9 @@ class PossessionReturnService:
                     "confirmation_version": version,
                     "canonical_payload_hash": confirmation.canonical_payload_hash,
                     "correction_reason": data.correction_reason,
+                    "previous_end_date": previous_end_date.isoformat(),
+                    "corrected_end_date": data.end_date.isoformat(),
+                    "final_odometer_km": float(final_odometer),
                 },
             )
             await self.db.flush()
