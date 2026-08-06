@@ -1,5 +1,7 @@
 .env
 *.env
+*.env.backup
+frontend/.env.local
 !.env.example
 
 __pycache__/
@@ -18,9 +20,13 @@ storage/logs/
 storage/runtime/
 storage/hotfix-backups/
 deploy/.ci-uploads/
+/data/
+/postgres-data/
+/restore/
 
 
 .playwright-mcp/
+.playwright-cli/
 *.out.log
 *.err.log
 

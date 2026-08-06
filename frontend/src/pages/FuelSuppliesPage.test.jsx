@@ -44,6 +44,10 @@ vi.mock('../components/Modal', () => ({
 vi.mock('../components/Pagination', () => ({ default: () => null }))
 vi.mock('../components/SearchableSelect', () => ({ default: ({ placeholder }) => <button type="button">{placeholder}</button> }))
 vi.mock('../components/FuelSupplyOrderCreateForm', () => ({ default: () => <div>Formulário de nova ordem</div> }))
+vi.mock('../components/FuelSupplyOrderBatchCreateForm', () => ({ default: () => <div>Formulário de ordens em lote</div> }))
+vi.mock('../components/GuidedTour', () => ({
+  default: ({ replayToken }) => <div data-testid="fuel-batch-guided-tour">Tour de lote {replayToken}</div>,
+}))
 vi.mock('../utils/fuelSupplyOrderDocument', () => ({
   downloadFuelSupplyOrderDocument: vi.fn(),
   previewFuelSupplyOrderDocument: vi.fn(),
@@ -94,6 +98,23 @@ describe('FuelSuppliesPage quick order action', () => {
 
     await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/abastecimentos$/))
     expect(screen.queryByRole('dialog', { name: 'Nova ordem de abastecimento' })).not.toBeInTheDocument()
+  })
+
+  it('abre o lote e inicia o guia pela URL de novidade', async () => {
+    renderPage('/abastecimentos?acao=nova-ordem-lote&guia=1&origem=novidade')
+
+    expect(await screen.findByRole('dialog', { name: 'Nova ordem de abastecimento em lote' })).toHaveTextContent('Formulário de ordens em lote')
+    expect(screen.getByTestId('fuel-batch-guided-tour')).toHaveTextContent('Tour de lote 1')
+    await waitFor(() => expect(screen.getByTestId('location')).toHaveTextContent(/^\/abastecimentos\?origem=novidade$/))
+  })
+
+  it('oferece o guia rápido manualmente para quem pode emitir ordens', async () => {
+    renderPage('/abastecimentos')
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver guia rápido' }))
+
+    expect(screen.getByRole('dialog', { name: 'Nova ordem de abastecimento em lote' })).toBeInTheDocument()
+    expect(screen.getByTestId('fuel-batch-guided-tour')).toHaveTextContent('Tour de lote 1')
   })
 })
 

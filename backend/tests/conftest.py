@@ -11,6 +11,8 @@ os.environ["DATABASE_URL"] = os.environ.get(
     "sqlite+aiosqlite:///./test.db",
 )
 os.environ["SECRET_KEY"] = "testsecret"
+os.environ["COOKIE_NAME"] = "access_token"
+os.environ["CSRF_COOKIE_NAME"] = "csrf_token"
 os.environ["CORS_ORIGINS"] = '["http://test", "http://localhost:8000"]'
 os.environ["CSRF_TRUSTED_ORIGINS"] = '["http://localhost:8000"]'
 os.environ["TRUSTED_HOSTS"] = '["test", "localhost", "127.0.0.1"]'

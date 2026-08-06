@@ -137,6 +137,14 @@ Fluxo administrativo:
 5. Gerar comprovante institucional.
 6. Acompanhar confirmação ou cancelar ordem aberta quando necessário.
 
+### Pedidos em lote
+
+Quando for necessário autorizar vários veículos no mesmo posto, clique em **Nova ordem em lote**. Selecione ao menos dois veículos, informe os dados comuns (posto, órgão, prazo e observações) e, se necessário, ajuste os litros previstos de cada veículo antes de revisar e emitir.
+
+O lote agiliza a emissão, mas cada veículo recebe uma ordem própria, com número, comprovante, QR Code, situação e confirmação independentes. Assim, o posto confirma cada abastecimento com os valores e o comprovante reais do respectivo veículo.
+
+Usuários autorizados a emitir ordens recebem uma apresentação da novidade no primeiro acesso após a atualização. O botão **Ver guia rápido** permite abrir novamente o passo a passo quando necessário.
+
 O comprovante da ordem informa os dados institucionais da autorização, o posto credenciado e o link de localização do posto quando houver latitude e longitude cadastradas.
 
 O operador de posto acessa apenas as ordens abertas vinculadas ao seu posto e confirma o abastecimento com dados reais, odômetro, litros, valor total, tipo de combustível, eventuais aditivos, data/hora e comprovante.
@@ -203,26 +211,17 @@ Os principais módulos oferecem:
 
 Antes de gerar relatórios, revise filtros de busca, status, datas e lotação para garantir que o documento reflita o recorte correto.
 
-## 19. Rotinas técnicas úteis
+## 19. Ambiente de homologação isolado
 
-Para operação local do projeto, use a Central Operacional:
+Neste clone de homologação, inicie exclusivamente o ambiente isolado com:
 
 ```powershell
-.\FROTA_Iniciar.bat
+.\scripts\homologation\start.ps1
 ```
 
-Rotinas comuns:
+Ele usa somente `127.0.0.1:3010`, `127.0.0.1:8010` e o PostgreSQL próprio em `127.0.0.1:5440`; seus logs e PIDs permanecem dentro deste clone.
 
-| Rotina | Uso |
-|---|---|
-| Iniciar stack dev | Sobe backend e frontend |
-| Preparar PostgreSQL local | Banco, migrations e seed |
-| Status | Verifica portas, processos e logs |
-| Backup manual | Gera backup local e cópia espelhada |
-| Configurar backup automático | Agenda backups diários |
-| Diagnóstico | Coleta informações para suporte |
-
-Consulte também `README.md`, `QUICK_START.md`, `TROUBLESHOOTING.md` e `SCRIPTS_MANIFEST.md`.
+Não use `FROTA_Iniciar.bat`, rotinas de publicação, watchdog, Cloudflared, porta 80 ou comandos globais de parada nesta árvore. Essas rotinas pertencem ao ambiente operacional e não fazem parte da homologação isolada.
 
 ## 20. Checklist rápido de uso diário
 
