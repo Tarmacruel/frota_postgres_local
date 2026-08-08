@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+command_text="${SSH_ORIGINAL_COMMAND:-}"
+
+if [[ "$command_text" =~ ^release[[:space:]]([0-9a-f]{40})$ ]]; then
+  exec sudo -n /usr/local/sbin/frota-release "${BASH_REMATCH[1]}"
+fi
+
+if [[ "$command_text" == "rollback" ]]; then
+  exec sudo -n /usr/local/sbin/frota-rollback
+fi
+
+printf 'Comando de deploy nao permitido.\n' >&2
+exit 126

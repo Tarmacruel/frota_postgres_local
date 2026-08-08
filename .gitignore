@@ -16,6 +16,8 @@ backend/storage/
 storage/backups/
 storage/logs/
 storage/runtime/
+storage/hotfix-backups/
+deploy/.ci-uploads/
 
 
 .playwright-mcp/

@@ -1,0 +1,14 @@
+[Unit]
+Description=Compartilhamento SMB do Frota em SAD61SVR001
+Wants=network-online.target
+After=network-online.target
+
+[Mount]
+What=//SAD61SVR001/licitacao.1
+Where=/mnt/frota-share
+Type=cifs
+Options=credentials=/etc/frota/smb-credentials,vers=3.0,uid=10001,gid=10001,file_mode=0660,dir_mode=0770,noserverino,_netdev
+TimeoutSec=30
+
+[Install]
+WantedBy=multi-user.target

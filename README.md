@@ -21,7 +21,7 @@ Ela concentra as tarefas do projeto:
 | Status | Mostra portas, PIDs e logs |
 | Backup manual | Gera backup local e copia no OneDrive |
 | Configurar backup automatico | Agenda backup 3x ao dia |
-| Configurar auto-retomada | Instala watchdog local para recuperar rede/app |
+| Configurar auto-retomada | Instala watchdog legado para desenvolvimento/local |
 
 ## URLs padrao
 
@@ -49,13 +49,13 @@ Destino espelhado:
 C:\Users\078364\OneDrive\BACKUPS\FROTAS
 ```
 
-## Auto-retomada
+## Auto-retomada legada
 
 ```powershell
 .\Configurar_Auto_Retomada.bat
 ```
 
-Execute como administrador para permitir configuracao de recuperacao dos servicos Cloudflared e PostgreSQL.
+Execute como administrador apenas no ambiente legado/desenvolvimento, para permitir configuracao de recuperacao dos servicos Cloudflared e PostgreSQL.
 
 O watchdog usa `C:\FROTAS\frota_runtime`, monitora backend `:8000`, frontend `:3000`, PostgreSQL e Cloudflared, e registra logs em:
 
@@ -81,3 +81,7 @@ output\doc\manual_sistema_frotas.pdf
 ## Scripts internos
 
 Os scripts operacionais ficam em `scripts\`. Para uso normal, prefira sempre `FROTA_Iniciar.bat`.
+
+## Produção Docker
+
+O deploy de produção passa a ser preparado para Docker em uma VM Linux do `SAD61SVR001`. O código, releases, uploads e backups ficam em `Z:\FROTAS`; o volume ativo do PostgreSQL fica local à VM Docker. O watchdog de `C:\FROTAS` não é usado em produção após o corte. Consulte o guia de implantação em `docs\deploy\docker-sad61svr001.md` antes de substituir o runtime legado.
