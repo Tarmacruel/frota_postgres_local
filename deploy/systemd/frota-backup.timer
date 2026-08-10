@@ -1,0 +1,11 @@
+[Unit]
+Description=Agenda backups do Frota tres vezes ao dia
+
+[Timer]
+OnCalendar=*-*-* 00,12,19:00:00
+Persistent=true
+RandomizedDelaySec=5m
+Unit=frota-backup.service
+
+[Install]
+WantedBy=timers.target

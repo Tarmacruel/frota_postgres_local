@@ -1,0 +1,154 @@
+name: CI e deploy do Frota
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: frota-production-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  backend-tests:
+    name: backend-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: backend/requirements.txt
+      - name: Instalar dependencias backend
+        run: python -m pip install --requirement backend/requirements.txt
+      - name: Executar testes backend
+        working-directory: backend
+        env:
+          TEST_DATABASE_URL: "sqlite+aiosqlite:///:memory:"
+        run: python -m pytest -q
+
+  frontend-tests:
+    name: frontend-tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: "22.14.0"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Instalar dependencias frontend
+        working-directory: frontend
+        run: npm ci
+      - name: Executar testes frontend
+        working-directory: frontend
+        run: npm run test
+      - name: Executar lint frontend
+        working-directory: frontend
+        run: npm run lint
+      - name: Gerar build frontend
+        working-directory: frontend
+        run: npm run build
+
+  container-smoke:
+    name: container-smoke
+    needs: [backend-tests, frontend-tests]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Preparar storage efemero
+        run: |
+          mkdir -p deploy/.ci-uploads
+          sudo chown 10001:10001 deploy/.ci-uploads
+      - name: Validar Compose
+        run: docker compose --env-file deploy/ci.env -f deploy/compose.production.yml config
+      - name: Construir imagem de producao
+        run: docker compose --env-file deploy/ci.env -f deploy/compose.production.yml build app
+      - name: Subir PostgreSQL e migrations
+        run: |
+          docker compose --env-file deploy/ci.env -f deploy/compose.production.yml up -d postgres
+          docker compose --env-file deploy/ci.env -f deploy/compose.production.yml --profile migration run --rm migrate
+      - name: Subir aplicacao e validar readiness
+        run: |
+          docker compose --env-file deploy/ci.env -f deploy/compose.production.yml up -d --no-deps app
+          for attempt in $(seq 1 45); do
+            if curl --fail --silent --show-error http://127.0.0.1:8000/api/health/ready; then
+              break
+            fi
+            if [ "$attempt" -eq 45 ]; then
+              docker compose --env-file deploy/ci.env -f deploy/compose.production.yml logs
+              exit 1
+            fi
+            sleep 2
+          done
+          curl --fail --silent --show-error http://127.0.0.1:8000/ | grep '<div id="root"></div>'
+      - name: Validar persistencia de upload montado
+        run: |
+          docker compose --env-file deploy/ci.env -f deploy/compose.production.yml exec -T app \
+            python -c "from pathlib import Path; path = Path('/data/uploads/container-smoke.txt'); path.write_text('persisted', encoding='utf-8'); assert path.read_text(encoding='utf-8') == 'persisted'"
+          docker compose --env-file deploy/ci.env -f deploy/compose.production.yml up -d --no-deps --force-recreate app
+          docker compose --env-file deploy/ci.env -f deploy/compose.production.yml exec -T app \
+            python -c "from pathlib import Path; assert Path('/data/uploads/container-smoke.txt').read_text(encoding='utf-8') == 'persisted'"
+      - name: Limpar stack efemera
+        if: always()
+        run: docker compose --env-file deploy/ci.env -f deploy/compose.production.yml down --volumes --remove-orphans
+
+  deploy-production:
+    name: deploy-production
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main' && vars.FROTA_DEPLOY_ENABLED == 'true'
+    needs: [backend-tests, frontend-tests, container-smoke]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    environment: production
+    env:
+      CF_ACCESS_CLIENT_ID: ${{ secrets.CF_ACCESS_CLIENT_ID }}
+      CF_ACCESS_CLIENT_SECRET: ${{ secrets.CF_ACCESS_CLIENT_SECRET }}
+      FROTA_SSH_HOST: ${{ secrets.FROTA_SSH_HOST }}
+      FROTA_SSH_USER: ${{ secrets.FROTA_SSH_USER }}
+      FROTA_SSH_KNOWN_HOSTS: ${{ secrets.FROTA_SSH_KNOWN_HOSTS }}
+      FROTA_DEPLOY_SSH_PRIVATE_KEY: ${{ secrets.FROTA_DEPLOY_SSH_PRIVATE_KEY }}
+    steps:
+      - name: Validar segredos de deploy
+        run: |
+          for variable in \
+            CF_ACCESS_CLIENT_ID \
+            CF_ACCESS_CLIENT_SECRET \
+            FROTA_SSH_HOST \
+            FROTA_SSH_USER \
+            FROTA_SSH_KNOWN_HOSTS \
+            FROTA_DEPLOY_SSH_PRIVATE_KEY; do
+            test -n "${!variable}" || { echo "Segredo ausente: $variable" >&2; exit 1; }
+          done
+      - name: Instalar cliente Cloudflare Access fixado
+        run: |
+          curl --fail --location --retry 3 \
+            https://github.com/cloudflare/cloudflared/releases/download/2026.7.2/cloudflared-linux-amd64 \
+            --output "$RUNNER_TEMP/cloudflared"
+          chmod 0755 "$RUNNER_TEMP/cloudflared"
+          "$RUNNER_TEMP/cloudflared" --version
+      - name: Configurar SSH por Cloudflare Access
+        run: |
+          install -d -m 0700 "$HOME/.ssh"
+          printf '%s\n' "$FROTA_DEPLOY_SSH_PRIVATE_KEY" >"$HOME/.ssh/id_frota_deploy"
+          printf '%s\n' "$FROTA_SSH_KNOWN_HOSTS" >"$HOME/.ssh/known_hosts"
+          chmod 0600 "$HOME/.ssh/id_frota_deploy" "$HOME/.ssh/known_hosts"
+          cat >>"$HOME/.ssh/config" <<EOF
+          Host $FROTA_SSH_HOST
+            User $FROTA_SSH_USER
+            IdentityFile $HOME/.ssh/id_frota_deploy
+            UserKnownHostsFile $HOME/.ssh/known_hosts
+            StrictHostKeyChecking yes
+            ProxyCommand $RUNNER_TEMP/cloudflared access ssh --hostname %h
+          EOF
+          chmod 0600 "$HOME/.ssh/config"
+      - name: Publicar commit validado
+        run: ssh "$FROTA_SSH_USER@$FROTA_SSH_HOST" "release $GITHUB_SHA"

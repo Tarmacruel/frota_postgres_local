@@ -8,6 +8,8 @@ from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from app.api.routes.admin_notifications import router as admin_notifications_router
 from app.api.routes.analytics import router as analytics_router
 from app.api.routes.audit import router as audit_router
@@ -32,6 +34,7 @@ from app.api.routes.search import router as search_router
 from app.api.routes.users import router as users_router
 from app.api.routes.vehicles import router as vehicles_router
 from app.core.config import settings
+from app.core.database import engine
 from app.core.request_context import (
     REQUEST_ID_HEADER,
     build_request_audit_context,
@@ -214,6 +217,19 @@ app.include_router(analytics_router)
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "app": "frota-pmtf"}
+
+
+@app.get("/api/health/ready")
+async def readiness():
+    """Report whether the application can serve requests that require PostgreSQL."""
+    try:
+        async with engine.connect() as connection:
+            await connection.execute(text("SELECT 1"))
+    except (OSError, TimeoutError, SQLAlchemyError):
+        logger.warning("Readiness check failed because PostgreSQL is unavailable")
+        raise HTTPException(status_code=503, detail="Banco de dados indisponível")
+
+    return {"status": "ok", "app": "frota-pmtf", "database": "ok"}
 
 
 @app.get("/")

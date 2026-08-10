@@ -4,8 +4,10 @@ import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
 import FuelSupplyOrderCreateForm from '../components/FuelSupplyOrderCreateForm'
+import FuelSupplyOrderBatchCreateForm from '../components/FuelSupplyOrderBatchCreateForm'
 import FuelSupplyOrderDeadlineForm from '../components/FuelSupplyOrderDeadlineForm'
 import FuelSupplyRectifyForm from '../components/FuelSupplyRectifyForm'
+import GuidedTour from '../components/GuidedTour'
 import api from '../api/client'
 import { fuelStationsAPI } from '../api/fuelStations'
 import { masterDataAPI } from '../api/masterData'
@@ -134,15 +136,25 @@ export default function FuelSuppliesPage() {
   const [currentHistoryPage, setCurrentHistoryPage] = useState(1)
   const [currentOrdersPage, setCurrentOrdersPage] = useState(1)
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
+  const [isBatchOrderModalOpen, setIsBatchOrderModalOpen] = useState(false)
+  const [batchTourReplayToken, setBatchTourReplayToken] = useState(0)
   const [supplyToRectify, setSupplyToRectify] = useState(null)
   const [orderToAdjust, setOrderToAdjust] = useState(null)
 
   useEffect(() => {
-    if (searchParams.get('acao') !== 'nova-ordem') return
-    if (canCreateOrder) setIsOrderModalOpen(true)
+    const action = searchParams.get('acao')
+    if (!['nova-ordem', 'nova-ordem-lote'].includes(action)) return
+    const shouldStartBatchTour = action === 'nova-ordem-lote' && searchParams.get('guia') === '1'
+
+    if (canCreateOrder) {
+      if (action === 'nova-ordem') setIsOrderModalOpen(true)
+      if (action === 'nova-ordem-lote') setIsBatchOrderModalOpen(true)
+      if (shouldStartBatchTour) setBatchTourReplayToken((current) => current + 1)
+    }
 
     const nextSearchParams = new URLSearchParams(searchParams)
     nextSearchParams.delete('acao')
+    if (shouldStartBatchTour) nextSearchParams.delete('guia')
     setSearchParams(nextSearchParams, { replace: true })
   }, [canCreateOrder, searchParams, setSearchParams])
 
@@ -444,6 +456,36 @@ export default function FuelSuppliesPage() {
     setOrderFilters({ status: 'TODOS', organization_id: '', fuel_station_id: '', created_from: '', created_to: '' })
   }
 
+  function openBatchOrderTour() {
+    if (!canCreateOrder) return
+    setIsBatchOrderModalOpen(true)
+    setBatchTourReplayToken((current) => current + 1)
+  }
+
+  const batchTourSteps = useMemo(() => [
+    {
+      selector: '[data-tour="fuel-batch-create"]',
+      title: 'Nova ordem em lote',
+      description: 'Use este atalho para preparar várias ordens de abastecimento de uma vez, sem substituir a emissão individual.',
+      placement: 'bottom',
+    },
+    {
+      selector: '[data-tour="fuel-batch-vehicles"]',
+      title: 'Selecione os veículos',
+      description: 'Marque dois ou mais veículos. O sistema emitirá uma ordem independente para cada seleção.',
+    },
+    {
+      selector: '[data-tour="fuel-batch-liters"]',
+      title: 'Ajuste os litros quando necessário',
+      description: 'Defina um valor padrão e altere somente os veículos que precisarem de um limite diferente.',
+    },
+    {
+      selector: '[data-tour="fuel-batch-review"]',
+      title: 'Revise e emita',
+      description: 'Confira os dados compartilhados e cada veículo antes de confirmar. Depois, cada ordem terá comprovante e acompanhamento próprios.',
+    },
+  ], [])
+
   return (
     <div className="surface-panel">
       <div className="panel-heading">
@@ -453,6 +495,8 @@ export default function FuelSuppliesPage() {
         </div>
         <div className="actions-inline">
           {canCreateOrder ? <button className="app-button" type="button" onClick={() => setIsOrderModalOpen(true)}>Nova ordem</button> : null}
+          {canCreateOrder ? <button className="secondary-button" data-tour="fuel-batch-create" type="button" onClick={() => setIsBatchOrderModalOpen(true)}>Nova ordem em lote</button> : null}
+          {canCreateOrder ? <button className="ghost-button" type="button" onClick={openBatchOrderTour}>Ver guia rápido</button> : null}
           <button className="ghost-button" type="button" onClick={() => { loadOrders(); loadRecords() }}>Atualizar painel</button>
         </div>
       </div>
@@ -704,6 +748,33 @@ export default function FuelSuppliesPage() {
           }}
         />
       </Modal>
+
+      <Modal
+        open={isBatchOrderModalOpen && canCreateOrder}
+        onClose={() => setIsBatchOrderModalOpen(false)}
+        title="Nova ordem de abastecimento em lote"
+        description="Emita ordens separadas para vários veículos, com posto, prazo e observações compartilhados."
+      >
+        <FuelSupplyOrderBatchCreateForm
+          vehicles={vehicles}
+          organizations={organizations}
+          fuelStations={fuelStations}
+          onClose={() => setIsBatchOrderModalOpen(false)}
+          onSuccess={({ message }) => {
+            setFeedback(message)
+            setLastIssuedOrder(null)
+            loadOrders()
+          }}
+        />
+      </Modal>
+
+      {batchTourReplayToken > 0 ? (
+        <GuidedTour
+          steps={batchTourSteps}
+          storageKey="frota-fuel-supply-orders-batch-tour-v1"
+          replayToken={batchTourReplayToken}
+        />
+      ) : null}
 
       <Modal
         open={Boolean(supplyToRectify) && canRectifySupply}

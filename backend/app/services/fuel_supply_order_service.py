@@ -18,6 +18,7 @@ from app.repositories.master_data_repository import MasterDataRepository
 from app.repositories.vehicle_repository import VehicleRepository
 from app.schemas.common import PaginatedResponse, build_pagination
 from app.schemas.fuel_supply import (
+    FuelSupplyOrderBatchCreate,
     FuelSupplyOrderCancel,
     FuelSupplyOrderConfirm,
     FuelSupplyOrderCreate,
@@ -73,31 +74,13 @@ class FuelSupplyOrderService:
         )
 
     async def create_order(self, data: FuelSupplyOrderCreate, current_user: User) -> dict:
-        now = datetime.now(timezone.utc)
-        if data.expires_at <= now:
-            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Prazo da ordem deve ser no futuro")
-
-        vehicle = await self.vehicles.get_by_id(data.vehicle_id)
-        if not vehicle:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
-
-        await self._ensure_vehicle_visible_to_user(data.vehicle_id, current_user)
-        order_organization_id = scoped_organization_id(current_user, data.organization_id)
-        if data.organization_id:
-            organization = await self.master_data.get_organization(data.organization_id)
-            if not organization:
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Órgão/posto não encontrado")
-
-        if data.organization_id:
-            ensure_organization_access(current_user, data.organization_id)
-        elif production_scope_is_empty(current_user):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Órgão não encontrado")
-
-        station = await self.fuel_stations.get(data.fuel_station_id)
-        if not station:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posto não encontrado")
-        if not station.active:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Posto selecionado está inativo")
+        self._ensure_order_deadline(data.expires_at)
+        vehicle = await self._get_visible_vehicle(data.vehicle_id, current_user)
+        order_organization_id = await self._validate_order_context(
+            organization_id=data.organization_id,
+            fuel_station_id=data.fuel_station_id,
+            current_user=current_user,
+        )
 
         order = FuelSupplyOrder(
             vehicle_id=data.vehicle_id,
@@ -133,6 +116,71 @@ class FuelSupplyOrderService:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível criar a ordem de abastecimento") from exc
 
         return await self.get_order(order.id, current_user=current_user)
+
+    async def create_batch(self, data: FuelSupplyOrderBatchCreate, current_user: User) -> dict:
+        self._ensure_batch_items_are_valid(data)
+        self._ensure_order_deadline(data.expires_at)
+        order_organization_id = await self._validate_order_context(
+            organization_id=data.organization_id,
+            fuel_station_id=data.fuel_station_id,
+            current_user=current_user,
+        )
+
+        # Validate every vehicle before any order or audit record is persisted.
+        validated_items = []
+        for item in data.items:
+            vehicle = await self._get_visible_vehicle(item.vehicle_id, current_user)
+            validated_items.append((item, vehicle))
+
+        created_orders: list[tuple[FuelSupplyOrder, object]] = []
+        loaded_orders: list[tuple[FuelSupplyOrder, object]] = []
+        try:
+            for item, vehicle in validated_items:
+                order = FuelSupplyOrder(
+                    vehicle_id=item.vehicle_id,
+                    organization_id=order_organization_id,
+                    fuel_station_id=data.fuel_station_id,
+                    validation_code=await self._generate_validation_code(),
+                    created_by_user_id=current_user.id,
+                    expires_at=data.expires_at,
+                    requested_liters=item.requested_liters,
+                    notes=data.notes,
+                    status=FuelSupplyOrderStatus.OPEN,
+                )
+                await self.orders.create(order)
+                created_orders.append((order, vehicle))
+
+            for order, vehicle in created_orders:
+                loaded_order = await self.orders.get_by_id(order.id)
+                if not loaded_order:
+                    raise HTTPException(
+                        status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+                        detail="Nao foi possivel carregar a ordem criada",
+                    )
+                loaded_orders.append((loaded_order, vehicle))
+
+            for loaded_order, vehicle in loaded_orders:
+                await self.audit.record(
+                    actor=current_user,
+                    action="ORDER_CREATED",
+                    entity_type="FUEL_SUPPLY_ORDER",
+                    entity_id=loaded_order.id,
+                    entity_label=f"{vehicle.plate} - {loaded_order.id}",
+                    details=self._serialize_order(loaded_order),
+                )
+
+            await self.db.commit()
+        except IntegrityError as exc:
+            await self.db.rollback()
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível criar as ordens de abastecimento") from exc
+        except Exception:
+            await self.db.rollback()
+            raise
+
+        return {
+            "created_count": len(loaded_orders),
+            "orders": [await self._serialize_order_with_signatures(order) for order, _vehicle in loaded_orders],
+        }
 
     async def get_order(self, order_id: UUID, *, current_user: User | None = None) -> dict:
         await self._expire_overdue_orders()
@@ -401,6 +449,57 @@ class FuelSupplyOrderService:
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Ajuste de prazo restrito a administradores e operadores de producao",
             )
+
+    def _ensure_order_deadline(self, expires_at: datetime) -> None:
+        if expires_at.tzinfo is None or expires_at.utcoffset() is None:
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Prazo da ordem deve incluir o fuso horário")
+        if expires_at <= datetime.now(timezone.utc):
+            raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Prazo da ordem deve ser no futuro")
+
+    def _ensure_batch_items_are_valid(self, data: FuelSupplyOrderBatchCreate) -> None:
+        if len(data.items) < 2:
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="O lote deve conter ao menos dois veículos",
+            )
+
+        vehicle_ids = [item.vehicle_id for item in data.items]
+        if len(vehicle_ids) != len(set(vehicle_ids)):
+            raise HTTPException(
+                status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                detail="Não é permitido repetir veículos no mesmo lote",
+            )
+
+    async def _get_visible_vehicle(self, vehicle_id: UUID, current_user: User) -> object:
+        vehicle = await self.vehicles.get_by_id(vehicle_id)
+        if not vehicle:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
+        await self._ensure_vehicle_visible_to_user(vehicle_id, current_user)
+        return vehicle
+
+    async def _validate_order_context(
+        self,
+        *,
+        organization_id: UUID | None,
+        fuel_station_id: UUID,
+        current_user: User,
+    ) -> UUID | None:
+        order_organization_id = scoped_organization_id(current_user, organization_id)
+        if organization_id:
+            organization = await self.master_data.get_organization(organization_id)
+            if not organization:
+                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Órgão/posto não encontrado")
+            ensure_organization_access(current_user, organization_id)
+        elif production_scope_is_empty(current_user):
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Órgão não encontrado")
+
+        station = await self.fuel_stations.get(fuel_station_id)
+        if not station:
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posto não encontrado")
+        if not station.active:
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Posto selecionado está inativo")
+
+        return order_organization_id
 
     async def _ensure_vehicle_visible_to_user(self, vehicle_id: UUID, current_user: User | None) -> None:
         organization_id = scoped_organization_id(current_user)

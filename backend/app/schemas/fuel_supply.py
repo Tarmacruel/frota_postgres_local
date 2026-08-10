@@ -128,6 +128,34 @@ class FuelSupplyOrderCreate(BaseModel):
         return normalized or None
 
 
+class FuelSupplyOrderBatchItem(BaseModel):
+    vehicle_id: UUID
+    requested_liters: float | None = Field(default=None, gt=0)
+
+
+class FuelSupplyOrderBatchCreate(BaseModel):
+    items: list[FuelSupplyOrderBatchItem] = Field(min_length=2)
+    organization_id: UUID | None = None
+    fuel_station_id: UUID
+    expires_at: datetime
+    notes: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("notes")
+    @classmethod
+    def normalize_order_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    @model_validator(mode="after")
+    def require_distinct_vehicles(self) -> "FuelSupplyOrderBatchCreate":
+        vehicle_ids = [item.vehicle_id for item in self.items]
+        if len(vehicle_ids) != len(set(vehicle_ids)):
+            raise ValueError("Não é permitido repetir veículos no mesmo lote")
+        return self
+
+
 class FuelSupplyOrderConfirm(BaseModel):
     supplied_at: datetime | None = None
     odometer_km: float = Field(gt=0)
@@ -283,6 +311,11 @@ class FuelSupplyOrderOut(BaseModel):
 
 class FuelSupplyOrderListResponse(PaginatedResponse[FuelSupplyOrderOut]):
     pass
+
+
+class FuelSupplyOrderBatchResponse(BaseModel):
+    created_count: int
+    orders: list[FuelSupplyOrderOut]
 
 
 class FuelSupplyOrderPublicOut(BaseModel):

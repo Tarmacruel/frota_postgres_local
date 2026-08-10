@@ -1,0 +1,12 @@
+[Unit]
+Description=Backup consistente do Frota Docker
+Requires=docker.service mnt-frota-share.mount
+After=docker.service mnt-frota-share.mount
+
+[Service]
+Type=oneshot
+User=root
+ExecStart=/usr/local/sbin/frota-backup
+Nice=10
+IOSchedulingClass=best-effort
+IOSchedulingPriority=7

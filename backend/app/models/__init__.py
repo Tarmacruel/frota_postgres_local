@@ -41,6 +41,7 @@ from app.models.payment_process import (
 )
 from app.models.user import User, UserRole
 from app.models.user_permission import UserPermission
+from app.models.user_feature_acknowledgement import UserFeatureAcknowledgement
 from app.models.user_report_preference import UserReportPreference
 from app.models.vehicle import Vehicle, VehicleOwnershipType, VehicleStatus, VehicleType
 from app.models.location_history import LocationHistory
@@ -102,6 +103,7 @@ __all__ = [
     "User",
     "UserRole",
     "UserPermission",
+    "UserFeatureAcknowledgement",
     "UserReportPreference",
     "Vehicle",
     "VehicleOwnershipType",

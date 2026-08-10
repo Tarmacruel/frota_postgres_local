@@ -5,8 +5,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import Settings, settings
+from app import main as main_module
 from app.models.user import UserRole
 from app.repositories.search_repository import SearchRepository
 from app.services.possession_service import PossessionService
@@ -67,6 +69,28 @@ async def test_security_headers_and_request_size_limit(client):
     assert too_large.status_code == 413
     assert too_large.json()["code"] == "REQUEST_BODY_TOO_LARGE"
     assert too_large.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.asyncio
+async def test_readiness_reports_database_state(client):
+    response = await client.get("/api/health/ready")
+
+    assert response.status_code == 200
+    assert response.json()["database"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_readiness_returns_503_when_database_is_unavailable(client, monkeypatch):
+    class UnavailableEngine:
+        def connect(self):
+            raise SQLAlchemyError("database unavailable")
+
+    monkeypatch.setattr(main_module, "engine", UnavailableEngine())
+
+    response = await client.get("/api/health/ready")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Banco de dados indisponível"
 
 
 def test_storage_resolution_blocks_absolute_and_parent_paths(tmp_path, monkeypatch):

@@ -7,6 +7,7 @@ import SearchOverlay from './SearchOverlay'
 import Modal from './Modal'
 import { adminNotificationsAPI } from '../api/adminNotifications'
 import { documentSignaturesAPI } from '../api/documentSignatures'
+import { featureGuidesAPI } from '../api/featureGuides'
 
 const THEME_STORAGE_KEY = 'frota-theme'
 const SIDEBAR_STORAGE_KEY = 'frota-sidebar-compact'
@@ -23,7 +24,9 @@ export default function Layout() {
   const passwordChangeRequired = Boolean(mustChangePassword)
   const cpfRegistrationRequired = Boolean(mustRegisterCpf) && !passwordChangeRequired
   const accessBlocked = passwordChangeRequired || cpfRegistrationRequired
+  const canCreateFuelSupplyOrders = canCreate('fuel_supply_orders')
   const mainRef = useRef(null)
+  const fuelSupplyOrdersBatchGuideUserRef = useRef(null)
 
   const [navOpen, setNavOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -39,6 +42,9 @@ export default function Layout() {
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [signatureRequestsOpen, setSignatureRequestsOpen] = useState(false)
   const [pendingSignatureRequests, setPendingSignatureRequests] = useState([])
+  const [fuelSupplyOrdersBatchGuideOpen, setFuelSupplyOrdersBatchGuideOpen] = useState(false)
+  const [fuelSupplyOrdersBatchGuideAcknowledging, setFuelSupplyOrdersBatchGuideAcknowledging] = useState(false)
+  const [fuelSupplyOrdersBatchGuideError, setFuelSupplyOrdersBatchGuideError] = useState('')
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined
@@ -193,6 +199,38 @@ export default function Layout() {
     setSearchOpen(false)
   }, [cpfRegistrationRequired])
 
+  useEffect(() => {
+    if (!user?.id || accessBlocked || !canCreateFuelSupplyOrders) {
+      fuelSupplyOrdersBatchGuideUserRef.current = null
+      setFuelSupplyOrdersBatchGuideOpen(false)
+      setFuelSupplyOrdersBatchGuideError('')
+      return undefined
+    }
+
+    if (fuelSupplyOrdersBatchGuideUserRef.current === user.id) return undefined
+
+    let mounted = true
+
+    async function loadFuelSupplyOrdersBatchGuide() {
+      try {
+        const { data } = await featureGuidesAPI.getFuelSupplyOrdersBatch()
+        if (!mounted) return
+        fuelSupplyOrdersBatchGuideUserRef.current = user.id
+        if (!data?.acknowledged) setFuelSupplyOrdersBatchGuideOpen(true)
+      } catch {
+        if (mounted) {
+          fuelSupplyOrdersBatchGuideUserRef.current = user.id
+          setFuelSupplyOrdersBatchGuideOpen(false)
+        }
+      }
+    }
+
+    loadFuelSupplyOrdersBatchGuide()
+    return () => {
+      mounted = false
+    }
+  }, [accessBlocked, canCreateFuelSupplyOrders, user?.id])
+
 
   useEffect(() => {
     if (!isAdmin || accessBlocked) return
@@ -318,6 +356,22 @@ export default function Layout() {
       setCpfFeedback('')
     } catch {
       setCpfFeedback('Nao foi possivel registrar o CPF. Confira o numero informado.')
+    }
+  }
+
+  async function acknowledgeFuelSupplyOrdersBatchGuide({ openGuide = false } = {}) {
+    if (fuelSupplyOrdersBatchGuideAcknowledging) return
+
+    setFuelSupplyOrdersBatchGuideAcknowledging(true)
+    setFuelSupplyOrdersBatchGuideError('')
+    try {
+      await featureGuidesAPI.acknowledgeFuelSupplyOrdersBatch()
+      setFuelSupplyOrdersBatchGuideOpen(false)
+      if (openGuide) navigate('/abastecimentos?acao=nova-ordem-lote&guia=1')
+    } catch {
+      setFuelSupplyOrdersBatchGuideError('Não foi possível registrar a visualização da novidade. Tente novamente.')
+    } finally {
+      setFuelSupplyOrdersBatchGuideAcknowledging(false)
     }
   }
 
@@ -580,6 +634,38 @@ export default function Layout() {
             <button className="ghost-button" type="button" onClick={handleLogout}>Sair</button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={fuelSupplyOrdersBatchGuideOpen}
+        title="Novo: pedidos de abastecimento em lote"
+        description="Emita ordens independentes para vários veículos em uma única operação."
+        onClose={() => {}}
+        canClose={false}
+      >
+        <div className="stack">
+          <p>Selecione os veículos, informe os dados compartilhados e revise cada ordem antes de emitir.</p>
+          <p className="muted">Cada veículo continuará com seu próprio comprovante, status e confirmação.</p>
+          {fuelSupplyOrdersBatchGuideError ? <div className="alert alert-error" role="alert">{fuelSupplyOrdersBatchGuideError}</div> : null}
+          <div className="actions-inline modal-actions">
+            <button
+              className="ghost-button"
+              type="button"
+              disabled={fuelSupplyOrdersBatchGuideAcknowledging}
+              onClick={() => acknowledgeFuelSupplyOrdersBatchGuide()}
+            >
+              Agora não
+            </button>
+            <button
+              className="app-button"
+              type="button"
+              disabled={fuelSupplyOrdersBatchGuideAcknowledging}
+              onClick={() => acknowledgeFuelSupplyOrdersBatchGuide({ openGuide: true })}
+            >
+              {fuelSupplyOrdersBatchGuideAcknowledging ? 'Abrindo...' : 'Ver guia rápido'}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 from jose import JWTError, jwt
-from fastapi import Cookie, Depends, HTTPException, status
+from fastapi import Depends, HTTPException, Request, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
@@ -26,10 +26,13 @@ CPF_REQUIRED_DETAIL = {
 
 
 async def get_current_user(
+    request: Request,
     db: AsyncSession = Depends(get_db_session),
-    access_token: str | None = Cookie(default=None),
 ) -> User:
-    token = access_token
+    # Cookie() binds the cookie name when the dependency is declared.  The
+    # homologation environment uses an isolated COOKIE_NAME, so resolve it at
+    # request time instead of assuming the production default (access_token).
+    token = request.cookies.get(settings.COOKIE_NAME)
     if not token:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Não autenticado")
 

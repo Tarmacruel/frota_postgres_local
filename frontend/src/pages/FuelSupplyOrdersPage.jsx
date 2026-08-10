@@ -38,7 +38,7 @@ function formatOrderNumber(order) {
 }
 
 function pickDeadline(order) {
-  return order.deadline_at || order.due_at || order.expected_supply_until || order.expected_at || null
+  return order.expires_at || order.deadline_at || order.due_at || order.expected_supply_until || order.expected_at || null
 }
 
 function getDeadlineMeta(order) {
