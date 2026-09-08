@@ -51,6 +51,14 @@ def test_production_configuration_accepts_explicit_https_baseline():
     assert configured.COOKIE_SECURE is True
 
 
+def test_settings_accepts_windows_utf8_bom(tmp_path, monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    env_file = tmp_path / ".env"
+    env_file.write_text("DATABASE_URL=sqlite+aiosqlite:///./bom-regression.db\n", encoding="utf-8-sig")
+    configured = Settings(_env_file=env_file)
+    assert configured.DATABASE_URL == "sqlite+aiosqlite:///./bom-regression.db"
+
+
 @pytest.mark.asyncio
 async def test_security_headers_and_request_size_limit(client):
     health = await client.get("/api/health")

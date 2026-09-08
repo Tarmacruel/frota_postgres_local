@@ -12,15 +12,38 @@ from app.core.request_context import RequestAuditContext, get_request_audit_cont
 _SECRET_KEYS = {
     "access_token",
     "authorization",
+    "certificate_chain",
+    "certificate_der",
+    "certificate_pfx",
     "cookie",
     "csrf_token",
     "password",
     "password_hash",
+    "pfx",
+    "pin",
+    "private_key",
+    "prepared_state",
+    "raw_signature",
     "refresh_token",
     "secret",
+    "signed_attributes",
     "token",
 }
-_PERSONAL_KEYS = {"contact", "cpf", "document", "driver_contact", "driver_document", "email", "phone", "telefone"}
+_PERSONAL_KEYS = {
+    "certificate_cpf",
+    "certificate_subject",
+    "contact",
+    "cpf",
+    "document",
+    "driver_contact",
+    "driver_document",
+    "email",
+    "phone",
+    "san",
+    "subject_alt_name",
+    "subject_dn",
+    "telefone",
+}
 
 
 def _mask_personal_value(value):
@@ -100,3 +123,4 @@ class AuditService:
             details=sanitized_details or None,
         )
         return await self.audit_logs.create(audit_log)
+    "device_public_key",

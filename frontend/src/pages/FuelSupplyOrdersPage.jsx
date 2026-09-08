@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import DocumentSignaturePanel from '../components/DocumentSignaturePanel'
 import Pagination from '../components/Pagination'
@@ -66,6 +67,8 @@ function getDeadlineMeta(order) {
 }
 
 export default function FuelSupplyOrdersPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const focusedOrderId = searchParams.get('focus')
   const { canEdit } = useAuth()
   const canConfirmOrder = canEdit('fuel_supply_orders')
   const { organizations } = useMasterDataCatalog()
@@ -106,6 +109,21 @@ export default function FuelSupplyOrdersPage() {
     loadOrders()
   }, [organizationFilter])
 
+  useEffect(() => {
+    if (!focusedOrderId) return undefined
+    let mounted = true
+    fuelSupplyOrdersAPI.getById(focusedOrderId)
+      .then(({ data }) => {
+        if (mounted) setSignatureOrder(data)
+      })
+      .catch((err) => {
+        if (mounted) setError(getApiErrorMessage(err, 'Não foi possível abrir a ordem vinculada à assinatura pendente.'))
+      })
+    return () => {
+      mounted = false
+    }
+  }, [focusedOrderId])
+
   const filteredOrders = useMemo(() => {
     const term = search.trim().toLowerCase()
     return orders.filter((order) => {
@@ -145,6 +163,14 @@ export default function FuelSupplyOrdersPage() {
     const nextOrder = { ...signatureOrder, signature_summary: summary }
     setSignatureOrder(nextOrder)
     setOrders((current) => current.map((order) => (order.id === signatureOrder.id ? nextOrder : order)))
+  }
+
+  function closeSignatureOrder() {
+    setSignatureOrder(null)
+    if (!focusedOrderId) return
+    const next = new URLSearchParams(searchParams)
+    next.delete('focus')
+    setSearchParams(next, { replace: true })
   }
 
   return (
@@ -266,7 +292,7 @@ export default function FuelSupplyOrdersPage() {
 
       <Modal
         open={Boolean(signatureOrder)}
-        onClose={() => setSignatureOrder(null)}
+        onClose={closeSignatureOrder}
         title="Assinatura da ordem"
         description={signatureOrder ? `Assinatura eletrônica institucional da ordem ${formatOrderNumber(signatureOrder)}.` : ''}
       >
@@ -277,6 +303,7 @@ export default function FuelSupplyOrdersPage() {
             summary={signatureOrder.signature_summary}
             title="Assinatura da ordem de abastecimento"
             onChanged={handleOrderSignatureChanged}
+            readOnly={!canConfirmOrder}
           />
         ) : null}
       </Modal>

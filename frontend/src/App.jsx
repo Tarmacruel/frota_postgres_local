@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
+import EnvironmentBanner from './components/EnvironmentBanner'
 import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import AuditPage from './pages/AuditPage'
@@ -33,6 +34,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <EnvironmentBanner />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />

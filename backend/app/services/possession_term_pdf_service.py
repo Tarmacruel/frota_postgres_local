@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from functools import partial
 from html import escape
 from io import BytesIO
 from uuid import UUID
@@ -21,6 +22,7 @@ from reportlab.platypus import (
     Table,
     TableStyle,
 )
+from reportlab.pdfgen.canvas import Canvas
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.official_identity import (
@@ -208,6 +210,145 @@ class PossessionTermPdfService:
         await self.db.commit()
         filename = f"termo-posse-{possession.public_number}.pdf"
         return pdf, filename
+
+    @classmethod
+    def build_canonical_delivery_pdf(
+        cls,
+        snapshot: dict,
+        *,
+        content_hash: str,
+        homologation_watermark: bool = False,
+    ) -> bytes:
+        """Render deterministic bytes from the persisted delivery snapshot.
+
+        No live possession state or wall-clock time is consulted here. Routes and
+        return events are deliberately absent because the signature scope is the
+        delivery/responsibility acknowledgement frozen in ``snapshot``.
+        """
+        if snapshot.get("document_type") != DigitalDocumentType.POSSESSION_RESPONSIBILITY_TERM:
+            raise ValueError("Snapshot nao pertence ao termo unico de responsabilidade")
+        if snapshot.get("scope") != "DELIVERY_AND_RESPONSIBILITY_ACCEPTANCE":
+            raise ValueError("Snapshot nao possui o escopo canonico esperado")
+
+        output = BytesIO()
+        font_regular, font_bold = ensure_pdf_fonts()
+        styles = cls._styles(font_regular=font_regular, font_bold=font_bold)
+        term_number = str(snapshot.get("term_number") or "-")
+        vehicle = snapshot.get("vehicle") or {}
+        driver = snapshot.get("responsible_driver") or {}
+        delivery = snapshot.get("delivery") or {}
+        acceptance = snapshot.get("acceptance") or {}
+        evidence = delivery.get("evidence") or []
+        delivered_at = cls._parse_snapshot_datetime(delivery.get("delivered_at"))
+        vehicle_name = " ".join(
+            str(value).strip()
+            for value in (vehicle.get("brand"), vehicle.get("model"))
+            if value
+        )
+
+        document = SimpleDocTemplate(
+            output,
+            pagesize=A4,
+            rightMargin=17 * mm,
+            leftMargin=17 * mm,
+            topMargin=20 * mm,
+            bottomMargin=22 * mm,
+            title=f"Termo canonico de entrega e responsabilidade nº {term_number}",
+            author=MUNICIPALITY_NAME,
+            subject="Escopo congelado de entrega e responsabilidade para assinatura digital",
+            creator="Sistema de Frota PMTF",
+            invariant=1,
+            pageCompression=1,
+        )
+        story = [
+            cls._institutional_header(styles),
+            Spacer(1, 4 * mm),
+            Paragraph("TERMO CANÔNICO DE ENTREGA E RESPONSABILIDADE", styles["TermTitle"]),
+            cls._key_value_table(
+                [
+                    ("Número do termo", term_number),
+                    ("Modelo documental", str(snapshot.get("document_model_version") or "-")),
+                    ("Escopo", "Entrega e ciência de responsabilidade"),
+                    ("Hash do conteúdo-fonte", content_hash),
+                ],
+                styles,
+            ),
+            Paragraph("1. Identificação da entrega", styles["Section"]),
+            cls._key_value_table(
+                [
+                    ("Veículo", f"{vehicle.get('plate') or '-'} · {vehicle_name or '-'}"),
+                    ("Responsável pela condução", str(driver.get("name") or "-")),
+                    ("Documento", str(driver.get("document_masked") or "-")),
+                    ("Data e hora da entrega", _fmt_datetime(delivered_at)),
+                    ("Hodômetro inicial", _fmt_odometer(delivery.get("odometer_km"))),
+                    ("Observação", str(delivery.get("observation") or "Sem observações registradas")),
+                    (
+                        "Evidências vinculadas",
+                        _count_label(len(evidence), "registro", "registros"),
+                    ),
+                ],
+                styles,
+            ),
+            Spacer(1, 3 * mm),
+            Paragraph("2. Declaração de ciência", styles["Section"]),
+            Paragraph(
+                f"<b>Versão {escape(str(acceptance.get('version') or '-'))}</b><br/>"
+                f"{escape(str(acceptance.get('text') or ''))}",
+                styles["Declaration"],
+            ),
+            Spacer(1, 4 * mm),
+            Paragraph(
+                "Este artefato congela exclusivamente a entrega e a ciência de responsabilidade. "
+                "Rotas, destinos e devolução permanecem no histórico operacional e não alteram os bytes deste PDF.",
+                styles["PrivacyNote"],
+            ),
+        ]
+
+        def footer(canvas, doc):
+            canvas.saveState()
+            if homologation_watermark:
+                canvas.setFillColor(colors.Color(0.72, 0.08, 0.08, alpha=0.16))
+                canvas.setFont(font_bold, 26)
+                canvas.translate(A4[0] / 2, A4[1] / 2)
+                canvas.rotate(35)
+                canvas.drawCentredString(0, 0, "HOMOLOGAÇÃO — SEM VALIDADE OPERACIONAL")
+                canvas.rotate(-35)
+                canvas.translate(-A4[0] / 2, -A4[1] / 2)
+            canvas.setStrokeColor(colors.HexColor(COLOR_NAVY))
+            canvas.setLineWidth(0.5)
+            canvas.line(17 * mm, 16 * mm, A4[0] - 17 * mm, 16 * mm)
+            canvas.setFillColor(colors.HexColor(COLOR_MUTED))
+            canvas.setFont(font_regular, 6.4)
+            canvas.drawString(17 * mm, 12.5 * mm, f"{MUNICIPALITY_NAME} · CNPJ {MUNICIPALITY_CNPJ}")
+            canvas.drawRightString(
+                A4[0] - 17 * mm,
+                12.5 * mm,
+                f"Termo nº {term_number} · Página {doc.page}",
+            )
+            canvas.drawString(17 * mm, 9.5 * mm, "Artefato canônico imutável")
+            canvas.drawRightString(A4[0] - 17 * mm, 9.5 * mm, content_hash)
+            canvas.restoreState()
+
+        deterministic_canvas = partial(Canvas)
+        document.build(
+            story,
+            onFirstPage=footer,
+            onLaterPages=footer,
+            canvasmaker=deterministic_canvas,
+        )
+        return output.getvalue()
+
+    @staticmethod
+    def _parse_snapshot_datetime(value) -> datetime | None:
+        if isinstance(value, datetime):
+            return value
+        if not isinstance(value, str) or not value.strip():
+            return None
+        normalized = value.strip().replace("Z", "+00:00")
+        try:
+            return datetime.fromisoformat(normalized)
+        except ValueError:
+            return None
 
     def _build_pdf(
         self,

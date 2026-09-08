@@ -3,6 +3,7 @@ import { useParams } from 'react-router-dom'
 import { possessionAPI } from '../api/possession'
 import { officialBrand } from '../constants/officialBrand'
 import { getApiErrorMessage } from '../utils/apiError'
+import { stripSignatureEvidence } from '../utils/publicDocument'
 import {
   downloadPossessionTermDocument,
   getPossessionTermLabel,
@@ -49,6 +50,7 @@ export default function PublicPossessionTermPage({ termType }) {
     () => resolvePossessionTermValidationUrl(term?.public_validation_path),
     [term?.public_validation_path],
   )
+  const publicDocument = useMemo(() => stripSignatureEvidence(term), [term])
 
   async function handleCopyLink() {
     if (!publicUrl) return
@@ -67,7 +69,7 @@ export default function PublicPossessionTermPage({ termType }) {
   async function handlePreview() {
     try {
       setError('')
-      await previewPossessionTermDocument(term, termType)
+      await previewPossessionTermDocument(publicDocument, termType)
     } catch (err) {
       setError(getApiErrorMessage(err, 'Não foi possível abrir o PDF do termo.'))
     }
@@ -76,7 +78,7 @@ export default function PublicPossessionTermPage({ termType }) {
   async function handleDownload() {
     try {
       setError('')
-      await downloadPossessionTermDocument(term, termType)
+      await downloadPossessionTermDocument(publicDocument, termType)
     } catch (err) {
       setError(getApiErrorMessage(err, 'Não foi possível baixar o PDF do termo.'))
     }
@@ -146,17 +148,6 @@ export default function PublicPossessionTermPage({ termType }) {
               <section className="public-order-notes">
                 <h2>Observações</h2>
                 <p>{term.observation}</p>
-              </section>
-            ) : null}
-
-            {term.signature_summary?.document_id ? (
-              <section className="public-order-notes">
-                <h2>Assinaturas digitais internas</h2>
-                <p>Código de integridade: <strong>{term.signature_summary.content_hash}</strong></p>
-                <p>Status: {term.signature_summary.is_complete ? 'Concluída' : 'Pendente'}</p>
-                {(term.signature_summary.signatures || []).map((signature) => (
-                  <p key={signature.id}>{signature.signer_name} assinou em {formatDate(signature.signed_at)}.</p>
-                ))}
               </section>
             ) : null}
 

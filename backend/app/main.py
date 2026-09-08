@@ -16,6 +16,7 @@ from app.api.routes.audit import router as audit_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.claims import router as claims_router
 from app.api.routes.data_imports import router as data_imports_router
+from app.api.routes.document_signatures import artifact_router as document_artifacts_router
 from app.api.routes.document_signatures import router as document_signatures_router
 from app.api.routes.drivers import router as drivers_router
 from app.api.routes.fines import router as fines_router
@@ -80,7 +81,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", REQUEST_ID_HEADER],
-    expose_headers=[REQUEST_ID_HEADER],
+    expose_headers=[REQUEST_ID_HEADER, "X-Document-Content-SHA256"],
 )
 app.add_middleware(RequestBodyLimitMiddleware, max_body_bytes=settings.MAX_REQUEST_BODY_BYTES)
 
@@ -196,6 +197,7 @@ app.include_router(users_router)
 app.include_router(master_data_router)
 app.include_router(data_imports_router)
 app.include_router(document_signatures_router)
+app.include_router(document_artifacts_router)
 app.include_router(drivers_router)
 app.include_router(vehicles_router)
 app.include_router(maintenance_router)

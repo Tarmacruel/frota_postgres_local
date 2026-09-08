@@ -1,0 +1,31 @@
+{
+  "schemaVersion": 1,
+  "environment": "homologation",
+  "repositoryRoot": "D:\\FROTAS\\frota_certificado_homologacao",
+  "secureVhdxPath": "D:\\FROTAS\\.secure\\frota-certificado-hml-data.vhdx",
+  "secureMountPath": "D:\\FROTAS\\frota_certificado_homologacao\\.runtime-secure",
+  "ports": {
+    "frontend": 3010,
+    "backend": 8010,
+    "postgres": 5440,
+    "signerAgent": 54174
+  },
+  "database": {
+    "host": "127.0.0.1",
+    "name": "frota_hml",
+    "applicationUser": "frota_hml_app",
+    "superUser": "frota_hml_admin"
+  },
+  "productionBackupRoots": [
+    "\\\\sad61svr001\\licitacao.1\\FROTAS\\frota_postgres_local\\storage\\backups"
+  ],
+  "refresh": {
+    "minimumBackupAgeMinutes": 5,
+    "maximumBackupAgeHours": 48,
+    "stabilityCheckSeconds": 10,
+    "retryMinutes": 30,
+    "cutoffHour": 6,
+    "keepPreviousSnapshot": true
+  },
+  "syntheticTargetHook": "backend\\scripts\\seed_homologation_signing_targets.py"
+}

@@ -312,7 +312,9 @@ export default function Layout() {
     const document = request.document || {}
     setSignatureRequestsOpen(false)
     if (document.document_type === 'FUEL_SUPPLY_ORDER') {
-      navigate('/ordens-abastecimento')
+      navigate(document.source_id
+        ? `/ordens-abastecimento?focus=${encodeURIComponent(document.source_id)}`
+        : '/ordens-abastecimento')
       return
     }
     if (document.source_id) {

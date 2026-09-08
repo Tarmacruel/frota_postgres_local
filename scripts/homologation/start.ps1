@@ -1,131 +1,130 @@
 [CmdletBinding()]
-param()
+param([switch]$StartSignerAgent)
 
 $ErrorActionPreference = "Stop"
 Set-StrictMode -Version Latest
+. (Join-Path $PSScriptRoot "common.ps1")
 
-$expectedRoot = "C:\FROTAS\frota_homolog"
-$repoRoot = [System.IO.Path]::GetFullPath((Join-Path $PSScriptRoot "..\.."))
-if ($repoRoot.TrimEnd("\") -ine $expectedRoot) {
-    throw "Este launcher só pode executar em $expectedRoot."
-}
-
-$backendPort = 8010
-$frontendPort = 3010
-$postgresPort = 5440
+$repoRoot = Assert-HmlRepository
+$mount = Assert-HmlSecureVolume
+$config = Get-HmlConfiguration
+$runtimeRoot = Join-Path $mount "runtime"
+$logsRoot = Join-Path $mount "logs"
 $backendRoot = Join-Path $repoRoot "backend"
 $frontendRoot = Join-Path $repoRoot "frontend"
-$envPath = Join-Path $backendRoot ".env"
+$envPath = Join-Path $mount "config\backend.env"
 $python = Join-Path $backendRoot ".venv\Scripts\python.exe"
-$runtimeRoot = Join-Path $repoRoot "storage\runtime"
-$logsRoot = Join-Path $repoRoot "storage\logs"
-$expectedStorage = Join-Path $repoRoot "data\uploads"
+$vite = Join-Path $frontendRoot "node_modules\vite\bin\vite.js"
+$node = Get-Command node.exe -ErrorAction SilentlyContinue
 
-if (-not (Test-Path -LiteralPath $envPath)) { throw "Configuração de homologação ausente: $envPath" }
-if (-not (Test-Path -LiteralPath $python)) { throw "Virtualenv de homologação ausente: $python" }
-if (-not (Test-Path -LiteralPath (Join-Path $frontendRoot "node_modules"))) { throw "Dependências do frontend de homologação ausentes." }
+foreach ($path in @($runtimeRoot, $logsRoot)) {
+    if (-not (Test-Path -LiteralPath $path)) { New-Item -ItemType Directory -Path $path -Force | Out-Null }
+}
+if (-not (Test-Path -LiteralPath $envPath -PathType Leaf)) { throw "Secure backend environment is missing. Run setup.ps1." }
+if (-not (Test-Path -LiteralPath $python -PathType Leaf)) { throw "Independent backend virtualenv is missing. Run setup.ps1 -InstallDependencies." }
+if (-not $node -or -not (Test-Path -LiteralPath $vite -PathType Leaf)) { throw "Independent frontend dependencies are missing. Run setup.ps1 -InstallDependencies." }
 
-$envContents = Get-Content -LiteralPath $envPath -Raw
-foreach ($required in @(
-    "APP_ENV=testing",
-    "127.0.0.1:5440/frota_homolog",
-    "COOKIE_NAME=frota_homolog_access_token"
-)) {
-    if (-not $envContents.Contains($required)) {
-        throw "A configuração não corresponde à homologação isolada."
+$values = Read-HmlEnvFile -Path $envPath
+Assert-HmlBackendEnvironment -Values $values -Config $config
+
+foreach ($port in @(3010, 8010, 54174)) {
+    if (Test-HmlPortListening -Port $port) {
+        throw "Homologation port $port is already in use. Run status.ps1 and stop.ps1 before retrying."
     }
 }
 
-# Pydantic gives inherited environment variables precedence over backend/.env.
-# Remove every setting that could redirect this launcher before validating and
-# starting the child processes, so this process can only use the isolated file.
-$settingEnvironmentNames = @(
-    "DATABASE_URL",
-    "SECRET_KEY",
-    "SIGNATURE_EVIDENCE_SECRET",
-    "ALGORITHM",
-    "ACCESS_TOKEN_EXPIRE_MINUTES",
-    "STORAGE_DIR",
-    "CORS_ORIGINS",
-    "COOKIE_NAME",
-    "CSRF_COOKIE_NAME",
-    "CSRF_TRUSTED_ORIGINS",
-    "COOKIE_SECURE",
-    "TRUSTED_PROXY_NETWORKS",
-    "MAX_USER_AGENT_LENGTH",
-    "MAX_REQUEST_BODY_BYTES",
-    "TRUSTED_HOSTS",
-    "APP_ENV",
-    "ENABLE_LEGACY_FUEL_SUPPLY_CREATE"
-)
-foreach ($settingEnvironmentName in $settingEnvironmentNames) {
-    Remove-Item -LiteralPath "Env:$settingEnvironmentName" -ErrorAction SilentlyContinue
+$postgresWasRunning = Test-HmlPortListening -Port 5440
+Start-HmlPostgres -Config $config
+
+$previousEnvironment = @{}
+foreach ($name in $values.Keys) {
+    $previousEnvironment[$name] = [Environment]::GetEnvironmentVariable($name, "Process")
+    [Environment]::SetEnvironmentVariable($name, [string]$values[$name], "Process")
 }
 
-$settingsValidation = @'
-from pathlib import Path
-from urllib.parse import urlparse
-
-from app.core.config import settings
-
-root = Path(r'C:\FROTAS\frota_homolog').resolve()
-storage = Path(settings.STORAGE_DIR).resolve()
-url = urlparse(settings.DATABASE_URL)
-
-if settings.APP_ENV != 'testing':
-    raise SystemExit('APP_ENV efetivo deve ser testing')
-if url.hostname != '127.0.0.1' or url.port != 5440 or url.path != '/frota_homolog':
-    raise SystemExit('DATABASE_URL efetiva deve apontar para 127.0.0.1:5440/frota_homolog')
-if storage != root / 'data' / 'uploads':
-    raise SystemExit('STORAGE_DIR efetivo deve permanecer dentro da homologação')
-if set(settings.CORS_ORIGINS) != {'http://127.0.0.1:3010'}:
-    raise SystemExit('CORS deve aceitar somente http://127.0.0.1:3010')
-if set(settings.CSRF_TRUSTED_ORIGINS) != {'http://127.0.0.1:3010'}:
-    raise SystemExit('CSRF deve aceitar somente http://127.0.0.1:3010')
-if not settings.COOKIE_NAME.startswith('frota_homolog_'):
-    raise SystemExit('COOKIE_NAME deve ser exclusivo da homologação')
-if not settings.CSRF_COOKIE_NAME.startswith('frota_homolog_'):
-    raise SystemExit('CSRF_COOKIE_NAME deve ser exclusivo da homologação')
-if settings.COOKIE_NAME == settings.CSRF_COOKIE_NAME or settings.COOKIE_SECURE:
-    raise SystemExit('Cookies de homologação devem ser distintos e funcionar em HTTP loopback')
-'@
-Push-Location $backendRoot
+$started = New-Object Collections.Generic.List[string]
 try {
-    & $python -c $settingsValidation
-    if ($LASTEXITCODE -ne 0) { throw "A configuração efetiva não corresponde à homologação isolada." }
-} finally {
-    Pop-Location
+    Push-Location $backendRoot
+    try {
+        & $python -c "from app.core.config import settings; assert settings.APP_ENV == 'homologation'; assert str(settings.STORAGE_DIR).startswith(r'D:\FROTAS\frota_certificado_homologacao\.runtime-secure'); assert ':5440/frota_hml' in settings.DATABASE_URL"
+        if ($LASTEXITCODE -ne 0) { throw "Effective backend settings are not isolated." }
+    }
+    finally { Pop-Location }
+
+    $backend = Start-Process -FilePath $python -ArgumentList @("-m", "uvicorn", "app.main:app", "--host", "127.0.0.1", "--port", "8010") -WorkingDirectory $backendRoot -RedirectStandardOutput (Join-Path $logsRoot "backend.out.log") -RedirectStandardError (Join-Path $logsRoot "backend.err.log") -WindowStyle Hidden -PassThru
+    Write-HmlPidRecord -Name "backend" -Process $backend -RuntimeRoot $runtimeRoot -WorkingDirectory $backendRoot
+    $started.Add("backend")
+
+    $oldProxy = [Environment]::GetEnvironmentVariable("VITE_API_PROXY_TARGET", "Process")
+    $oldBase = [Environment]::GetEnvironmentVariable("VITE_API_BASE_URL", "Process")
+    $oldAppEnv = [Environment]::GetEnvironmentVariable("VITE_APP_ENV", "Process")
+    $oldHomologation = [Environment]::GetEnvironmentVariable("VITE_HOMOLOGATION", "Process")
+    $oldCertificateSigning = [Environment]::GetEnvironmentVariable("VITE_CERTIFICATE_SIGNING_ENABLED", "Process")
+    $oldAgentUrl = [Environment]::GetEnvironmentVariable("VITE_SIGNATURE_AGENT_URL", "Process")
+    $oldSignatureBackendUrl = [Environment]::GetEnvironmentVariable("VITE_SIGNATURE_BACKEND_URL", "Process")
+    $oldFrontendHost = [Environment]::GetEnvironmentVariable("VITE_FRONTEND_HOST", "Process")
+    $oldFrontendPort = [Environment]::GetEnvironmentVariable("VITE_FRONTEND_PORT", "Process")
+    [Environment]::SetEnvironmentVariable("VITE_API_PROXY_TARGET", "http://127.0.0.1:8010", "Process")
+    [Environment]::SetEnvironmentVariable("VITE_API_BASE_URL", "/api", "Process")
+    [Environment]::SetEnvironmentVariable("VITE_APP_ENV", "homologation", "Process")
+    [Environment]::SetEnvironmentVariable("VITE_HOMOLOGATION", "true", "Process")
+    [Environment]::SetEnvironmentVariable("VITE_CERTIFICATE_SIGNING_ENABLED", [string]$values["CERTIFICATE_SIGNING_ENABLED"], "Process")
+    [Environment]::SetEnvironmentVariable("VITE_SIGNATURE_AGENT_URL", "http://127.0.0.1:54174", "Process")
+    [Environment]::SetEnvironmentVariable("VITE_SIGNATURE_BACKEND_URL", "http://127.0.0.1:8010", "Process")
+    [Environment]::SetEnvironmentVariable("VITE_FRONTEND_HOST", "127.0.0.1", "Process")
+    [Environment]::SetEnvironmentVariable("VITE_FRONTEND_PORT", "3010", "Process")
+    try {
+        $frontend = Start-Process -FilePath $node.Source -ArgumentList @($vite, "--host", "127.0.0.1", "--port", "3010", "--strictPort") -WorkingDirectory $frontendRoot -RedirectStandardOutput (Join-Path $logsRoot "frontend.out.log") -RedirectStandardError (Join-Path $logsRoot "frontend.err.log") -WindowStyle Hidden -PassThru
+    }
+    finally {
+        [Environment]::SetEnvironmentVariable("VITE_API_PROXY_TARGET", $oldProxy, "Process")
+        [Environment]::SetEnvironmentVariable("VITE_API_BASE_URL", $oldBase, "Process")
+        [Environment]::SetEnvironmentVariable("VITE_APP_ENV", $oldAppEnv, "Process")
+        [Environment]::SetEnvironmentVariable("VITE_HOMOLOGATION", $oldHomologation, "Process")
+        [Environment]::SetEnvironmentVariable("VITE_CERTIFICATE_SIGNING_ENABLED", $oldCertificateSigning, "Process")
+        [Environment]::SetEnvironmentVariable("VITE_SIGNATURE_AGENT_URL", $oldAgentUrl, "Process")
+        [Environment]::SetEnvironmentVariable("VITE_SIGNATURE_BACKEND_URL", $oldSignatureBackendUrl, "Process")
+        [Environment]::SetEnvironmentVariable("VITE_FRONTEND_HOST", $oldFrontendHost, "Process")
+        [Environment]::SetEnvironmentVariable("VITE_FRONTEND_PORT", $oldFrontendPort, "Process")
+    }
+    Write-HmlPidRecord -Name "frontend" -Process $frontend -RuntimeRoot $runtimeRoot -WorkingDirectory $frontendRoot
+    $started.Add("frontend")
+
+    if ($StartSignerAgent) {
+        $agent = Join-Path $repoRoot "signature-agent\artifacts\win-x64\FrotaSigner-HML.exe"
+        if (-not (Test-Path -LiteralPath $agent -PathType Leaf)) { throw "Signer agent is not published at '$agent'." }
+        $agentProcess = Start-Process -FilePath $agent -ArgumentList @("--host", "127.0.0.1", "--port", "54174", "--environment", "homologation") -WorkingDirectory (Split-Path $agent -Parent) -RedirectStandardOutput (Join-Path $logsRoot "signer-agent.out.log") -RedirectStandardError (Join-Path $logsRoot "signer-agent.err.log") -WindowStyle Hidden -PassThru
+        Write-HmlPidRecord -Name "signer-agent" -Process $agentProcess -RuntimeRoot $runtimeRoot -WorkingDirectory (Split-Path $agent -Parent)
+        $started.Add("signer-agent")
+    }
+
+    $deadline = (Get-Date).AddSeconds(45)
+    do {
+        Start-Sleep -Milliseconds 500
+        try {
+            $backendReady = (Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:8010/api/health/ready" -TimeoutSec 2).StatusCode -eq 200
+        }
+        catch { $backendReady = $false }
+        try {
+            $frontendReady = (Invoke-WebRequest -UseBasicParsing -Uri "http://127.0.0.1:3010" -TimeoutSec 2).StatusCode -eq 200
+        }
+        catch { $frontendReady = $false }
+    } until (($backendReady -and $frontendReady) -or (Get-Date) -ge $deadline)
+    if (-not $backendReady -or -not $frontendReady) { throw "Homologation health checks did not become ready within 45 seconds." }
+
+    Write-HmlAuditLog -Event "environment_started" -Data @{ frontendPort = 3010; backendPort = 8010; postgresPort = 5440; signerAgentStarted = [bool]$StartSignerAgent }
+    Write-Host "Homologation ready: http://127.0.0.1:3010" -ForegroundColor Green
+    Write-Host "Backend health: http://127.0.0.1:8010/api/health/ready" -ForegroundColor Cyan
 }
-
-foreach ($port in @($backendPort, $frontendPort)) {
-    $listener = Get-NetTCPConnection -LocalPort $port -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
-    if ($listener) { throw "A porta $port já está em uso (PID $($listener.OwningProcess))." }
+catch {
+    for ($index = $started.Count - 1; $index -ge 0; $index--) {
+        Stop-HmlOwnedProcess -Name $started[$index] -RuntimeRoot $runtimeRoot | Out-Null
+    }
+    if (-not $postgresWasRunning) { Stop-HmlPostgres }
+    throw
 }
-
-$postgres = Get-NetTCPConnection -LocalPort $postgresPort -State Listen -ErrorAction SilentlyContinue | Select-Object -First 1
-if (-not $postgres) { throw "O PostgreSQL isolado não está ativo na porta $postgresPort." }
-
-New-Item -ItemType Directory -Force -Path $runtimeRoot, $logsRoot | Out-Null
-
-$backendCommand = @'
-Set-Location '__BACKEND_ROOT__'
-& '__PYTHON__' -m uvicorn app.main:app --host 127.0.0.1 --port 8010 --reload
-'@
-$backendCommand = $backendCommand.Replace("__BACKEND_ROOT__", $backendRoot).Replace("__PYTHON__", $python)
-
-$frontendCommand = @'
-$env:VITE_API_PROXY_TARGET = 'http://127.0.0.1:8010'
-$env:VITE_API_BASE_URL = '/api'
-Set-Location '__FRONTEND_ROOT__'
-npm run dev -- --host 127.0.0.1 --port 3010 --strictPort
-'@
-$frontendCommand = $frontendCommand.Replace("__FRONTEND_ROOT__", $frontendRoot)
-
-$backend = Start-Process -FilePath "powershell.exe" -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $backendCommand) -WorkingDirectory $repoRoot -RedirectStandardOutput (Join-Path $logsRoot "homologation-backend.out.log") -RedirectStandardError (Join-Path $logsRoot "homologation-backend.err.log") -WindowStyle Hidden -PassThru
-$frontend = Start-Process -FilePath "powershell.exe" -ArgumentList @("-NoProfile", "-ExecutionPolicy", "Bypass", "-Command", $frontendCommand) -WorkingDirectory $repoRoot -RedirectStandardOutput (Join-Path $logsRoot "homologation-frontend.out.log") -RedirectStandardError (Join-Path $logsRoot "homologation-frontend.err.log") -WindowStyle Hidden -PassThru
-
-Set-Content -LiteralPath (Join-Path $runtimeRoot "homologation-backend.pid") -Value $backend.Id -Encoding ASCII
-Set-Content -LiteralPath (Join-Path $runtimeRoot "homologation-frontend.pid") -Value $frontend.Id -Encoding ASCII
-
-Write-Host "Homologação iniciada em http://127.0.0.1:$frontendPort" -ForegroundColor Green
-Write-Host "Backend: http://127.0.0.1:$backendPort/api/health" -ForegroundColor Cyan
+finally {
+    foreach ($name in $values.Keys) {
+        [Environment]::SetEnvironmentVariable($name, $previousEnvironment[$name], "Process")
+    }
+}

@@ -26,9 +26,11 @@ from app.core.possession_responsibility import (
 from app.core.security import verify_password
 from app.models.document_signature import (
     DigitalDocument,
+    DigitalDocumentArtifactType,
     DigitalDocumentStatus,
     DigitalDocumentType,
     DocumentSignature,
+    DocumentSignatureMethod,
     DocumentSignatureRequest,
     DocumentSignatureRequestStatus,
 )
@@ -79,6 +81,17 @@ class DocumentSignatureService:
 
         existing = await self._get_active_document(data.document_type, data.source_id, for_update=True)
         if existing and existing.content_hash == context["content_hash"]:
+            from app.services.document_artifact_service import DocumentArtifactService
+
+            if settings.CANONICAL_DOCUMENT_ARTIFACTS_ENABLED and DocumentArtifactService.supports_canonical_artifact(
+                existing.document_type
+            ):
+                await DocumentArtifactService(self.db).ensure_canonical_artifact(
+                    existing,
+                    current_user=current_user,
+                )
+                await self.db.commit()
+                existing = await self._get_document(existing.id) or existing
             return self._serialize_document(existing)
 
         if existing:
@@ -105,6 +118,15 @@ class DocumentSignatureService:
 
         try:
             await self.db.flush()
+            from app.services.document_artifact_service import DocumentArtifactService
+
+            if settings.CANONICAL_DOCUMENT_ARTIFACTS_ENABLED and DocumentArtifactService.supports_canonical_artifact(
+                document.document_type
+            ):
+                await DocumentArtifactService(self.db).ensure_canonical_artifact(
+                    document,
+                    current_user=current_user,
+                )
             await self.db.refresh(document)
             await self._record_audit(
                 current_user,
@@ -140,6 +162,65 @@ class DocumentSignatureService:
         if include_restricted:
             return payload
         return self.sanitize_summary_for_restricted_view(payload)
+
+    async def get_authorized_document(
+        self,
+        document_id: UUID,
+        current_user: User,
+        *,
+        require_evidence_access: bool = False,
+    ) -> DigitalDocument:
+        """Authorize internal artifact/validation reads without exposing the snapshot."""
+        self._ensure_ready()
+        document = await self._require_document(document_id)
+        self._ensure_module_permission(current_user, document.document_type, "view")
+        await self._ensure_document_visible(document, current_user)
+        if require_evidence_access and current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acesso ao artefato probatório restrito a perfis autorizados",
+            )
+        return document
+
+    async def get_document_for_certificate_signing(
+        self,
+        document_id: UUID,
+        current_user: User,
+    ) -> DigitalDocument:
+        """Lock and revalidate a document before starting/finalising ICP-Brasil signing."""
+        self._ensure_ready()
+        initial = await self._require_document(document_id)
+        self._ensure_module_permission(current_user, initial.document_type, "edit")
+        self._ensure_possession_term_mutation_allowed(current_user, initial.document_type)
+        await self._ensure_document_visible(initial, current_user)
+        await self._lock_source(initial.document_type, initial.source_id)
+        document = await self._require_document(document_id, for_update=True)
+        self._ensure_module_permission(current_user, document.document_type, "edit")
+        self._ensure_possession_term_mutation_allowed(current_user, document.document_type)
+        await self._ensure_document_visible(
+            document,
+            current_user,
+            refresh_source=True,
+            supersede_stale=True,
+        )
+        if document.status in {DigitalDocumentStatus.SUPERSEDED, DigitalDocumentStatus.CANCELLED}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Documento nÃ£o estÃ¡ mais disponÃ­vel para assinatura",
+            )
+        if current_user.must_change_password or not current_user.cpf:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="UsuÃ¡rio nÃ£o estÃ¡ apto a assinar com certificado",
+            )
+        if any(signature.signer_user_id == current_user.id for signature in document.signatures):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="UsuÃ¡rio jÃ¡ assinou este documento")
+        if not self._can_user_sign_document(document, current_user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="UsuÃ¡rio nÃ£o estÃ¡ autorizado a assinar este documento",
+            )
+        return document
 
     async def sign_document(self, document_id: UUID, data: DocumentSignInput, current_user: User) -> dict:
         self._ensure_ready()
@@ -183,6 +264,7 @@ class DocumentSignatureService:
             signer_cpf_hash=hash_cpf(current_user.cpf),
             content_hash=document.content_hash,
             signature_fingerprint=self._build_signature_fingerprint(document, current_user, now),
+            signature_method=DocumentSignatureMethod.INTERNAL_PASSWORD,
             signed_at=now,
         )
         document.signatures.append(signature)
@@ -723,6 +805,7 @@ class DocumentSignatureService:
         public_path = f"{PUBLIC_FUEL_ORDER_PATH_PREFIX}/{order.validation_code}"
         title = f"Ordem de abastecimento {self._build_order_number(order)}"
         snapshot = {
+            "schema_version": "fuel-supply-order.v1",
             "document_type": DigitalDocumentType.FUEL_SUPPLY_ORDER,
             "source_type": SOURCE_FUEL_SUPPLY_ORDER,
             "source_id": str(order.id),
@@ -745,6 +828,8 @@ class DocumentSignatureService:
                 "id": str(order.fuel_station_id) if order.fuel_station_id else None,
                 "name": order.fuel_station_ref.name if order.fuel_station_ref else None,
                 "cnpj": order.fuel_station_ref.cnpj if order.fuel_station_ref else None,
+                "address": order.fuel_station_ref.address if order.fuel_station_ref else None,
+                "phone": order.fuel_station_ref.phone if order.fuel_station_ref else None,
             },
             "created_by_name": order.creator.name if order.creator else None,
             "confirmed_by_name": order.confirmer.name if order.confirmer else None,
@@ -1007,6 +1092,8 @@ class DocumentSignatureService:
             select(DigitalDocument)
             .options(
                 selectinload(DigitalDocument.signatures),
+                selectinload(DigitalDocument.artifacts),
+                selectinload(DigitalDocument.signature_validations),
                 selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requester),
                 selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requested_signer),
             )
@@ -1027,6 +1114,8 @@ class DocumentSignatureService:
             select(DigitalDocument)
             .options(
                 selectinload(DigitalDocument.signatures),
+                selectinload(DigitalDocument.artifacts),
+                selectinload(DigitalDocument.signature_validations),
                 selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requester),
                 selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requested_signer),
             )
@@ -1089,6 +1178,11 @@ class DocumentSignatureService:
     ) -> dict:
         pending_count = sum(1 for request in document.signature_requests if request.status == DocumentSignatureRequestStatus.PENDING)
         declined_count = sum(1 for request in document.signature_requests if request.status == DocumentSignatureRequestStatus.DECLINED)
+        artifacts = list(getattr(document, "artifacts", []) or [])
+        signature_counts_by_method: dict[str, int] = {}
+        for signature in document.signatures:
+            method = getattr(signature, "signature_method", None) or DocumentSignatureMethod.INTERNAL_PASSWORD
+            signature_counts_by_method[method] = signature_counts_by_method.get(method, 0) + 1
         payload = {
             "document_id": document.id,
             "document_type": document.document_type,
@@ -1104,6 +1198,23 @@ class DocumentSignatureService:
             "pending_count": pending_count,
             "declined_count": declined_count,
             "is_complete": document.status == DigitalDocumentStatus.COMPLETED,
+            "signature_counts_by_method": signature_counts_by_method,
+            "canonical_artifact_available": any(
+                item.artifact_type == DigitalDocumentArtifactType.CANONICAL_PDF
+                for item in artifacts
+            ),
+            "certified_artifact_available": any(
+                item.artifact_type == DigitalDocumentArtifactType.CERTIFIED_PDF
+                for item in artifacts
+            ),
+            "certificate_signing_enabled": bool(
+                settings.CERTIFICATE_SIGNING_ENABLED
+                and settings.SIGNATURE_AGENT_ENABLED
+                and any(
+                    item.artifact_type == DigitalDocumentArtifactType.CANONICAL_PDF
+                    for item in artifacts
+                )
+            ),
             "signatures": [self._serialize_signature(signature) for signature in document.signatures],
             "requests": [self._serialize_request(request) for request in document.signature_requests],
             "created_by_user_id": document.created_by_user_id,
@@ -1136,36 +1247,39 @@ class DocumentSignatureService:
             "pending_count": summary.get("pending_count", 0),
             "declined_count": summary.get("declined_count", 0),
             "is_complete": bool(summary.get("is_complete")),
+            "signature_counts_by_method": dict(summary.get("signature_counts_by_method") or {}),
+            "canonical_artifact_available": bool(summary.get("canonical_artifact_available")),
+            "certified_artifact_available": bool(summary.get("certified_artifact_available")),
+            "certificate_signing_enabled": False,
             "signatures": [],
             "requests": [],
         }
 
     @staticmethod
     def sanitize_summary_for_legacy_public_view(summary: dict) -> dict:
-        """Preserve historical public validation without exposing contact or request data."""
-        payload = {
-            **summary,
-            "signatures": [
-                {
-                    key: value
-                    for key, value in signature.items()
-                    if key in {
-                        "id",
-                        "signer_name",
-                        "signer_role",
-                        "content_hash",
-                        "signature_fingerprint",
-                        "signed_at",
-                    }
-                }
-                for signature in summary.get("signatures", [])
-            ],
+        """Return workflow status only; never publish people or evidence data."""
+        return {
+            "document_id": None,
+            "document_type": summary.get("document_type"),
+            "source_id": None,
+            "status": summary.get("status", UNSIGNED_STATUS),
+            "title": summary.get("title"),
+            "content_hash": None,
+            "content_hash_short": None,
+            "public_validation_code": None,
+            "public_validation_path": None,
+            "required_signatures": summary.get("required_signatures", 1),
+            "signed_count": summary.get("signed_count", 0),
+            "pending_count": 0,
+            "declined_count": 0,
+            "is_complete": bool(summary.get("is_complete")),
+            "signature_counts_by_method": {},
+            "canonical_artifact_available": False,
+            "certified_artifact_available": False,
+            "certificate_signing_enabled": False,
+            "signatures": [],
             "requests": [],
         }
-        payload.pop("snapshot", None)
-        payload.pop("evidence_hmac", None)
-        payload.pop("created_by_user_id", None)
-        return payload
 
     def _serialize_signature(self, signature: DocumentSignature) -> dict:
         return {
@@ -1178,6 +1292,17 @@ class DocumentSignatureService:
             "signer_cpf_masked": signature.signer_cpf_masked,
             "content_hash": signature.content_hash,
             "signature_fingerprint": signature.signature_fingerprint,
+            "signature_method": getattr(signature, "signature_method", None) or DocumentSignatureMethod.INTERNAL_PASSWORD,
+            "signature_format": getattr(signature, "signature_format", None),
+            "artifact_id": getattr(signature, "artifact_id", None),
+            "certificate_fingerprint": getattr(signature, "certificate_fingerprint", None),
+            "certificate_issuer_summary": getattr(signature, "certificate_issuer_summary", None),
+            "certificate_serial_masked": getattr(signature, "certificate_serial_masked", None),
+            "certificate_valid_from": getattr(signature, "certificate_valid_from", None),
+            "certificate_valid_until": getattr(signature, "certificate_valid_until", None),
+            "signature_policy_oid": getattr(signature, "signature_policy_oid", None),
+            "timestamped_at": getattr(signature, "timestamped_at", None),
+            "validation_status": getattr(signature, "validation_status", None),
             "signed_at": signature.signed_at,
         }
 
@@ -1212,6 +1337,10 @@ class DocumentSignatureService:
             "pending_count": 0,
             "declined_count": 0,
             "is_complete": False,
+            "signature_counts_by_method": {},
+            "canonical_artifact_available": False,
+            "certified_artifact_available": False,
+            "certificate_signing_enabled": False,
             "signatures": [],
             "requests": [],
         }

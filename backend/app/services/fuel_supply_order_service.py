@@ -203,9 +203,12 @@ class FuelSupplyOrderService:
         if not order:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Comprovante público não encontrado")
         payload = self._serialize_public_order(order)
-        payload["signature_summary"] = await DocumentSignatureService(self.db).get_summary_for_source(
+        signature_summary = await DocumentSignatureService(self.db).get_summary_for_source(
             DigitalDocumentType.FUEL_SUPPLY_ORDER,
             order.id,
+        )
+        payload["signature_summary"] = DocumentSignatureService.sanitize_summary_for_legacy_public_view(
+            signature_summary,
         )
         return payload
 

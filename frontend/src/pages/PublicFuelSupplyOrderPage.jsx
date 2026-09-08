@@ -4,6 +4,7 @@ import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { officialBrand } from '../constants/officialBrand'
 import { getApiErrorMessage } from '../utils/apiError'
 import { downloadFuelSupplyOrderDocument, previewFuelSupplyOrderDocument } from '../utils/fuelSupplyOrderDocument'
+import { stripSignatureEvidence } from '../utils/publicDocument'
 import {
   formatOrderNumber,
   getOrderStatusClass,
@@ -46,6 +47,7 @@ export default function PublicFuelSupplyOrderPage() {
   }, [validationCode])
 
   const publicUrl = useMemo(() => resolvePublicValidationUrl(order?.public_validation_path), [order?.public_validation_path])
+  const publicDocument = useMemo(() => stripSignatureEvidence(order), [order])
 
   async function handleCopyLink() {
     if (!publicUrl) return
@@ -138,22 +140,11 @@ export default function PublicFuelSupplyOrderPage() {
               </section>
             ) : null}
 
-            {order.signature_summary?.document_id ? (
-              <section className="public-order-notes">
-                <h2>Assinaturas eletrônicas institucionais</h2>
-                <p>Hash SHA-256: <strong>{order.signature_summary.content_hash}</strong></p>
-                <p>Status: {order.signature_summary.is_complete ? 'Concluída' : 'Pendente'}</p>
-                {(order.signature_summary.signatures || []).map((signature) => (
-                  <p key={signature.id}>{signature.signer_name} assinou em {formatDate(signature.signed_at)}.</p>
-                ))}
-              </section>
-            ) : null}
-
             <section className="public-order-actions">
-              <button type="button" className="app-button" onClick={() => downloadFuelSupplyOrderDocument(order)}>
+              <button type="button" className="app-button" onClick={() => downloadFuelSupplyOrderDocument(publicDocument)}>
                 Baixar comprovante em PDF
               </button>
-              <button type="button" className="secondary-button" onClick={() => previewFuelSupplyOrderDocument(order)}>
+              <button type="button" className="secondary-button" onClick={() => previewFuelSupplyOrderDocument(publicDocument)}>
                 Pré-visualizar PDF
               </button>
               <button type="button" className="ghost-button" onClick={handleCopyLink}>

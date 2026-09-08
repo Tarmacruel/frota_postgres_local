@@ -412,7 +412,7 @@ def test_individual_override_cannot_expand_signature_mutation_permission():
     assert exc.value.status_code == 403
 
 
-def test_legacy_public_projection_preserves_validation_and_minimizes_people_data():
+def test_public_projection_exposes_only_workflow_status():
     document_id = uuid4()
     summary = {
         "document_id": document_id,
@@ -438,12 +438,12 @@ def test_legacy_public_projection_preserves_validation_and_minimizes_people_data
 
     public = DocumentSignatureService.sanitize_summary_for_legacy_public_view(summary)
 
-    assert public["document_id"] == document_id
-    assert public["content_hash"] == "a" * 64
-    assert public["signatures"][0]["signer_name"] == "Servidor histórico"
-    assert "signer_email" not in public["signatures"][0]
-    assert "signer_cpf_masked" not in public["signatures"][0]
-    assert "signer_organization_name" not in public["signatures"][0]
+    assert public["document_id"] is None
+    assert public["content_hash"] is None
+    assert public["signatures"] == []
+    assert public["signature_counts_by_method"] == {}
+    assert public["canonical_artifact_available"] is False
+    assert public["certified_artifact_available"] is False
     assert public["requests"] == []
     assert "snapshot" not in public
     assert "evidence_hmac" not in public
