@@ -1,12 +1,17 @@
 .env
+.env.*
 *.env
 *.env.backup
 frontend/.env.local
 !.env.example
+!.env.*.example
 
 __pycache__/
 *.py[cod]
 .pytest_cache/
+/.tmp-cert-pgtest/
+/backend/test.db
+/backend/test.db-*
 
 .venv/
 venv/
@@ -14,6 +19,9 @@ venv/
 node_modules/
 frontend/node_modules/
 frontend/dist/
+signature-agent/**/bin/
+signature-agent/**/obj/
+signature-agent/artifacts/
 backend/storage/
 storage/backups/
 storage/logs/
@@ -23,6 +31,9 @@ deploy/.ci-uploads/
 /data/
 /postgres-data/
 /restore/
+/.runtime-secure/
+/storage/homologation/
+/storage/migration-*/
 
 
 .playwright-mcp/
