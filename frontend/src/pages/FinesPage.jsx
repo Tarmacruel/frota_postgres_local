@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useState } from 'react'
 import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
+import DriverSelect from '../components/DriverSelect'
 import SearchableSelect from '../components/SearchableSelect'
 import { finesAPI } from '../api/fines'
 import { vehiclesAPI } from '../api/vehicles'
-import { driversAPI } from '../api/drivers'
 import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
@@ -51,15 +51,6 @@ function vehicleOption(vehicle) {
   }
 }
 
-function driverOption(driver) {
-  return {
-    value: driver.id,
-    label: driver.nome_completo,
-    description: `${driver.documento} | CNH ${driver.cnh_categoria}${driver.cnh_validade ? ` | validade ${formatDate(driver.cnh_validade)}` : ''}`,
-    keywords: [driver.nome_completo, driver.documento, driver.email || '', driver.contato || ''].join(' '),
-  }
-}
-
 function infractionOption(item) {
   return {
     value: item.id,
@@ -79,7 +70,6 @@ export default function FinesPage() {
   const canCreateFine = canCreate('fines')
   const canEditFine = canEdit('fines')
   const [vehicles, setVehicles] = useState([])
-  const [drivers, setDrivers] = useState([])
   const [infractions, setInfractions] = useState([])
   const [records, setRecords] = useState([])
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
@@ -130,13 +120,11 @@ export default function FinesPage() {
   }
 
   async function loadAux() {
-    const [vehicleResponse, driverResponse] = await Promise.all([
+    const [vehicleResponse] = await Promise.all([
       vehiclesAPI.list({ limit: VEHICLE_LIST_LIMIT }),
-      driversAPI.listActive({ limit: 200 }),
       loadInfractions(),
     ])
     setVehicles(Array.isArray(vehicleResponse.data) ? vehicleResponse.data : [])
-    setDrivers(Array.isArray(driverResponse.data) ? driverResponse.data : [])
   }
 
   async function handleVehicleChange(value) {
@@ -346,7 +334,13 @@ export default function FinesPage() {
           </div>
           <div className="form-field">
             <label>Condutor</label>
-            <SearchableSelect value={form.driver_id} onChange={(value) => setForm({ ...form, driver_id: value })} options={[{ value: '', label: 'Não informado' }, ...drivers.map(driverOption)]} placeholder="Selecionar condutor" searchPlaceholder="Buscar condutor por nome ou documento" />
+            <DriverSelect
+              value={form.driver_id}
+              onChange={(driver) => setForm({ ...form, driver_id: driver?.id || '' })}
+              placeholder="Selecionar condutor"
+              allowClear
+              clearLabel="Não informado"
+            />
           </div>
           <div className="form-field modal-field-span">
             <label>Enquadramento</label>

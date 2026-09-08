@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { driversAPI } from '../api/drivers'
 import SearchableSelect from './SearchableSelect'
 
@@ -13,29 +13,102 @@ function buildOption(driver) {
   }
 }
 
-export default function DriverSelect({ value, onChange, disabled = false, placeholder = 'Selecione o condutor', ariaLabel = 'Condutor' }) {
+function mergeDriver(list, driver) {
+  if (!driver?.id) return list
+  const exists = list.some((item) => String(item.id) === String(driver.id))
+  return exists ? list : [driver, ...list]
+}
+
+export default function DriverSelect({
+  value,
+  onChange,
+  disabled = false,
+  placeholder = 'Selecione o condutor',
+  ariaLabel = 'Condutor',
+  allowClear = false,
+  clearLabel = 'Limpar seleção',
+}) {
   const [drivers, setDrivers] = useState([])
   const [loading, setLoading] = useState(true)
+  const requestSequenceRef = useRef(0)
+  const searchTimerRef = useRef(null)
 
-  useEffect(() => {
-    async function loadDrivers() {
-      try {
-        setLoading(true)
-        const { data } = await driversAPI.listActive({ limit: 200 })
-        setDrivers(data)
-      } catch {
+  const loadDrivers = useCallback(async (search = '') => {
+    const requestId = ++requestSequenceRef.current
+
+    try {
+      setLoading(true)
+      const normalizedSearch = search.trim()
+      const { data } = await driversAPI.listActive({
+        search: normalizedSearch || undefined,
+        limit: 30,
+      })
+
+      if (requestId === requestSequenceRef.current) {
+        setDrivers(Array.isArray(data) ? data : [])
+      }
+    } catch {
+      if (requestId === requestSequenceRef.current) {
         setDrivers([])
-      } finally {
+      }
+    } finally {
+      if (requestId === requestSequenceRef.current) {
         setLoading(false)
       }
     }
-    loadDrivers()
   }, [])
+
+  useEffect(() => {
+    loadDrivers()
+
+    return () => {
+      requestSequenceRef.current += 1
+      if (searchTimerRef.current) {
+        window.clearTimeout(searchTimerRef.current)
+      }
+    }
+  }, [loadDrivers])
+
+  useEffect(() => {
+    if (!value) return
+
+    const alreadyLoaded = drivers.some((driver) => String(driver.id) === String(value))
+    if (alreadyLoaded) return
+
+    let cancelled = false
+
+    async function loadSelectedDriver() {
+      try {
+        const { data } = await driversAPI.getById(value)
+        if (!cancelled && data) {
+          setDrivers((current) => mergeDriver(current, data))
+        }
+      } catch {
+        // Se o registro não puder ser recuperado, preserva o comportamento normal do seletor.
+      }
+    }
+
+    loadSelectedDriver()
+
+    return () => {
+      cancelled = true
+    }
+  }, [value, drivers])
 
   const options = useMemo(() => drivers.map(buildOption), [drivers])
 
+  const handleSearch = useCallback((query) => {
+    if (searchTimerRef.current) {
+      window.clearTimeout(searchTimerRef.current)
+    }
+
+    searchTimerRef.current = window.setTimeout(() => {
+      loadDrivers(query)
+    }, 300)
+  }, [loadDrivers])
+
   function handleSelect(nextValue) {
-    const nextOption = options.find((option) => option.value === nextValue)
+    const nextOption = options.find((option) => String(option.value) === String(nextValue))
     onChange?.(nextOption?.driver || null)
   }
 
@@ -44,11 +117,17 @@ export default function DriverSelect({ value, onChange, disabled = false, placeh
       value={value}
       onChange={handleSelect}
       options={options}
-      placeholder={loading ? 'Carregando condutores...' : placeholder}
-      searchPlaceholder="Buscar por nome, documento ou contato"
+      placeholder={loading && drivers.length === 0 ? 'Carregando condutores...' : placeholder}
+      searchPlaceholder="Buscar por nome, documento ou secretaria"
       emptyLabel="Nenhum condutor ativo encontrado."
-      disabled={disabled || loading}
+      loadingLabel="Buscando condutores..."
+      disabled={disabled}
       ariaLabel={ariaLabel}
+      allowClear={allowClear}
+      clearLabel={clearLabel}
+      remoteSearch
+      onSearch={handleSearch}
+      loading={loading}
     />
   )
 }

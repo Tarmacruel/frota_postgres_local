@@ -58,7 +58,7 @@ class DriverService:
         self,
         *,
         search: str | None = None,
-        limit: int = 100,
+        limit: int = 1000,
         organization_id: UUID | None = None,
         current_user: User | None = None,
     ) -> list[dict]:

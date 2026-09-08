@@ -59,7 +59,7 @@ class DriverRepository:
         items = list((await self.db.execute(stmt)).scalars().all())
         return items, total
 
-    async def list_active(self, *, search: str | None = None, limit: int = 100, organization_id: UUID | None = None) -> list[Driver]:
+    async def list_active(self, *, search: str | None = None, limit: int = 1000, organization_id: UUID | None = None) -> list[Driver]:
         stmt = (
             select(Driver)
             .options(joinedload(Driver.organization))
