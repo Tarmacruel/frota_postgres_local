@@ -634,10 +634,13 @@ export default function PossessionPage() {
       if (editForm.driver_document) payload.append('driver_document', editForm.driver_document)
       if (editForm.driver_contact) payload.append('driver_contact', editForm.driver_contact)
       payload.append('start_date', new Date(editForm.start_date).toISOString())
-      if (editForm.end_date) payload.append('end_date', new Date(editForm.end_date).toISOString())
+      const endDate = editingRecord.return_confirmation_available ? editingRecord.end_date : editForm.end_date
+      const endOdometer = editingRecord.return_confirmation_available ? editingRecord.end_odometer_km : editForm.end_odometer_km
+      // Preserve the confirmed timestamp, including seconds, during general edits.
+      if (endDate) payload.append('end_date', editingRecord.return_confirmation_available ? endDate : new Date(endDate).toISOString())
       if (editForm.observation) payload.append('observation', editForm.observation)
       if (editForm.start_odometer_km !== '') payload.append('start_odometer_km', String(Number(editForm.start_odometer_km)))
-      if (editForm.end_odometer_km !== '') payload.append('end_odometer_km', String(Number(editForm.end_odometer_km)))
+      if (endOdometer !== '' && endOdometer != null) payload.append('end_odometer_km', String(Number(endOdometer)))
       payload.append('edit_reason', editForm.edit_reason)
       if (editDocumentFile) {
         payload.append('loan_term_document', editDocumentFile, editDocumentFile.name)
@@ -688,12 +691,15 @@ export default function PossessionPage() {
 
   async function openReturnCorrection(record) {
     try {
+      setError('')
       setCorrectionError('')
       const { data } = await possessionAPI.getReturnContext(record.id)
       if (!data.current_confirmation) {
         setError('Esta posse não possui confirmação versionada para retificar.')
         return
       }
+      closeEditModal()
+      closeTermModal()
       setCorrectionRecord(record)
       setCorrectionContext(data)
       setCorrectionForm({
@@ -1061,6 +1067,11 @@ export default function PossessionPage() {
                             Retificar
                           </button>
                         ) : null}
+                        {isAdmin && canEditPossession && record.return_confirmation_available ? (
+                          <button type="button" className="mini-button" onClick={() => openReturnCorrection(record)}>
+                            Retificar devolução
+                          </button>
+                        ) : null}
                         {renderTripActions(record)}
                       </div>
                     </td>
@@ -1119,6 +1130,15 @@ export default function PossessionPage() {
         onClose={closeEditModal}
       >
         <form onSubmit={handleEditPossession} className="form-grid modal-form-grid">
+          {editingRecord?.return_confirmation_available ? (
+            <div className="alert alert-warning modal-field-span">
+              <p>A devolução já foi confirmada. Para corrigir a data, o horário ou o hodômetro final, use Retificar devolução. A correção preserva a versão anterior e registra a justificativa.</p>
+              <button type="button" className="ghost-button" disabled={savingEdit} onClick={() => openReturnCorrection(editingRecord)}>
+                Retificar devolução
+              </button>
+              <p className="helper-text">Salve outras alterações deste formulário antes de abrir a correção da devolução.</p>
+            </div>
+          ) : null}
           <div className="form-field">
             <label>Condutor</label>
             <DriverSelect
@@ -1168,6 +1188,7 @@ export default function PossessionPage() {
               type="datetime-local"
               className="app-input"
               value={editForm.end_date}
+              disabled={Boolean(editingRecord?.return_confirmation_available)}
               onChange={(event) => setEditForm({ ...editForm, end_date: event.target.value })}
             />
           </div>
@@ -1193,6 +1214,7 @@ export default function PossessionPage() {
               step="0.1"
               className="app-input"
               value={editForm.end_odometer_km}
+              disabled={Boolean(editingRecord?.return_confirmation_available)}
               onChange={(event) => setEditForm({ ...editForm, end_odometer_km: event.target.value })}
             />
           </div>
@@ -1317,7 +1339,7 @@ export default function PossessionPage() {
                     Baixar PDF oficial
                   </button>
                 ) : null}
-                {isAdmin && !termRecord.is_active ? (
+                {isAdmin && canEditPossession && termRecord.return_confirmation_available ? (
                   <button type="button" className="ghost-button" disabled={termBusy} onClick={() => openReturnCorrection(termRecord)}>
                     Retificar devolução
                   </button>

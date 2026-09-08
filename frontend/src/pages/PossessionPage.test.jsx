@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PossessionPage from './PossessionPage'
@@ -9,6 +9,10 @@ const mocks = vi.hoisted(() => ({
   list: vi.fn(),
   listTrips: vi.fn(),
   reload: vi.fn(),
+  update: vi.fn(),
+  getReturnContext: vi.fn(),
+  correctReturnConfirmation: vi.fn(),
+  isAdmin: false,
 }))
 
 vi.mock('../api/client', () => ({ default: { get: mocks.get } }))
@@ -18,20 +22,23 @@ vi.mock('../api/possession', () => ({
     list: mocks.list,
     listTrips: mocks.listTrips,
     end: vi.fn(),
-    update: vi.fn(),
+    update: mocks.update,
+    getReturnContext: mocks.getReturnContext,
+    correctReturnConfirmation: mocks.correctReturnConfirmation,
   },
 }))
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({
     canCreate: (module) => module === 'possession',
     canEdit: (module) => module === 'possession',
-    isAdmin: false,
+    isAdmin: mocks.isAdmin,
     reload: mocks.reload,
   }),
 }))
 vi.mock('../hooks/useMasterDataCatalog', () => ({ useMasterDataCatalog: () => ({ organizations: [] }) }))
 vi.mock('../components/DriverBadge', () => ({ default: ({ name }) => <span>{name}</span> }))
 vi.mock('../components/Pagination', () => ({ default: () => null }))
+vi.mock('../components/GuidedTour', () => ({ default: () => null }))
 vi.mock('../components/PossessionTripsModal', () => ({ default: () => null }))
 vi.mock('../components/PossessionReportBuilder', () => ({ default: () => <button type="button">Mais opções</button> }))
 vi.mock('../components/SearchableSelect', () => ({
@@ -70,6 +77,7 @@ const possession = {
 describe('PossessionPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.isAdmin = false
     mocks.get.mockResolvedValue({ data: [vehicle] })
     mocks.listActive.mockResolvedValue({ data: [possession] })
     mocks.list.mockResolvedValue({ data: [possession] })
@@ -94,5 +102,96 @@ describe('PossessionPage', () => {
       { page: 1, limit: 1, status: 'EM_ANDAMENTO' },
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
+  })
+
+  function setupClosedPossession(confirmed = true) {
+    mocks.isAdmin = true
+    const record = {
+      ...possession,
+      public_number: 898,
+      is_active: false,
+      end_date: '2026-07-13T17:00:37.123Z',
+      end_odometer_km: '108.0',
+      return_confirmation_available: confirmed,
+      return_confirmation_version: confirmed ? 1 : null,
+    }
+    mocks.listActive.mockResolvedValue({ data: [] })
+    mocks.list.mockResolvedValue({ data: [record] })
+    mocks.getReturnContext.mockResolvedValue({ data: {
+      possession_public_number: 898,
+      end_date: record.end_date,
+      minimum_end_odometer_km: 100,
+      declaration: { version: '1.0', text: 'Declaração da devolução.' },
+      current_confirmation: { version: 1, final_odometer_km: 108, vehicle_condition_notes: 'Sem ressalvas' },
+    } })
+    return record
+  }
+
+  async function showClosedPossessions() {
+    render(<MemoryRouter><PossessionPage /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'Encerradas' }))
+    await screen.findByRole('button', { name: 'Retificar', exact: true })
+  }
+
+  it('corrige o horário de uma devolução confirmada pelo fluxo versionado direto', async () => {
+    const record = setupClosedPossession()
+    mocks.correctReturnConfirmation.mockResolvedValue({ data: { version: 2 } })
+    await showClosedPossessions()
+    fireEvent.click(screen.getByRole('button', { name: 'Retificar devolução' }))
+    const dialog = await screen.findByRole('dialog', { name: 'Retificar confirmação de devolução' })
+    expect(mocks.getReturnContext).toHaveBeenCalledWith(record.id)
+    fireEvent.change(within(dialog).getByLabelText('Data e hora da devolução corrigidas'), { target: { value: '2026-07-13T16:30' } })
+    fireEvent.change(within(dialog).getByLabelText('Justificativa administrativa'), { target: { value: 'Horário corrigido após conferência.' } })
+    expect(within(dialog).getByRole('button', { name: 'Criar nova versão' })).toBeDisabled()
+    fireEvent.click(within(dialog).getByRole('checkbox'))
+    fireEvent.click(within(dialog).getByRole('button', { name: 'Criar nova versão' }))
+    await waitFor(() => expect(mocks.correctReturnConfirmation).toHaveBeenCalledWith(record.id, {
+      end_date: new Date('2026-07-13T16:30').toISOString(),
+      end_odometer_km: 108,
+      vehicle_condition_notes: 'Sem ressalvas',
+      correction_reason: 'Horário corrigido após conferência.',
+      declaration_accepted: true,
+    }))
+    expect(await screen.findByText(/retificada na versão 2/, { selector: '.alert' })).toBeInTheDocument()
+    expect(mocks.update).not.toHaveBeenCalled()
+  })
+
+  it('preserva a devolução confirmada com segundos na retificação geral', async () => {
+    const record = setupClosedPossession()
+    mocks.update.mockResolvedValue({ data: record })
+    await showClosedPossessions()
+    fireEvent.click(screen.getByRole('button', { name: 'Retificar', exact: true }))
+    expect(screen.getByLabelText('Fim')).toBeDisabled()
+    expect(screen.getByLabelText('Odômetro final (km)')).toBeDisabled()
+    fireEvent.change(screen.getByLabelText('Observação'), { target: { value: 'Observação corrigida' } })
+    fireEvent.change(screen.getByLabelText('Justificativa da retificação'), { target: { value: 'Conferência administrativa' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar retificação' }))
+    await waitFor(() => expect(mocks.update).toHaveBeenCalledOnce())
+    const [id, payload] = mocks.update.mock.calls[0]
+    expect(id).toBe(record.id)
+    expect(payload.get('end_date')).toBe(record.end_date)
+    expect(payload.get('end_odometer_km')).toBe('108')
+    expect(payload.get('observation')).toBe('Observação corrigida')
+    expect(mocks.correctReturnConfirmation).not.toHaveBeenCalled()
+  })
+
+  it('abre a correção versionada pelo formulário geral sem sobrepor os diálogos', async () => {
+    setupClosedPossession()
+    await showClosedPossessions()
+    fireEvent.click(screen.getByRole('button', { name: 'Retificar', exact: true }))
+    const editDialog = screen.getByRole('dialog', { name: 'Retificar posse' })
+    fireEvent.click(within(editDialog).getByRole('button', { name: 'Retificar devolução' }))
+    await screen.findByRole('dialog', { name: 'Retificar confirmação de devolução' })
+    expect(screen.queryByRole('dialog', { name: 'Retificar posse' })).not.toBeInTheDocument()
+    expect(screen.getAllByRole('dialog')).toHaveLength(1)
+  })
+
+  it('mantém a edição geral da devolução legada sem confirmação', async () => {
+    setupClosedPossession(false)
+    await showClosedPossessions()
+    expect(screen.queryByRole('button', { name: 'Retificar devolução' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Retificar', exact: true }))
+    expect(screen.getByLabelText('Fim')).toBeEnabled()
+    expect(screen.getByLabelText('Odômetro final (km)')).toBeEnabled()
   })
 })
