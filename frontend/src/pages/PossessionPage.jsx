@@ -1181,17 +1181,18 @@ export default function PossessionPage() {
               onChange={(event) => setEditForm({ ...editForm, start_date: event.target.value })}
             />
           </div>
-          <div className="form-field">
-            <label htmlFor="edit-possession-end">Fim</label>
-            <input
-              id="edit-possession-end"
-              type="datetime-local"
-              className="app-input"
-              value={editForm.end_date}
-              disabled={Boolean(editingRecord?.return_confirmation_available)}
-              onChange={(event) => setEditForm({ ...editForm, end_date: event.target.value })}
-            />
-          </div>
+          {!editingRecord?.return_confirmation_available ? (
+            <div className="form-field">
+              <label htmlFor="edit-possession-end">Fim</label>
+              <input
+                id="edit-possession-end"
+                type="datetime-local"
+                className="app-input"
+                value={editForm.end_date}
+                onChange={(event) => setEditForm({ ...editForm, end_date: event.target.value })}
+              />
+            </div>
+          ) : null}
           <div className="form-field">
             <label htmlFor="edit-possession-start-odometer">Odômetro inicial (km)</label>
             <input
@@ -1205,19 +1206,20 @@ export default function PossessionPage() {
             />
           </div>
 
-          <div className="form-field">
-            <label htmlFor="edit-possession-end-odometer">Odômetro final (km)</label>
-            <input
-              id="edit-possession-end-odometer"
-              type="number"
-              min="0"
-              step="0.1"
-              className="app-input"
-              value={editForm.end_odometer_km}
-              disabled={Boolean(editingRecord?.return_confirmation_available)}
-              onChange={(event) => setEditForm({ ...editForm, end_odometer_km: event.target.value })}
-            />
-          </div>
+          {!editingRecord?.return_confirmation_available ? (
+            <div className="form-field">
+              <label htmlFor="edit-possession-end-odometer">Odômetro final (km)</label>
+              <input
+                id="edit-possession-end-odometer"
+                type="number"
+                min="0"
+                step="0.1"
+                className="app-input"
+                value={editForm.end_odometer_km}
+                onChange={(event) => setEditForm({ ...editForm, end_odometer_km: event.target.value })}
+              />
+            </div>
+          ) : null}
 
           <div className="form-field modal-field-span">
             <label htmlFor="edit-possession-observation">Observação</label>
