@@ -123,6 +123,7 @@ export default function PossessionPage() {
   const { canCreate, canEdit, isAdmin, isProduction, reload } = useAuth()
   const canCreatePossession = canCreate('possession')
   const canEditPossession = canEdit('possession')
+  const canRectifyPossession = (isAdmin || isProduction) && canEditPossession
   const [tourReplayToken, setTourReplayToken] = useState(0)
   const [searchParams, setSearchParams] = useSearchParams()
   const [vehicles, setVehicles] = useState([])
@@ -1062,12 +1063,12 @@ export default function PossessionPage() {
                         <button type="button" className="mini-button" onClick={() => setTermRecord(record)}>
                           Termos
                         </button>
-                        {isAdmin && canEditPossession ? (
+                        {canRectifyPossession ? (
                           <button type="button" className="mini-button" onClick={() => openEditModal(record)}>
                             Retificar
                           </button>
                         ) : null}
-                        {isAdmin && canEditPossession && record.return_confirmation_available ? (
+                        {canRectifyPossession && record.return_confirmation_available ? (
                           <button type="button" className="mini-button" onClick={() => openReturnCorrection(record)}>
                             Retificar devolução
                           </button>
@@ -1341,7 +1342,7 @@ export default function PossessionPage() {
                     Baixar PDF oficial
                   </button>
                 ) : null}
-                {isAdmin && canEditPossession && termRecord.return_confirmation_available ? (
+                {canRectifyPossession && termRecord.return_confirmation_available ? (
                   <button type="button" className="ghost-button" disabled={termBusy} onClick={() => openReturnCorrection(termRecord)}>
                     Retificar devolução
                   </button>

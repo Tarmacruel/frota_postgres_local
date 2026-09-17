@@ -13,6 +13,8 @@ const mocks = vi.hoisted(() => ({
   getReturnContext: vi.fn(),
   correctReturnConfirmation: vi.fn(),
   isAdmin: false,
+  isProduction: false,
+  canEdit: true,
 }))
 
 vi.mock('../api/client', () => ({ default: { get: mocks.get } }))
@@ -30,8 +32,9 @@ vi.mock('../api/possession', () => ({
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({
     canCreate: (module) => module === 'possession',
-    canEdit: (module) => module === 'possession',
+    canEdit: (module) => module === 'possession' && mocks.canEdit,
     isAdmin: mocks.isAdmin,
+    isProduction: mocks.isProduction,
     reload: mocks.reload,
   }),
 }))
@@ -78,6 +81,8 @@ describe('PossessionPage', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.isAdmin = false
+    mocks.isProduction = false
+    mocks.canEdit = true
     mocks.get.mockResolvedValue({ data: [vehicle] })
     mocks.listActive.mockResolvedValue({ data: [possession] })
     mocks.list.mockResolvedValue({ data: [possession] })
@@ -133,8 +138,10 @@ describe('PossessionPage', () => {
     await screen.findByRole('button', { name: 'Retificar', exact: true })
   }
 
-  it('corrige o horário de uma devolução confirmada pelo fluxo versionado direto', async () => {
+  it.each(['ADMIN', 'PRODUCAO'])('corrige o horário de uma devolução confirmada pelo fluxo versionado direto (%s)', async (role) => {
     const record = setupClosedPossession()
+    mocks.isAdmin = role === 'ADMIN'
+    mocks.isProduction = role === 'PRODUCAO'
     mocks.correctReturnConfirmation.mockResolvedValue({ data: { version: 2 } })
     await showClosedPossessions()
     fireEvent.click(screen.getByRole('button', { name: 'Retificar devolução' }))
@@ -156,8 +163,10 @@ describe('PossessionPage', () => {
     expect(mocks.update).not.toHaveBeenCalled()
   })
 
-  it('preserva a devolução confirmada com segundos na retificação geral', async () => {
+  it.each(['ADMIN', 'PRODUCAO'])('preserva a devolução confirmada com segundos na retificação geral (%s)', async (role) => {
     const record = setupClosedPossession()
+    mocks.isAdmin = role === 'ADMIN'
+    mocks.isProduction = role === 'PRODUCAO'
     mocks.update.mockResolvedValue({ data: record })
     await showClosedPossessions()
     fireEvent.click(screen.getByRole('button', { name: 'Retificar', exact: true }))
@@ -194,4 +203,16 @@ describe('PossessionPage', () => {
     expect(screen.getByLabelText('Fim')).toBeEnabled()
     expect(screen.getByLabelText('Odômetro final (km)')).toBeEnabled()
   })
+  it.each(['PADRAO', 'POSTO', 'PRODUCAO_SEM_EDICAO'])('oculta retificações para %s', async (role) => {
+    setupClosedPossession()
+    mocks.isAdmin = false
+    mocks.isProduction = role === 'PRODUCAO_SEM_EDICAO'
+    mocks.canEdit = false
+    render(<MemoryRouter><PossessionPage /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'Encerradas' }))
+    await screen.findByText('Posse #898')
+    expect(screen.queryByRole('button', { name: 'Retificar', exact: true })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Retificar devolução' })).not.toBeInTheDocument()
+  })
+
 })

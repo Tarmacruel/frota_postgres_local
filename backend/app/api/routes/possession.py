@@ -348,7 +348,7 @@ async def correct_possession_return_confirmation(
     possession_id: UUID,
     data: PossessionReturnCorrection,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_writer),
     _permission: User = Depends(require_permission("possession", "edit")),
 ):
     confirmation = await PossessionReturnService(db).correct(possession_id, data, current_user)
@@ -535,7 +535,7 @@ async def update_possession(
     return_term_document: UploadFile | None = File(default=None),
     new_photos: list[UploadFile] | None = File(default=None),
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_writer),
     _permission: User = Depends(require_permission("possession", "edit")),
 ):
     return await PossessionService(db).admin_update(
