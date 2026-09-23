@@ -1225,6 +1225,7 @@ class PossessionService:
         loan_term_url = f"/api/possession/{record.id}/documents/loan-term" if record.document_path and can_view_personal_data else None
         return_term_url = f"/api/possession/{record.id}/documents/return-term" if record.return_document_path and can_view_personal_data else None
         current_confirmation = next((item for item in getattr(record, "return_confirmations", []) if item.is_current), None)
+        driver = getattr(record, "driver", None) if can_view_personal_data else None
 
         return {
             "id": record.id,
@@ -1236,6 +1237,7 @@ class PossessionService:
             "vehicle_description": self._build_vehicle_description(record),
             "driver_id": record.driver_id if can_view_personal_data else None,
             "driver_name": record.driver_name if can_view_personal_data else "Identidade protegida",
+            "driver_matricula": driver.matricula if driver else None,
             "driver_document": record.driver_document if can_view_personal_data else self._mask_document(record.driver_document),
             "driver_contact": record.driver_contact if can_view_personal_data else None,
             "start_date": record.start_date,

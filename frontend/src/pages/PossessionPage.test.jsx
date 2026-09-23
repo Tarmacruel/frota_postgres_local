@@ -39,7 +39,6 @@ vi.mock('../context/AuthContext', () => ({
   }),
 }))
 vi.mock('../hooks/useMasterDataCatalog', () => ({ useMasterDataCatalog: () => ({ organizations: [] }) }))
-vi.mock('../components/DriverBadge', () => ({ default: ({ name }) => <span>{name}</span> }))
 vi.mock('../components/Pagination', () => ({ default: () => null }))
 vi.mock('../components/GuidedTour', () => ({ default: () => null }))
 vi.mock('../components/PossessionTripsModal', () => ({ default: () => null }))
@@ -107,6 +106,15 @@ describe('PossessionPage', () => {
       { page: 1, limit: 1, status: 'EM_ANDAMENTO' },
       expect.objectContaining({ signal: expect.any(AbortSignal) }),
     )
+  })
+
+  it('exibe a matrícula junto ao condutor da posse', async () => {
+    mocks.isProduction = true
+    mocks.listActive.mockResolvedValue({ data: [{ ...possession, driver_matricula: '000123' }] })
+    render(<MemoryRouter><PossessionPage /></MemoryRouter>)
+    const registration = await screen.findByText('Matrícula: 000123')
+    expect(registration.closest('td')).toHaveTextContent(possession.driver_name)
+    expect(registration.closest('td')).toHaveAttribute('data-label', 'Condutor')
   })
 
   function setupClosedPossession(confirmed = true) {

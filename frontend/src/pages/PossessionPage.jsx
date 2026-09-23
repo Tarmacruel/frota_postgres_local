@@ -1011,6 +1011,7 @@ export default function PossessionPage() {
                     <td data-label="Condutor">
                       <DriverBadge
                         name={record.driver_name}
+                        registration={record.driver_matricula}
                         document={record.driver_document}
                         contact={record.driver_contact}
                       />

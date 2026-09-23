@@ -139,6 +139,7 @@ class PossessionOut(BaseModel):
     vehicle_description: str | None
     driver_id: UUID | None
     driver_name: str
+    driver_matricula: str | None = None
     driver_document: str | None
     driver_contact: str | None
     start_date: datetime
