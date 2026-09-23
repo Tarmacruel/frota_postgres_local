@@ -4,6 +4,7 @@ from uuid import UUID
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
+from app.models.driver import Driver
 from app.models.fine import Fine, FineInfraction, FineStatus
 from app.models.location_history import LocationHistory
 from app.models.master_data import Allocation, Department
@@ -71,6 +72,7 @@ class FineRepository:
                 Fine.ticket_number.ilike(term),
                 Fine.description.ilike(term),
                 Fine.location.ilike(term),
+                Fine.driver.has(Driver.matricula.ilike(term)),
                 FineInfraction.code.ilike(term),
                 FineInfraction.description.ilike(term),
             )

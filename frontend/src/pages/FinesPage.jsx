@@ -292,7 +292,7 @@ export default function FinesPage() {
 
       <div className="toolbar-row" style={{ marginBottom: 18 }}>
         <div className="filter-inline">
-          <input className="app-input" placeholder="Buscar por auto, enquadramento, descrição ou local" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <input className="app-input" placeholder="Buscar por auto, enquadramento, descrição, local ou matrícula" value={search} onChange={(e) => setSearch(e.target.value)} />
           <SearchableSelect value={organizationFilter} onChange={setOrganizationFilter} options={[{ value: '', label: 'Todas as secretarias' }, ...organizationOptions]} placeholder="Filtrar secretaria" searchPlaceholder="Buscar secretaria" />
           <SearchableSelect value={vehicleFilter} onChange={setVehicleFilter} options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(vehicleOption)]} placeholder="Filtrar veículo" searchPlaceholder="Buscar veículo" />
           <select className="app-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>{statusOptions.map((o) => <option key={o} value={o}>{o}</option>)}</select>

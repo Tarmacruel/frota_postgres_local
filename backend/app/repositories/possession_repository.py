@@ -5,6 +5,7 @@ from uuid import UUID
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
+from app.models.driver import Driver
 from app.models.location_history import LocationHistory
 from app.models.master_data import Allocation, Department
 from app.models.possession import VehiclePossession
@@ -173,6 +174,7 @@ class PossessionRepository:
                         VehiclePossession.driver_name.ilike(term),
                         VehiclePossession.driver_document.ilike(term),
                         VehiclePossession.driver_contact.ilike(term),
+                        VehiclePossession.driver.has(Driver.matricula.ilike(term)),
                     ]
                 )
             search_predicate = or_(*search_conditions)

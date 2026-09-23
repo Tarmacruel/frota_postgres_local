@@ -117,6 +117,31 @@ describe('PossessionPage', () => {
     expect(registration.closest('td')).toHaveAttribute('data-label', 'Condutor')
   })
 
+  it('filtra posses pela matrícula completa ou parcial e mantém a busca existente', async () => {
+    mocks.isProduction = true
+    mocks.listActive.mockResolvedValue({ data: [
+      { ...possession, driver_name: 'Condutor Localizado', driver_matricula: '000123-AB' },
+      { ...possession, id: 'possession-2', driver_name: 'Condutor Legado', driver_matricula: null },
+      { ...possession, id: 'possession-3', driver_name: 'Outro Condutor', driver_matricula: '987654' },
+    ] })
+    render(<MemoryRouter><PossessionPage /></MemoryRouter>)
+    await screen.findByText('Condutor Localizado')
+    const search = screen.getByPlaceholderText('Buscar por placa, secretaria, condutor, matrícula ou contato')
+    for (const value of ['000123-AB', '000123', '  123-ab  ']) {
+      fireEvent.change(search, { target: { value } })
+      expect(screen.getByText('Condutor Localizado')).toBeInTheDocument()
+      expect(screen.queryByText('Condutor Legado')).not.toBeInTheDocument()
+      expect(screen.queryByText('Outro Condutor')).not.toBeInTheDocument()
+    }
+    fireEvent.change(search, { target: { value: 'Legado' } })
+    expect(screen.getByText('Condutor Legado')).toBeInTheDocument()
+    expect(screen.queryByText('Condutor Localizado')).not.toBeInTheDocument()
+    fireEvent.change(search, { target: { value: '' } })
+    expect(screen.getByText('Condutor Localizado')).toBeInTheDocument()
+    expect(screen.getByText('Condutor Legado')).toBeInTheDocument()
+    expect(screen.getByText('Outro Condutor')).toBeInTheDocument()
+  })
+
   function setupClosedPossession(confirmed = true) {
     mocks.isAdmin = true
     const record = {

@@ -165,7 +165,7 @@ export default function ClaimsPage() {
       <div className="toolbar-card">
         <div className="toolbar-row">
           <div className="filter-inline">
-            <input className="app-input" placeholder="Buscar por descrição, local ou BO" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <input className="app-input" placeholder="Buscar por descrição, local, BO ou matrícula" value={search} onChange={(event) => setSearch(event.target.value)} />
             <SearchableSelect
               value={organizationFilter}
               onChange={setOrganizationFilter}

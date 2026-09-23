@@ -5,6 +5,7 @@ from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 from app.models.claim import Claim, ClaimStatus, ClaimType
+from app.models.driver import Driver
 from app.models.location_history import LocationHistory
 from app.models.master_data import Allocation, Department
 
@@ -78,6 +79,7 @@ class ClaimRepository:
                 Claim.descricao.ilike(term),
                 Claim.local.ilike(term),
                 Claim.boletim_ocorrencia.ilike(term),
+                Claim.driver.has(Driver.matricula.ilike(term)),
             )
             stmt = stmt.where(filter_clause)
             count_stmt = count_stmt.where(filter_clause)

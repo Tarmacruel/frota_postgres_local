@@ -272,7 +272,7 @@ export default function PossessionPage() {
       const term = search.trim().toLowerCase()
       const matchesSearch =
         !term ||
-        [record.vehicle_plate, getRecordOrganizationName(record), record.driver_name, record.driver_document, record.driver_contact, record.observation]
+        [record.vehicle_plate, getRecordOrganizationName(record), record.driver_name, record.driver_matricula, record.driver_document, record.driver_contact, record.observation]
           .filter(Boolean)
           .some((value) => value.toLowerCase().includes(term))
       const recordOrganizationId = getRecordOrganizationId(record)
@@ -901,7 +901,7 @@ export default function PossessionPage() {
           <div className="filter-inline">
             <input
               className="app-input"
-              placeholder={(isAdmin || isProduction) ? 'Buscar por placa, secretaria, condutor ou contato' : 'Buscar por placa ou número da posse'}
+              placeholder={(isAdmin || isProduction) ? 'Buscar por placa, secretaria, condutor, matrícula ou contato' : 'Buscar por placa ou número da posse'}
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
