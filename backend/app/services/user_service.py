@@ -40,7 +40,7 @@ class UserService:
     async def create(self, data: UserCreate, current_user: User) -> User:
         existing = await self.users.get_by_email(data.email.lower())
         if existing:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="E-mail já cadastrado")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Este e-mail já está cadastrado. Localize o usuário na lista para editar o cadastro ou informe outro e-mail.")
 
         await self._ensure_unique_cpf(data.cpf)
         organization = await self._require_organization(data.organization_id)
@@ -101,7 +101,7 @@ class UserService:
         if payload.get("email") and payload["email"].lower() != user.email:
             existing = await self.users.get_by_email(payload["email"].lower())
             if existing and existing.id != user.id:
-                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="E-mail já cadastrado")
+                raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Este e-mail já está cadastrado. Localize o usuário na lista para editar o cadastro ou informe outro e-mail.")
 
         if payload.get("name") is not None:
             user.name = payload["name"].strip()
@@ -109,7 +109,7 @@ class UserService:
             user.email = payload["email"].lower()
         if "cpf" in payload:
             if not payload["cpf"]:
-                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="CPF nao pode ser removido")
+                raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="O CPF não pode ser removido. Informe um CPF válido para substituir o atual.")
             if payload["cpf"] != user.cpf:
                 await self._ensure_unique_cpf(payload["cpf"], exclude_id=user.id)
                 user.cpf = payload["cpf"]
@@ -244,13 +244,13 @@ class UserService:
     async def _require_organization(self, organization_id: UUID):
         organization = await self.master_data.get_organization(organization_id)
         if not organization:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Secretaria não encontrada")
+            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Secretaria não encontrada. Atualize a página e selecione uma secretaria disponível na lista.")
         return organization
 
     async def _ensure_unique_cpf(self, cpf: str, *, exclude_id: UUID | None = None) -> None:
         existing = await self.users.get_by_cpf(cpf)
         if existing and existing.id != exclude_id:
-            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"CPF {mask_cpf(cpf)} ja cadastrado")
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail=f"O CPF {mask_cpf(cpf)} já está vinculado a outro usuário. Confira o documento ou localize o cadastro existente na lista de usuários.")
 
     def _add_default_permissions(self, user: User) -> None:
         for module, flags in default_permissions_for_role(user.role.value).items():

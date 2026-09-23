@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import hmac
 import logging
+from app.core.validation_errors import validation_message
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
@@ -180,7 +181,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     safe_errors = [
         {
             "loc": error.get("loc", ()),
-            "msg": "Valor inválido",
+            "msg": validation_message(error),
             "type": error.get("type", "validation_error"),
         }
         for error in exc.errors()

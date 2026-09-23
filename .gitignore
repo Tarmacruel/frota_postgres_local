@@ -27,6 +27,8 @@ storage/backups/
 storage/logs/
 storage/runtime/
 storage/hotfix-backups/
+storage/deploy-verification/
+/output/playwright/driver-registration-*.png
 deploy/.ci-uploads/
 /data/
 /postgres-data/
