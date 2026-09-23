@@ -9,6 +9,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.organization_scope import production_scope_is_empty, scoped_organization_id
+from app.core.driver_registration import ensure_driver_registration
 from app.models.fine import Fine, FineInfraction, FineStatus
 from app.models.user import User
 from app.repositories.driver_repository import DriverRepository
@@ -70,6 +71,7 @@ class FineService:
             driver = await self.drivers.get_by_id(data.driver_id)
             if not driver:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
+            ensure_driver_registration(driver)
 
         payload = data.model_dump()
         payload["description"] = payload.get("description") or infraction.description
@@ -98,10 +100,12 @@ class FineService:
         await self._ensure_vehicle_visible_to_user(fine.vehicle_id, current_user)
 
         payload = data.model_dump(exclude_unset=True)
-        if "driver_id" in payload and payload["driver_id"]:
-            driver = await self.drivers.get_by_id(payload["driver_id"])
+        next_driver_id = payload.get("driver_id", fine.driver_id)
+        if next_driver_id:
+            driver = await self.drivers.get_by_id(next_driver_id)
             if not driver:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
+            ensure_driver_registration(driver)
         if "infraction_type_id" in payload and payload["infraction_type_id"]:
             infraction = await self._require_active_infraction(payload["infraction_type_id"])
             payload["description"] = payload.get("description") or infraction.description

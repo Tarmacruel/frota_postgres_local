@@ -11,6 +11,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
+from app.core.driver_registration import ensure_driver_registration
 from app.core.organization_scope import production_scope_is_empty, scoped_organization_id
 from app.models.possession import VehiclePossession
 from app.models.possession_photo import VehiclePossessionPhoto
@@ -918,6 +919,7 @@ class PossessionService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor selecionado não encontrado")
         if not driver.ativo:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Condutor selecionado está inativo")
+        ensure_driver_registration(driver)
 
         return {
             "driver_id": driver.id,

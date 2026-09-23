@@ -244,6 +244,7 @@ async def test_openapi_contains_new_routes(client):
     assert "organization_id" in driver_create["required"]
     assert "cnh_numero" in driver_create["properties"]
     assert "matricula" in driver_create["properties"]
+    assert "matricula" in driver_create["required"]
 
     driver_update = schemas["DriverUpdate"]
     assert "organization_id" in driver_update["properties"]

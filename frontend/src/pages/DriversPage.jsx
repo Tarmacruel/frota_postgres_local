@@ -13,6 +13,7 @@ import { DRIVER_LICENSE_CATEGORY_OPTIONS } from '../constants/driverCategories'
 const initialForm = {
   nome_completo: '',
   documento: '',
+  matricula: '',
   organization_id: '',
   contato: '',
   email: '',
@@ -75,6 +76,7 @@ export default function DriversPage() {
   const exportColumns = [
     { header: 'Nome completo', value: (item) => item.nome_completo },
     { header: 'Documento', value: (item) => item.documento },
+    { header: 'Matrícula', value: (item) => item.matricula || 'Não informada' },
     { header: 'Secretaria', value: (item) => item.organization_name || 'Não informada' },
     { header: 'Contato', value: (item) => item.contato || '-' },
     { header: 'E-mail', value: (item) => item.email || '-' },
@@ -108,16 +110,19 @@ export default function DriversPage() {
   }, [search, activeFilter, organizationFilter])
 
   function openCreateModal() {
+    setError('')
     setEditingRecord(null)
     setForm(initialForm)
     setIsModalOpen(true)
   }
 
   function openEditModal(record) {
+    setError('')
     setEditingRecord(record)
     setForm({
       nome_completo: record.nome_completo,
       documento: record.documento,
+      matricula: record.matricula || '',
       organization_id: record.organization_id || '',
       contato: record.contato || '',
       email: record.email || '',
@@ -135,6 +140,10 @@ export default function DriversPage() {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if (!form.matricula.trim()) {
+      setError('Informe a matrícula do condutor para prosseguir.')
+      return
+    }
     if ((editingRecord && !canEditDriver) || (!editingRecord && !canCreateDriver)) {
       setError('Você não tem permissão para salvar condutores.')
       return
@@ -149,6 +158,7 @@ export default function DriversPage() {
       setError('')
       const payload = {
         ...form,
+        matricula: form.matricula.trim(),
         contato: form.contato || null,
         email: form.email || null,
         cnh_validade: form.cnh_validade || null,
@@ -247,7 +257,7 @@ export default function DriversPage() {
             ))}
           </div>
           <div className="filter-inline">
-            <input className="app-input" placeholder="Buscar por nome, documento ou secretaria" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <input className="app-input" placeholder="Buscar por nome, matrícula, documento ou secretaria" value={search} onChange={(event) => setSearch(event.target.value)} />
             <select className="app-select" value={organizationFilter} onChange={(event) => setOrganizationFilter(event.target.value)}>
               <option value="TODAS">Todas as secretarias</option>
               {organizations.map((organization) => (
@@ -294,6 +304,7 @@ export default function DriversPage() {
               <tr>
                 <th>Nome</th>
                 <th>Documento</th>
+                <th>Matrícula</th>
                 <th>Secretaria</th>
                 <th>Contato</th>
                 <th>E-mail</th>
@@ -305,9 +316,9 @@ export default function DriversPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={canManageDriverActions ? 9 : 8} className="muted">Carregando condutores...</td></tr>
+                <tr><td colSpan={canManageDriverActions ? 10 : 9} className="muted">Carregando condutores...</td></tr>
               ) : !records.length ? (
-                <tr><td colSpan={canManageDriverActions ? 9 : 8}><div className="empty-state">Nenhum condutor encontrado para o filtro atual.</div></td></tr>
+                <tr><td colSpan={canManageDriverActions ? 10 : 9}><div className="empty-state">Nenhum condutor encontrado para o filtro atual.</div></td></tr>
               ) : (
                 records.map((record) => {
                   const cnhAlert = getCnhAlert(record.cnh_validade)
@@ -315,6 +326,7 @@ export default function DriversPage() {
                   <tr key={record.id}>
                     <td data-label="Nome"><strong>{record.nome_completo}</strong></td>
                     <td data-label="Documento">{record.documento}</td>
+                    <td data-label="Matrícula">{record.matricula || 'Não informada'}</td>
                     <td data-label="Secretaria">{record.organization_name || 'Não informada'}</td>
                     <td data-label="Contato">{record.contato || '-'}</td>
                     <td data-label="E-mail">{record.email || '-'}</td>
@@ -349,6 +361,7 @@ export default function DriversPage() {
         onClose={closeModal}
       >
         <form onSubmit={handleSubmit} className="stack">
+          {error ? <div className="alert alert-error" role="alert">{error}</div> : null}
           <AccordionSection title="Dados básicos" subtitle="Identificação e contato" open>
             <div className="form-grid modal-form-grid">
               <div className="form-field">
@@ -358,6 +371,10 @@ export default function DriversPage() {
               <div className="form-field">
                 <label htmlFor="driver-document">Documento</label>
                 <input id="driver-document" className="app-input" value={form.documento} onChange={(event) => setForm({ ...form, documento: event.target.value })} />
+              </div>
+              <div className="form-field">
+                <label htmlFor="driver-registration">Matrícula (obrigatória)</label>
+                <input id="driver-registration" className="app-input" required maxLength={30} value={form.matricula} onChange={(event) => setForm({ ...form, matricula: event.target.value })} />
               </div>
               <div className="form-field modal-field-span">
                 <label>Secretaria</label>

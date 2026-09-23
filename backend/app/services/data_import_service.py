@@ -565,6 +565,10 @@ class DataImportService:
         }
         official_extra = {key: value for key, value in official_extra.items() if value is not None}
         triage_extra = {column: raw.get(column) for column in DRIVER_TRIAGE_EXTRA_COLUMNS if self._present(raw.get(column))}
+        if not official_extra.get("matricula"):
+            errors.append("Campo obrigatório ausente: matricula")
+        elif len(official_extra["matricula"]) > 30:
+            errors.append("Matrícula deve ter no máximo 30 caracteres")
         return mapped, official_extra, triage_extra, errors, conflicts
 
     def _map_fine(self, raw: dict, key_counts: dict, context: dict) -> tuple[dict, dict, dict, list[str], list[str]]:
@@ -797,7 +801,9 @@ class DataImportService:
         for field in DRIVER_OFFICIAL_EXTRA_FIELDS:
             if field not in data:
                 continue
-            if field in {"data_nascimento", "data_emissao_cnh"}:
+            if field == "matricula":
+                payload[field] = str(data[field] or "").strip()
+            elif field in {"data_nascimento", "data_emissao_cnh"}:
                 payload[field] = self._date_from_iso(data[field])
             elif field == "ultimo_abastecimento":
                 payload[field] = self._datetime_from_iso(data[field])
@@ -810,8 +816,11 @@ class DataImportService:
             required = ("plate", "brand", "model", "vehicle_type", "ownership_type", "status", "allocation_id")
             return [f"Campo obrigatório ausente: {field}" for field in required if not data.get(field)]
         if entity_type == DataImportEntityType.DRIVER:
-            required = ("nome_completo", "documento", "organization_id", "cnh_categoria")
-            return [f"Campo obrigatório ausente: {field}" for field in required if not data.get(field)]
+            required = ("nome_completo", "documento", "organization_id", "cnh_categoria", "matricula")
+            errors = [f"Campo obrigatório ausente: {field}" for field in required if not str(data.get(field) or "").strip()]
+            if len(str(data.get("matricula") or "").strip()) > 30:
+                errors.append("Matrícula deve ter no máximo 30 caracteres")
+            return errors
         errors = [f"Campo obrigatório ausente: {field}" for field in ("ticket_number", "infraction_date", "amount") if not data.get(field)]
         if not data.get("vehicle_id") and not data.get("provisional_vehicle"):
             errors.append("Campo obrigatório ausente: vehicle_id")

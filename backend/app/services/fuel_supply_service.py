@@ -10,6 +10,7 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.organization_scope import ensure_organization_access, production_scope_is_empty, scoped_organization_id
 from app.core.config import settings
+from app.core.driver_registration import ensure_driver_registration
 from app.models.fuel_supply import FuelSupply
 from app.models.user import User, UserRole
 from app.repositories.driver_repository import DriverRepository
@@ -147,6 +148,7 @@ class FuelSupplyService:
             driver = await self.drivers.get_by_id(data.driver_id)
             if not driver:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
+            ensure_driver_registration(driver)
 
         if data.organization_id:
             organization = await self.master_data.get_organization(data.organization_id)

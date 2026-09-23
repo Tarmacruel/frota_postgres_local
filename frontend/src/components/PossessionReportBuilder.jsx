@@ -347,6 +347,7 @@ export default function PossessionReportBuilder({ vehicles = EMPTY_VEHICLES, ini
               <div className="report-driver-filter">
                 <span>Condutor</span>
                 <DriverSelect
+                  requireRegistration={false}
                   value={filters.driver_id}
                   onChange={(driver) => setFilters({ ...filters, driver_id: driver?.id || '' })}
                   placeholder="Todos os condutores"

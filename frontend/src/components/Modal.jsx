@@ -38,6 +38,9 @@ export default function Modal({ open, title, description, onClose, children, can
     }
 
     function handleKeyDown(event) {
+      // Only the top dialog handles keyboard navigation when a modal opens another.
+      const dialogs = document.querySelectorAll('.modal-shell[role="dialog"]')
+      if (dialogs[dialogs.length - 1] !== dialog) return
       if (event.key === 'Escape' && canClose) {
         event.preventDefault()
         onCloseRef.current?.()

@@ -212,6 +212,7 @@ async def test_driver_create_links_secretaria_and_records_audit():
     driver = await service.create(
         DriverCreate(
             nome_completo="Joao Motorista",
+            matricula="000123",
             documento="12345678900",
             organization_id=organization.id,
             contato=None,
@@ -340,6 +341,7 @@ async def test_driver_create_for_producao_allows_other_secretaria():
     driver = await service.create(
         DriverCreate(
             nome_completo="Cassio de Oliveira Farias",
+            matricula="000124",
             documento="22233344455",
             organization_id=target_organization.id,
             contato=None,
@@ -407,6 +409,7 @@ async def test_master_data_catalog_include_all_for_producao_returns_all_secretar
 async def test_possession_driver_snapshot_allows_driver_from_other_secretaria():
     driver = Driver(
         id=uuid4(),
+        matricula="000125",
         nome_completo="Cassio de Oliveira Farias",
         documento="22233344455",
         organization_id=uuid4(),
