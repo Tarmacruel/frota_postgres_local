@@ -132,6 +132,12 @@ class PossessionService:
     async def list_active(self, current_user: User | None = None) -> list[dict]:
         return await self.list(active=True, current_user=current_user)
 
+    async def get_odometer_suggestion(
+        self, vehicle_id: UUID, start_date: datetime, current_user: User,
+    ) -> dict | None:
+        await self._ensure_vehicle_exists(vehicle_id, current_user=current_user)
+        return await self.possessions.get_odometer_suggestion(vehicle_id, start_date)
+
     async def get_current_driver(self, vehicle_id: UUID, current_user: User | None = None) -> dict:
         await self._ensure_vehicle_exists(vehicle_id, current_user=current_user)
         record = await self.possessions.get_active_by_vehicle(vehicle_id)

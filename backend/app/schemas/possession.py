@@ -6,6 +6,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.schemas.common import PaginatedResponse
 
 
+class PossessionOdometerSuggestion(BaseModel):
+    odometer_km: float
+    end_date: datetime
+
+
 class PossessionCreate(BaseModel):
     vehicle_id: UUID
     driver_id: UUID | None = None

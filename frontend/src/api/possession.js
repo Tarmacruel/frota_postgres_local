@@ -1,6 +1,7 @@
 import api from './client'
 
 export const possessionAPI = {
+  getOdometerSuggestion: (params) => api.get('/possession/odometer-suggestion', { params }),
   list: (params) => api.get('/possession', { params }),
   listPaginated: (params) => api.get('/possession/paginated', { params }),
   listActive: () => api.get('/possession/active'),

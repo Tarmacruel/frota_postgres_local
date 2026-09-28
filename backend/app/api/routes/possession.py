@@ -18,6 +18,7 @@ from app.schemas.possession import (
     PossessionCreate,
     PossessionListResponse,
     PossessionOut,
+    PossessionOdometerSuggestion,
     PossessionPhotoCreate,
     PossessionTermPublicOut,
     PossessionUpdate,
@@ -244,6 +245,16 @@ async def list_possession_paginated(
         search=search,
         current_user=current_user,
     )
+
+
+@router.get("/odometer-suggestion", response_model=PossessionOdometerSuggestion | None)
+async def get_odometer_suggestion(
+    vehicle_id: UUID,
+    start_date: datetime,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("possession", "view")),
+):
+    return await PossessionService(db).get_odometer_suggestion(vehicle_id, start_date, current_user)
 
 
 @router.get("/active", response_model=list[PossessionOut])

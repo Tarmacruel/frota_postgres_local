@@ -198,6 +198,26 @@ class PossessionRepository:
             )
         )
 
+    async def get_odometer_suggestion(self, vehicle_id: UUID, start_date: datetime):
+        result = await self.db.execute(
+            select(VehiclePossession.end_odometer_km, VehiclePossession.end_date)
+            .where(
+                VehiclePossession.vehicle_id == vehicle_id,
+                VehiclePossession.end_date <= start_date,
+                VehiclePossession.end_odometer_km.is_not(None),
+            )
+            .order_by(
+                VehiclePossession.end_date.desc(),
+                VehiclePossession.created_at.desc(),
+                VehiclePossession.id.desc(),
+            )
+            .limit(1)
+        )
+        record = result.first()
+        if record is None:
+            return None
+        return {"odometer_km": record.end_odometer_km, "end_date": record.end_date}
+
     async def get_active_by_vehicle(
         self,
         vehicle_id: UUID,
