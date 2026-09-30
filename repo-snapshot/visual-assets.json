@@ -1,0 +1,142 @@
+[
+  {
+    "file": "references/current-state/original/01-inicio-dashboard.png",
+    "sha256": "e9e3f5c52eec8e7a974b60dfc6f6dff7ff854765c63e103721b50f59d16e0528",
+    "bytes": 464855
+  },
+  {
+    "file": "references/current-state/original/02-veiculos.png",
+    "sha256": "76ef8b9cf541c5b3a1433f5ba391d1815a7643480563ab67ee85c959e3b64434",
+    "bytes": 483911
+  },
+  {
+    "file": "references/current-state/original/03-emprestimos.png",
+    "sha256": "cfc93b34fb6012ca5b08ff65715b3b33cc222003ef79de46bab84c0e0bb45b86",
+    "bytes": 221086
+  },
+  {
+    "file": "references/current-state/original/04-posses-operacional.png",
+    "sha256": "4edbc85e9c76a33300be8827a25a26014e1badff46e151f1b770039e0863885a",
+    "bytes": 475313
+  },
+  {
+    "file": "references/current-state/original/05-condutores.png",
+    "sha256": "4da9ccbffce72bd238529c6f4c404d6cb100caf6f1d350514f6a0b4b4888cd40",
+    "bytes": 374249
+  },
+  {
+    "file": "references/current-state/original/06-manutencoes.png",
+    "sha256": "60845b0f47a5ac6e29469d1abc52a3e9d56cf7bf07054f5059de4120d6aaf88e",
+    "bytes": 247767
+  },
+  {
+    "file": "references/current-state/original/07-sinistros.png",
+    "sha256": "495149f1072d1b17cae44847ef15798f99363c4c152f79aaa5b3b896220eb8c8",
+    "bytes": 196186
+  },
+  {
+    "file": "references/current-state/original/08-multas.png",
+    "sha256": "bbd4e6b36a500a508e5ea1c5d7c5ea9990c550251ca1db9269c479ae135a3cb9",
+    "bytes": 214657
+  },
+  {
+    "file": "references/current-state/original/09-abastecimentos.png",
+    "sha256": "e9270cbedfa36e423b9cef51de8d5c88e725a933ca1fac90118f1a291ee66119",
+    "bytes": 491912
+  },
+  {
+    "file": "references/current-state/original/10-abastecimentos-historico.png",
+    "sha256": "a016d1606f6486adfb5edca5e3488fa6df67cf380c3180cba2c69bcd19a7503d",
+    "bytes": 468760
+  },
+  {
+    "file": "references/current-state/original/11-ordens-abertas.png",
+    "sha256": "8ae5c3ed1ba50e5dff5f4c2ebf7d6db772f5f327c1e1ca484cd4df3a8132e4fc",
+    "bytes": 503993
+  },
+  {
+    "file": "references/current-state/original/12-cadastros.png",
+    "sha256": "874bca5a2e05e9e6d2db66cb88c364bea7e028949efc88157528afa2b56137ba",
+    "bytes": 275378
+  },
+  {
+    "file": "references/current-state/original/13-postos.png",
+    "sha256": "b2248e11f02d9c710848b97967c5662d3b2338c25c1d6701e65f7a3b0f43f7fc",
+    "bytes": 239072
+  },
+  {
+    "file": "references/current-state/original/14-processos-pagamento-processos.png",
+    "sha256": "e5113c42a2ea877ed51927002da779e47bcee50b15dbb7c60eea23a38c39a395",
+    "bytes": 479857
+  },
+  {
+    "file": "references/current-state/original/15-processos-pagamento-gestao-contrato.png",
+    "sha256": "553660519f857b467bebddcf0dd232796b922750b017f5b1ccd2b17f6c0de31b",
+    "bytes": 423965
+  },
+  {
+    "file": "references/current-state/original/16-processos-pagamento-contratos.png",
+    "sha256": "81401048583865e5b635afd8c516bc731598e662c91ee1eb404a7809663a8f97",
+    "bytes": 229470
+  },
+  {
+    "file": "references/current-state/original/17-processos-pagamento-fornecedores.png",
+    "sha256": "417da49a59a76eb19a837bb282dc3ad13b20dbcf6bcb43f3777455c639ffbe6d",
+    "bytes": 234391
+  },
+  {
+    "file": "references/current-state/original/18-analises.png",
+    "sha256": "d95090a436846313a6f99db44ce5059e530a9c9b77ad855033364a43b568c88b",
+    "bytes": 406134
+  },
+  {
+    "file": "references/current-state/original/19-importar-exportar.png",
+    "sha256": "6de89920fa4e8c5aa3406bac8f9b0f918341b1f9233156619e513f5c7e1724bf",
+    "bytes": 384361
+  },
+  {
+    "file": "references/current-state/original/20-usuarios.png",
+    "sha256": "c76c4d2690015d3fb3d5969867984041d1ef8d8160e1bbaaa0143edac2dd0b8f",
+    "bytes": 587683
+  },
+  {
+    "file": "references/current-state/original/21-auditoria.png",
+    "sha256": "5ae9eaeff5693e5f665bca7be8a269c7a72670a7f9259196517be73eaac2793c",
+    "bytes": 627788
+  },
+  {
+    "file": "references/current-state/original/22-dashboard-dark-amostra.png",
+    "sha256": "902fc685a82f2f749cc0882346b5c657c568349e91c6281b65a2e4415c2074fe",
+    "bytes": 845910
+  },
+  {
+    "file": "references/current-state/original/23-dashboard-light-amostra.png",
+    "sha256": "bdabbc0bda26507366bee7f5fc94febe0f90a233e2156cff45bbbfc91361ac41",
+    "bytes": 476372
+  },
+  {
+    "file": "references/current-state/original/24-posses-dark-amostra.png",
+    "sha256": "b93ce35c5f6f30171199107b0f7c709d92ea830891e4567c1914a7dfd6d8d1a9",
+    "bytes": 559554
+  },
+  {
+    "file": "references/current-state/original/25-posses-light-amostra.png",
+    "sha256": "fb39def75efb751bfc06fc95528d7b6e9dc4f34bc492337dbe328d0c778367d2",
+    "bytes": 388600
+  },
+  {
+    "file": "references/target/00-conceito-geral.png",
+    "sha256": "66b746e75cc52a389f31882e29cb2bf943b82229c946ff046b8bbbc863de1569",
+    "bytes": 1614301
+  },
+  {
+    "file": "references/target/01-design-system-board.png",
+    "sha256": "c16ba96bb6d2f1bc9c75edaa5010dc8019f62116a17ba1d8e54f033f8c4583f7",
+    "bytes": 1559955
+  },
+  {
+    "file": "references/target/02-telas-alvo-board.png",
+    "sha256": "c16ba96bb6d2f1bc9c75edaa5010dc8019f62116a17ba1d8e54f033f8c4583f7",
+    "bytes": 1559955
+  }
+]

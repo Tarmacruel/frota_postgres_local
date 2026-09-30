@@ -1,0 +1,7 @@
+{
+  "repository": "Tarmacruel/frota_postgres_local",
+  "branch": "feature/certificado-digital-hml",
+  "head_observed": "12150b19919b999cd47668abe4c3e6b5f3504329",
+  "commit_message": "feat: sugere odometro inicial com historico de posses",
+  "observed_on": "2026-09-30"
+}

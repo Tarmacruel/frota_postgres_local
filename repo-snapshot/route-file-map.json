@@ -1,0 +1,17 @@
+{
+  "/": "DashboardPage.jsx",
+  "/vehicles": "VehiclesPage.jsx",
+  "/posses": "PossessionPage.jsx",
+  "/condutores": "DriversPage.jsx",
+  "/manutencoes": "MaintenancePage.jsx",
+  "/sinistros": "ClaimsPage.jsx",
+  "/multas": "FinesPage.jsx",
+  "/abastecimentos": "FuelSuppliesPage.jsx",
+  "/postos": "FuelStationsPage.jsx",
+  "/ordens-abastecimento": "FuelSupplyOrdersPage.jsx",
+  "/processos-pagamento": "PaymentProcessesPage.jsx",
+  "/users": "UsersPage.jsx",
+  "/analytics": "AdminAnalyticsDashboard.jsx",
+  "/importacao-dados": "DataImportsPage.jsx",
+  "/auditoria": "AuditPage.jsx"
+}
