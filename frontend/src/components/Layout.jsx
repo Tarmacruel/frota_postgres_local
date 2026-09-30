@@ -58,7 +58,7 @@ export default function Layout() {
   const navSections = useMemo(() => {
     const sections = [
       {
-        title: 'Visao geral',
+        title: 'Visão geral',
         items: [
           { to: '/', label: 'Início', description: 'Resumo', icon: 'dashboard' },
         ],
@@ -417,7 +417,7 @@ export default function Layout() {
 
       <button type="button" className={`sidebar-scrim${navOpen ? ' is-visible' : ''}`} aria-label="Fechar navegação" onClick={() => setNavOpen(false)} />
 
-      <aside className={`app-sidebar${navOpen ? ' is-open' : ''}${sidebarCompact ? ' is-compact' : ''}`}>
+      <aside className={`app-sidebar${navOpen ? ' is-open' : ''}${sidebarCompact ? ' is-compact' : ''}`} aria-label="Navegação principal">
         <div className="sidebar-head">
           <div className="brand-block">
             <div className="brand-mark brand-mark-official">
@@ -451,12 +451,14 @@ export default function Layout() {
               <strong>{user?.name || officialBrand.systemName}</strong>
               <span>{roleLabel}</span>
             </div>
-            <button type="button" className="icon-button account-action" aria-label="Alterar senha" onClick={() => setPasswordModalOpen(true)}>
-              <AppIcon name="users" className="app-icon" />
-            </button>
-            <button type="button" className="icon-button account-action" aria-label="Encerrar sessão" onClick={handleLogout}>
-              <AppIcon name="logout" className="app-icon" />
-            </button>
+            <div className="account-actions">
+              <button type="button" className="icon-button account-action" aria-label="Alterar senha" onClick={() => setPasswordModalOpen(true)}>
+                <AppIcon name="users" className="app-icon" />
+              </button>
+              <button type="button" className="icon-button account-action" aria-label="Encerrar sessão" onClick={handleLogout}>
+                <AppIcon name="logout" className="app-icon" />
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -495,33 +497,38 @@ export default function Layout() {
             </button>
 
 
-            {isAdmin && !accessBlocked ? (
-              <button
-                type="button"
-                className="icon-button theme-button"
-                aria-label="Abrir central de notificações"
-                title="Central de notificações"
-                onClick={openNotificationsCenter}
-              >
-                <AppIcon name="audit" className="app-icon" />
-                {unreadNotifications > 0 ? <span className="badge-counter">{unreadNotifications > 99 ? '99+' : unreadNotifications}</span> : null}
+            <div className="topbar-system-actions" aria-label="Ações do sistema">
+              {isAdmin && !accessBlocked ? (
+                <button
+                  type="button"
+                  className="icon-button theme-button"
+                  aria-label="Abrir central de notificações"
+                  title="Central de notificações"
+                  onClick={openNotificationsCenter}
+                >
+                  <AppIcon name="audit" className="app-icon" />
+                  {unreadNotifications > 0 ? <span className="badge-counter">{unreadNotifications > 99 ? '99+' : unreadNotifications}</span> : null}
+                </button>
+              ) : null}
+              {!accessBlocked ? (
+                <button
+                  type="button"
+                  className="icon-button theme-button"
+                  aria-label="Abrir assinaturas pendentes"
+                  title="Assinaturas pendentes"
+                  onClick={() => setSignatureRequestsOpen(true)}
+                >
+                  <AppIcon name="audit" className="app-icon" />
+                  {pendingSignatureRequests.length > 0 ? <span className="badge-counter">{pendingSignatureRequests.length > 99 ? '99+' : pendingSignatureRequests.length}</span> : null}
+                </button>
+              ) : null}
+              <button type="button" className="icon-button theme-button" aria-label={darkMode ? 'Ativar modo claro' : 'Ativar modo escuro'} title={darkMode ? 'Modo claro' : 'Modo escuro'} onClick={() => setDarkMode((current) => !current)}>
+                <AppIcon name={darkMode ? 'sun' : 'moon'} className="app-icon" />
               </button>
-            ) : null}
-            {!accessBlocked ? (
-              <button
-                type="button"
-                className="icon-button theme-button"
-                aria-label="Abrir assinaturas pendentes"
-                title="Assinaturas pendentes"
-                onClick={() => setSignatureRequestsOpen(true)}
-              >
-                <AppIcon name="audit" className="app-icon" />
-                {pendingSignatureRequests.length > 0 ? <span className="badge-counter">{pendingSignatureRequests.length > 99 ? '99+' : pendingSignatureRequests.length}</span> : null}
-              </button>
-            ) : null}
-            <button type="button" className="icon-button theme-button" aria-label={darkMode ? 'Ativar modo claro' : 'Ativar modo escuro'} title={darkMode ? 'Modo claro' : 'Modo escuro'} onClick={() => setDarkMode((current) => !current)}>
-              <AppIcon name={darkMode ? 'sun' : 'moon'} className="app-icon" />
-            </button>
+              <span className="topbar-user" title={`${user?.name || officialBrand.systemName} · ${roleLabel}`} aria-label={`Usuário: ${user?.name || officialBrand.systemName}. Perfil: ${roleLabel}`}>
+                {getInitials(user?.name)}
+              </span>
+            </div>
           </div>
         </header>
 

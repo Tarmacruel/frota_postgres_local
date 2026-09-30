@@ -288,3 +288,433 @@
   .ui-action-menu__item,
   .ui-icon-button { transition: none; }
 }
+
+/* Phase 2 — global application shell */
+body.internal-app-active {
+  background: var(--ui-app-bg);
+}
+
+body.internal-app-active .app-shell {
+  gap: var(--ui-space-2);
+  padding: var(--ui-space-2);
+  background: var(--ui-app-bg);
+}
+
+body.internal-app-active .app-sidebar {
+  color: #dce7f6;
+  background: var(--ui-sidebar-bg);
+  border-color: #20324b;
+  box-shadow: 0 12px 28px rgb(3 10 22 / 0.22);
+  backdrop-filter: none;
+}
+
+body.internal-app-active .sidebar-head {
+  min-height: 40px;
+  padding: 0 2px 8px;
+  border-bottom: 1px solid rgb(148 163 184 / 0.16);
+}
+
+body.internal-app-active .brand-block {
+  gap: var(--ui-space-2);
+}
+
+body.internal-app-active .brand-mark {
+  flex: 0 0 auto;
+  background: #ffffff;
+  border-color: rgb(255 255 255 / 0.22);
+  box-shadow: 0 4px 14px rgb(0 0 0 / 0.2);
+}
+
+body.internal-app-active .brand-name {
+  color: #ffffff;
+  letter-spacing: -0.025em;
+}
+
+body.internal-app-active .brand-subtitle {
+  color: #91a4bf;
+}
+
+body.internal-app-active .sidebar-scroll {
+  gap: 12px;
+  scrollbar-color: #415675 transparent;
+  scrollbar-width: thin;
+}
+
+body.internal-app-active .nav-section {
+  gap: var(--ui-space-1);
+}
+
+body.internal-app-active .nav-section-title {
+  padding: 0 8px;
+  color: #8194af;
+  font-size: 0.62rem;
+  line-height: 1.4;
+  letter-spacing: 0.13em;
+}
+
+body.internal-app-active .nav-group {
+  gap: 2px;
+}
+
+body.internal-app-active .nav-link {
+  min-height: 36px;
+  gap: var(--ui-space-2);
+  padding: 5px 8px;
+  color: #b9c7da;
+  border-color: transparent;
+  border-radius: var(--ui-radius-control);
+  transition: color var(--ui-motion-fast) ease, background-color var(--ui-motion-fast) ease, border-color var(--ui-motion-fast) ease;
+}
+
+body.internal-app-active .nav-link:hover {
+  color: #ffffff;
+  background: rgb(255 255 255 / 0.07);
+  border-color: rgb(148 163 184 / 0.14);
+}
+
+body.internal-app-active .app-sidebar .nav-link.active {
+  color: #ffffff;
+  background: var(--ui-primary);
+  border-color: #5b8df5;
+  box-shadow: 0 5px 14px rgb(37 99 235 / 0.24);
+}
+
+body.internal-app-active .nav-icon {
+  width: 26px;
+  height: 26px;
+  color: #9fb5d2;
+  background: rgb(255 255 255 / 0.035);
+  border-color: rgb(148 163 184 / 0.15);
+}
+
+body.internal-app-active .app-sidebar .nav-link:hover .nav-icon,
+body.internal-app-active .app-sidebar .nav-link.active .nav-icon {
+  color: #ffffff;
+  background: rgb(255 255 255 / 0.1);
+  border-color: rgb(255 255 255 / 0.2);
+}
+
+body.internal-app-active .nav-label {
+  font-size: 0.8rem;
+  line-height: 1.2;
+}
+
+body.internal-app-active .nav-link::after {
+  display: none;
+}
+
+body.internal-app-active .sidebar-footer {
+  padding-top: var(--ui-space-2);
+  border-top: 1px solid rgb(148 163 184 / 0.16);
+}
+
+body.internal-app-active .account-card {
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  gap: var(--ui-space-2);
+  padding: 7px;
+  color: #eef4fc;
+  background: #0d1d32;
+  border-color: #293d59;
+}
+
+body.internal-app-active .account-avatar,
+body.internal-app-active .topbar-user {
+  background: var(--ui-primary);
+  color: #ffffff;
+}
+
+body.internal-app-active .account-meta span {
+  color: #8fa4c0;
+}
+
+body.internal-app-active .account-actions,
+body.internal-app-active .topbar-system-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-1);
+}
+
+body.internal-app-active .app-sidebar .icon-button {
+  color: #a9bad0;
+  background: rgb(255 255 255 / 0.04);
+  border-color: rgb(148 163 184 / 0.2);
+}
+
+body.internal-app-active .app-sidebar .icon-button:hover {
+  color: #ffffff;
+  background: rgb(255 255 255 / 0.1);
+  border-color: rgb(148 163 184 / 0.34);
+}
+
+body.internal-app-active .content-shell {
+  gap: var(--ui-space-2);
+}
+
+body.internal-app-active .app-topbar {
+  min-height: 48px;
+  gap: var(--ui-space-2);
+  padding: 7px 10px;
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
+  box-shadow: var(--ui-shadow-sm);
+  backdrop-filter: none;
+}
+
+body.internal-app-active .topbar-leading,
+body.internal-app-active .topbar-actions {
+  gap: var(--ui-space-2);
+}
+
+body.internal-app-active .topbar-route-title {
+  color: var(--ui-text);
+  font-size: 1rem;
+  line-height: 1.2;
+  letter-spacing: -0.02em;
+}
+
+body.internal-app-active .topbar-kicker {
+  color: var(--ui-text-muted);
+}
+
+body.internal-app-active .topbar-search-trigger {
+  height: 34px;
+  max-width: 390px;
+  padding: 0 8px 0 10px;
+  color: var(--ui-text-muted);
+  background: var(--ui-surface-subtle);
+  border-color: var(--ui-control-border);
+  border-radius: var(--ui-radius-control);
+  transition: color var(--ui-motion-fast) ease, background-color var(--ui-motion-fast) ease, border-color var(--ui-motion-fast) ease;
+}
+
+body.internal-app-active .topbar-search-trigger:hover {
+  color: var(--ui-text);
+  background: var(--ui-surface-hover);
+  border-color: var(--ui-primary);
+}
+
+body.internal-app-active .topbar-search-hint {
+  min-width: 44px;
+  height: 22px;
+  padding: 0 6px;
+  color: var(--ui-text-muted);
+  background: var(--ui-surface);
+  border: 1px solid var(--ui-border);
+}
+
+body.internal-app-active .app-topbar .icon-button {
+  color: var(--ui-text-muted);
+  background: var(--ui-surface-subtle);
+  border-color: var(--ui-control-border);
+}
+
+body.internal-app-active .app-topbar .icon-button:hover {
+  color: var(--ui-primary);
+  background: var(--ui-surface-hover);
+  border-color: var(--ui-primary);
+}
+
+body.internal-app-active .topbar-user {
+  width: 32px;
+  height: 32px;
+  display: inline-grid;
+  place-items: center;
+  flex: 0 0 auto;
+  border: 1px solid color-mix(in srgb, var(--ui-primary) 74%, white);
+  border-radius: 50%;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+body.internal-app-active .mobile-bottom-bar {
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
+  box-shadow: var(--ui-shadow-menu);
+  backdrop-filter: none;
+}
+
+body.internal-app-active .mobile-bottom-link {
+  color: var(--ui-text-muted);
+}
+
+body.internal-app-active .mobile-bottom-link.active {
+  color: var(--ui-primary);
+  background: color-mix(in srgb, var(--ui-primary) 10%, var(--ui-surface));
+}
+
+:root[data-theme='dark'] body.internal-app-active .app-topbar {
+  box-shadow: 0 8px 22px rgb(0 0 0 / 0.18);
+}
+
+:root[data-theme='dark'] body.internal-app-active .topbar-search-trigger,
+:root[data-theme='dark'] body.internal-app-active .app-topbar .icon-button {
+  border-color: #38506f;
+}
+
+@media (max-width: 720px) {
+  body.internal-app-active .app-shell {
+    gap: 6px;
+    padding: 6px;
+  }
+
+  body.internal-app-active .app-sidebar {
+    top: 48px;
+    left: 6px;
+    bottom: 6px;
+    width: min(276px, calc(100vw - 12px));
+  }
+
+  body.internal-app-active .app-topbar {
+    padding: 8px;
+  }
+
+  body.internal-app-active .topbar-actions {
+    justify-content: stretch;
+  }
+
+  body.internal-app-active .topbar-search-trigger {
+    flex: 1 1 100%;
+    max-width: none;
+    order: 2;
+  }
+
+  body.internal-app-active .topbar-system-actions {
+    margin-left: auto;
+  }
+
+  body.internal-app-active .topbar-user {
+    display: none;
+  }
+}
+
+@media (min-width: 721px) and (max-width: 1179px) {
+  body.internal-app-active .app-shell .app-sidebar {
+    top: 42px;
+  }
+
+  body.internal-app-active .app-topbar {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  body.internal-app-active .topbar-leading {
+    flex: 0 1 auto;
+  }
+
+  body.internal-app-active .topbar-actions {
+    min-width: 0;
+    flex: 1 1 auto;
+  }
+
+  body.internal-app-active .topbar-search-trigger {
+    flex: 1 1 260px;
+    margin-left: auto;
+  }
+}
+
+@media (max-width: 1179px) {
+  body.internal-app-active .sidebar-scrim {
+    position: fixed;
+    inset: 0;
+    z-index: 110;
+    display: block;
+    visibility: hidden;
+    border: 0;
+    background: rgb(3 10 22 / 0.56);
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 180ms ease, visibility 180ms ease;
+  }
+
+  body.internal-app-active .sidebar-scrim.is-visible {
+    visibility: visible;
+    opacity: 1;
+    pointer-events: auto;
+  }
+}
+
+@media (min-width: 900px) and (max-width: 1179px) {
+  body.internal-app-active .app-shell .mobile-only {
+    display: inline-flex;
+  }
+
+  body.internal-app-active .app-shell .desktop-only {
+    display: none;
+  }
+}
+
+@media (min-width: 1180px) {
+  body.internal-app-active .app-shell {
+    grid-template-columns: 228px minmax(0, 1fr);
+  }
+
+  body.internal-app-active .app-shell.sidebar-compact {
+    grid-template-columns: 72px minmax(0, 1fr);
+  }
+
+  body.internal-app-active .app-sidebar {
+    top: 8px;
+    min-height: calc(100vh - 16px);
+    padding: 10px 8px 8px;
+  }
+
+  body.internal-app-active .app-sidebar.is-compact .nav-link {
+    justify-content: center;
+    padding: 5px;
+  }
+
+  body.internal-app-active .app-sidebar.is-compact .nav-link::after {
+    content: attr(aria-label);
+    position: absolute;
+    left: calc(100% + 10px);
+    top: 50%;
+    z-index: 160;
+    display: block;
+    width: max-content;
+    max-width: 220px;
+    padding: 7px 9px;
+    color: var(--ui-text);
+    background: var(--ui-surface);
+    border: 1px solid var(--ui-border);
+    border-radius: var(--ui-radius-control);
+    box-shadow: var(--ui-shadow-menu);
+    opacity: 0;
+    pointer-events: none;
+    transform: translate(-4px, -50%);
+    transition: opacity var(--ui-motion-fast) ease, transform var(--ui-motion-fast) ease;
+  }
+
+  body.internal-app-active .app-sidebar.is-compact .nav-link:hover::after,
+  body.internal-app-active .app-sidebar.is-compact .nav-link:focus-visible::after {
+    opacity: 1;
+    transform: translate(0, -50%);
+  }
+
+  body.internal-app-active .app-sidebar.is-compact .account-card {
+    grid-template-columns: 1fr;
+    justify-items: center;
+  }
+
+  body.internal-app-active .app-sidebar.is-compact .account-actions {
+    flex-direction: column;
+  }
+
+  body.internal-app-active .app-topbar {
+    flex-direction: row;
+    align-items: center;
+  }
+
+  body.internal-app-active .topbar-leading {
+    flex: 1 1 auto;
+  }
+
+  body.internal-app-active .topbar-actions {
+    flex: 1 1 auto;
+  }
+
+  body.internal-app-active .topbar-search-trigger {
+    flex: 0 1 390px;
+    margin-left: auto;
+  }
+}

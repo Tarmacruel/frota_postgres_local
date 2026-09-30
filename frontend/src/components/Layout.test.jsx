@@ -91,6 +91,44 @@ function mobileRoutes() {
   return within(navigation).getAllByRole('link').map((link) => link.getAttribute('href'))
 }
 
+describe('Layout global shell', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    window.localStorage.clear()
+    window.scrollTo = vi.fn()
+    mocks.allowedModules = new Set(['vehicles', 'vehicle_loans', 'possession', 'drivers'])
+    mocks.creatableModules = new Set()
+    mocks.canView.mockImplementation((module) => mocks.allowedModules.has(module))
+    mocks.canCreate.mockReturnValue(false)
+    mocks.mustChangePassword = false
+    mocks.mustRegisterCpf = false
+    mocks.pendingLoans.mockResolvedValue({ data: { total: 0 } })
+  })
+
+  it('preserva navegação, identidade, tema e preferência da sidebar', async () => {
+    const user = userEvent.setup()
+    const { container } = renderLayout('/vehicles')
+
+    expect(screen.getByRole('complementary', { name: 'Navegação principal' })).toBeInTheDocument()
+    expect(screen.getByRole('navigation', { name: 'Visão geral' })).toBeInTheDocument()
+    expect(screen.getByRole('link', { name: 'Veículos. Frota' })).toHaveAttribute('aria-current', 'page')
+    expect(screen.getByLabelText('Usuário: Servidor responsável. Perfil: Produção')).toHaveTextContent('SR')
+
+    await user.click(screen.getByRole('button', { name: 'Ativar modo escuro' }))
+    expect(document.documentElement).toHaveAttribute('data-theme', 'dark')
+    expect(window.localStorage.getItem('frota-theme')).toBe('dark')
+
+    await user.click(screen.getByRole('button', { name: 'Abrir navegação' }))
+    expect(container.querySelector('.app-sidebar')).toHaveClass('is-open')
+    await user.click(screen.getAllByRole('button', { name: 'Fechar navegação' })[0])
+    expect(container.querySelector('.app-sidebar')).not.toHaveClass('is-open')
+
+    await user.click(screen.getByRole('button', { name: 'Rebater menu lateral' }))
+    expect(container.querySelector('.app-shell')).toHaveClass('sidebar-compact')
+    expect(window.localStorage.getItem('frota-sidebar-compact')).toBe('1')
+  })
+})
+
 it('exibe contador de empréstimos no menu sem apagá-lo ao abrir a guia', async () => {
   mocks.allowedModules = new Set(['vehicle_loans'])
   mocks.canView.mockImplementation((module) => mocks.allowedModules.has(module))

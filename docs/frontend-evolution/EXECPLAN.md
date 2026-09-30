@@ -1,5 +1,23 @@
 ﻿# ExecPlan — Fase 0 — Baseline e segurança
 
+## Continuação autorizada — Fase 2 — 30/09/2026
+
+Objetivo: evoluir somente o shell global, preservando rotas, permissões, notificações, usuário, busca, tema e todo o conteúdo das páginas. Estado inicial verificado: branch `feature/frontend-evolution-hml`, HEAD `1880e58`, working tree limpo; baseline herdado da Fase 1 com 190 testes aprovados no pool `forks`, 16 falhas preexistentes no comando padrão, lint sem erros/46 avisos e build aprovado.
+
+Tese visual: uma moldura institucional escura e estável organiza uma área de trabalho clara, densa e silenciosa. Plano de conteúdo: marca e grupos na sidebar; rota e busca na topbar; ações de sistema e identidade do usuário agrupadas ao final. Tese de interação: transições curtas no estado ativo, no recolhimento da sidebar e no drawer responsivo, sempre respeitando redução de movimento.
+
+Arquivos previstos: `frontend/src/components/Layout.jsx`, `frontend/src/styles/frontend-evolution.css`, testes diretos do Layout, este ExecPlan, `STATUS.md` e relatório/evidências da fase. Não alterar páginas, rotas, APIs, regras condicionais, backend ou configuração de homologação/produção.
+
+- [x] Reorganizar apenas agrupamentos semânticos do shell, sem remover controles.
+- [x] Aplicar sidebar escura, estado ativo, topbar e superfícies equivalentes nos dois temas.
+- [x] Validar desktop, tablet/drawer, busca, tema, usuário e notificações.
+- [x] Rodar testes, lint e build; comparar com o baseline.
+- [x] Capturar claro/escuro, atualizar STATUS, registrar commit e parar.
+
+Resultado: sidebar de 228 px/72 px compacta no desktop, drawer abaixo da faixa de homologação em larguras menores, scrim clicável até 1179 px, topbar de 48 px, busca e ações preservadas, avatar contextual e contraste equivalente. `npm run test` manteve as 16 falhas preexistentes (175 aprovados); pool `forks` aprovou 191; lint manteve 0 erros/46 avisos; build aprovado. Evidências e detalhes em `PHASE_2_SHELL.md`.
+
+Rollback: reverter exclusivamente o commit da Fase 2; não há migration, dependência nova ou alteração de dados.
+
 ## Continuação autorizada — Fase 1 — 30/09/2026
 
 Usuário autorizou somente tokens, folha CSS aditiva, seis componentes base e miniaturas. Estado inicial desta fase: branch `feature/frontend-evolution-hml`, HEAD `a71c9c0`, working tree limpo. Aplicar a lista de arquivos prevista abaixo; não reorganizar páginas nem alterar o runner de testes.
