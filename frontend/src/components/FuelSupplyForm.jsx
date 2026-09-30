@@ -154,7 +154,7 @@ export default function FuelSupplyForm({ vehicles, drivers, organizations, fuelS
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
       <div className="form-field">
         <label>Veículo</label>
-        <SearchableSelect value={form.vehicle_id} onChange={(value) => setForm({ ...form, vehicle_id: value })} options={vehicles.map(buildVehicleOption)} placeholder="Selecione o veículo" searchPlaceholder="Buscar veículo" />
+        <SearchableSelect value={form.vehicle_id} onChange={(value) => setForm({ ...form, vehicle_id: value })} options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(buildVehicleOption)} placeholder="Selecione o veículo" searchPlaceholder="Buscar veículo" />
       </div>
       <div className="form-field">
         <label>Condutor</label>

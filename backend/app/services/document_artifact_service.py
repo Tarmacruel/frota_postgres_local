@@ -30,6 +30,8 @@ from app.services.audit_service import AuditService
 
 CANONICAL_ARTIFACT_DOCUMENT_TYPES = frozenset(
     {
+        DigitalDocumentType.VEHICLE_LOAN_DELIVERY_TERM,
+        DigitalDocumentType.VEHICLE_LOAN_RETURN_TERM,
         DigitalDocumentType.POSSESSION_RESPONSIBILITY_TERM,
         DigitalDocumentType.FUEL_SUPPLY_ORDER,
     }
@@ -172,7 +174,12 @@ class DocumentArtifactService:
         *,
         homologation_watermark: bool,
     ) -> tuple[bytes, dict]:
-        if document.document_type == DigitalDocumentType.POSSESSION_RESPONSIBILITY_TERM:
+        if document.document_type in {DigitalDocumentType.VEHICLE_LOAN_DELIVERY_TERM, DigitalDocumentType.VEHICLE_LOAN_RETURN_TERM}:
+            from app.services.vehicle_loan_pdf_service import VehicleLoanPdfService
+            content = VehicleLoanPdfService.build(document.snapshot, content_hash=document.content_hash)
+            metadata = {'schema_version': 'vehicle-loan-term.v1', 'scope': 'VEHICLE_LOAN',
+                        'test_environment': document.snapshot.get('test_environment', False)}
+        elif document.document_type == DigitalDocumentType.POSSESSION_RESPONSIBILITY_TERM:
             from app.services.possession_term_pdf_service import PossessionTermPdfService
 
             content = PossessionTermPdfService.build_canonical_delivery_pdf(

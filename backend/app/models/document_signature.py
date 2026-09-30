@@ -26,6 +26,8 @@ class DocumentSignatureRequestStatus:
 
 
 class DigitalDocumentType:
+    VEHICLE_LOAN_DELIVERY_TERM = "VEHICLE_LOAN_DELIVERY_TERM"
+    VEHICLE_LOAN_RETURN_TERM = "VEHICLE_LOAN_RETURN_TERM"
     POSSESSION_RESPONSIBILITY_TERM = "POSSESSION_RESPONSIBILITY_TERM"
     POSSESSION_LOAN_TERM = "POSSESSION_LOAN_TERM"
     POSSESSION_RETURN_TERM = "POSSESSION_RETURN_TERM"
@@ -75,6 +77,8 @@ class DocumentSignatureValidationStatus:
 class DigitalDocument(Base):
     __tablename__ = "digital_documents"
     __table_args__ = (
+        Index('uq_vehicle_loan_term_source', 'source_id', 'document_type', unique=True,
+              postgresql_where=text("source_type = 'VEHICLE_LOAN'")),
         Index("idx_digital_documents_source", "source_type", "source_id", "document_type"),
         Index("idx_digital_documents_status", "status"),
         Index("idx_digital_documents_content_hash", "content_hash"),

@@ -578,7 +578,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess, onUnautho
         <SearchableSelect
           value={form.vehicle_id}
           onChange={handleVehicleChange}
-          options={vehicles.map(buildVehicleOption)}
+          options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(buildVehicleOption)}
           placeholder="Selecione o veículo"
           searchPlaceholder="Buscar veículo por placa, modelo, chassi ou lotação"
           emptyLabel="Nenhum veículo disponível."

@@ -13,6 +13,8 @@ from uuid import UUID
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import Text, cast, func, or_, select
 from sqlalchemy.exc import IntegrityError
+from app.services.operational_scope import attribute_operation, ensure_registration_manager
+from app.core.vehicle_handoff import lock_vehicle_handoff, prevent_loan_location_bypass
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -674,11 +676,14 @@ class DataImportService:
                 ownership_type=VehicleOwnershipType(data["ownership_type"]),
                 status=VehicleStatus(data["status"]),
             )
+            vehicle.owner_organization_id = await self.db.scalar(select(Department.organization_id).join(Allocation, Allocation.department_id == Department.id).where(Allocation.id == allocation_id))
             self._assign_vehicle_extra(vehicle, data)
             self.db.add(vehicle)
             await self.db.flush()
             self.db.add(LocationHistory(vehicle_id=vehicle.id, allocation_id=allocation_id, department="Importação de dados"))
         else:
+            await lock_vehicle_handoff(self.db, vehicle.id)
+            await ensure_registration_manager(self.db, vehicle.id, current_user)
             for field in ("plate", "chassis_number", "brand", "model"):
                 if data.get(field):
                     setattr(vehicle, field, data[field])
@@ -688,6 +693,7 @@ class DataImportService:
             self._assign_vehicle_extra(vehicle, data)
             active = await self._get_active_vehicle_history(vehicle.id)
             if not active or active.allocation_id != allocation_id:
+                await prevent_loan_location_bypass(self.db, vehicle.id)
                 if active:
                     active.end_date = datetime.now(timezone.utc)
                 self.db.add(LocationHistory(vehicle_id=vehicle.id, allocation_id=allocation_id, department="Importação de dados"))
@@ -763,6 +769,7 @@ class DataImportService:
             for field, value in payload.items():
                 setattr(fine, field, value)
 
+        await attribute_operation(self.db, fine, current_user, new=action == "CREATE")
         await self.db.flush()
         await self.audit.record(
             actor=current_user,

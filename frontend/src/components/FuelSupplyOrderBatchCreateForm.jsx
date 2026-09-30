@@ -3,6 +3,7 @@ import SearchableSelect from './SearchableSelect'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
+import useFuelSupplyOrderForm from '../hooks/useFuelSupplyOrderForm'
 
 function buildDefaultDeadline() {
   const deadline = new Date(Date.now() + 48 * 60 * 60 * 1000)
@@ -39,13 +40,11 @@ function parseOptionalLiters(value) {
 }
 
 export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organizations = [], fuelStations = [], onClose, onSuccess }) {
-  const [form, setForm] = useState({
-    organization_id: '',
-    fuel_station_id: '',
+  const [form, setForm] = useFuelSupplyOrderForm(() => ({
     expires_at: buildDefaultDeadline(),
-    default_requested_liters: '',
+    default_requested_liters: '30',
     notes: '',
-  })
+  }), organizations, fuelStations)
   const [selectedVehicleIds, setSelectedVehicleIds] = useState([])
   const [vehicleOverrides, setVehicleOverrides] = useState({})
   const [vehicleQuery, setVehicleQuery] = useState('')
@@ -55,8 +54,9 @@ export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organiza
 
   const filteredVehicles = useMemo(() => {
     const term = vehicleQuery.trim().toLowerCase()
-    if (!term) return vehicles
-    return vehicles.filter((vehicle) => [
+    const available = vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false)
+    if (!term) return available
+    return available.filter((vehicle) => [
       vehicle.plate,
       vehicle.brand,
       vehicle.model,
@@ -65,7 +65,7 @@ export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organiza
   }, [vehicleQuery, vehicles])
 
   const selectedVehicles = useMemo(
-    () => vehicles.filter((vehicle) => selectedVehicleIds.includes(vehicle.id)),
+    () => vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false && selectedVehicleIds.includes(vehicle.id)),
     [selectedVehicleIds, vehicles],
   )
 

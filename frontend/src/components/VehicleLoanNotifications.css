@@ -1,0 +1,25 @@
+.nav-link:has(.loan-nav-badge) { position: relative; }
+.loan-nav-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  min-width: 22px;
+  height: 22px;
+  padding: 0 5px;
+  margin-left: auto;
+  border: 1px solid #fff;
+  border-radius: 12px;
+  background: #b42318;
+  color: #fff;
+  font-size: 12px;
+  font-weight: 700;
+}
+.app-sidebar.is-compact .loan-nav-badge {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  min-width: 18px;
+  height: 18px;
+  font-size: 10px;
+}

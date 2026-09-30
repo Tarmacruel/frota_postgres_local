@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from datetime import datetime
 from uuid import UUID
-from sqlalchemy import Boolean, DateTime, Enum, Float, String, text
+from sqlalchemy import Boolean, DateTime, Enum, Float, ForeignKey, String, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
@@ -67,6 +67,7 @@ class Vehicle(Base):
         nullable=False,
         default=VehicleOwnershipType.PROPRIO,
     )
+    owner_organization_id: Mapped[UUID | None] = mapped_column(ForeignKey('master_organizations.id', ondelete='RESTRICT'), nullable=True, index=True)
     status: Mapped[VehicleStatus] = mapped_column(Enum(VehicleStatus, name="vehicle_status"), nullable=False, default=VehicleStatus.ATIVO)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))

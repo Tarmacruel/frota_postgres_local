@@ -8,6 +8,7 @@ from sqlalchemy import DateTime, Enum, ForeignKey, Index, Numeric, String, Text,
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
+from app.models.operational_responsibility import LoanAttributionMixin
 
 
 class FuelSupplyOrderStatus(str, enum.Enum):
@@ -17,7 +18,7 @@ class FuelSupplyOrderStatus(str, enum.Enum):
     EXPIRED = "EXPIRED"
 
 
-class FuelSupplyOrder(Base):
+class FuelSupplyOrder(LoanAttributionMixin, Base):
     __tablename__ = "fuel_supply_orders"
     __table_args__ = (
         Index("idx_fuel_supply_orders_status", "status"),

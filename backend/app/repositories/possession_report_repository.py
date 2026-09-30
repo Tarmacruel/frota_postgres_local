@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import UUID
 
 from sqlalchemy import exists, or_, select
+from app.repositories.vehicle_scope import responsible_to
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -238,17 +239,7 @@ class PossessionReportRepository:
             statement = statement.where(confirmation_exists if filters.has_return_confirmation else ~confirmation_exists)
         effective_organization_id = organization_id or filters.organization_id
         if effective_organization_id:
-            scoped_vehicle = exists(
-                select(LocationHistory.id)
-                .join(Allocation, Allocation.id == LocationHistory.allocation_id)
-                .join(Department, Department.id == Allocation.department_id)
-                .where(
-                    LocationHistory.vehicle_id == vehicle.id,
-                    LocationHistory.end_date.is_(None),
-                    Department.organization_id == effective_organization_id,
-                )
-            )
-            statement = statement.where(scoped_vehicle)
+            statement = statement.where(responsible_to(possession, possession.start_date, effective_organization_id))
         return statement
 
     @staticmethod

@@ -14,6 +14,7 @@ const mocks = vi.hoisted(() => ({
   changePassword: vi.fn(),
   registerCpf: vi.fn(),
   pendingSignatures: vi.fn(() => new Promise(() => {})),
+  pendingLoans: vi.fn(),
   getFuelSupplyOrdersBatchGuide: vi.fn(),
   acknowledgeFuelSupplyOrdersBatchGuide: vi.fn(),
   mustChangePassword: false,
@@ -42,6 +43,8 @@ vi.mock('../api/adminNotifications', () => ({
     markAsRead: vi.fn(),
   },
 }))
+
+vi.mock('../api/vehicleLoans', () => ({ vehicleLoansAPI: { pendingSummary: mocks.pendingLoans } }))
 
 vi.mock('../api/documentSignatures', () => ({
   documentSignaturesAPI: {
@@ -87,6 +90,20 @@ function mobileRoutes() {
   const navigation = screen.getByRole('navigation', { name: 'Navegação móvel' })
   return within(navigation).getAllByRole('link').map((link) => link.getAttribute('href'))
 }
+
+it('exibe contador de empréstimos no menu sem apagá-lo ao abrir a guia', async () => {
+  mocks.allowedModules = new Set(['vehicle_loans'])
+  mocks.canView.mockImplementation((module) => mocks.allowedModules.has(module))
+  mocks.canCreate.mockReturnValue(false)
+  mocks.mustChangePassword = false
+  mocks.mustRegisterCpf = false
+  mocks.pendingLoans.mockResolvedValue({ data: { total: 2 } })
+  renderLayout()
+  const link = await screen.findByRole('link', { name: /Empréstimos.*2 solicitações pendentes/ })
+  expect(link).toHaveTextContent('2')
+  await userEvent.click(link)
+  expect(screen.getByRole('link', { name: /Empréstimos.*2 solicitações pendentes/ })).toBeInTheDocument()
+})
 
 describe('Layout mobile quick actions', () => {
   beforeEach(() => {

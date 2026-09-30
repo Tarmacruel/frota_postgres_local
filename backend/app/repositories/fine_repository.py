@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from datetime import time
 from uuid import UUID
 from sqlalchemy import func, or_, select
+from app.repositories.vehicle_scope import record_visible, fine_visibility_at
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.models.driver import Driver
@@ -47,20 +49,9 @@ class FineRepository:
             stmt = stmt.where(Fine.vehicle_id == vehicle_id)
             count_stmt = count_stmt.where(Fine.vehicle_id == vehicle_id)
         if organization_id:
-            stmt = (
-                stmt
-                .join(LocationHistory, (LocationHistory.vehicle_id == Fine.vehicle_id) & LocationHistory.end_date.is_(None))
-                .join(Allocation, Allocation.id == LocationHistory.allocation_id)
-                .join(Department, Department.id == Allocation.department_id)
-                .where(Department.organization_id == organization_id)
-            )
-            count_stmt = (
-                count_stmt
-                .join(LocationHistory, (LocationHistory.vehicle_id == Fine.vehicle_id) & LocationHistory.end_date.is_(None))
-                .join(Allocation, Allocation.id == LocationHistory.allocation_id)
-                .join(Department, Department.id == Allocation.department_id)
-                .where(Department.organization_id == organization_id)
-            )
+            predicate = record_visible(Fine.vehicle_id, fine_visibility_at(Fine), organization_id)
+            stmt = stmt.where(predicate)
+            count_stmt = count_stmt.where(predicate)
         if status:
             stmt = stmt.where(Fine.status == status)
             count_stmt = count_stmt.where(Fine.status == status)

@@ -5,6 +5,7 @@ PERMISSION_ACTIONS = ("view", "create", "edit", "delete")
 
 PERMISSION_MODULES = (
     "vehicles",
+    "vehicle_loans",
     "possession",
     "drivers",
     "maintenance",
@@ -51,11 +52,13 @@ def default_permissions_for_role(role: str) -> dict[str, dict[str, bool]]:
                 "can_delete": True,
             }
         permissions["possession"] = POSSESSION_ROLE_CEILINGS[role].copy()
+        permissions["vehicle_loans"]["can_delete"] = False
         return permissions
 
     if role == "PRODUCAO":
         for module in (
             "vehicles",
+            "vehicle_loans",
             "possession",
             "drivers",
             "maintenance",
@@ -87,6 +90,9 @@ def apply_role_permission_ceiling(
     module: str,
     flags: dict[str, bool],
 ) -> dict[str, bool]:
+    if module == "vehicle_loans":
+        allowed = role in {"ADMIN", "PRODUCAO"}
+        return {key: bool(value and allowed and key != "can_delete") for key, value in flags.items()}
     if module != "possession":
         return flags.copy()
 

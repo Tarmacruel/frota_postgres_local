@@ -6,6 +6,9 @@ from httpx import ASGITransport, AsyncClient
 # An explicit TEST_DATABASE_URL may point at a disposable PostgreSQL database;
 # production values from backend/.env must never leak into the test process.
 os.environ["APP_ENV"] = "testing"
+os.environ["CANONICAL_DOCUMENT_ARTIFACTS_ENABLED"] = "false"
+os.environ["CERTIFICATE_SIGNING_ENABLED"] = "false"
+os.environ["SIGNATURE_AGENT_ENABLED"] = "false"
 os.environ["DATABASE_URL"] = os.environ.get(
     "TEST_DATABASE_URL",
     "sqlite+aiosqlite:///./test.db",

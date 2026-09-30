@@ -51,6 +51,7 @@ class CurrentUserOut(BaseModel):
     name: str
     email: str
     role: UserRole
+    organization_id: UUID | None = None
     must_change_password: bool = False
     cpf_masked: str | None = None
     has_cpf: bool = False

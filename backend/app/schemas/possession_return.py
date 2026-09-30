@@ -26,6 +26,7 @@ class PossessionEndWithConfirmation(BaseModel):
 
 class PossessionReturnCorrection(BaseModel):
     model_config = ConfigDict(extra="forbid")
+    expected_revision: int | None = Field(default=None, ge=1)
     end_date: datetime
     end_odometer_km: float = Field(ge=0)
     vehicle_condition_notes: str = Field(min_length=3, max_length=4000)

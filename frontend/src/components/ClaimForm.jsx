@@ -125,7 +125,7 @@ export default function ClaimForm({
         <SearchableSelect
           value={form.vehicle_id}
           onChange={(value) => setForm({ ...form, vehicle_id: value })}
-          options={vehicles.map(vehicleOption)}
+          options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(vehicleOption)}
           placeholder="Selecione o veículo envolvido"
           searchPlaceholder="Buscar por placa, modelo ou chassi"
         />

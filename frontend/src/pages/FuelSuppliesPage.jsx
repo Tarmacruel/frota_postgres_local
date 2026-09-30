@@ -124,7 +124,7 @@ export default function FuelSuppliesPage() {
   const [vehicles, setVehicles] = useState([])
   const [organizations, setOrganizations] = useState([])
   const [fuelStations, setFuelStations] = useState([])
-  const [filters, setFilters] = useState({ vehicle_id: '', organization_id: '', fuel_station_id: '', only_anomalies: '' })
+  const [filters, setFilters] = useState(() => ({ vehicle_id: searchParams.get('vehicle_id') || '', organization_id: '', fuel_station_id: '', only_anomalies: '' }))
   const [orderFilters, setOrderFilters] = useState({ status: 'TODOS', organization_id: '', fuel_station_id: '', created_from: '', created_to: '' })
   const [search, setSearch] = useState('')
   const [orderSearch, setOrderSearch] = useState('')
@@ -677,7 +677,7 @@ export default function FuelSuppliesPage() {
 
         <div className="filter-inline" style={{ marginBottom: 12 }}>
           <input className="app-input" placeholder="Buscar por placa, secretaria, posto, combustível ou aditivo" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(buildVehicleOption)]} placeholder="Filtrar veículo" />
+          <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veículos' }, ...(filters.vehicle_id && !vehicles.some((item) => item.id === filters.vehicle_id) ? [{ value: filters.vehicle_id, label: 'Veiculo do historico de emprestimo' }] : []), ...vehicles.map(buildVehicleOption)]} placeholder="Filtrar veículo" />
           <SearchableSelect value={filters.organization_id} onChange={(value) => setFilters((prev) => ({ ...prev, organization_id: value }))} options={organizationFilterOptions} placeholder="Filtrar secretaria" />
           <SearchableSelect value={filters.fuel_station_id} onChange={(value) => setFilters((prev) => ({ ...prev, fuel_station_id: value }))} options={[{ value: '', label: 'Todos os postos' }, ...fuelStations.map(buildStationOption)]} placeholder="Filtrar posto" />
           <select className="app-input" value={filters.only_anomalies} onChange={(event) => setFilters((prev) => ({ ...prev, only_anomalies: event.target.value }))}>

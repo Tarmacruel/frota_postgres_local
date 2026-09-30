@@ -3,12 +3,13 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 from sqlalchemy import BigInteger, DateTime, Float, ForeignKey, Index, Integer, String, Text, text
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.dialects.postgresql import UUID as PGUUID, JSONB
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
+from app.models.operational_responsibility import OperationalResponsibilityMixin
 
 
-class VehiclePossession(Base):
+class VehiclePossession(OperationalResponsibilityMixin, Base):
     __tablename__ = "vehicle_possession"
     __table_args__ = (
         Index("idx_possession_vehicle", "vehicle_id"),
@@ -44,6 +45,7 @@ class VehiclePossession(Base):
     observation = mapped_column(Text, nullable=True)
     start_odometer_km = mapped_column(Float, nullable=True)
     end_odometer_km = mapped_column(Float, nullable=True)
+    revision: Mapped[int] = mapped_column(Integer, nullable=False, server_default=text("1"))
     photo_path = mapped_column(String(255), nullable=True)
     photo_mime_type = mapped_column(String(100), nullable=True)
     photo_size_bytes = mapped_column(Integer, nullable=True)
@@ -88,3 +90,17 @@ class VehiclePossession(Base):
     @property
     def is_active(self) -> bool:
         return self.end_date is None
+
+
+class PossessionRevision(Base):
+    __tablename__ = 'possession_revisions'
+    __table_args__ = (Index('uq_possession_revision', 'possession_id', 'version', unique=True),)
+    id = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=text('gen_random_uuid()'))
+    possession_id = mapped_column(PGUUID(as_uuid=True), ForeignKey('vehicle_possession.id', ondelete='RESTRICT'), nullable=False)
+    version = mapped_column(Integer, nullable=False)
+    actor_user_id = mapped_column(PGUUID(as_uuid=True), ForeignKey('users.id', ondelete='RESTRICT'), nullable=False)
+    actor_name = mapped_column(String(150), nullable=False)
+    reason = mapped_column(Text, nullable=False)
+    before = mapped_column(JSONB, nullable=False)
+    after = mapped_column(JSONB, nullable=False)
+    created_at = mapped_column(DateTime(timezone=True), nullable=False, server_default=text('NOW()'))

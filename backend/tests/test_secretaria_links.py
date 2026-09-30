@@ -20,6 +20,9 @@ from app.services.vehicle_service import VehicleService
 
 
 class FakeSession:
+    async def scalar(self, statement):
+        return uuid4() if statement.selected_columns[0].table.name == 'vehicles' else None
+
     def add(self, _entity):
         pass
 
@@ -435,7 +438,10 @@ async def test_possession_driver_snapshot_allows_driver_from_other_secretaria():
 
 
 @pytest.mark.asyncio
-async def test_vehicle_update_for_producao_allows_transfer_to_other_secretaria_without_post_commit_visibility_check():
+async def test_vehicle_update_for_producao_allows_transfer_to_other_secretaria_without_post_commit_visibility_check(monkeypatch):
+    from unittest.mock import AsyncMock
+    registration_scope = AsyncMock()
+    monkeypatch.setattr("app.services.vehicle_service.ensure_registration_manager", registration_scope)
     source_organization_id = uuid4()
     target_organization_id = uuid4()
     now = datetime.now(timezone.utc)
@@ -511,6 +517,7 @@ async def test_vehicle_update_for_producao_allows_transfer_to_other_secretaria_w
         current_user=SimpleNamespace(id=uuid4(), role=UserRole.PRODUCAO, organization_id=source_organization_id),
     )
 
-    assert service.vehicles.visibility_checks == [source_organization_id]
+    registration_scope.assert_awaited_once()
+    assert service.vehicles.visibility_checks == []
     assert service.vehicles.created_history.allocation_id == target_allocation.id
     assert result["current_location"]["organization_id"] == target_organization_id

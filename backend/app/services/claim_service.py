@@ -11,6 +11,7 @@ from zipfile import BadZipFile, ZipFile
 from fastapi import HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
+from app.services.operational_scope import attribute_operation, ensure_record_visible
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.driver_registration import ensure_driver_registration
@@ -99,7 +100,7 @@ class ClaimService:
         claim = await self.claims.get_by_id(claim_id)
         if not claim:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sinistro não encontrado")
-        await self._ensure_vehicle_visible_to_user(claim.vehicle_id, current_user)
+        await ensure_record_visible(self.db, claim, current_user)
         return self._serialize(claim)
 
     async def create(
@@ -130,6 +131,7 @@ class ClaimService:
 
         stored_paths: list[Path] = []
         try:
+            await attribute_operation(self.db, claim, current_user, new=True)
             await self.claims.create(claim)
             attachment_records = self._store_attachment_payloads(
                 claim_id=claim.id,
@@ -177,7 +179,8 @@ class ClaimService:
         if not claim:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sinistro não encontrado")
 
-        await self._ensure_vehicle_visible_to_user(claim.vehicle_id, current_user)
+        await ensure_record_visible(self.db, claim, current_user)
+        await attribute_operation(self.db, claim, current_user)
 
         payload = data.model_dump(exclude_unset=True)
         next_vehicle_id = claim.vehicle_id
@@ -211,6 +214,7 @@ class ClaimService:
         for field, value in payload.items():
             setattr(claim, field, value)
         claim.driver_id = driver.id if driver else None
+        await attribute_operation(self.db, claim, current_user)
 
         stored_paths: list[Path] = []
         try:
@@ -269,7 +273,7 @@ class ClaimService:
         claim = await self.claims.get_by_id(claim_id)
         if not claim:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Sinistro não encontrado")
-        await self._ensure_vehicle_visible_to_user(claim.vehicle_id, current_user)
+        await ensure_record_visible(self.db, claim, current_user)
 
         attachment = next((item for item in claim.attachments if item.id == attachment_id), None)
         if not attachment:
@@ -299,7 +303,6 @@ class ClaimService:
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
-        await self._ensure_vehicle_visible_to_user(vehicle_id, current_user)
         if vehicle.status not in {VehicleStatus.ATIVO, VehicleStatus.MANUTENCAO}:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -557,6 +560,8 @@ class ClaimService:
         attachment_records = attachments if attachments is not None else claim.attachments
         return {
             "id": claim.id,
+            "vehicle_loan_id": getattr(claim, "vehicle_loan_id", None),
+            "responsible_organization_id": getattr(claim, "responsible_organization_id", None),
             "vehicle_id": claim.vehicle_id,
             "vehicle_plate": claim.vehicle.plate if claim.vehicle else "",
             "driver_id": claim.driver_id,

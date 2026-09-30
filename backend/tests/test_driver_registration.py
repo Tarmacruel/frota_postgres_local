@@ -66,6 +66,7 @@ async def test_legacy_registration_update_is_saved_and_audited():
 @pytest.mark.parametrize("operation", ["possession", "claim", "fine_create", "fine_update", "fuel_supply"])
 @pytest.mark.parametrize("matricula", [None, "", "   "])
 async def test_operations_reject_legacy_driver_until_registration_is_saved(operation, matricula, monkeypatch):
+    monkeypatch.setattr("app.services.fine_service.attribute_operation", AsyncMock())
     driver = Driver(id=uuid4(), nome_completo="Condutor legado", matricula=matricula,
                     documento="12345678900", cnh_categoria=DriverLicenseCategory.B, ativo=True)
     actor = SimpleNamespace(id=uuid4(), role=UserRole.ADMIN)

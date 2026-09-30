@@ -7,6 +7,7 @@ from uuid import UUID
 from fastapi import HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
+from app.services.operational_scope import attribute_operation, ensure_record_visible
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.organization_scope import ensure_organization_access, production_scope_is_empty, scoped_organization_id
 from app.core.config import settings
@@ -65,6 +66,7 @@ class FuelSupplyService:
         if not supply:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abastecimento nao encontrado")
         await self._ensure_supply_visible_to_user(supply, current_user)
+        await attribute_operation(self.db, supply, current_user)
         if not supply.fuel_supply_order_id:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -94,6 +96,7 @@ class FuelSupplyService:
 
         for field, value in new_values.items():
             setattr(supply, field, value)
+        await attribute_operation(self.db, supply, current_user)
         supply.updated_at = datetime.now(timezone.utc)
         consumption_inputs = {"supplied_at", "odometer_km", "liters"}
         recalculated_supply_ids = (
@@ -211,6 +214,7 @@ class FuelSupplyService:
 
         stored_receipt_path: Path | None = None
         try:
+            await attribute_operation(self.db, supply, current_user, new=True)
             await self.supplies.create(supply)
             relative_receipt_path, stored_receipt_path = self._build_receipt_storage_paths(supply.id, receipt_payload["mime_type"])
             self._store_file(stored_receipt_path, receipt_payload["content"])
@@ -310,14 +314,7 @@ class FuelSupplyService:
         ]
 
     async def _ensure_supply_visible_to_user(self, supply: FuelSupply, current_user: User | None) -> None:
-        organization_id = scoped_organization_id(current_user)
-        if organization_id is None:
-            if production_scope_is_empty(current_user):
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abastecimento não encontrado")
-            return
-        if supply.organization_id == organization_id:
-            return
-        await self._ensure_vehicle_visible_to_user(supply.vehicle_id, current_user)
+        await ensure_record_visible(self.db, supply, current_user)
 
     def _ensure_operational_adjustment_role(self, current_user: User) -> None:
         if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
@@ -441,6 +438,7 @@ class FuelSupplyService:
             alerts.append(item.anomaly_details)
         return {
             "id": item.id,
+            "vehicle_loan_id": getattr(item, "vehicle_loan_id", None),
             "vehicle_id": item.vehicle_id,
             "vehicle_plate": item.vehicle.plate if item.vehicle else "",
             "driver_id": item.driver_id,

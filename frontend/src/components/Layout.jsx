@@ -8,6 +8,8 @@ import Modal from './Modal'
 import { adminNotificationsAPI } from '../api/adminNotifications'
 import { documentSignaturesAPI } from '../api/documentSignatures'
 import { featureGuidesAPI } from '../api/featureGuides'
+import usePendingVehicleLoans from '../hooks/usePendingVehicleLoans'
+import './VehicleLoanNotifications.css'
 
 const THEME_STORAGE_KEY = 'frota-theme'
 const SIDEBAR_STORAGE_KEY = 'frota-sidebar-compact'
@@ -24,6 +26,7 @@ export default function Layout() {
   const passwordChangeRequired = Boolean(mustChangePassword)
   const cpfRegistrationRequired = Boolean(mustRegisterCpf) && !passwordChangeRequired
   const accessBlocked = passwordChangeRequired || cpfRegistrationRequired
+  const pendingLoans = usePendingVehicleLoans(user?.id, !accessBlocked && canView('vehicle_loans'))
   const canCreateFuelSupplyOrders = canCreate('fuel_supply_orders')
   const mainRef = useRef(null)
   const fuelSupplyOrdersBatchGuideUserRef = useRef(null)
@@ -64,6 +67,7 @@ export default function Layout() {
         title: 'Operacional',
         items: [
           { to: '/vehicles', label: 'Veículos', description: 'Frota', icon: 'vehicles' },
+          { to: '/emprestimos', label: 'Empréstimos', description: 'Entre secretarias', icon: 'vehicles' },
           { to: '/posses', label: 'Posses', description: 'Responsáveis', icon: 'drivers' },
           { to: '/condutores', label: 'Condutores', mobileLabel: 'Condut.', description: 'Motoristas', icon: 'users' },
           { to: '/manutencoes', label: 'Manutenções', description: 'Custos', icon: 'maintenance' },
@@ -77,6 +81,7 @@ export default function Layout() {
 
     const moduleByRoute = {
       '/vehicles': 'vehicles',
+      '/emprestimos': 'vehicle_loans',
       '/posses': 'possession',
       '/condutores': 'drivers',
       '/manutencoes': 'maintenance',
@@ -311,6 +316,10 @@ export default function Layout() {
   function openPendingSignature(request) {
     const document = request.document || {}
     setSignatureRequestsOpen(false)
+    if (document.document_type?.startsWith('VEHICLE_LOAN_')) {
+      navigate(`/emprestimos?id=${encodeURIComponent(document.source_id)}`)
+      return
+    }
     if (document.document_type === 'FUEL_SUPPLY_ORDER') {
       navigate(document.source_id
         ? `/ordens-abastecimento?focus=${encodeURIComponent(document.source_id)}`
@@ -378,13 +387,16 @@ export default function Layout() {
   }
 
   function renderNavLink(item) {
+    const pendingDescription = item.to === '/emprestimos' && pendingLoans > 0
+      ? `${pendingLoans} ${pendingLoans === 1 ? 'solicitação pendente' : 'solicitações pendentes'} de análise`
+      : ''
     return (
       <NavLink
         key={item.to}
         to={item.to}
         end={item.to === '/'}
-        title={item.description}
-        aria-label={`${item.label}. ${item.description}`}
+        title={pendingDescription || item.description}
+        aria-label={`${item.label}. ${item.description}${pendingDescription ? `. ${pendingDescription}` : ''}`}
         data-tooltip={item.description}
         className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
       >
@@ -394,6 +406,7 @@ export default function Layout() {
         <span className="nav-text">
           <span className="nav-label">{item.label}</span>
         </span>
+        {item.to === '/emprestimos' && pendingLoans > 0 && <span className="loan-nav-badge" aria-hidden="true">{pendingLoans > 99 ? '99+' : pendingLoans}</span>}
       </NavLink>
     )
   }
@@ -584,7 +597,7 @@ export default function Layout() {
                 </div>
                 <div className="actions-inline" style={{ marginTop: 8 }}>
                   <button className="mini-button" type="button" onClick={() => openPendingSignature(request)}>Abrir origem</button>
-                  <button className="mini-button danger" type="button" onClick={() => declinePendingSignature(request.id)}>Recusar</button>
+                  {!request.document?.document_type?.startsWith('VEHICLE_LOAN_') && <button className="mini-button danger" type="button" onClick={() => declinePendingSignature(request.id)}>Recusar</button>}
                 </div>
               </div>
             ))}

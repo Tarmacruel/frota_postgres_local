@@ -32,6 +32,7 @@ from app.api.routes.payment_processes import router as payment_processes_router
 from app.api.routes.payment_processes import supplier_router as payment_suppliers_router
 from app.api.routes.possession import public_router as public_possession_terms_router
 from app.api.routes.possession import router as possession_router
+from app.api.routes.vehicle_loans import router as vehicle_loans_router
 from app.api.routes.search import router as search_router
 from app.api.routes.users import router as users_router
 from app.api.routes.vehicles import router as vehicles_router
@@ -203,6 +204,7 @@ app.include_router(drivers_router)
 app.include_router(vehicles_router)
 app.include_router(maintenance_router)
 app.include_router(possession_router)
+app.include_router(vehicle_loans_router)
 app.include_router(public_possession_terms_router)
 app.include_router(claims_router)
 app.include_router(fines_router)

@@ -21,6 +21,7 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Image, LongTable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 from sqlalchemy import case, func, select
+from app.repositories.vehicle_scope import responsible_to, fine_occurred_at
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.official_identity import (
@@ -215,10 +216,12 @@ class AnalyticsService:
         rows: list[FleetAnalyticsSnapshot],
         organization_id: UUID | None,
     ) -> list[FleetAnalyticsSnapshot]:
-        vehicle_ids = await self._vehicle_ids_for_organization(organization_id)
-        if vehicle_ids is None:
+        # Inputs are aggregated by responsibility in _ensure_snapshots.
+        if organization_id is None:
             return rows
-        return [row for row in rows if row.vehicle_id in vehicle_ids]
+        vehicle_ids = await self._vehicle_ids_for_organization(organization_id)
+        return [row for row in rows if row.vehicle_id in vehicle_ids or any((
+            row.total_liters, row.total_km, row.fuel_cost, row.maintenance_cost, row.fines_cost))]
 
     async def _filter_driver_snapshots_by_organization(
         self,
@@ -228,9 +231,9 @@ class AnalyticsService:
         driver_ids = await self._driver_ids_for_organization(organization_id)
         if driver_ids is None:
             return rows
-        return [row for row in rows if row.driver_id in driver_ids]
+        return [row for row in rows if row.driver_id in driver_ids or row.driver_risk_score or row.anomalies_count]
 
-    async def _ensure_snapshots(self, period_days: int) -> list[FleetAnalyticsSnapshot]:
+    async def _ensure_snapshots(self, period_days: int, organization_id: UUID | None = None) -> list[FleetAnalyticsSnapshot]:
         period_start, period_end = self._period_bounds(period_days)
 
         vehicle_rows = (
@@ -251,7 +254,7 @@ class AnalyticsService:
                     func.sum(func.coalesce(FuelSupply.total_amount, 0)).label("sum_fuel_cost"),
                     func.sum(case((FuelSupply.is_consumption_anomaly.is_(True), 1), else_=0)).label("anomalies_count"),
                 )
-                .where(FuelSupply.supplied_at >= period_start, FuelSupply.supplied_at <= period_end)
+                .where((responsible_to(FuelSupply, FuelSupply.supplied_at, organization_id) if organization_id else True), FuelSupply.supplied_at >= period_start, FuelSupply.supplied_at <= period_end)
                 .group_by(FuelSupply.vehicle_id)
             )
         ).all()
@@ -268,7 +271,7 @@ class AnalyticsService:
         maint_rows = (
             await self.db.execute(
                 select(MaintenanceRecord.vehicle_id, func.sum(MaintenanceRecord.total_cost).label("sum_cost"))
-                .where(MaintenanceRecord.start_date >= period_start, MaintenanceRecord.start_date <= period_end)
+                .where((responsible_to(MaintenanceRecord, MaintenanceRecord.start_date, organization_id) if organization_id else True), MaintenanceRecord.start_date >= period_start, MaintenanceRecord.start_date <= period_end)
                 .group_by(MaintenanceRecord.vehicle_id)
             )
         ).all()
@@ -280,7 +283,7 @@ class AnalyticsService:
         fine_rows = (
             await self.db.execute(
                 select(Fine.vehicle_id, func.sum(Fine.amount).label("sum_cost"))
-                .where(Fine.infraction_date >= period_start.date(), Fine.infraction_date <= period_end.date())
+                .where((responsible_to(Fine, fine_occurred_at(Fine), organization_id) if organization_id else True), Fine.infraction_date >= period_start.date(), Fine.infraction_date <= period_end.date())
                 .group_by(Fine.vehicle_id)
             )
         ).all()
@@ -339,7 +342,7 @@ class AnalyticsService:
                     await self.db.execute(
                         select(func.count(Fine.id)).where(
                             Fine.driver_id == driver.id,
-                            Fine.infraction_date >= period_start.date(),
+                            (responsible_to(Fine, fine_occurred_at(Fine), organization_id) if organization_id else True), Fine.infraction_date >= period_start.date(),
                             Fine.infraction_date <= period_end.date(),
                         )
                     )
@@ -351,7 +354,7 @@ class AnalyticsService:
                     await self.db.execute(
                         select(func.count(Claim.id)).where(
                             Claim.driver_id == driver.id,
-                            Claim.data_ocorrencia >= period_start,
+                            (responsible_to(Claim, Claim.data_ocorrencia, organization_id) if organization_id else True), Claim.data_ocorrencia >= period_start,
                             Claim.data_ocorrencia <= period_end,
                         )
                     )
@@ -363,7 +366,7 @@ class AnalyticsService:
                     await self.db.execute(
                         select(func.count(FuelSupply.id)).where(
                             FuelSupply.driver_id == driver.id,
-                            FuelSupply.supplied_at >= period_start,
+                            (responsible_to(FuelSupply, FuelSupply.supplied_at, organization_id) if organization_id else True), FuelSupply.supplied_at >= period_start,
                             FuelSupply.supplied_at <= period_end,
                             FuelSupply.is_consumption_anomaly.is_(True),
                         )
@@ -405,12 +408,15 @@ class AnalyticsService:
         if not snapshots:
             return []
 
+        if organization_id is not None:
+            return snapshots
+
         await self.analytics_repo.replace_period_snapshots(period_start=period_start, period_end=period_end, items=snapshots)
         await self.db.commit()
         return snapshots
 
     async def overview(self, period_days: int, organization_id: UUID | None = None) -> dict:
-        snapshots = await self._ensure_snapshots(period_days)
+        snapshots = await self._ensure_snapshots(period_days, organization_id=organization_id)
         vehicle_rows = await self._filter_vehicle_snapshots_by_organization(
             self._unique_vehicle_snapshots(snapshots),
             organization_id,
@@ -439,7 +445,7 @@ class AnalyticsService:
         organization_id: UUID | None = None,
     ) -> list[dict]:
         rows = await self._filter_vehicle_snapshots_by_organization(
-            self._unique_vehicle_snapshots(await self._ensure_snapshots(period_days)),
+            self._unique_vehicle_snapshots(await self._ensure_snapshots(period_days, organization_id=organization_id)),
             organization_id,
         )
         if vehicle_type:
@@ -467,7 +473,7 @@ class AnalyticsService:
         organization_id: UUID | None = None,
     ) -> list[dict]:
         rows = await self._filter_vehicle_snapshots_by_organization(
-            self._unique_vehicle_snapshots(await self._ensure_snapshots(period_days)),
+            self._unique_vehicle_snapshots(await self._ensure_snapshots(period_days, organization_id=organization_id)),
             organization_id,
         )
         if vehicle_type:
@@ -491,7 +497,7 @@ class AnalyticsService:
 
     async def driver_risk(self, period_days: int, organization_id: UUID | None = None) -> list[dict]:
         rows = await self._filter_driver_snapshots_by_organization(
-            self._unique_driver_snapshots(await self._ensure_snapshots(period_days)),
+            self._unique_driver_snapshots(await self._ensure_snapshots(period_days, organization_id=organization_id)),
             organization_id,
         )
         payload = []
@@ -588,7 +594,7 @@ class AnalyticsService:
         vehicle_type: str | None = None,
         organization_id: UUID | None = None,
     ) -> list[dict]:
-        rows = await self._ensure_snapshots(period_days)
+        rows = await self._ensure_snapshots(period_days, organization_id=organization_id)
         vehicle_rows = await self._filter_vehicle_snapshots_by_organization(
             self._unique_vehicle_snapshots(rows),
             organization_id,
@@ -642,10 +648,10 @@ class AnalyticsService:
                 maint_stmt = maint_stmt.join(Vehicle, Vehicle.id == MaintenanceRecord.vehicle_id).where(*vehicle_filter)
                 fine_stmt = fine_stmt.join(Vehicle, Vehicle.id == Fine.vehicle_id).where(*vehicle_filter)
 
-            if organization_vehicle_ids is not None:
-                fuel_stmt = fuel_stmt.where(FuelSupply.vehicle_id.in_(organization_vehicle_ids))
-                maint_stmt = maint_stmt.where(MaintenanceRecord.vehicle_id.in_(organization_vehicle_ids))
-                fine_stmt = fine_stmt.where(Fine.vehicle_id.in_(organization_vehicle_ids))
+            if organization_id is not None:
+                fuel_stmt = fuel_stmt.where(responsible_to(FuelSupply, FuelSupply.supplied_at, organization_id))
+                maint_stmt = maint_stmt.where(responsible_to(MaintenanceRecord, MaintenanceRecord.start_date, organization_id))
+                fine_stmt = fine_stmt.where(responsible_to(Fine, fine_occurred_at(Fine), organization_id))
 
             fuel_cost = float((await self.db.execute(fuel_stmt)).scalar_one() or 0)
             maintenance_cost = float((await self.db.execute(maint_stmt)).scalar_one() or 0)

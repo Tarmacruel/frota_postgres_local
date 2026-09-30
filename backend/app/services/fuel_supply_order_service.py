@@ -5,9 +5,11 @@ from pathlib import Path
 from uuid import UUID, uuid4
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.exc import IntegrityError
+from app.services.operational_scope import attribute_operation, ensure_record_visible
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.organization_scope import ensure_organization_access, production_scope_is_empty, scoped_organization_id
 from app.core.config import settings
+from app.core.vehicle_handoff import lock_vehicle_handoff, ensure_order_handoff_scope
 from app.models.fuel_supply import FuelSupply
 from app.models.fuel_supply_order import FuelSupplyOrder, FuelSupplyOrderStatus
 from app.models.user import User, UserRole
@@ -75,6 +77,7 @@ class FuelSupplyOrderService:
 
     async def create_order(self, data: FuelSupplyOrderCreate, current_user: User) -> dict:
         self._ensure_order_deadline(data.expires_at)
+        await lock_vehicle_handoff(self.db, data.vehicle_id)
         vehicle = await self._get_visible_vehicle(data.vehicle_id, current_user)
         order_organization_id = await self._validate_order_context(
             organization_id=data.organization_id,
@@ -82,6 +85,7 @@ class FuelSupplyOrderService:
             current_user=current_user,
         )
 
+        await ensure_order_handoff_scope(self.db, data.vehicle_id, order_organization_id)
         order = FuelSupplyOrder(
             vehicle_id=data.vehicle_id,
             organization_id=order_organization_id,
@@ -95,6 +99,7 @@ class FuelSupplyOrderService:
         )
 
         try:
+            await attribute_operation(self.db, order, current_user, new=True)
             await self.orders.create(order)
             loaded_order = await self.orders.get_by_id(order.id)
             if not loaded_order:
@@ -127,9 +132,13 @@ class FuelSupplyOrderService:
         )
 
         # Validate every vehicle before any order or audit record is persisted.
+        # Stable lock order avoids deadlocks between batches and loan handoffs.
+        for vehicle_id in sorted({item.vehicle_id for item in data.items}, key=str):
+            await lock_vehicle_handoff(self.db, vehicle_id)
         validated_items = []
         for item in data.items:
             vehicle = await self._get_visible_vehicle(item.vehicle_id, current_user)
+            await ensure_order_handoff_scope(self.db, item.vehicle_id, order_organization_id)
             validated_items.append((item, vehicle))
 
         created_orders: list[tuple[FuelSupplyOrder, object]] = []
@@ -147,6 +156,7 @@ class FuelSupplyOrderService:
                     notes=data.notes,
                     status=FuelSupplyOrderStatus.OPEN,
                 )
+                await attribute_operation(self.db, order, current_user, new=True)
                 await self.orders.create(order)
                 created_orders.append((order, vehicle))
 
@@ -218,6 +228,7 @@ class FuelSupplyOrderService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento não encontrada")
 
         await self._ensure_order_visible_to_user(order, current_user)
+        await attribute_operation(self.db, order, current_user)
         if order.status == FuelSupplyOrderStatus.COMPLETED:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem já confirmada")
         if order.status == FuelSupplyOrderStatus.CANCELLED:
@@ -297,6 +308,9 @@ class FuelSupplyOrderService:
 
         stored_receipt_path: Path | None = None
         try:
+            await attribute_operation(self.db, supply, current_user, new=True)
+            if supply.organization_id != order.organization_id:
+                raise HTTPException(409, 'A data do abastecimento pertence a outra secretaria')
             await self.supplies.create(supply)
             relative_receipt_path, stored_receipt_path = self._build_receipt_storage_paths(supply.id, receipt_payload["mime_type"])
             self._store_file(stored_receipt_path, receipt_payload["content"])
@@ -348,6 +362,7 @@ class FuelSupplyOrderService:
         if not order:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento não encontrada")
         await self._ensure_order_visible_to_user(order, current_user)
+        await attribute_operation(self.db, order, current_user)
         if order.status == FuelSupplyOrderStatus.COMPLETED:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem já confirmada")
         if order.status == FuelSupplyOrderStatus.CANCELLED:
@@ -390,7 +405,10 @@ class FuelSupplyOrderService:
         order = await self.orders.get_by_id(order_id)
         if not order:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento nao encontrada")
+        await lock_vehicle_handoff(self.db, order.vehicle_id)
+        await ensure_order_handoff_scope(self.db, order.vehicle_id, order.organization_id)
         await self._ensure_order_visible_to_user(order, current_user)
+        await attribute_operation(self.db, order, current_user)
         if order.status == FuelSupplyOrderStatus.COMPLETED:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem ja confirmada")
         if order.status == FuelSupplyOrderStatus.CANCELLED:
@@ -437,14 +455,7 @@ class FuelSupplyOrderService:
             await self.db.commit()
 
     async def _ensure_order_visible_to_user(self, order: FuelSupplyOrder, current_user: User) -> None:
-        organization_id = scoped_organization_id(current_user)
-        if organization_id is None:
-            if production_scope_is_empty(current_user):
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento não encontrada")
-            return
-        if order.organization_id == organization_id:
-            return
-        await self._ensure_vehicle_visible_to_user(order.vehicle_id, current_user)
+        await ensure_record_visible(self.db, order, current_user)
 
     def _ensure_operational_adjustment_role(self, current_user: User) -> None:
         if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
@@ -617,6 +628,7 @@ class FuelSupplyOrderService:
         supply = item.supply
         return {
             "id": item.id,
+            "vehicle_loan_id": getattr(item, "vehicle_loan_id", None),
             "request_number": f"AB-{str(item.id).split('-')[0].upper()}",
             "validation_code": item.validation_code,
             "public_validation_path": self._build_public_validation_path(item.validation_code),

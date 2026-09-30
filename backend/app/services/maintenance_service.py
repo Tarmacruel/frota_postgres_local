@@ -4,6 +4,7 @@ from datetime import datetime
 from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
+from app.services.operational_scope import attribute_operation, ensure_record_visible
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.organization_scope import production_scope_is_empty, scoped_organization_id
 from app.models.maintenance import MaintenanceRecord
@@ -46,7 +47,7 @@ class MaintenanceService:
         record = await self.records.get_by_id(record_id)
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de manutencao nao encontrado")
-        await self._ensure_vehicle_visible_to_user(record.vehicle_id, current_user)
+        await ensure_record_visible(self.db, record, current_user)
         return self._serialize(record)
 
     async def list_paginated(
@@ -91,6 +92,7 @@ class MaintenanceService:
         )
 
         try:
+            await attribute_operation(self.db, record, current_user, new=True)
             await self.records.create(record)
             await self.audit.record(
                 actor=current_user,
@@ -119,7 +121,8 @@ class MaintenanceService:
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de manutencao nao encontrado")
 
-        await self._ensure_vehicle_visible_to_user(record.vehicle_id, current_user)
+        await ensure_record_visible(self.db, record, current_user)
+        await attribute_operation(self.db, record, current_user)
 
         payload = data.model_dump(exclude_unset=True)
         previous_values = {
@@ -165,7 +168,8 @@ class MaintenanceService:
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de manutencao nao encontrado")
 
-        await self._ensure_vehicle_visible_to_user(record.vehicle_id, current_user)
+        await ensure_record_visible(self.db, record, current_user)
+        await attribute_operation(self.db, record, current_user)
 
         try:
             await self.audit.record(
@@ -192,7 +196,6 @@ class MaintenanceService:
         if not vehicle:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veiculo nao encontrado")
 
-        await self._ensure_vehicle_visible_to_user(vehicle_id, current_user)
         return vehicle
 
     async def _ensure_vehicle_visible_to_user(self, vehicle_id: UUID, current_user: User | None) -> None:
@@ -207,6 +210,8 @@ class MaintenanceService:
     def _serialize(self, record: MaintenanceRecord) -> dict:
         return {
             "id": record.id,
+            "vehicle_loan_id": getattr(record, "vehicle_loan_id", None),
+            "responsible_organization_id": getattr(record, "responsible_organization_id", None),
             "vehicle_id": record.vehicle_id,
             "vehicle_plate": record.vehicle.plate if record.vehicle else "",
             "start_date": record.start_date,

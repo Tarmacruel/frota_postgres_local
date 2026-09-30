@@ -69,6 +69,8 @@ class ClaimAttachmentOut(BaseModel):
 class ClaimOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    responsible_organization_id: UUID | None = None
+    vehicle_loan_id: UUID | None = None
     id: UUID
     vehicle_id: UUID
     vehicle_plate: str

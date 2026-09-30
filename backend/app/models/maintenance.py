@@ -7,9 +7,10 @@ from sqlalchemy import CheckConstraint, DateTime, ForeignKey, Index, Numeric, Te
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
+from app.models.operational_responsibility import OperationalResponsibilityMixin
 
 
-class MaintenanceRecord(Base):
+class MaintenanceRecord(OperationalResponsibilityMixin, Base):
     __tablename__ = "maintenance_records"
     __table_args__ = (
         CheckConstraint("total_cost >= 0", name="check_total_cost_non_negative"),

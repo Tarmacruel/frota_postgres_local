@@ -58,6 +58,7 @@ class FuelSupplyFilter(BaseModel):
 class FuelSupplyOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    vehicle_loan_id: UUID | None = None
     id: UUID
     vehicle_id: UUID
     vehicle_plate: str
@@ -266,6 +267,7 @@ class FuelSupplyOrderDeadlineUpdate(BaseModel):
 class FuelSupplyOrderOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    vehicle_loan_id: UUID | None = None
     id: UUID
     request_number: str
     validation_code: str

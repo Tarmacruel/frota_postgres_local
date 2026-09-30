@@ -8,6 +8,8 @@ vi.mock('../api/fuelSupplyOrders', () => ({
   fuelSupplyOrdersAPI: { createBatch: vi.fn() },
 }))
 
+vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: { organization_id: 'organization-1' } }) }))
+
 vi.mock('./SearchableSelect', () => ({
   default: ({ ariaLabel, onChange }) => (
     <button
@@ -30,6 +32,15 @@ const organizations = [{ id: 'organization-1', name: 'Secretaria de Transportes'
 const fuelStations = [{ id: 'station-1', name: 'Posto Central', address: 'Av. Principal', phone: '0000-0000' }]
 
 describe('FuelSupplyOrderBatchCreateForm', () => {
+  it('omite veículos emprestados que estão disponíveis apenas para consulta', () => {
+    render(<FuelSupplyOrderBatchCreateForm vehicles={[
+      { ...vehicles[0], can_operate_vehicle: false },
+      { ...vehicles[1], can_operate_vehicle: true },
+    ]} organizations={organizations} fuelStations={fuelStations} />)
+    expect(screen.queryByRole('checkbox', { name: /ABC1D23/ })).not.toBeInTheDocument()
+    expect(screen.getByRole('checkbox', { name: /DEF4G56/ })).toBeInTheDocument()
+  })
+
   beforeEach(() => {
     vi.clearAllMocks()
     fuelSupplyOrdersAPI.createBatch.mockResolvedValue({
@@ -67,9 +78,7 @@ describe('FuelSupplyOrderBatchCreateForm', () => {
 
     await user.click(screen.getByRole('checkbox', { name: /ABC1D23/ }))
     await user.click(screen.getByRole('checkbox', { name: /DEF4G56/ }))
-    await user.click(screen.getByRole('button', { name: 'Posto responsável' }))
-    await user.click(screen.getByRole('button', { name: 'Órgão solicitante' }))
-    await user.type(screen.getByRole('spinbutton', { name: 'Litros previstos padrão' }), '30')
+    expect(screen.getByRole('spinbutton', { name: 'Litros previstos padrão' })).toHaveValue(30)
 
     const individualLiters = screen.getByRole('spinbutton', { name: 'Litros previstos para DEF4G56' })
     await user.clear(individualLiters)

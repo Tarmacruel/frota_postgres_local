@@ -21,6 +21,7 @@ const initialForm = {
 const roleOptions = ['ADMIN', 'PRODUCAO', 'POSTO', 'PADRAO']
 
 function permissionExceedsPossessionCeiling(moduleKey, actionKey, role) {
+  if (moduleKey === 'vehicle_loans') return actionKey === 'delete' || !['ADMIN', 'PRODUCAO'].includes(role)
   if (moduleKey !== 'possession') return false
   if (actionKey === 'delete') return true
   if (role === 'PADRAO') return actionKey !== 'view'

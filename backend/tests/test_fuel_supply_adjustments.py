@@ -14,6 +14,9 @@ from app.services.fuel_supply_service import FuelSupplyService
 
 
 class FakeDb:
+    async def scalar(self, statement):
+        return uuid4() if statement.selected_columns[0].table.name == 'vehicles' else None
+
     def __init__(self):
         self.committed = False
 
@@ -138,6 +141,7 @@ async def test_rectify_order_confirmation_requires_reason_and_audits_changes():
 async def test_reopen_expired_order_with_new_deadline_and_audit():
     now = datetime.now(timezone.utc)
     order = SimpleNamespace(
+        organization_id=None,
         id=uuid4(),
         status=FuelSupplyOrderStatus.EXPIRED,
         expires_at=now - timedelta(hours=2),
@@ -184,3 +188,11 @@ async def test_station_operator_cannot_adjust_order_deadline():
         await service.update_deadline(uuid4(), payload, make_user(UserRole.POSTO))
 
     assert exc_info.value.status_code == 403
+
+
+@pytest.fixture(autouse=True)
+def operational_attribution_collaborator(monkeypatch):
+    """These unit tests use fake sessions; temporal scope has PostgreSQL integration tests."""
+    from unittest.mock import AsyncMock
+    monkeypatch.setattr("app.services.fuel_supply_order_service.attribute_operation", AsyncMock())
+    monkeypatch.setattr("app.services.fuel_supply_service.attribute_operation", AsyncMock())

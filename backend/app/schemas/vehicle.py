@@ -101,6 +101,13 @@ class VehicleOut(BaseModel):
     vehicle_type: VehicleType
     ownership_type: VehicleOwnershipType
     status: VehicleStatus
+    owner_organization_id: UUID | None = None
+    owner_organization_name: str | None = None
+    operating_organization_id: UUID | None = None
+    active_vehicle_loan_id: UUID | None = None
+    loan_status: str | None = None
+    can_operate_vehicle: bool = False
+    can_manage_registration: bool = False
     current_department: str | None = None
     current_location: VehicleLocationOut | None = None
     current_driver_name: str | None = None

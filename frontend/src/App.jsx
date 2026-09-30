@@ -22,6 +22,7 @@ import PublicFuelSupplyOrderPage from './pages/PublicFuelSupplyOrderPage'
 import PublicPossessionTermPage from './pages/PublicPossessionTermPage'
 import UsersPage from './pages/UsersPage'
 import VehiclesPage from './pages/VehiclesPage'
+import VehicleLoansPage from './pages/VehicleLoansPage'
 import UnauthorizedPage from './pages/UnauthorizedPage'
 
 function HomeRoute() {
@@ -50,6 +51,11 @@ export default function App() {
             }
           >
             <Route index element={<HomeRoute />} />
+            <Route path="emprestimos" element={(
+              <ProtectedRoute permission={{ module: 'vehicle_loans', action: 'view' }}>
+                <VehicleLoansPage />
+              </ProtectedRoute>
+            )} />
             <Route
               path="cadastros"
               element={(

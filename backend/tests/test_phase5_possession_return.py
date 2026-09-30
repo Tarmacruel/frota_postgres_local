@@ -769,3 +769,10 @@ async def test_pdf_route_applies_protected_no_cache_headers(monkeypatch):
     assert response.headers["pragma"] == "no-cache"
     assert response.headers["x-content-type-options"] == "nosniff"
     assert response.headers["content-disposition"].startswith("inline;")
+
+
+@pytest.fixture(autouse=True)
+def operational_attribution_collaborator(monkeypatch):
+    """These unit tests use fake sessions; temporal scope has PostgreSQL integration tests."""
+    from unittest.mock import AsyncMock
+    monkeypatch.setattr("app.services.possession_return_service.attribute_operation", AsyncMock())

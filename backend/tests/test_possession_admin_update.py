@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timedelta, timezone
 from inspect import signature
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
@@ -70,6 +70,8 @@ def _payload(record, **changes) -> PossessionAdminUpdate:
         "start_odometer_km": record.start_odometer_km,
         "end_odometer_km": record.end_odometer_km,
         "edit_reason": "Correção administrativa de teste",
+        "vehicle_condition_notes": "Sem avarias" if record.end_date else None,
+        "declaration_accepted": bool(record.end_date),
     }
     values.update(changes)
     return PossessionAdminUpdate(**values)
@@ -77,6 +79,7 @@ def _payload(record, **changes) -> PossessionAdminUpdate:
 
 def _service(record, monkeypatch):
     db = AsyncMock()
+    db.add = Mock()
     service = PossessionService(db)
     service.possessions.get_by_id = AsyncMock(return_value=record)
     service.possessions.get_by_id_for_update = AsyncMock(return_value=record)
@@ -213,3 +216,10 @@ async def test_rectification_endpoint_permissions(endpoint, role, can_edit):
         with pytest.raises(HTTPException) as exc:
             await authorize()
         assert exc.value.status_code == 403
+
+
+@pytest.fixture(autouse=True)
+def operational_attribution_collaborator(monkeypatch):
+    """These unit tests use fake sessions; temporal scope has PostgreSQL integration tests."""
+    from unittest.mock import AsyncMock
+    monkeypatch.setattr("app.services.possession_service.attribute_operation", AsyncMock())

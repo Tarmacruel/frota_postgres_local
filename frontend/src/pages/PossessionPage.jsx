@@ -9,7 +9,7 @@ import Pagination from '../components/Pagination'
 import PossessionForm from '../components/PossessionForm'
 import PossessionReportBuilder from '../components/PossessionReportBuilder'
 import PossessionEndModal from '../components/PossessionEndModal'
-import PossessionReturnCorrectionModal from '../components/PossessionReturnCorrectionModal'
+import PossessionRevisionHistory from '../components/PossessionRevisionHistory'
 import PossessionTripsModal from '../components/PossessionTripsModal'
 import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
@@ -133,10 +133,10 @@ export default function PossessionPage() {
   const [feedback, setFeedback] = useState('')
   const [search, setSearch] = useState('')
   const [organizationFilter, setOrganizationFilter] = useState('')
-  const [vehicleFilter, setVehicleFilter] = useState('')
+  const [vehicleFilter, setVehicleFilter] = useState(() => searchParams.get('vehicle_id') || '')
   const [startDateFrom, setStartDateFrom] = useState('')
   const [startDateTo, setStartDateTo] = useState('')
-  const [viewFilter, setViewFilter] = useState('ATIVAS')
+  const [viewFilter, setViewFilter] = useState(() => searchParams.get('vehicle_id') ? 'TODAS' : 'ATIVAS')
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false)
   const [tripsDialog, setTripsDialog] = useState(null)
   const [tripOverview, setTripOverview] = useState({})
@@ -167,11 +167,12 @@ export default function PossessionPage() {
   const [locationRecord, setLocationRecord] = useState(null)
   const [termRecord, setTermRecord] = useState(null)
   const [termBusy, setTermBusy] = useState(false)
-  const [correctionRecord, setCorrectionRecord] = useState(null)
-  const [correctionContext, setCorrectionContext] = useState(null)
-  const [correctionForm, setCorrectionForm] = useState({ end_odometer_km: '', vehicle_condition_notes: '', correction_reason: '', declaration_accepted: false })
-  const [correctionSaving, setCorrectionSaving] = useState(false)
-  const [correctionError, setCorrectionError] = useState('')
+  const [editContext, setEditContext] = useState(null)
+  const [editError, setEditError] = useState('')
+  const [editLoading, setEditLoading] = useState(false)
+  const [editStale, setEditStale] = useState(false)
+  const editRequest = useRef(0)
+  const editSending = useRef(false)
   const [currentPage, setCurrentPage] = useState(1)
   const editDocumentInputRef = useRef(null)
   const editPhotoInputRef = useRef(null)
@@ -420,30 +421,44 @@ export default function PossessionPage() {
     setTripsDialog({ possession: record, action })
   }
 
-  function openEditModal(record) {
-    setEditingRecord(record)
-    setEditForm({
-      driver_id: record.driver_id || '',
-      driver_name: record.driver_name || '',
-      driver_document: record.driver_document || '',
-      driver_contact: record.driver_contact || '',
-      start_date: toDateTimeLocalValue(record.start_date),
-      end_date: toDateTimeLocalValue(record.end_date),
-      observation: record.observation || '',
-      start_odometer_km: record.start_odometer_km ?? '',
-      end_odometer_km: record.end_odometer_km ?? '',
-      edit_reason: '',
-    })
-    setEditDocumentFile(null)
-    setEditDocumentError('')
-    setEditPhotoFiles([])
-    setEditPhotoError('')
-    if (editDocumentInputRef.current) {
-      editDocumentInputRef.current.value = ''
-    }
-    if (editPhotoInputRef.current) {
-      editPhotoInputRef.current.value = ''
-    }
+  async function openEditModal(selected) {
+    const request = ++editRequest.current
+    closeTermModal()
+    setEditingRecord(selected)
+    setEditContext(null); setEditError(''); setEditLoading(true); setEditStale(false)
+    try {
+      const { data } = await possessionAPI.getRectificationContext(selected.id)
+      if (request !== editRequest.current) return
+      const record = data.possession
+      setEditingRecord(record)
+      setEditContext(data)
+      setEditForm({
+        driver_id: record.driver_id || '',
+        driver_name: record.driver_name || '',
+        driver_document: record.driver_document || '',
+        driver_contact: record.driver_contact || '',
+        start_date: toDateTimeLocalValue(record.start_date),
+        end_date: toDateTimeLocalValue(record.end_date),
+        observation: record.observation || '',
+        start_odometer_km: record.start_odometer_km ?? '',
+        end_odometer_km: record.end_odometer_km ?? '',
+        edit_reason: '',
+        vehicle_condition_notes: data.return_context.current_confirmation?.vehicle_condition_notes || '',
+        declaration_accepted: false,
+      })
+      setEditDocumentFile(null)
+      setEditDocumentError('')
+      setEditPhotoFiles([])
+      setEditPhotoError('')
+      if (editDocumentInputRef.current) {
+        editDocumentInputRef.current.value = ''
+      }
+      if (editPhotoInputRef.current) {
+        editPhotoInputRef.current.value = ''
+      }
+    } catch (err) {
+      if (request === editRequest.current) setEditError(getApiErrorMessage(err))
+    } finally { if (request === editRequest.current) setEditLoading(false) }
   }
 
   function closeEndModal() {
@@ -453,7 +468,10 @@ export default function PossessionPage() {
     setEndForm(buildEndState(null))
   }
 
-  function closeEditModal() {
+  function closeEditModal(force = false) {
+    if (editSending.current && !force) return
+    editRequest.current += 1
+    setEditContext(null); setEditError(''); setEditLoading(false)
     setEditingRecord(null)
     setEditForm({
       driver_id: '',
@@ -620,25 +638,30 @@ export default function PossessionPage() {
 
   async function handleEditPossession(event) {
     event.preventDefault()
-    if (!editingRecord) return
+    if (!editingRecord || !editContext || editSending.current || editStale) return
     if (!canEditPossession) {
       setError('Você não tem permissão para retificar posses.')
       return
     }
 
+    editSending.current = true
     try {
       setSavingEdit(true)
-      setError('')
+      setEditError('')
       const payload = new FormData()
       if (editForm.driver_id) payload.append('driver_id', editForm.driver_id)
       payload.append('driver_name', editForm.driver_name)
       if (editForm.driver_document) payload.append('driver_document', editForm.driver_document)
       if (editForm.driver_contact) payload.append('driver_contact', editForm.driver_contact)
-      payload.append('start_date', new Date(editForm.start_date).toISOString())
-      const endDate = editingRecord.return_confirmation_available ? editingRecord.end_date : editForm.end_date
-      const endOdometer = editingRecord.return_confirmation_available ? editingRecord.end_odometer_km : editForm.end_odometer_km
-      // Preserve the confirmed timestamp, including seconds, during general edits.
-      if (endDate) payload.append('end_date', editingRecord.return_confirmation_available ? endDate : new Date(endDate).toISOString())
+      const instant = (value, original) => value === toDateTimeLocalValue(original) ? original : new Date(value).toISOString()
+      payload.append('expected_revision', String(editingRecord.revision))
+      payload.append('start_date', instant(editForm.start_date, editingRecord.start_date))
+      if (editForm.end_date) payload.append('end_date', instant(editForm.end_date, editingRecord.end_date))
+      const endOdometer = editForm.end_odometer_km
+      if (editingRecord.end_date) {
+        payload.append('vehicle_condition_notes', editForm.vehicle_condition_notes)
+        payload.append('declaration_accepted', String(editForm.declaration_accepted))
+      }
       if (editForm.observation) payload.append('observation', editForm.observation)
       if (editForm.start_odometer_km !== '') payload.append('start_odometer_km', String(Number(editForm.start_odometer_km)))
       if (endOdometer !== '' && endOdometer != null) payload.append('end_odometer_km', String(Number(endOdometer)))
@@ -650,13 +673,15 @@ export default function PossessionPage() {
         payload.append('new_photos', file, file.name)
       })
 
-      await possessionAPI.update(editingRecord.id, payload)
-      setFeedback('Registro de posse retificado com justificativa e auditoria.')
-      closeEditModal()
+      const { data } = await possessionAPI.update(editingRecord.id, payload)
+      setFeedback(`Posse retificada na versão ${data.revision}. Os dados anteriores foram preservados no histórico.`)
+      closeEditModal(true)
       await loadPossessions()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível retificar a posse.'))
+      setEditError(getApiErrorMessage(err, 'Não foi possível retificar a posse.'))
+      if (getApiErrorCode(err) === 'POSSESSION_REVISION_CONFLICT') setEditStale(true)
     } finally {
+      editSending.current = false
       setSavingEdit(false)
     }
   }
@@ -687,59 +712,6 @@ export default function PossessionPage() {
       setError(getApiErrorMessage(err, 'Não foi possível obter o termo oficial.'))
     } finally {
       setTermBusy(false)
-    }
-  }
-
-  async function openReturnCorrection(record) {
-    try {
-      setError('')
-      setCorrectionError('')
-      const { data } = await possessionAPI.getReturnContext(record.id)
-      if (!data.current_confirmation) {
-        setError('Esta posse não possui confirmação versionada para retificar.')
-        return
-      }
-      closeEditModal()
-      closeTermModal()
-      setCorrectionRecord(record)
-      setCorrectionContext(data)
-      setCorrectionForm({
-        end_date: toDateTimeLocalValue(data.end_date),
-        end_odometer_km: data.current_confirmation.final_odometer_km,
-        vehicle_condition_notes: data.current_confirmation.vehicle_condition_notes,
-        correction_reason: '',
-        declaration_accepted: false,
-      })
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível carregar a confirmação atual.'))
-    }
-  }
-
-  function closeReturnCorrection(force = false) {
-    if (correctionSaving && !force) return
-    setCorrectionRecord(null)
-    setCorrectionContext(null)
-    setCorrectionError('')
-  }
-
-  async function handleReturnCorrection(event) {
-    event.preventDefault()
-    if (!correctionRecord || correctionSaving) return
-    try {
-      setCorrectionSaving(true)
-      setCorrectionError('')
-      const { data } = await possessionAPI.correctReturnConfirmation(correctionRecord.id, {
-        ...correctionForm,
-        end_date: new Date(correctionForm.end_date).toISOString(),
-        end_odometer_km: Number(correctionForm.end_odometer_km),
-      })
-      setFeedback(`Confirmação de devolução retificada na versão ${data.version}; a versão anterior foi preservada.`)
-      closeReturnCorrection(true)
-      await loadPossessions()
-    } catch (err) {
-      setCorrectionError(getApiErrorMessage(err, 'Não foi possível criar a nova versão da confirmação.'))
-    } finally {
-      setCorrectionSaving(false)
     }
   }
 
@@ -915,7 +887,7 @@ export default function PossessionPage() {
             <SearchableSelect
               value={vehicleFilter}
               onChange={setVehicleFilter}
-              options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(buildVehicleOption)]}
+              options={[{ value: '', label: 'Todos os veículos' }, ...(vehicleFilter && !vehicles.some((item) => item.id === vehicleFilter) ? [{ value: vehicleFilter, label: 'Veículo do histórico de empréstimo' }] : []), ...vehicles.map(buildVehicleOption)]}
               placeholder="Filtrar veículo"
               searchPlaceholder="Buscar veículo por placa, modelo, chassi ou lotação"
             />
@@ -1069,11 +1041,7 @@ export default function PossessionPage() {
                             Retificar
                           </button>
                         ) : null}
-                        {canRectifyPossession && record.return_confirmation_available ? (
-                          <button type="button" className="mini-button" onClick={() => openReturnCorrection(record)}>
-                            Retificar devolução
-                          </button>
-                        ) : null}
+
                         {renderTripActions(record)}
                       </div>
                     </td>
@@ -1130,18 +1098,15 @@ export default function PossessionPage() {
         title="Retificar posse"
         description={editingRecord ? `Retificação administrativa de ${editingRecord.driver_name} no veículo ${editingRecord.vehicle_plate}. A justificativa é obrigatória, entra na auditoria e também pode substituir termos e fotos complementares.` : ''}
         onClose={closeEditModal}
+        canClose={!savingEdit}
       >
-        <form onSubmit={handleEditPossession} className="form-grid modal-form-grid">
-          {editingRecord?.return_confirmation_available ? (
-            <div className="alert alert-warning modal-field-span">
-              <p>A devolução já foi confirmada. Para corrigir a data, o horário ou o hodômetro final, use Retificar devolução. A correção preserva a versão anterior e registra a justificativa.</p>
-              <button type="button" className="ghost-button" disabled={savingEdit} onClick={() => openReturnCorrection(editingRecord)}>
-                Retificar devolução
-              </button>
-              <p className="helper-text">Salve outras alterações deste formulário antes de abrir a correção da devolução.</p>
-            </div>
-          ) : null}
-          <div className="form-field">
+        {editLoading && <p role="status">Carregando dados e versões da posse…</p>}
+        {editError && <div role="alert" className="alert alert-error">{editError}</div>}
+        {!editLoading && (!editContext || editStale) && <button type="button" className="ghost-button" onClick={() => openEditModal(editingRecord)}>Recarregar retificação</button>}
+        {editContext && <form onSubmit={handleEditPossession} className="form-grid modal-form-grid">
+          <fieldset className="form-grid modal-form-grid modal-field-span" disabled={savingEdit} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
+          <div className="alert alert-info modal-field-span">Versão atual: {editingRecord.revision}. Corrija os dados necessários e informe uma única justificativa. O salvamento preserva a versão anterior.</div>
+          <div className="form-field modal-field-span">
             <label>Condutor</label>
             <DriverSelect
               value={editForm.driver_id}
@@ -1178,17 +1143,19 @@ export default function PossessionPage() {
             <input
               id="edit-possession-start"
               type="datetime-local"
+              required
               className="app-input"
               value={editForm.start_date}
               onChange={(event) => setEditForm({ ...editForm, start_date: event.target.value })}
             />
           </div>
-          {!editingRecord?.return_confirmation_available ? (
+          {editingRecord?.end_date ? (
             <div className="form-field">
               <label htmlFor="edit-possession-end">Fim</label>
               <input
                 id="edit-possession-end"
                 type="datetime-local"
+                required
                 className="app-input"
                 value={editForm.end_date}
                 onChange={(event) => setEditForm({ ...editForm, end_date: event.target.value })}
@@ -1208,12 +1175,13 @@ export default function PossessionPage() {
             />
           </div>
 
-          {!editingRecord?.return_confirmation_available ? (
+          {editingRecord?.end_date ? (
             <div className="form-field">
               <label htmlFor="edit-possession-end-odometer">Odômetro final (km)</label>
               <input
                 id="edit-possession-end-odometer"
                 type="number"
+                required
                 min="0"
                 step="0.1"
                 className="app-input"
@@ -1223,6 +1191,20 @@ export default function PossessionPage() {
             </div>
           ) : null}
 
+          {editingRecord?.end_date && <>
+            <div className="form-field modal-field-span">
+              <label htmlFor="edit-return-condition">Condições do veículo na devolução</label>
+              <textarea id="edit-return-condition" className="app-textarea" rows="3" required minLength={3} maxLength={4000}
+                value={editForm.vehicle_condition_notes} onChange={(event) => setEditForm({ ...editForm, vehicle_condition_notes: event.target.value })} />
+            </div>
+            <section className="possession-return-declaration modal-field-span">
+              <strong>Declaração da devolução · v{editContext.return_context.declaration.version}</strong>
+              <p>{editContext.return_context.declaration.text}</p>
+              <label className="checkbox-line possession-return-acceptance"><input type="checkbox" checked={editForm.declaration_accepted}
+                onChange={(event) => setEditForm({ ...editForm, declaration_accepted: event.target.checked })} />
+                <span>Li integralmente e confirmo a declaração para esta retificação.</span></label>
+            </section>
+          </>}
           <div className="form-field modal-field-span">
             <label htmlFor="edit-possession-observation">Observação</label>
             <textarea
@@ -1238,6 +1220,7 @@ export default function PossessionPage() {
             <label htmlFor="edit-possession-reason">Justificativa da retificação</label>
             <textarea
               id="edit-possession-reason"
+              required minLength={8} maxLength={500}
               className="app-textarea"
               rows="3"
               placeholder="Explique por que este registro precisa ser retificado."
@@ -1304,12 +1287,14 @@ export default function PossessionPage() {
             </div>
           </div>
           <div className="actions-inline modal-actions">
-            <button className="app-button" type="submit" disabled={savingEdit || !editForm.start_date || !editForm.edit_reason.trim()}>
+            <button className="app-button" type="submit" disabled={savingEdit || editStale || !editForm.start_date || editForm.edit_reason.trim().length < 8 || (Boolean(editingRecord.end_date) && !editForm.declaration_accepted)}>
               {savingEdit ? 'Salvando...' : 'Salvar retificação'}
             </button>
-            <button className="ghost-button" type="button" onClick={closeEditModal}>Cancelar</button>
+            <button className="ghost-button" type="button" onClick={() => closeEditModal()}>Cancelar</button>
           </div>
-        </form>
+          </fieldset>
+          <PossessionRevisionHistory revisions={editContext.revisions} />
+        </form>}
       </Modal>
 
       <PossessionEndModal
@@ -1343,9 +1328,9 @@ export default function PossessionPage() {
                     Baixar PDF oficial
                   </button>
                 ) : null}
-                {canRectifyPossession && termRecord.return_confirmation_available ? (
-                  <button type="button" className="ghost-button" disabled={termBusy} onClick={() => openReturnCorrection(termRecord)}>
-                    Retificar devolução
+                {canRectifyPossession ? (
+                  <button type="button" className="ghost-button" disabled={termBusy} onClick={() => openEditModal(termRecord)}>
+                    Retificar posse
                   </button>
                 ) : null}
               </div>
@@ -1407,16 +1392,7 @@ export default function PossessionPage() {
         ) : null}
       </Modal>
 
-      <PossessionReturnCorrectionModal
-        record={correctionRecord}
-        context={correctionContext}
-        form={correctionForm}
-        saving={correctionSaving}
-        error={correctionError}
-        onChange={(patch) => setCorrectionForm((current) => ({ ...current, ...patch }))}
-        onClose={closeReturnCorrection}
-        onSubmit={handleReturnCorrection}
-      />
+
 
       <Modal
         open={Boolean(photoRecord)}

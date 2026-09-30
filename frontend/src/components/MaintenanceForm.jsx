@@ -96,7 +96,7 @@ export default function MaintenanceForm({ vehicles, initialData = null, onClose,
         <SearchableSelect
           value={form.vehicle_id}
           onChange={(value) => setForm({ ...form, vehicle_id: value })}
-          options={vehicles.map(buildVehicleOption)}
+          options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(buildVehicleOption)}
           placeholder="Selecione o veículo"
           searchPlaceholder="Buscar veículo por placa, modelo ou chassi"
           disabled={isEdit}

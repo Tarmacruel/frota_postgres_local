@@ -53,6 +53,9 @@ class PossessionUpdate(BaseModel):
 
 
 class PossessionAdminUpdate(BaseModel):
+    expected_revision: int | None = Field(default=None, ge=1)
+    vehicle_condition_notes: str | None = Field(default=None, min_length=3, max_length=4000)
+    declaration_accepted: bool = False
     driver_id: UUID | None = None
     driver_name: str = Field(min_length=3, max_length=150)
     driver_document: str | None = Field(default=None, max_length=20)
@@ -135,7 +138,10 @@ class PossessionPhotoOut(BaseModel):
 class PossessionOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    responsible_organization_id: UUID | None = None
+    vehicle_loan_id: UUID | None = None
     id: UUID
+    revision: int = 1
     public_number: int
     vehicle_id: UUID
     vehicle_plate: str

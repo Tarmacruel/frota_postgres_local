@@ -330,7 +330,7 @@ export default function FinesPage() {
         <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
           <div className="form-field">
             <label>Veículo</label>
-            <SearchableSelect value={form.vehicle_id} onChange={handleVehicleChange} options={vehicles.map(vehicleOption)} placeholder="Selecionar veículo" searchPlaceholder="Buscar veículo por placa, RENAVAM, marca ou modelo" />
+            <SearchableSelect value={form.vehicle_id} onChange={handleVehicleChange} options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(vehicleOption)} placeholder="Selecionar veículo" searchPlaceholder="Buscar veículo por placa, RENAVAM, marca ou modelo" />
           </div>
           <div className="form-field">
             <label>Condutor</label>

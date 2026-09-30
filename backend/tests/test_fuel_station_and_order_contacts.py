@@ -132,6 +132,9 @@ class FakeReceipt:
 
 
 class FakeDb:
+    async def scalar(self, statement):
+        return uuid4() if statement.selected_columns[0].table.name == 'vehicles' else None
+
     def __init__(self):
         self.committed = False
         self.rolled_back = False
@@ -418,3 +421,10 @@ async def test_order_repository_applies_created_period_filters():
     compiled = "\n".join(db.statements)
     assert "fuel_supply_orders.created_at >= " in compiled
     assert "fuel_supply_orders.created_at <= " in compiled
+
+
+@pytest.fixture(autouse=True)
+def operational_attribution_collaborator(monkeypatch):
+    """These unit tests use fake sessions; temporal scope has PostgreSQL integration tests."""
+    from unittest.mock import AsyncMock
+    monkeypatch.setattr("app.services.fuel_supply_order_service.attribute_operation", AsyncMock())

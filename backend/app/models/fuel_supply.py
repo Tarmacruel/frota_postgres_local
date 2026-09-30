@@ -7,9 +7,10 @@ from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, Num
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
+from app.models.operational_responsibility import LoanAttributionMixin
 
 
-class FuelSupply(Base):
+class FuelSupply(LoanAttributionMixin, Base):
     __tablename__ = "fuel_supplies"
     __table_args__ = (
         Index("idx_fuel_supplies_vehicle", "vehicle_id"),

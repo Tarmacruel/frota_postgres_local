@@ -29,6 +29,12 @@ storage/runtime/
 storage/hotfix-backups/
 storage/deploy-verification/
 /output/playwright/driver-registration-*.png
+/output/playwright/phase3-*.png
+/output/playwright/phase4-*.png
+/output/playwright/phase6-*.png
+/output/playwright/fuel-order-defaults.png
+/output/playwright/possession-*-dark.png
+/output/playwright/possession-*-light.png
 deploy/.ci-uploads/
 /data/
 /postgres-data/
@@ -36,6 +42,7 @@ deploy/.ci-uploads/
 /.runtime-secure/
 /storage/homologation/
 /storage/migration-*/
+/storage/loan-tests/
 
 
 .playwright-mcp/

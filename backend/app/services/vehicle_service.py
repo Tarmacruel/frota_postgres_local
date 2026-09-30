@@ -7,9 +7,11 @@ from uuid import UUID
 from fastapi import HTTPException, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from app.services.operational_scope import ensure_registration_manager
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
 from app.core.organization_scope import ensure_organization_access, production_scope_is_empty, scoped_organization_id
+from app.core.vehicle_handoff import lock_vehicle_handoff, prevent_loan_location_bypass
 from app.models.audit_log import AuditLog
 from app.models.claim import Claim
 from app.models.claim_attachment import ClaimAttachment
@@ -20,6 +22,9 @@ from app.models.vehicle import Vehicle, VehicleOwnershipType, VehicleStatus
 from app.repositories.master_data_repository import MasterDataRepository
 from app.services.audit_service import AuditService
 from app.repositories.vehicle_repository import VehicleRepository
+from app.repositories.vehicle_loan_repository import VehicleLoanRepository
+from app.models.vehicle_loan import VehicleLoan
+from app.models.master_data import Organization
 from app.schemas.common import PaginatedResponse, build_pagination
 from app.schemas.vehicle import VehicleCreate, VehicleUpdate
 
@@ -60,8 +65,8 @@ class VehicleService:
         for vehicle in vehicles:
             active = await self.vehicles.get_active_history(vehicle.id)
             possession = await self.vehicles.get_active_possession(vehicle.id)
-            items.append(self._serialize_vehicle(vehicle, active, possession))
-        return items
+            items.append(self._serialize_vehicle(vehicle, active, possession, current_user=current_user))
+        return await self._loan_metadata(items, current_user)
 
     async def list_paginated(
         self,
@@ -93,8 +98,8 @@ class VehicleService:
         for vehicle in vehicles:
             active = await self.vehicles.get_active_history(vehicle.id)
             possession = await self.vehicles.get_active_possession(vehicle.id)
-            items.append(self._serialize_vehicle(vehicle, active, possession))
-        return PaginatedResponse[dict](data=items, pagination=build_pagination(page, limit, total))
+            items.append(self._serialize_vehicle(vehicle, active, possession, current_user=current_user))
+        return PaginatedResponse[dict](data=await self._loan_metadata(items, current_user), pagination=build_pagination(page, limit, total))
 
     async def get_history(
         self,
@@ -110,10 +115,22 @@ class VehicleService:
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
-        await self._ensure_vehicle_visible_to_user(vehicle_id, current_user=current_user)
+        cutoff = None
+        org = scoped_organization_id(current_user)
+        if org is not None or production_scope_is_empty(current_user):
+            scope = await VehicleLoanRepository(self.db).scope(vehicle_id, datetime.now(timezone.utc))
+            if scope is None or not scope.can_view(org, now=datetime.now(timezone.utc)):
+                raise HTTPException(404, "Registro nao encontrado")
+            if org not in (scope.owner_organization_id, scope.current_organization_id):
+                cutoff = max(loan.returned_at for loan in scope.loans if loan.recipient_organization_id == org and loan.returned_at)
+                end_date = min(end_date, cutoff) if end_date else cutoff
         history = await self.vehicles.list_history(vehicle_id, start_date=start_date, end_date=end_date)
         audit_logs = await self._list_vehicle_audit_logs(vehicle_id, start_date=start_date, end_date=end_date)
         events = [self._serialize_history(item) for item in history]
+        if cutoff:
+            for event in events:
+                if event.get("end_date") and event["end_date"] > cutoff:
+                    event["end_date"] = None
         events.extend(self._serialize_audit_event(item) for item in audit_logs)
         return sorted(events, key=lambda item: item["occurred_at"], reverse=True)
 
@@ -137,6 +154,7 @@ class VehicleService:
             model=data.model.strip(),
             vehicle_type=data.vehicle_type,
             ownership_type=data.ownership_type,
+            owner_organization_id=allocation.organization_id,
             status=data.status,
         )
         for field in VEHICLE_OPTIONAL_FIELDS:
@@ -173,14 +191,15 @@ class VehicleService:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível criar o veículo") from exc
 
         active = await self.vehicles.get_active_history(vehicle.id)
-        return self._serialize_vehicle(vehicle, active, None)
+        return self._serialize_vehicle(vehicle, active, None, current_user=current_user)
 
     async def update(self, vehicle_id: UUID, data: VehicleUpdate, current_user: User) -> dict:
+        await lock_vehicle_handoff(self.db, vehicle_id)
         vehicle = await self.vehicles.get_by_id(vehicle_id)
         if not vehicle:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
-        await self._ensure_vehicle_visible_to_user(vehicle_id, current_user=current_user)
+        await ensure_registration_manager(self.db, vehicle_id, current_user)
         previous_active = await self.vehicles.get_active_history(vehicle.id)
         previous_values = {
             "plate": vehicle.plate,
@@ -230,6 +249,7 @@ class VehicleService:
                 active = await self.vehicles.get_active_history(vehicle.id)
                 current_allocation_id = active.allocation_id if active else None
                 if current_allocation_id != allocation.id:
+                    await prevent_loan_location_bypass(self.db, vehicle.id)
                     if active:
                         active.end_date = datetime.now(timezone.utc)
                     new_history = LocationHistory(
@@ -272,13 +292,14 @@ class VehicleService:
 
         active = await self.vehicles.get_active_history(vehicle.id)
         possession = await self.vehicles.get_active_possession(vehicle.id)
-        return self._serialize_vehicle(vehicle, active, possession)
+        return self._serialize_vehicle(vehicle, active, possession, current_user=current_user)
 
     async def delete(self, vehicle_id: UUID, current_user: User) -> None:
         vehicle = await self.vehicles.get_by_id_for_update(vehicle_id)
         if not vehicle:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
+        await ensure_registration_manager(self.db, vehicle_id, current_user)
         active = await self.vehicles.get_active_history(vehicle.id)
         possession = await self.vehicles.get_active_possession(vehicle.id)
         attachment_paths = await self._claim_attachment_paths_for_vehicle(vehicle.id)
@@ -408,8 +429,32 @@ class VehicleService:
             return normalized or None
         return value
 
-    def _serialize_vehicle(self, vehicle: Vehicle, active_history: LocationHistory | None, possession) -> dict:
+    async def _loan_metadata(self, items, current_user):
+        if not items:
+            return items
+        ids = [item['id'] for item in items]
+        owners = {item['owner_organization_id'] for item in items if item.get('owner_organization_id')}
+        names = dict((await self.db.execute(select(Organization.id, Organization.name).where(Organization.id.in_(owners)))).all()) if owners else {}
+        loans = (await self.db.execute(select(VehicleLoan).where(VehicleLoan.vehicle_id.in_(ids),
+            VehicleLoan.status.in_(('ACTIVE', 'AWAITING_RETURN_RECEIPT'))))).scalars().all()
+        active = {loan.vehicle_id: loan for loan in loans}
+        org = scoped_organization_id(current_user)
+        for item in items:
+            owner = item.get('owner_organization_id')
+            operator = (item.get('current_location') or {}).get('organization_id')
+            loan = active.get(item['id'])
+            item.update(owner_organization_name=names.get(owner), operating_organization_id=operator,
+                active_vehicle_loan_id=loan.id if loan else None,
+                loan_status=('EMPRESTADO' if org == owner else 'RECEBIDO') if loan and org else ('EMPRESTADO' if loan else None),
+                can_operate_vehicle=org is None or org == operator,
+                can_manage_registration=org is None or org == (owner or operator))
+        return items
+
+    def _serialize_vehicle(self, vehicle: Vehicle, active_history: LocationHistory | None, possession, *, current_user=None) -> dict:
         current_location = self._serialize_location(active_history)
+        org = scoped_organization_id(current_user)
+        operator = (current_location or {}).get("organization_id")
+        owner = getattr(vehicle, "owner_organization_id", None)
         return {
             "id": vehicle.id,
             "plate": vehicle.plate,
@@ -435,6 +480,10 @@ class VehicleService:
             "status": vehicle.status,
             "current_department": current_location["display_name"] if current_location else None,
             "current_location": current_location,
+            "owner_organization_id": owner,
+            "operating_organization_id": operator,
+            "can_operate_vehicle": org is None or org == operator,
+            "can_manage_registration": org is None or org == (owner or operator),
             "current_driver_name": possession.driver_name if possession else None,
             "created_at": vehicle.created_at,
             "updated_at": vehicle.updated_at,

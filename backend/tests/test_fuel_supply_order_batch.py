@@ -13,6 +13,10 @@ from app.services.fuel_supply_order_service import FuelSupplyOrderService
 
 
 class FakeDb:
+    async def scalar(self, statement):
+        # Unit fixture has visible vehicles and no inter-secretariat loan history.
+        return uuid4() if statement.selected_columns[0].table.name == 'vehicles' else None
+
     def __init__(self):
         self.commit_calls = 0
         self.rollback_calls = 0
@@ -185,3 +189,10 @@ async def test_create_batch_validates_all_vehicles_before_any_order_is_written()
     assert service.orders.created == []
     assert db.commit_calls == 0
     assert db.rollback_calls == 0
+
+
+@pytest.fixture(autouse=True)
+def operational_attribution_collaborator(monkeypatch):
+    """These unit tests use fake sessions; temporal scope has PostgreSQL integration tests."""
+    from unittest.mock import AsyncMock
+    monkeypatch.setattr("app.services.fuel_supply_order_service.attribute_operation", AsyncMock())

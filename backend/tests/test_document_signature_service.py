@@ -34,6 +34,7 @@ def test_document_hash_is_deterministic_for_canonical_snapshot():
 @pytest.mark.asyncio
 async def test_document_creation_rebuilds_source_context_after_lock():
     service = DocumentSignatureService(db=AsyncMock())
+    service._ensure_source_writer = AsyncMock()
     source_id = uuid4()
     events = []
     old_context = {"content_hash": "old"}
@@ -83,6 +84,7 @@ async def test_joint_signature_requires_creator_and_requested_signer():
     service = DocumentSignatureService(db=None)
     document = SimpleNamespace(
         created_by_user_id=creator_id,
+        document_type=DigitalDocumentType.POSSESSION_RESPONSIBILITY_TERM,
         required_signatures=2,
         status=DigitalDocumentStatus.PENDING,
         completed_at=None,
@@ -111,6 +113,7 @@ async def test_declined_joint_request_no_longer_blocks_completed_primary_signatu
     service = DocumentSignatureService(db=None)
     document = SimpleNamespace(
         created_by_user_id=creator_id,
+        document_type=DigitalDocumentType.POSSESSION_RESPONSIBILITY_TERM,
         required_signatures=2,
         status=DigitalDocumentStatus.PENDING,
         completed_at=None,
@@ -232,7 +235,8 @@ def test_production_profile_can_mutate_legacy_possession_term_signature():
 
 
 @pytest.mark.asyncio
-async def test_unique_responsibility_signature_hashes_canonical_delivery_scope_only():
+async def test_unique_responsibility_signature_hashes_canonical_delivery_scope_only(monkeypatch):
+    monkeypatch.setattr("app.services.document_signature_service.ensure_record_visible", AsyncMock())
     service = DocumentSignatureService(db=AsyncMock())
     possession_id = uuid4()
     record = SimpleNamespace(
