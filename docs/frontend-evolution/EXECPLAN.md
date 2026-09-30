@@ -1,4 +1,16 @@
-# ExecPlan — Fase 0 — Baseline e segurança
+﻿# ExecPlan — Fase 0 — Baseline e segurança
+
+## Continuação autorizada — Fase 1 — 30/09/2026
+
+Usuário autorizou somente tokens, folha CSS aditiva, seis componentes base e miniaturas. Estado inicial desta fase: branch `feature/frontend-evolution-hml`, HEAD `a71c9c0`, working tree limpo. Aplicar a lista de arquivos prevista abaixo; não reorganizar páginas nem alterar o runner de testes.
+
+Plano executado: adaptar starter-kit local, manter os raios menores 4/6/8/10 já solicitados, usar tokens `--ui-*` sem substituir os atuais, importar a folha depois de ambos os CSS existentes, completar teclado/foco do ActionMenu e validar regressão visual claro/escuro. Os testes padrão e com forks serão executados separadamente; as 16 falhas anteriores do pool padrão continuarão explicitamente registradas caso persistam. Nenhuma mudança de backend, dependência, configuração de homologação ou produção está prevista.
+
+- [x] Integrar tokens, componentes e 11 miniaturas do kit.
+- [x] Testar contratos acessíveis e teclado/foco, incluindo itens desabilitados.
+- [x] Executar test/lint/build e comparação com baseline.
+- [x] Conferir componentes e páginas existentes nos dois temas.
+- [x] Atualizar STATUS, registrar commit da Fase 1 e parar.
 
 ## Objetivo
 
@@ -45,7 +57,7 @@ Não modificar rotas, permissões, autenticação, payloads, indicadores, PDF/XL
 - [x] Executar test/lint/build, preservar logs e comparar teste com forks.
 - [x] Capturar Início/Veículos/Posses nos dois temas.
 - [x] Criar baseline, ExecPlan e STATUS.
-- [ ] Fase 1 — não iniciada; depende de autorização.
+- [x] Fase 1 — autorizada e concluída em continuação; ver PHASE_1_FOUNDATION.md.
 
 ## Validação visual
 
@@ -70,3 +82,4 @@ Fase 0 entregue, código de frontend/backend idêntico ao HEAD inicial. O commit
 ## Rollback
 
 A Fase 0 só acrescenta documentação/referências. Reverter seu commit documental caso necessário, mantendo o commit operacional `06d44c1`. Nas fases futuras, commits separados e reversão normal de Git; sem migração ou mecanismo customizado.
+

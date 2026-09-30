@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 96" role="img" aria-label="Machine">
+  <defs>
+    <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#d8e0ea"/>
+    </linearGradient>
+  </defs>
+  <rect width="180" height="96" rx="14" fill="transparent"/>
+  <g stroke="#516174" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M24 59h77l13 11H30z" fill="url(#g)"/><path d="M42 58V35h36l18 23z" fill="url(#g)"/><path d="M81 36h26l18 9 20-15 5 6-22 22-24-10z" fill="#d7a84a"/><path d="M145 31h10v31h-10z" fill="#d7a84a"/><path d="M18 72h105"/><circle cx="43" cy="73" r="10" fill="#263445"/><circle cx="43" cy="73" r="4" fill="#aeb9c7"/><circle cx="93" cy="73" r="10" fill="#263445"/><circle cx="93" cy="73" r="4" fill="#aeb9c7"/>
+  </g>
+</svg>

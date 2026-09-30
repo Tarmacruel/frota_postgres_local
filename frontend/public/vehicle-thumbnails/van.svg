@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 96" role="img" aria-label="Van">
+  <defs>
+    <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#d8e0ea"/>
+    </linearGradient>
+  </defs>
+  <rect width="180" height="96" rx="14" fill="transparent"/>
+  <g stroke="#516174" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M20 66V36q0-8 8-8h75l32 17h18q8 0 8 8v17H20z" fill="url(#g)"/><path d="M38 34h58v22H38zM103 34h16l20 12v10h-36z" fill="#c9e0f7"/><circle cx="50" cy="70" r="11" fill="#263445"/><circle cx="50" cy="70" r="5" fill="#aeb9c7"/><circle cx="133" cy="70" r="11" fill="#263445"/><circle cx="133" cy="70" r="5" fill="#aeb9c7"/>
+  </g>
+</svg>

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 96" role="img" aria-label="Microbus">
+  <defs>
+    <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#d8e0ea"/>
+    </linearGradient>
+  </defs>
+  <rect width="180" height="96" rx="14" fill="transparent"/>
+  <g stroke="#516174" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M20 66V34q0-7 7-7h90l28 16h13v27H20z" fill="url(#g)"/><path d="M31 34h24v20H31zm29 0h24v20H60zm29 0h24v20H89zm29 1h10l17 10v9h-27z" fill="#c9e0f7"/><circle cx="49" cy="72" r="10" fill="#263445"/><circle cx="49" cy="72" r="4" fill="#aeb9c7"/><circle cx="133" cy="72" r="10" fill="#263445"/><circle cx="133" cy="72" r="4" fill="#aeb9c7"/>
+  </g>
+</svg>

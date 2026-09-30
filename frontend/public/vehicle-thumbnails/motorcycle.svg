@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 96" role="img" aria-label="Motorcycle">
+  <defs>
+    <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#d8e0ea"/>
+    </linearGradient>
+  </defs>
+  <rect width="180" height="96" rx="14" fill="transparent"/>
+  <g stroke="#516174" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <circle cx="45" cy="69" r="15" fill="none"/><circle cx="132" cy="69" r="15" fill="none"/><path d="M45 69 73 51l25 18H70l-15-24m43 24 18-29h15m-39 5-11-9h-17m55 33-15-30" fill="none"/><path d="M72 51h24l8 9H79z" fill="url(#g)"/>
+  </g>
+</svg>

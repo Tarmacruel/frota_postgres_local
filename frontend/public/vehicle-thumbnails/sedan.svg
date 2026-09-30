@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 180 96" role="img" aria-label="Sedan">
+  <defs>
+    <linearGradient id="g" x1="0" x2="0" y1="0" y2="1">
+      <stop offset="0" stop-color="#f8fafc"/>
+      <stop offset="1" stop-color="#d8e0ea"/>
+    </linearGradient>
+  </defs>
+  <rect width="180" height="96" rx="14" fill="transparent"/>
+  <g stroke="#516174" stroke-width="2" stroke-linejoin="round" stroke-linecap="round">
+    <path d="M18 63 30 48 58 42h60l22 7 20 14v7H18z" fill="url(#g)"/><path d="M61 43 54 56h66l-6-13z" fill="#c9e0f7"/><circle cx="50" cy="70" r="11" fill="#263445"/><circle cx="50" cy="70" r="5" fill="#aeb9c7"/><circle cx="133" cy="70" r="11" fill="#263445"/><circle cx="133" cy="70" r="5" fill="#aeb9c7"/>
+  </g>
+</svg>
