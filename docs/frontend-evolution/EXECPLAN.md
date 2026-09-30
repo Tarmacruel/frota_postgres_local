@@ -1,5 +1,23 @@
 ﻿# ExecPlan — Fase 0 — Baseline e segurança
 
+## Continuação autorizada — Fase 3 — 30/09/2026
+
+Objetivo: evoluir somente o dashboard (`DashboardPage.jsx`) e seus estilos/componentes diretos, usando o board `references/target/02-telas-alvo-board.png` como direção. Preservar as três consultas existentes, seus parâmetros, cálculos, filtros de permissão e destinos das ações. Não alterar shell, páginas de negócio, backend, contratos ou dados.
+
+Tese visual: saudação curta e contextual, quatro KPIs distinguíveis por ícone e cor semântica, ações rápidas compactas e pendências ocupando a área de maior prioridade. A leitura do dia e os atalhos condicionais do perfil permanecem disponíveis em uma coluna de apoio. Os dois temas devem conservar contraste e hierarquia equivalentes.
+
+Arquivos previstos: `frontend/src/pages/DashboardPage.jsx`, `frontend/src/styles/frontend-evolution.css`, teste direto do dashboard, este ExecPlan, `STATUS.md` e relatório/evidências da fase.
+
+- [x] Reestruturar a apresentação do dashboard sem alterar consultas, cálculos ou permissões.
+- [x] Adotar `StatCard` e estilos próprios para KPIs, ações, pendências e leitura do dia.
+- [x] Cobrir em teste o número/forma das consultas e a filtragem de ações por permissão.
+- [x] Rodar testes, lint e build; comparar com o baseline.
+- [x] Capturar claro/escuro, atualizar STATUS, registrar commit e parar.
+
+Resultado: saudação contextual compacta, quatro KPIs semânticos, quatro ações rápidas, pendências priorizadas e leitura diária lateral, com atalhos administrativos condicionais preservados. As únicas chamadas continuam sendo `/vehicles`, `/maintenance` e `/possession/active`, sob as mesmas permissões. O teste direto do dashboard aprovou 2 cenários; o pool `forks` aprovou 193 testes; lint manteve 0 erros/46 avisos; build aprovado. O runner padrão concluiu com 178 aprovados e 15 falhas intermitentes nas quatro suítes preexistentes, sem falha no dashboard. Evidências e detalhes em `PHASE_3_DASHBOARD.md`.
+
+Rollback: reverter exclusivamente o commit da Fase 3; não há migration, dependência nova ou alteração de dados.
+
 ## Continuação autorizada — Fase 2 — 30/09/2026
 
 Objetivo: evoluir somente o shell global, preservando rotas, permissões, notificações, usuário, busca, tema e todo o conteúdo das páginas. Estado inicial verificado: branch `feature/frontend-evolution-hml`, HEAD `1880e58`, working tree limpo; baseline herdado da Fase 1 com 190 testes aprovados no pool `forks`, 16 falhas preexistentes no comando padrão, lint sem erros/46 avisos e build aprovado.
