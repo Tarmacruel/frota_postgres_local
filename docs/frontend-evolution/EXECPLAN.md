@@ -10,7 +10,7 @@ Arquivos previstos: as cinco páginas da fase, seus testes diretos existentes ou
 
 - [x] Veículos — cabeçalho, toolbar, miniatura, chips e overflow; testado antes do subcommit.
 - [x] Posses — fluxos condicionais preservados; 12 testes aprovados antes do subcommit.
-- [ ] Condutores — padronizar consulta e ações; testar e subcommitar.
+- [x] Condutores — consulta e ações padronizadas; 2 testes aprovados antes do subcommit.
 - [ ] Manutenções — padronizar consulta e ações; testar e subcommitar.
 - [ ] Empréstimos — adaptar a implementação real, documentos e ações; testar e subcommitar.
 - [ ] Validar claro/escuro, executar gates completos, atualizar STATUS e parar.

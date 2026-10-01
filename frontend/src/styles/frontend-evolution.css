@@ -1243,6 +1243,12 @@ body.internal-app-active .operation-page .operation-table-card {
 .operation-page--possessions .operation-table th:last-child,
 .operation-page--possessions .operation-table td:last-child { width: 220px; }
 
+.operation-page--drivers .operation-table { min-width: 1220px; }
+.operation-page--drivers .operation-table th:first-child,
+.operation-page--drivers .operation-table td:first-child { width: 190px; }
+.operation-page--drivers .operation-table th:last-child,
+.operation-page--drivers .operation-table td:last-child { width: 76px; }
+
 .operation-vehicle-identity {
   min-width: 142px;
   display: flex;

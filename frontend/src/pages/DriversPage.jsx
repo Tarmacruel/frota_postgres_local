@@ -9,6 +9,7 @@ import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 import { DRIVER_LICENSE_CATEGORY_OPTIONS } from '../constants/driverCategories'
+import { ActionMenu, PageHeader, StatusChip } from '../components/ui'
 
 const initialForm = {
   nome_completo: '',
@@ -33,9 +34,9 @@ function getCnhAlert(cnhDate) {
   const validade = new Date(cnhDate)
   validade.setHours(0, 0, 0, 0)
   const diffDays = Math.floor((validade - today) / (1000 * 60 * 60 * 24))
-  if (diffDays < 0) return { label: 'CNH vencida', tone: 'alert-error' }
-  if (diffDays <= 30) return { label: `Vence em ${diffDays} dias`, tone: 'alert-error' }
-  if (diffDays <= 60) return { label: `Vence em ${diffDays} dias`, tone: 'alert-info' }
+  if (diffDays < 0) return { label: 'CNH vencida', tone: 'danger' }
+  if (diffDays <= 30) return { label: `Vence em ${diffDays} dias`, tone: 'danger' }
+  if (diffDays <= 60) return { label: `Vence em ${diffDays} dias`, tone: 'warning' }
   return null
 }
 
@@ -234,20 +235,20 @@ export default function DriversPage() {
   }
 
   return (
-    <div className="surface-panel">
-      <div className="panel-heading">
-        <div>
-          <h2 className="section-title">Condutores cadastrados</h2>
-          <p className="section-copy">Mantenha a base reutilizável de condutores para posse, busca e futuros módulos operacionais.</p>
-        </div>
-        <div className="actions-inline">
+    <div className="surface-panel operation-page operation-page--drivers">
+      <PageHeader
+        title="Condutores cadastrados"
+        description="Mantenha a base reutilizável de condutores para posse, busca e futuros módulos operacionais."
+        actions={(
+          <>
           {canCreateDriver ? <button className="app-button" type="button" onClick={openCreateModal}>Novo condutor</button> : null}
           <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
-      <div className="toolbar-card">
+      <div className="toolbar-card operation-toolbar">
         <div className="toolbar-row">
           <div className="status-pills">
             {['ATIVOS', 'TODOS', 'INATIVOS'].map((option) => (
@@ -297,9 +298,9 @@ export default function DriversPage() {
       {catalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
-      <div className="surface-panel panel-nested">
+      <div className="surface-panel panel-nested operation-table-card">
         <div className="table-wrap table-wrap-wide">
-          <table className="data-table data-table-wide">
+          <table className="data-table data-table-wide operation-table">
             <thead>
               <tr>
                 <th>Nome</th>
@@ -332,14 +333,19 @@ export default function DriversPage() {
                     <td data-label="E-mail">{record.email || '-'}</td>
                     <td data-label="CNH">{record.cnh_categoria} {record.cnh_validade ? `| validade ${formatDate(record.cnh_validade)}` : ''}</td>
                     <td data-label="Alerta CNH">
-                      {cnhAlert ? <span className={`alert ${cnhAlert.tone}`}>{cnhAlert.label}</span> : '-'}
+                      {cnhAlert ? <StatusChip tone={cnhAlert.tone}>{cnhAlert.label}</StatusChip> : '-'}
                     </td>
-                    <td data-label="Status"><span className={`status-badge ${record.ativo ? 'status-ATIVO' : 'status-INATIVO'}`}>{record.ativo ? 'ATIVO' : 'INATIVO'}</span></td>
+                    <td data-label="Status"><StatusChip tone={record.ativo ? 'success' : 'neutral'}>{record.ativo ? 'ATIVO' : 'INATIVO'}</StatusChip></td>
                     {canManageDriverActions ? (
                       <td data-label="Ações">
-                        <div className="actions-inline">
-                          {canEditDriver ? <button type="button" className="mini-button" onClick={() => openEditModal(record)}>Editar</button> : null}
-                          {canDeleteDriver && record.ativo ? <button type="button" className="mini-button danger" onClick={() => handleDeactivate(record)}>Inativar</button> : null}
+                        <div className="operation-row-actions">
+                          <ActionMenu
+                            label={`Mais ações do condutor ${record.nome_completo}`}
+                            items={[
+                              { key: 'edit', label: 'Editar', icon: 'catalog', hidden: !canEditDriver, onClick: () => openEditModal(record) },
+                              { key: 'deactivate', label: 'Inativar', icon: 'close', tone: 'danger', hidden: !canDeleteDriver || !record.ativo, onClick: () => handleDeactivate(record) },
+                            ]}
+                          />
                         </div>
                       </td>
                     ) : null}
