@@ -1280,6 +1280,72 @@ body.internal-app-active .operation-page .operation-table-card {
 
 .operation-page--loans .section-copy { color: var(--ui-text-muted); }
 
+.operation-page--fuel-supplies .operation-module,
+.operation-page--open-orders .operation-module,
+.operation-page--claims .operation-module,
+.operation-page--fines .operation-module {
+  margin-top: var(--ui-space-4);
+}
+
+.operation-page--fuel-supplies .operation-module--orders {
+  margin-bottom: var(--ui-space-4);
+}
+
+.operation-page--fuel-supplies .operation-toolbar,
+.operation-page--open-orders .operation-toolbar,
+.operation-page--claims .operation-toolbar,
+.operation-page--fines .operation-toolbar {
+  margin-bottom: var(--ui-space-3);
+}
+
+.operation-page--fuel-supplies .operation-table { min-width: 1260px; }
+.operation-page--fuel-supplies .operation-module--fuel-history .operation-table { min-width: 1480px; }
+.operation-page--open-orders .operation-table { min-width: 1240px; }
+.operation-page--claims .operation-table { min-width: 1120px; }
+.operation-page--fines .operation-table { min-width: 1260px; }
+
+.operation-page--fuel-supplies .operation-table th:first-child,
+.operation-page--fuel-supplies .operation-table td:first-child,
+.operation-page--open-orders .operation-table th:nth-child(2),
+.operation-page--open-orders .operation-table td:nth-child(2),
+.operation-page--claims .operation-table th:first-child,
+.operation-page--claims .operation-table td:first-child,
+.operation-page--fines .operation-table th:first-child,
+.operation-page--fines .operation-table td:first-child {
+  width: 190px;
+}
+
+.operation-page--fuel-supplies .operation-table th:last-child,
+.operation-page--fuel-supplies .operation-table td:last-child,
+.operation-page--claims .operation-table th:last-child,
+.operation-page--claims .operation-table td:last-child,
+.operation-page--fines .operation-table th:last-child,
+.operation-page--fines .operation-table td:last-child {
+  width: 92px;
+}
+
+.operation-page--open-orders .operation-table th:nth-child(5),
+.operation-page--open-orders .operation-table td:nth-child(5) {
+  min-width: 170px;
+}
+
+.operation-page--open-orders .operation-table th:last-child,
+.operation-page--open-orders .operation-table td:last-child {
+  width: 230px;
+}
+
+.operation-page--fuel-supplies .filter-date-field {
+  min-width: 150px;
+}
+
+.operation-page--fuel-supplies .table-focus-banner .actions-inline {
+  flex-wrap: wrap;
+}
+
+.operation-page--fines .ui-page-header__copy {
+  max-width: 58%;
+}
+
 .loan-detail-title {
   display: flex;
   align-items: center;

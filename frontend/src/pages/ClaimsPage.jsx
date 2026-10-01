@@ -4,6 +4,7 @@ import ClaimForm from '../components/ClaimForm'
 import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
+import { ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 import { claimsAPI } from '../api/claims'
 import { vehiclesAPI } from '../api/vehicles'
 import { useAuth } from '../context/AuthContext'
@@ -36,6 +37,13 @@ function vehicleOption(vehicle) {
 
 function hasClaimAttachments(record) {
   return Boolean(record?.attachments?.length || record?.anexos?.length)
+}
+
+function claimStatusTone(status) {
+  if (status === 'ENCERRADO') return 'success'
+  if (status === 'EM_ANALISE') return 'warning'
+  if (status === 'ABERTO') return 'danger'
+  return 'neutral'
 }
 
 export default function ClaimsPage() {
@@ -149,20 +157,18 @@ export default function ClaimsPage() {
   }
 
   return (
-    <div className="surface-panel">
-      <div className="panel-heading">
-        <div>
-          <h2 className="section-title">Sinistros</h2>
-          <p className="section-copy">Registre ocorrências, acompanhe o status e mantenha o histórico de prejuízos e análises da frota.</p>
-        </div>
-        <div className="actions-inline">
+    <div className="surface-panel operation-page operation-page--claims">
+      <PageHeader
+        title="Sinistros"
+        description="Registre ocorrências, acompanhe o status e mantenha o histórico de prejuízos e análises da frota."
+        actions={<>
           {canCreateClaim ? <button className="app-button" type="button" onClick={() => { setEditingRecord(null); setClaimFormBusy(false); setIsModalOpen(true) }}>Novo sinistro</button> : null}
           <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
-        </div>
-      </div>
+        </>}
+      />
 
-      <div className="toolbar-card">
+      <div className="toolbar-card operation-toolbar">
         <div className="toolbar-row">
           <div className="filter-inline">
             <input className="app-input" placeholder="Buscar por descrição, local, BO ou matrícula" value={search} onChange={(event) => setSearch(event.target.value)} />
@@ -200,9 +206,9 @@ export default function ClaimsPage() {
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
-      <div className="surface-panel panel-nested">
-        <div className="table-wrap table-wrap-wide">
-          <table className="data-table data-table-wide">
+      <div className="surface-panel panel-nested operation-module">
+        <div className="table-wrap table-wrap-wide operation-table-card">
+          <table className="data-table data-table-wide operation-table">
             <thead>
               <tr>
                 <th>Veículo</th>
@@ -224,23 +230,28 @@ export default function ClaimsPage() {
                 records.map((record) => (
                   <tr key={record.id}>
                     <td data-label="Veículo">
-                      <div className="stack">
+                      <div className="operation-vehicle-identity">
+                        <VehicleThumbnail vehicleType={record.vehicle_type} plate={record.vehicle_plate} />
+                        <span>
                         <strong>{record.vehicle_plate}</strong>
                         <span className="muted">{getVehicleOrganizationName(record.vehicle_id)}</span>
+                        </span>
                       </div>
                     </td>
                     <td data-label="Condutor">{record.driver_name || '-'}</td>
                     <td data-label="Data">{formatDate(record.data_ocorrencia)}</td>
                     <td data-label="Tipo">{record.tipo}</td>
-                    <td data-label="Status"><span className={`status-badge status-${record.status === 'ENCERRADO' ? 'ATIVO' : 'MANUTENCAO'}`}>{record.status}</span></td>
+                    <td data-label="Status"><StatusChip tone={claimStatusTone(record.status)}>{record.status}</StatusChip></td>
                     <td data-label="Local">{record.local}</td>
                     <td data-label="Valor">{formatMoney(record.valor_estimado)}</td>
                     <td data-label="Ações">
-                      {canEditClaim ? (
-                        <button type="button" className="mini-button" onClick={() => { setEditingRecord(record); setClaimFormBusy(false); setIsModalOpen(true) }}>Editar</button>
-                      ) : hasClaimAttachments(record) ? (
-                        <button type="button" className="mini-button" onClick={() => setViewingAttachmentsRecord(record)}>Ver anexos</button>
-                      ) : <span className="muted">-</span>}
+                      {canEditClaim || hasClaimAttachments(record) ? <ActionMenu
+                        label={`Ações do sinistro de ${record.vehicle_plate}`}
+                        items={[
+                          canEditClaim ? { key: 'edit', label: 'Editar sinistro', onClick: () => { setEditingRecord(record); setClaimFormBusy(false); setIsModalOpen(true) } } : null,
+                          !canEditClaim && hasClaimAttachments(record) ? { key: 'attachments', label: 'Ver anexos', onClick: () => setViewingAttachmentsRecord(record) } : null,
+                        ]}
+                      /> : <span className="muted">-</span>}
                     </td>
                   </tr>
                 ))

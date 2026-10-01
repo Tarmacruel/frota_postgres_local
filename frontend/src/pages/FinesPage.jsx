@@ -3,6 +3,7 @@ import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
 import DriverSelect from '../components/DriverSelect'
 import SearchableSelect from '../components/SearchableSelect'
+import { ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 import { finesAPI } from '../api/fines'
 import { vehiclesAPI } from '../api/vehicles'
 import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
@@ -63,6 +64,13 @@ function infractionOption(item) {
 function infractionTitle(item) {
   if (!item) return '-'
   return `${item.code}/${item.desdobramento} - ${item.description}`
+}
+
+function fineStatusTone(status) {
+  if (status === 'PAGA' || status === 'DEFERIDA') return 'success'
+  if (status === 'RECURSO') return 'info'
+  if (status === 'PENDENTE') return 'warning'
+  return 'neutral'
 }
 
 export default function FinesPage() {
@@ -277,20 +285,18 @@ export default function FinesPage() {
   }
 
   return (
-    <div className="surface-panel">
-      <div className="panel-heading">
-        <div>
-          <h2 className="section-title">Multas</h2>
-          <p className="section-copy">Registre autos de infração, acompanhe vencimentos e status de pagamento, recurso ou deferimento.</p>
-        </div>
-        <div className="actions-inline">
+    <div className="surface-panel operation-page operation-page--fines">
+      <PageHeader
+        title="Multas"
+        description="Registre autos de infração, acompanhe vencimentos e status de pagamento, recurso ou deferimento."
+        actions={<>
           {canCreateFine ? <button className="app-button" onClick={openCreate}>Nova multa</button> : null}
           <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
-        </div>
-      </div>
+        </>}
+      />
 
-      <div className="toolbar-row" style={{ marginBottom: 18 }}>
+      <div className="operation-toolbar toolbar-row">
         <div className="filter-inline">
           <input className="app-input" placeholder="Buscar por auto, enquadramento, descrição, local ou matrícula" value={search} onChange={(e) => setSearch(e.target.value)} />
           <SearchableSelect value={organizationFilter} onChange={setOrganizationFilter} options={[{ value: '', label: 'Todas as secretarias' }, ...organizationOptions]} placeholder="Filtrar secretaria" searchPlaceholder="Buscar secretaria" />
@@ -302,21 +308,21 @@ export default function FinesPage() {
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
-      <div className="surface-panel panel-nested">
-        <div className="table-wrap table-wrap-wide">
-          <table className="data-table data-table-wide">
+      <div className="surface-panel panel-nested operation-module">
+        <div className="table-wrap table-wrap-wide operation-table-card">
+          <table className="data-table data-table-wide operation-table">
             <thead><tr><th>Veículo</th><th>Auto</th><th>Enquadramento</th><th>Condutor</th><th>Infração</th><th>Valor</th><th>Status</th>{canEditFine ? <th>Ações</th> : null}</tr></thead>
             <tbody>
               {loading ? <tr><td colSpan={canEditFine ? 8 : 7}>Carregando multas...</td></tr> : records.length === 0 ? <tr><td colSpan={canEditFine ? 8 : 7}><div className="empty-state">Nenhuma multa encontrada.</div></td></tr> : records.map((record) => (
                 <tr key={record.id}>
-                  <td data-label="Veículo"><div className="stack"><strong>{record.vehicle_plate}</strong><span className="muted">{getVehicleOrganizationName(record.vehicle_id)}</span></div></td>
+                  <td data-label="Veículo"><div className="operation-vehicle-identity"><VehicleThumbnail vehicleType={record.vehicle_type} plate={record.vehicle_plate} /><span><strong>{record.vehicle_plate}</strong><span className="muted">{getVehicleOrganizationName(record.vehicle_id)}</span></span></div></td>
                   <td data-label="Auto">{record.ticket_number}</td>
                   <td data-label="Enquadramento"><div className="stack"><strong>{record.infraction_type ? `${record.infraction_type.code}/${record.infraction_type.desdobramento}` : '-'}</strong><span className="muted">{record.infraction_type?.description || record.description}</span></div></td>
                   <td data-label="Condutor">{record.driver_name || record.imported_driver_name || '-'}</td>
-                  <td data-label="Infração">{formatDate(record.infraction_date)}{record.infraction_time ? ` ${record.infraction_time.slice(0, 5)}` : ''}</td>
+                  <td data-label="Infração"><div className="stack"><span>{formatDate(record.infraction_date)}{record.infraction_time ? ` ${record.infraction_time.slice(0, 5)}` : ''}</span><span className="muted">Vence em {formatDate(record.due_date)}</span></div></td>
                   <td data-label="Valor">{formatMoney(record.amount)}</td>
-                  <td data-label="Status"><span className="status-badge status-MANUTENCAO">{record.status}</span></td>
-                  {canEditFine ? <td data-label="Ações"><button className="mini-button" onClick={() => openEdit(record)}>Editar</button></td> : null}
+                  <td data-label="Status"><StatusChip tone={fineStatusTone(record.status)}>{record.status}</StatusChip></td>
+                  {canEditFine ? <td data-label="Ações"><ActionMenu label={`Ações da multa ${record.ticket_number}`} items={[{ key: 'edit', label: 'Editar multa', onClick: () => openEdit(record) }]} /></td> : null}
                 </tr>
               ))}
             </tbody>

@@ -171,7 +171,8 @@ describe('FuelSuppliesPage administrative adjustments', () => {
 
     renderPage('/abastecimentos')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Reabrir prazo' }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Mais ações da ordem AB-ORDER-EX' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Reabrir prazo' }))
     expect(screen.getByRole('dialog', { name: 'Reabrir prazo da ordem' })).toBeInTheDocument()
     expect(screen.getByLabelText('Novo prazo')).toBeRequired()
     expect(screen.getByLabelText('Justificativa')).toBeRequired()
