@@ -99,10 +99,11 @@ describe('PossessionPage', () => {
     render(<MemoryRouter><PossessionPage /></MemoryRouter>)
 
     expect(await screen.findByRole('button', { name: 'Registrar retorno' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Adicionar destino' })).toBeInTheDocument()
-    expect(screen.getByRole('button', { name: 'Cancelar rota' })).toBeInTheDocument()
     expect(screen.getByRole('button', { name: 'Encerrar posse bloqueado' })).toBeDisabled()
-    expect(screen.queryByRole('button', { name: 'Retificar' })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Mais ações da posse/ }))
+    expect(screen.getByRole('menuitem', { name: 'Adicionar destino' })).toBeInTheDocument()
+    expect(screen.getByRole('menuitem', { name: 'Cancelar rota' })).toBeInTheDocument()
+    expect(screen.queryByRole('menuitem', { name: 'Retificar' })).not.toBeInTheDocument()
     expect(mocks.listTrips).toHaveBeenCalledWith(
       possession.id,
       { page: 1, limit: 1, status: 'EM_ANDAMENTO' },
@@ -173,7 +174,9 @@ describe('PossessionPage', () => {
   async function showClosedPossessions() {
     render(<MemoryRouter><PossessionPage /></MemoryRouter>)
     fireEvent.click(screen.getByRole('button', { name: 'Encerradas' }))
-    await screen.findByRole('button', { name: 'Retificar', exact: true })
+    await screen.findByText('Posse #898')
+    fireEvent.click(screen.getByRole('button', { name: /Mais ações da posse/ }))
+    await screen.findByRole('menuitem', { name: 'Retificar', exact: true })
   }
 
   it.each(['ADMIN', 'PRODUCAO'])('retifica início e devolução por uma única requisição (%s)', async (role) => {
@@ -182,7 +185,7 @@ describe('PossessionPage', () => {
     mocks.update.mockResolvedValue({ data: { ...record, revision: 3 } })
     await showClosedPossessions()
     expect(screen.queryByRole('button', { name: 'Retificar devolução' })).not.toBeInTheDocument()
-    fireEvent.click(screen.getByRole('button', { name: 'Retificar', exact: true }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Retificar', exact: true }))
     const end = await screen.findByLabelText('Fim')
     fireEvent.change(screen.getByLabelText('Início'), { target: { value: '2026-07-13T10:00' } })
     fireEvent.change(end, { target: { value: '2026-07-13T16:30' } })
@@ -210,7 +213,7 @@ describe('PossessionPage', () => {
     const record = setupClosedPossession()
     mocks.update.mockRejectedValue({ response: { status: 409, data: { detail: { code: 'POSSESSION_REVISION_CONFLICT', message: 'A posse mudou; recarregue.' } } } })
     await showClosedPossessions()
-    fireEvent.click(screen.getByRole('button', { name: 'Retificar', exact: true }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Retificar', exact: true }))
     await screen.findByLabelText('Fim')
     fireEvent.change(screen.getByLabelText('Observação'), { target: { value: 'Observação corrigida' } })
     fireEvent.change(screen.getByLabelText('Justificativa da retificação'), { target: { value: 'Conferência administrativa' } })
@@ -227,7 +230,7 @@ describe('PossessionPage', () => {
   it('oferece a mesma tela para devolução legada e permite consultar o histórico', async () => {
     setupClosedPossession(false)
     await showClosedPossessions()
-    fireEvent.click(screen.getByRole('button', { name: 'Retificar', exact: true }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Retificar', exact: true }))
     expect(await screen.findByLabelText('Fim')).toBeEnabled()
     expect(screen.getByLabelText('Condições do veículo na devolução')).toHaveValue('')
     expect(screen.getByText('Histórico de retificações (0)')).toBeInTheDocument()
@@ -237,7 +240,7 @@ describe('PossessionPage', () => {
     setupClosedPossession()
     mocks.getRectificationContext.mockRejectedValueOnce(new Error('offline'))
     await showClosedPossessions()
-    fireEvent.click(screen.getByRole('button', { name: 'Retificar', exact: true }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Retificar', exact: true }))
     expect(await screen.findByRole('alert')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Salvar retificação' })).not.toBeInTheDocument()
     fireEvent.click(screen.getByRole('button', { name: 'Recarregar retificação' }))
@@ -249,7 +252,7 @@ describe('PossessionPage', () => {
     let finish
     mocks.update.mockImplementationOnce(() => new Promise((resolve) => { finish = resolve }))
     await showClosedPossessions()
-    fireEvent.click(screen.getByRole('button', { name: 'Retificar', exact: true }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Retificar', exact: true }))
     await screen.findByLabelText('Fim')
     fireEvent.change(screen.getByLabelText('Justificativa da retificação'), { target: { value: 'Conferência administrativa' } })
     fireEvent.click(screen.getByLabelText(/Li integralmente/))
@@ -270,7 +273,8 @@ describe('PossessionPage', () => {
     render(<MemoryRouter><PossessionPage /></MemoryRouter>)
     fireEvent.click(screen.getByRole('button', { name: 'Encerradas' }))
     await screen.findByText('Posse #898')
-    expect(screen.queryByRole('button', { name: 'Retificar', exact: true })).not.toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: /Mais ações da posse/ }))
+    expect(screen.queryByRole('menuitem', { name: 'Retificar', exact: true })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Retificar devolução' })).not.toBeInTheDocument()
   })
 

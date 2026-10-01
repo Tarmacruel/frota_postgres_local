@@ -9,7 +9,7 @@ Estado inicial: branch `feature/frontend-evolution-hml`, HEAD `ce86bb0`. O worki
 Arquivos previstos: as cinco páginas da fase, seus testes diretos existentes ou novos, `frontend/src/styles/frontend-evolution.css`, este ExecPlan, `STATUS.md`, relatório e evidências. Nenhuma alteração em backend, rotas, clientes de API ou configuração de ambiente.
 
 - [x] Veículos — cabeçalho, toolbar, miniatura, chips e overflow; testado antes do subcommit.
-- [ ] Posses — preservar integralmente os fluxos condicionais; testar e subcommitar.
+- [x] Posses — fluxos condicionais preservados; 12 testes aprovados antes do subcommit.
 - [ ] Condutores — padronizar consulta e ações; testar e subcommitar.
 - [ ] Manutenções — padronizar consulta e ações; testar e subcommitar.
 - [ ] Empréstimos — adaptar a implementação real, documentos e ações; testar e subcommitar.

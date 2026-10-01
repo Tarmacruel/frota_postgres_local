@@ -24,6 +24,7 @@ import { getApiErrorCode, getHttpStatus } from '../utils/httpError'
 import {
   resolvePossessionTermValidationUrl,
 } from '../utils/possessionTermDocument'
+import { ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 
 const viewOptions = [
   { value: 'ATIVAS', label: 'Ativas' },
@@ -752,13 +753,10 @@ export default function PossessionPage() {
     )))
   }
 
-  function renderTripActions(record) {
+  function renderPrimaryTripActions(record) {
     const overview = tripOverview[record.id]
     return (
       <>
-        <button type="button" className="mini-button" data-tour="possession-routes" onClick={() => openTrips(record)}>
-          Rotas
-        </button>
         {record.is_active && (canCreatePossession || canEditPossession) ? (
           overview?.loading || !overview ? (
             <span className="route-state-text" role="status">Verificando rota...</span>
@@ -769,11 +767,7 @@ export default function PossessionPage() {
           ) : overview.openTrip ? (
             <>
               {canEditPossession ? (
-                <>
-                  <button type="button" className="mini-button" onClick={() => openTrips(record, 'add')}>Adicionar destino</button>
-                  <button type="button" className="mini-button route-return-button" data-tour="possession-route-return" onClick={() => openTrips(record, 'end')}>Registrar retorno</button>
-                  <button type="button" className="mini-button route-cancel-button" onClick={() => openTrips(record, 'cancel')}>Cancelar rota</button>
-                </>
+                <button type="button" className="mini-button route-return-button" data-tour="possession-route-return" onClick={() => openTrips(record, 'end')}>Registrar retorno</button>
               ) : null}
               <button type="button" className="mini-button" data-tour="possession-end" disabled title="Registre o retorno ou cancele a rota antes de encerrar a posse.">
                 Encerrar posse bloqueado
@@ -781,9 +775,6 @@ export default function PossessionPage() {
             </>
           ) : (
             <>
-              {canCreatePossession ? (
-                <button type="button" className="mini-button" data-tour="possession-route-start" onClick={() => openTrips(record, 'create')}>Iniciar rota</button>
-              ) : null}
               {canEditPossession ? (
                 <button type="button" className="mini-button possession-end-button" data-tour="possession-end" onClick={() => openEndModal(record)}>Encerrar posse</button>
               ) : null}
@@ -792,6 +783,19 @@ export default function PossessionPage() {
         ) : null}
       </>
     )
+  }
+
+  function buildPossessionMenuItems(record) {
+    const overview = tripOverview[record.id]
+    return [
+      { key: 'photos', label: 'Ver fotos', icon: 'search', hidden: !record.photo_available, onClick: () => setPhotoRecord(record) },
+      { key: 'terms', label: 'Termos', icon: 'catalog', onClick: () => setTermRecord(record) },
+      { key: 'rectify', label: 'Retificar', icon: 'maintenance', hidden: !canRectifyPossession, onClick: () => openEditModal(record) },
+      { key: 'routes', label: 'Rotas', icon: 'audit', onClick: () => openTrips(record) },
+      { key: 'route-add', label: 'Adicionar destino', icon: 'spark', hidden: !record.is_active || !canEditPossession || !overview?.openTrip, onClick: () => openTrips(record, 'add') },
+      { key: 'route-start', label: 'Iniciar rota', icon: 'spark', hidden: !record.is_active || !canCreatePossession || !overview || overview.loading || overview.error || overview.openTrip, onClick: () => openTrips(record, 'create') },
+      { key: 'route-cancel', label: 'Cancelar rota', icon: 'close', tone: 'danger', hidden: !record.is_active || !canEditPossession || !overview?.openTrip, onClick: () => openTrips(record, 'cancel') },
+    ]
   }
 
   const activeCount = filteredRecords.filter((item) => item.is_active).length
@@ -833,13 +837,13 @@ export default function PossessionPage() {
   ]), [canCreatePossession])
 
   return (
-    <div className="surface-panel">
-      <div className="panel-heading">
-        <div data-tour="possession-overview">
-          <h2 className="section-title">Posses de veículos</h2>
-          <p className="section-copy">Controle quem está com cada veículo, anexe evidências e mantenha um histórico simples de transferências.</p>
-        </div>
-        <div className="actions-inline">
+    <div className="surface-panel operation-page operation-page--possessions">
+      <PageHeader
+        title="Posses de veículos"
+        description="Controle quem está com cada veículo, anexe evidências e mantenha um histórico simples de transferências."
+        className="possession-page-header"
+        actions={(
+          <>
           {canCreatePossession ? (
             <button data-tour="possession-create" className="app-button" type="button" onClick={() => setIsCreateModalOpen(true)}>
               Nova posse
@@ -853,10 +857,11 @@ export default function PossessionPage() {
           <button className="secondary-button" type="button" onClick={() => setTourReplayToken((value) => value + 1)}>
             Ver tour rápido
           </button>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
-      <div className="toolbar-card">
+      <div className="toolbar-card operation-toolbar" data-tour="possession-overview">
         <div className="toolbar-row">
           <div className="status-pills">
             {viewOptions.map((option) => (
@@ -942,9 +947,9 @@ export default function PossessionPage() {
       {error ? <div className="alert alert-error" role="alert" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" role="status" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
-      <div className="surface-panel panel-nested" data-tour="possession-records">
+      <div className="surface-panel panel-nested operation-table-card" data-tour="possession-records">
         <div className="table-wrap table-wrap-wide">
-          <table className="data-table data-table-wide">
+          <table className="data-table data-table-wide operation-table">
             <thead>
               <tr>
                 <th>Veículo</th>
@@ -974,10 +979,13 @@ export default function PossessionPage() {
                 paginatedRecords.map((record) => (
                   <tr key={record.id} className={focusedRecord?.id === record.id ? 'is-focused-row' : ''}>
                     <td data-label="Veículo">
-                      <div className="stack">
-                        <strong>{record.vehicle_plate}</strong>
-                        {record.public_number ? <span className="muted">Posse #{record.public_number}</span> : null}
-                        <span className="muted">{getRecordOrganizationName(record)}</span>
+                      <div className="operation-vehicle-identity">
+                        <VehicleThumbnail vehicleType={record.vehicle_type} plate={record.vehicle_plate} />
+                        <span>
+                          <strong>{record.vehicle_plate}</strong>
+                          {record.public_number ? <small className="muted">Posse #{record.public_number}</small> : null}
+                          <small className="muted">{getRecordOrganizationName(record)}</small>
+                        </span>
                       </div>
                     </td>
                     <td data-label="Condutor">
@@ -1017,32 +1025,17 @@ export default function PossessionPage() {
                       </div>
                     </td>
                     <td data-label="Status">
-                      <span className={`status-badge ${record.is_active ? 'status-ATIVO' : 'status-INATIVO'}`}>
-                        {record.is_active ? 'ATIVA' : 'ENCERRADA'}
-                      </span>
+                      <StatusChip tone={record.is_active ? 'success' : 'neutral'}>{record.is_active ? 'ATIVA' : 'ENCERRADA'}</StatusChip>
                     </td>
                     <td data-label="Km inicial">{record.start_odometer_km ?? '-'}</td>
                     <td data-label="Km final">{record.end_odometer_km ?? '-'}</td>
                     <td data-label="Km rodados">{record.kilometers_driven ?? '-'}</td>
                     <td data-label="Ações">
-                      <div className="actions-inline">
-                        {record.photo_available ? (
-                          <button type="button" className="mini-button" onClick={() => setPhotoRecord(record)}>
-                            Ver fotos
-                          </button>
-                        ) : (
-                          <span className="muted">Legado</span>
-                        )}
-                        <button type="button" className="mini-button" onClick={() => setTermRecord(record)}>
-                          Termos
-                        </button>
-                        {canRectifyPossession ? (
-                          <button type="button" className="mini-button" onClick={() => openEditModal(record)}>
-                            Retificar
-                          </button>
-                        ) : null}
-
-                        {renderTripActions(record)}
+                      <div className="operation-row-actions">
+                        {renderPrimaryTripActions(record)}
+                        <span data-tour="possession-routes">
+                          <ActionMenu label={`Mais ações da posse de ${record.driver_name}`} items={buildPossessionMenuItems(record)} />
+                        </span>
                       </div>
                     </td>
                   </tr>

@@ -1235,6 +1235,14 @@ body.internal-app-active .operation-page .operation-table-card {
 .operation-page--vehicles .operation-table th:last-child,
 .operation-page--vehicles .operation-table td:last-child { width: 142px; }
 
+.operation-page--possessions .operation-table { min-width: 1420px; }
+.operation-page--possessions .operation-table th:first-child,
+.operation-page--possessions .operation-table td:first-child { width: 210px; }
+.operation-page--possessions .operation-table th:nth-child(5),
+.operation-page--possessions .operation-table td:nth-child(5) { width: 300px; }
+.operation-page--possessions .operation-table th:last-child,
+.operation-page--possessions .operation-table td:last-child { width: 220px; }
+
 .operation-vehicle-identity {
   min-width: 142px;
   display: flex;
