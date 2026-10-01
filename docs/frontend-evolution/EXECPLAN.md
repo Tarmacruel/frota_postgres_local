@@ -1,5 +1,24 @@
 ﻿# ExecPlan — Fase 0 — Baseline e segurança
 
+## Continuação autorizada — Fase 5 — 01/10/2026
+
+Objetivo: evoluir Abastecimentos, seu Histórico, Ordens abertas, Sinistros e Multas com a fundação visual existente. Distinguir ação principal, consulta e ação crítica; reduzir fileiras de botões somente quando todos os comandos continuarem acessíveis. Preservar comprovantes, links públicos, PDF/XLSX, assinatura, prazos, confirmação, retificação, cancelamento, paginação, permissões e chamadas atuais.
+
+Estado inicial: branch `feature/frontend-evolution-hml`, HEAD `d34be2d`. O working tree contém somente as 11 alterações externas já documentadas em `frontend/public/vehicle-thumbnails/`; elas serão preservadas e excluídas dos commits. Baseline herdado: pool `forks` 195/195, lint 0 erros/46 avisos, build aprovado e runner padrão com 16 falhas intermitentes preexistentes.
+
+Arquivos previstos: `FuelSuppliesPage.jsx`, `FuelSupplyOrdersPage.jsx`, `ClaimsPage.jsx`, `FinesPage.jsx`, testes diretos necessários, `frontend-evolution.css`, este ExecPlan, `STATUS.md`, relatório e evidências. Nenhuma alteração em APIs, utilitários de documentos, backend, rotas ou configuração de ambiente.
+
+- [x] Abastecimentos e Histórico — hierarquia, filtros, tabelas, status e ações preservadas.
+- [x] Ordens abertas — prazos, comprovante, assinatura e confirmação preservados.
+- [x] Sinistros — filtros, anexos, PDF/XLSX e edição preservados.
+- [x] Multas — vencimentos, PDF/XLSX e edição preservados.
+- [x] Executar testes diretos e gates completos.
+- [x] Validar claro/escuro, atualizar STATUS e parar.
+
+Resultado: as cinco áreas foram evoluídas no commit `f14da97`. Comprovante e confirmação mantêm destaque conforme a frequência; link público, download de PDF, prazo, cancelamento e assinatura permanecem acessíveis em menus contextuais com teclado. O teste direto de Abastecimentos aprovou 6/6 casos e a suíte com pool `forks` aprovou 195/195. Lint manteve 0 erros/46 avisos e o build transformou 1008 módulos. O runner padrão reproduziu as mesmas 16 falhas intermitentes do baseline em cinco suítes sem relação com esta fase. Detalhes em `PHASE_5_INCIDENTS_FUEL.md`.
+
+Rollback: reverter os commits da Fase 5 na ordem inversa. Não há migration, dependência nova ou alteração de dados.
+
 ## Continuação autorizada — Fase 4 — 01/10/2026
 
 Objetivo: evoluir os módulos operacionais centrais, em sequência e com subcommit isolado: Veículos, Posses, Condutores, Manutenções e Empréstimos. Aplicar os componentes de fundação sem alterar APIs, payloads, permissões ou fluxos de negócio. Em Posses, preservar termos, retificação unificada, rotas, retorno e encerramento; em Empréstimos, trabalhar somente na implementação real documentada na Fase 0.
