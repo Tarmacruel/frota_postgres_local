@@ -1,5 +1,22 @@
 ﻿# ExecPlan — Fase 0 — Baseline e segurança
 
+## Continuação autorizada — Fase 4 — 01/10/2026
+
+Objetivo: evoluir os módulos operacionais centrais, em sequência e com subcommit isolado: Veículos, Posses, Condutores, Manutenções e Empréstimos. Aplicar os componentes de fundação sem alterar APIs, payloads, permissões ou fluxos de negócio. Em Posses, preservar termos, retificação unificada, rotas, retorno e encerramento; em Empréstimos, trabalhar somente na implementação real documentada na Fase 0.
+
+Estado inicial: branch `feature/frontend-evolution-hml`, HEAD `ce86bb0`. O working tree contém alterações externas em 11 SVGs de `frontend/public/vehicle-thumbnails/`; elas serão preservadas e excluídas de todos os subcommits da fase. Baseline herdado: teste direto do dashboard 2/2, pool `forks` 193/193, lint 0 erros/46 avisos e build aprovado; runner padrão com 15 falhas intermitentes preexistentes.
+
+Arquivos previstos: as cinco páginas da fase, seus testes diretos existentes ou novos, `frontend/src/styles/frontend-evolution.css`, este ExecPlan, `STATUS.md`, relatório e evidências. Nenhuma alteração em backend, rotas, clientes de API ou configuração de ambiente.
+
+- [x] Veículos — cabeçalho, toolbar, miniatura, chips e overflow; testado antes do subcommit.
+- [ ] Posses — preservar integralmente os fluxos condicionais; testar e subcommitar.
+- [ ] Condutores — padronizar consulta e ações; testar e subcommitar.
+- [ ] Manutenções — padronizar consulta e ações; testar e subcommitar.
+- [ ] Empréstimos — adaptar a implementação real, documentos e ações; testar e subcommitar.
+- [ ] Validar claro/escuro, executar gates completos, atualizar STATUS e parar.
+
+Rollback: cada tela poderá ser revertida pelo próprio subcommit. Não há migration, dependência nova ou alteração de dados.
+
 ## Continuação autorizada — Fase 3 — 30/09/2026
 
 Objetivo: evoluir somente o dashboard (`DashboardPage.jsx`) e seus estilos/componentes diretos, usando o board `references/target/02-telas-alvo-board.png` como direção. Preservar as três consultas existentes, seus parâmetros, cálculos, filtros de permissão e destinos das ações. Não alterar shell, páginas de negócio, backend, contratos ou dados.

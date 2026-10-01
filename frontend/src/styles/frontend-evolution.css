@@ -1126,3 +1126,167 @@ body.internal-app-active .dashboard-page {
   .dashboard-pending-item { transition: none; }
   .dashboard-quick-action:hover { transform: none; }
 }
+
+/* Phase 4 — operational modules */
+body.internal-app-active .operation-page {
+  padding: var(--ui-space-5);
+  color: var(--ui-text);
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
+  box-shadow: var(--ui-shadow-sm);
+}
+
+.operation-page .ui-page-header {
+  padding-bottom: var(--ui-space-4);
+  border-bottom: 1px solid var(--ui-border-soft);
+}
+
+.operation-page .ui-page-header__actions > .app-button,
+.operation-page .ui-page-header__actions > .secondary-button,
+.operation-page .ui-page-header__actions > .ghost-button {
+  min-height: var(--ui-control-h);
+}
+
+.operation-page .operation-toolbar {
+  margin-bottom: var(--ui-space-4);
+  padding: var(--ui-space-3);
+  background: var(--ui-surface-subtle);
+  border-color: var(--ui-border);
+  box-shadow: none;
+}
+
+.operation-page .operation-toolbar .toolbar-row,
+.operation-page .operation-toolbar .filter-inline {
+  gap: var(--ui-space-2);
+}
+
+.operation-page .operation-toolbar .app-input,
+.operation-page .operation-toolbar .app-select,
+.operation-page .operation-toolbar .searchable-select-trigger {
+  min-height: var(--ui-control-h);
+}
+
+.operation-page .panel-metrics {
+  gap: var(--ui-space-2);
+  margin-bottom: var(--ui-space-4);
+}
+
+.operation-page .metric-inline {
+  min-height: 48px;
+  padding: 8px 10px;
+  color: var(--ui-text);
+  background: var(--ui-surface-subtle);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+}
+
+.operation-page .metric-inline strong {
+  font-family: var(--ui-font-heading);
+  font-size: 1.05rem;
+}
+
+.operation-page .metric-inline span {
+  color: var(--ui-text-muted);
+  font-size: 0.68rem;
+}
+
+body.internal-app-active .operation-page .operation-table-card {
+  padding: 0;
+  overflow: hidden;
+  background: var(--ui-surface);
+  border-color: var(--ui-border);
+  box-shadow: none;
+}
+
+.operation-page .operation-table {
+  color: var(--ui-text);
+}
+
+.operation-page .operation-table thead th {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  color: var(--ui-text-muted);
+  background: var(--ui-surface-subtle);
+  border-bottom-color: var(--ui-border);
+  font-size: 0.67rem;
+  letter-spacing: 0.045em;
+  text-transform: uppercase;
+}
+
+.operation-page .operation-table tbody tr {
+  transition: background-color var(--ui-motion-fast) ease;
+}
+
+.operation-page .operation-table tbody tr:hover {
+  background: var(--ui-surface-hover);
+}
+
+.operation-page .operation-table td {
+  border-bottom-color: var(--ui-border-soft);
+  vertical-align: middle;
+}
+
+.operation-page--vehicles .operation-table { min-width: 1500px; }
+.operation-page--vehicles .operation-table th:first-child,
+.operation-page--vehicles .operation-table td:first-child { width: 170px; }
+.operation-page--vehicles .operation-table th:nth-child(8),
+.operation-page--vehicles .operation-table td:nth-child(8) { width: 250px; }
+.operation-page--vehicles .operation-table th:last-child,
+.operation-page--vehicles .operation-table td:last-child { width: 142px; }
+
+.operation-vehicle-identity {
+  min-width: 142px;
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-2);
+}
+
+.operation-vehicle-identity > span {
+  min-width: 0;
+  display: grid;
+  justify-items: start;
+  gap: 4px;
+}
+
+.operation-vehicle-identity strong {
+  color: var(--ui-text);
+  font-family: var(--ui-font-heading);
+  font-size: 0.78rem;
+}
+
+.operation-row-actions {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 6px;
+  min-width: max-content;
+}
+
+.operation-page .ui-status-chip {
+  min-height: 20px;
+  padding: 2px 7px;
+  font-size: 0.63rem;
+}
+
+.operation-page .history-panel {
+  margin-top: var(--ui-space-4);
+  border-color: var(--ui-border);
+  box-shadow: none;
+}
+
+:root[data-theme='dark'] .operation-page .operation-table thead th {
+  background: #101f34;
+}
+
+@media (max-width: 900px) {
+  body.internal-app-active .operation-page { padding: var(--ui-space-4); }
+  .operation-page .operation-table thead th { position: static; }
+  .operation-page .operation-toolbar .toolbar-row { align-items: stretch; }
+}
+
+@media (max-width: 640px) {
+  .operation-page .ui-page-header__actions > * { flex: 1 1 auto; justify-content: center; }
+  .operation-page .operation-toolbar .filter-inline { display: grid; grid-template-columns: 1fr; }
+  .operation-row-actions { justify-content: flex-start; }
+}
