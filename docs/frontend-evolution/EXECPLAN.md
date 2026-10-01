@@ -13,7 +13,9 @@ Arquivos previstos: as cinco páginas da fase, seus testes diretos existentes ou
 - [x] Condutores — consulta e ações padronizadas; 2 testes aprovados antes do subcommit.
 - [x] Manutenções — consulta e ações padronizadas; 2 testes aprovados antes do subcommit.
 - [x] Empréstimos — implementação real, documentos e ações preservados; 8 testes aprovados antes do subcommit.
-- [ ] Validar claro/escuro, executar gates completos, atualizar STATUS e parar.
+- [x] Validar claro/escuro, executar gates completos, atualizar STATUS e parar.
+
+Resultado: as cinco telas foram evoluídas na ordem solicitada e registradas nos subcommits `59f4ecf`, `8d3bed1`, `273b9ec`, `8e0c495` e `5dfae38`. A inspeção real em 1366×768 confirmou os temas claro e escuro. Os testes diretos aprovaram 12 cenários de Posses, 2 de Condutores, 2 de Manutenções e 8 de Empréstimos; a suíte completa com pool `forks` aprovou 195/195 testes; lint manteve 0 erros/46 avisos; build aprovado. O runner padrão reproduziu 16 falhas intermitentes do baseline em cinco suítes sem relação com as páginas alteradas. Detalhes em `PHASE_4_OPERATIONS.md`.
 
 Rollback: cada tela poderá ser revertida pelo próprio subcommit. Não há migration, dependência nova ou alteração de dados.
 
