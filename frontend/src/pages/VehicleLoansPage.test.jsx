@@ -23,9 +23,11 @@ beforeEach(() => {
 })
 
 it('carrega detalhe e oferece envio e edição apenas para a origem', async () => {
+  const actor = userEvent.setup()
   mount('/emprestimos?id=one')
   expect(await screen.findByRole('button', { name: 'Enviar para recebimento' })).toBeEnabled()
-  expect(screen.getByRole('button', { name: 'Editar proposta' })).toBeEnabled()
+  await actor.click(screen.getByRole('button', { name: 'Mais ações do empréstimo de ABC1234' }))
+  expect(screen.getByRole('menuitem', { name: 'Editar proposta' })).toBeEnabled()
   expect(screen.queryByRole('button', { name: 'Confirmar recebimento' })).not.toBeInTheDocument()
   expect(screen.getByRole('link', { name: 'Consultar posses do veículo' })).toHaveAttribute('href', '/posses?vehicle_id=vehicle')
 })
@@ -46,7 +48,7 @@ it('Produção da recebedora vê recebimento e rejeição no início do detalhe'
   const accept = await screen.findByRole('button', { name: 'Confirmar recebimento' })
   expect(accept).toBeEnabled()
   expect(screen.getByRole('button', { name: 'Rejeitar proposta' })).toBeEnabled()
-  expect(screen.queryByRole('button', { name: 'Editar proposta' })).not.toBeInTheDocument()
+  expect(screen.queryByRole('button', { name: 'Mais ações do empréstimo de ABC1234' })).not.toBeInTheDocument()
   expect(accept.compareDocumentPosition(screen.getByText('Lotação de origem')) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy()
 })
 

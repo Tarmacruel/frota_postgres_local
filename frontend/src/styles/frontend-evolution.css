@@ -1257,6 +1257,52 @@ body.internal-app-active .operation-page .operation-table-card {
 .operation-page--maintenance .operation-table th:last-child,
 .operation-page--maintenance .operation-table td:last-child { width: 76px; }
 
+.operation-module { gap: var(--ui-space-4); }
+.operation-page--loans .operation-table { min-width: 850px; }
+.operation-page--loans .operation-table th:first-child,
+.operation-page--loans .operation-table td:first-child { width: 190px; }
+.operation-page--loans .operation-table th:last-child,
+.operation-page--loans .operation-table td:last-child { width: 112px; }
+
+.operation-page--loans .loan-filters {
+  margin: 0 0 var(--ui-space-4);
+}
+
+.operation-page--loans .loan-filters label {
+  color: var(--ui-text-muted);
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.operation-page--loans .loan-filters .app-input {
+  min-height: var(--ui-control-h);
+}
+
+.operation-page--loans .section-copy { color: var(--ui-text-muted); }
+
+.loan-detail-title {
+  display: flex;
+  align-items: center;
+  gap: var(--ui-space-3);
+  margin: 0 0 var(--ui-space-4);
+  color: var(--ui-text);
+  font-family: var(--ui-font-heading);
+}
+
+.loan-detail-title .ui-vehicle-thumb { width: 58px; height: 38px; }
+
+.operation-page--loan-detail .loan-facts,
+.operation-page--loan-detail .loan-copy,
+.operation-page--loan-detail .loan-timeline { color: var(--ui-text); }
+
+.operation-page--loan-detail .loan-facts dt,
+.operation-page--loan-detail .loan-timeline span { color: var(--ui-text-muted); }
+
+.operation-page--loan-detail .loan-actions {
+  align-items: flex-start;
+  margin: 0 0 var(--ui-space-4);
+}
+
 .operation-vehicle-identity {
   min-width: 142px;
   display: flex;

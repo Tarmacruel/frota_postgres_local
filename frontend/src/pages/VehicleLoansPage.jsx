@@ -10,9 +10,18 @@ import { getApiErrorMessage } from '../utils/apiError'
 import { availableLoanActions, blockedLoanAction, canRepresent, formatLoanDate, loanEventLabels, loanStatuses } from '../utils/vehicleLoans'
 import './VehicleLoansPage.css'
 import { LOANS_CHANGED_EVENT } from '../hooks/usePendingVehicleLoans'
+import { ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 
 const emptyCatalog = { vehicles: [], organizations: [], allocations: [] }
 const ended = ['RETURNED', 'REJECTED', 'CANCELLED']
+
+function getLoanStatusTone(status) {
+  if (status === 'ACTIVE') return 'success'
+  if (['AWAITING_RECEIPT', 'AWAITING_RETURN_RECEIPT'].includes(status)) return 'warning'
+  if (status === 'RETURNED') return 'info'
+  if (['REJECTED', 'CANCELLED'].includes(status)) return 'danger'
+  return 'neutral'
+}
 
 export default function VehicleLoansPage() {
   const { user, canCreate, canEdit, canView } = useAuth()
@@ -90,17 +99,21 @@ export default function VehicleLoansPage() {
   const actions = detail && canEdit('vehicle_loans') ? availableLoanActions(user, detail) : []
   const orgName = (id) => catalog.organizations.find((item) => item.id === id)?.name || (id === detail?.origin_organization_id ? detail.origin_organization_name : detail?.recipient_organization_name) || 'Secretaria'
 
-  return <div className="vehicle-loans-page">
-    <section className="card loan-section">
-      <div className="loan-heading"><div><h2>Empréstimos entre secretarias</h2><p>Entrega, recebimento e devolução de veículos. A secretaria de origem permanece no cadastro.</p></div>
-        <div className="actions-inline">
+  return <div className="vehicle-loans-page operation-module">
+    <section className="card loan-section operation-page operation-page--loans">
+      <PageHeader
+        title="Empréstimos entre secretarias"
+        description="Entrega, recebimento e devolução de veículos. A secretaria de origem permanece no cadastro."
+        actions={(
+          <>
           {user.role === 'ADMIN' && canCreate('vehicle_loans') && <button className="ghost-button" onClick={() => { setFeedback(''); setModal('regularization') }}>Regularizar empréstimo anterior</button>}
           {canCreate('vehicle_loans') && <button className="app-button" disabled={!catalogReady} onClick={() => { setFeedback(''); setModal('new') }}>Novo empréstimo</button>}
-        </div>
-      </div>
+          </>
+        )}
+      />
       {catalogError && <div role="alert" className="loan-error">{catalogError} <button className="ghost-button" onClick={loadCatalog}>Tentar carregar opções novamente</button></div>}
       {feedback && <p role="status" className="loan-success">{feedback}</p>}
-      <form className="loan-filters" onSubmit={(event) => { event.preventDefault(); setPage(1); setAppliedSearch(search.trim()) }}>
+      <form className="loan-filters operation-toolbar" onSubmit={(event) => { event.preventDefault(); setPage(1); setAppliedSearch(search.trim()) }}>
         <label>Placa<input className="app-input" value={search} onChange={(e) => setSearch(e.target.value)} maxLength={100} placeholder="Buscar placa" /></label>
         <button className="ghost-button">Buscar</button>
         <label>Situação<select className="app-input" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1) }}>
@@ -114,12 +127,12 @@ export default function VehicleLoansPage() {
       {listError && <p role="alert" className="loan-error">{listError}</p>}
       {loading ? <p role="status">Carregando empréstimos…</p> : <>
         <p className="section-copy">{pagination.total} registro(s). Devolvidos, rejeitados e cancelados permanecem no histórico.</p>
-        <div className="loan-table-wrap"><table className="loan-table"><thead><tr><th>Veículo</th><th>Origem → recebedora</th><th>Situação</th><th>Prazo</th><th>Consulta</th></tr></thead><tbody>
+        <div className="loan-table-wrap operation-table-card"><table className="loan-table operation-table"><thead><tr><th>Veículo</th><th>Origem → recebedora</th><th>Situação</th><th>Prazo</th><th>Consulta</th></tr></thead><tbody>
           {rows.length === 0 && <tr><td colSpan={5}>Nenhum empréstimo encontrado para estes filtros.</td></tr>}
           {rows.map((loan) => <tr key={loan.id} className={loan.id === selectedId ? 'loan-selected' : ''}>
-            <td><strong>{loan.vehicle_plate}</strong></td>
+            <td><div className="operation-vehicle-identity"><VehicleThumbnail vehicleType={catalog.vehicles.find((vehicle) => vehicle.id === loan.vehicle_id)?.vehicle_type} plate={loan.vehicle_plate} /><span><strong>{loan.vehicle_plate}</strong></span></div></td>
             <td>{loan.origin_organization_name}<br /><span aria-label="para">→ </span>{loan.recipient_organization_name}</td>
-            <td><span className={`loan-status loan-status-${loan.status}`}>{loanStatuses[loan.status]}</span>{loan.regularized_at && <small className="loan-regularized">Inclusão retroativa</small>}</td>
+            <td><StatusChip tone={getLoanStatusTone(loan.status)}>{loanStatuses[loan.status]}</StatusChip>{loan.regularized_at && <small className="loan-regularized">Inclusão retroativa</small>}</td>
             <td>{loan.expected_return_at ? formatLoanDate(loan.expected_return_at) : 'Indeterminado'}</td>
             <td><button className="mini-button" onClick={() => { setModal(null); setParams({ id: loan.id }) }} aria-label={`Ver empréstimo de ${loan.vehicle_plate}`}>Ver detalhes</button></td>
           </tr>)}
@@ -128,15 +141,15 @@ export default function VehicleLoansPage() {
       </>}
     </section>
 
-    {selectedId && <section className="card loan-section" aria-label="Detalhe do empréstimo">
-      <div className="loan-heading"><h2>Detalhes do empréstimo</h2><button className="ghost-button" onClick={() => { setModal(null); setParams({}) }}>Fechar detalhes</button></div>
+    {selectedId && <section className="card loan-section operation-page operation-page--loan-detail" aria-label="Detalhe do empréstimo">
+      <PageHeader title="Detalhes do empréstimo" actions={<button className="ghost-button" onClick={() => { setModal(null); setParams({}) }}>Fechar detalhes</button>} />
       {detailLoading && <p role="status">Carregando dados, pendências e histórico…</p>}
       {detailError && <p role="alert" className="loan-error">{detailError} <button className="ghost-button" onClick={refresh}>Recarregar detalhe</button></p>}
       {detail && <>
-        <h3>{detail.vehicle_plate} <span className={`loan-status loan-status-${detail.status}`}>{loanStatuses[detail.status]}</span></h3>
+        <h3 className="loan-detail-title"><VehicleThumbnail vehicleType={catalog.vehicles.find((vehicle) => vehicle.id === detail.vehicle_id)?.vehicle_type} plate={detail.vehicle_plate} /><span>{detail.vehicle_plate}</span><StatusChip tone={getLoanStatusTone(detail.status)}>{loanStatuses[detail.status]}</StatusChip></h3>
         {detail.regularized_at && <div className="loan-notice"><strong>Regularização administrativa registrada em {formatLoanDate(detail.regularized_at)}</strong><p>Referência: {detail.regularization_reference}</p><p>As datas efetivas foram informadas na regularização. Não representam aceites ou assinaturas realizados no passado.</p></div>}
         <div className="loan-actions">
-          {editable && <button className="ghost-button" disabled={!catalogReady || !context} onClick={() => setModal('edit')}>Editar proposta</button>}
+          {editable && <ActionMenu label={`Mais ações do empréstimo de ${detail.vehicle_plate}`} items={[{ key: 'edit', label: 'Editar proposta', icon: 'catalog', disabled: !catalogReady || !context, onClick: () => setModal('edit') }]} />}
           {actions.map(([operation, action]) => {
             const blocked = blockedLoanAction(user, detail, action, context)
             return <div key={operation}><button className="app-button" disabled={Boolean(blocked) || !catalogReady} onClick={() => setModal(operation)}>{action.label}</button>{blocked && <small>{blocked}</small>}</div>

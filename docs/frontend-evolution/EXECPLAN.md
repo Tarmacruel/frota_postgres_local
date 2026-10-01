@@ -12,7 +12,7 @@ Arquivos previstos: as cinco páginas da fase, seus testes diretos existentes ou
 - [x] Posses — fluxos condicionais preservados; 12 testes aprovados antes do subcommit.
 - [x] Condutores — consulta e ações padronizadas; 2 testes aprovados antes do subcommit.
 - [x] Manutenções — consulta e ações padronizadas; 2 testes aprovados antes do subcommit.
-- [ ] Empréstimos — adaptar a implementação real, documentos e ações; testar e subcommitar.
+- [x] Empréstimos — implementação real, documentos e ações preservados; 8 testes aprovados antes do subcommit.
 - [ ] Validar claro/escuro, executar gates completos, atualizar STATUS e parar.
 
 Rollback: cada tela poderá ser revertida pelo próprio subcommit. Não há migration, dependência nova ou alteração de dados.
