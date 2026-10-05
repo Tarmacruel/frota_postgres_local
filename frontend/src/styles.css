@@ -1934,6 +1934,12 @@ button {
   grid-template-columns: 1fr;
 }
 
+.fuel-supply-rectify-form,
+.fuel-supply-rectify-form > *,
+.fuel-supply-rectify-form input {
+  min-width: 0;
+}
+
 .modal-field-span {
   grid-column: 1 / -1;
 }

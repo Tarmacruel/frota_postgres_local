@@ -790,7 +790,7 @@ export default function FuelSuppliesPage() {
         open={Boolean(supplyToRectify) && canRectifySupply}
         onClose={() => setSupplyToRectify(null)}
         title="Retificar confirmação de abastecimento"
-        description="Corrija os dados confirmados mantendo os valores anteriores e a justificativa na auditoria."
+        description="Corrija os dados confirmados ou substitua o comprovante, mantendo os valores anteriores e a justificativa na auditoria."
       >
         {supplyToRectify ? (
           <FuelSupplyRectifyForm

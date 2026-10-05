@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 from fastapi import HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
@@ -60,7 +60,10 @@ class FuelSupplyService:
         await self._ensure_supply_visible_to_user(supply, current_user)
         return self._serialize(supply)
 
-    async def rectify(self, supply_id: UUID, payload: FuelSupplyRectify, current_user: User) -> dict:
+    async def rectify(
+        self, supply_id: UUID, payload: FuelSupplyRectify, current_user: User,
+        *, receipt: UploadFile | None = None,
+    ) -> dict:
         self._ensure_operational_adjustment_role(current_user)
         supply = await self.supplies.get_by_id(supply_id)
         if not supply:
@@ -91,34 +94,58 @@ class FuelSupplyService:
             for field in editable_fields
             if before[field] != new_values[field]
         }
-        if not changes:
+        receipt_payload = await self._read_and_validate_receipt(receipt) if receipt is not None else None
+        if not changes and receipt_payload is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nenhuma alteracao foi informada")
 
-        for field, value in new_values.items():
-            setattr(supply, field, value)
-        await attribute_operation(self.db, supply, current_user)
-        supply.updated_at = datetime.now(timezone.utc)
-        consumption_inputs = {"supplied_at", "odometer_km", "liters"}
-        recalculated_supply_ids = (
-            await self._recalculate_vehicle_consumption(supply.vehicle_id)
-            if consumption_inputs.intersection(changes)
-            else []
-        )
+        stored_receipt_path: Path | None = None
+        try:
+            if receipt_payload is not None:
+                relative_path, stored_receipt_path = self._build_receipt_storage_paths(
+                    supply.id, receipt_payload["mime_type"], revision_id=uuid4(),
+                )
+                self._store_file(stored_receipt_path, receipt_payload["content"])
+                receipt_values = {
+                    "receipt_path": relative_path,
+                    "receipt_mime_type": receipt_payload["mime_type"],
+                    "receipt_size_bytes": receipt_payload["size_bytes"],
+                    "receipt_uploaded_at": datetime.now(timezone.utc),
+                }
+                changes["receipt"] = {
+                    "before": {field: getattr(supply, field) for field in receipt_values},
+                    "after": receipt_values,
+                }
+                new_values.update(receipt_values)
 
-        await self.audit.record(
-            actor=current_user,
-            action="ORDER_CONFIRM_RECTIFIED",
-            entity_type="FUEL_SUPPLY_ORDER",
-            entity_id=supply.fuel_supply_order_id,
-            entity_label=f"{supply.vehicle.plate if supply.vehicle else supply.vehicle_id} - {supply.fuel_supply_order_id}",
-            details={
-                "supply_id": str(supply.id),
-                "reason": payload.reason,
-                "changes": changes,
-                "recalculated_supply_ids": [str(item_id) for item_id in recalculated_supply_ids],
-            },
-        )
-        await self.db.commit()
+            for field, value in new_values.items():
+                setattr(supply, field, value)
+            await attribute_operation(self.db, supply, current_user)
+            supply.updated_at = datetime.now(timezone.utc)
+            consumption_inputs = {"supplied_at", "odometer_km", "liters"}
+            recalculated_supply_ids = (
+                await self._recalculate_vehicle_consumption(supply.vehicle_id)
+                if consumption_inputs.intersection(changes)
+                else []
+            )
+
+            await self.audit.record(
+                actor=current_user,
+                action="ORDER_CONFIRM_RECTIFIED",
+                entity_type="FUEL_SUPPLY_ORDER",
+                entity_id=supply.fuel_supply_order_id,
+                entity_label=f"{supply.vehicle.plate if supply.vehicle else supply.vehicle_id} - {supply.fuel_supply_order_id}",
+                details={
+                    "supply_id": str(supply.id),
+                    "reason": payload.reason,
+                    "changes": changes,
+                    "recalculated_supply_ids": [str(item_id) for item_id in recalculated_supply_ids],
+                },
+            )
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            self._cleanup_file(stored_receipt_path)
+            raise
         return await self.get(supply.id, current_user=current_user)
 
     async def get_for_station(self, *, supply_id: UUID, fuel_station: str) -> dict:
@@ -391,9 +418,10 @@ class FuelSupplyService:
             "size_bytes": len(content),
         }
 
-    def _build_receipt_storage_paths(self, supply_id: UUID, mime_type: str) -> tuple[str, Path]:
+    def _build_receipt_storage_paths(self, supply_id: UUID, mime_type: str, *, revision_id: UUID | None = None) -> tuple[str, Path]:
         extension = RECEIPT_EXTENSIONS[mime_type]
-        relative_path = Path("fuel_receipts") / f"{supply_id}{extension}"
+        filename = f"{supply_id}-{revision_id}{extension}" if revision_id else f"{supply_id}{extension}"
+        relative_path = Path("fuel_receipts") / filename
         absolute_path = Path(settings.STORAGE_DIR) / relative_path
         return relative_path.as_posix(), absolute_path
 
