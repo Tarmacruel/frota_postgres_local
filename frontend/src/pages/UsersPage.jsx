@@ -1,3 +1,5 @@
+import StatusChip from '../components/ui/StatusChip'
+import PageHeader from '../components/ui/PageHeader'
 import { useEffect, useMemo, useState } from 'react'
 import Modal from '../components/Modal'
 import SearchableSelect from '../components/SearchableSelect'
@@ -336,20 +338,18 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="surface-panel">
-      <div className="panel-heading">
-        <div>
-          <h2 className="section-title">Gestão de usuários</h2>
-          <p className="section-copy">Gerencie perfis administrativos, operadores de produção, postos credenciados e usuários apenas de consulta.</p>
-        </div>
-        <div className="actions-inline">
+    <div className="surface-panel operation-page management-page management-page--users">
+      <PageHeader
+        title="Gestão de usuários"
+        description="Gerencie perfis administrativos, operadores de produção, postos credenciados e usuários apenas de consulta."
+        actions={<>
           <button className="app-button" type="button" onClick={openCreateModal}>Novo usuário</button>
           <button className="secondary-button" type="button" onClick={handleExportPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
-        </div>
-      </div>
+        </>}
+      />
 
-      <div className="toolbar-row" style={{ marginBottom: 18 }}>
+      <div className="toolbar-row operation-toolbar">
         <div className="filter-inline">
           <input
             className="app-input"
@@ -407,7 +407,7 @@ export default function UsersPage() {
 
       <div className="surface-panel panel-nested">
         <div className="table-wrap table-wrap-wide">
-          <table className="data-table data-table-wide">
+          <table className="data-table data-table-wide management-table">
             <thead>
               <tr>
                 <th>Nome</th>
@@ -445,14 +445,14 @@ export default function UsersPage() {
                     <td data-label="CPF">{user.cpf_masked || 'Pendente'}</td>
                     <td data-label="Secretaria">{user.organization_name || 'Não informada'}</td>
                     <td data-label="Perfil">
-                      <span className={`status-badge ${user.role === 'ADMIN' ? 'status-ATIVO' : user.role === 'PRODUCAO' ? 'status-PRODUCAO' : user.role === 'POSTO' ? 'status-POSTO' : 'status-INATIVO'}`}>
+                      <StatusChip tone={user.role === 'ADMIN' ? 'success' : user.role === 'PRODUCAO' ? 'info' : user.role === 'POSTO' ? 'warning' : 'neutral'}>
                         {getRoleLabel(user.role)}
-                      </span>
+                      </StatusChip>
                     </td>
                     <td data-label="Senha">
-                      <span className={`status-badge ${user.must_change_password ? 'status-MANUTENCAO' : 'status-ATIVO'}`}>
+                      <StatusChip tone={user.must_change_password ? 'warning' : 'success'}>
                         {user.must_change_password ? 'Troca pendente' : 'Regularizada'}
-                      </span>
+                      </StatusChip>
                     </td>
                     <td data-label="Criado em">{formatDate(user.created_at)}</td>
                     <td data-label="Atualizado em">{formatDate(user.updated_at)}</td>
@@ -572,7 +572,7 @@ export default function UsersPage() {
         ) : (
           <div className="stack">
             <div className="table-wrap table-wrap-wide">
-              <table className="data-table data-table-wide">
+              <table className="data-table data-table-wide management-table">
                 <thead>
                   <tr>
                     <th>Módulo</th>

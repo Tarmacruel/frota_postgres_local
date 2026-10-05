@@ -1,3 +1,4 @@
+import PageHeader from '../components/ui/PageHeader'
 import { useEffect, useMemo, useState } from 'react'
 import SearchableSelect from '../components/SearchableSelect'
 import Pagination from '../components/Pagination'
@@ -491,19 +492,17 @@ export default function CadastrosPage() {
   }
 
   return (
-    <div className="surface-panel">
-      <div className="panel-heading">
-        <div>
-          <h2 className="section-title">Cadastros</h2>
-          <p className="section-copy">Cadastre bases auxiliares para padronizar lotações, veículos e registros de multas.</p>
-        </div>
-        <div className="actions-inline">
+    <div className="surface-panel operation-page management-page management-page--catalog">
+      <PageHeader
+        title="Cadastros"
+        description="Cadastre bases auxiliares para padronizar lotações, veículos e registros de multas."
+        actions={<>
           <button className="ghost-button cadastros-toolbar-btn" type="button" onClick={resetForms}>Limpar formulários</button>
           <button className="ghost-button cadastros-toolbar-btn" type="button" onClick={() => setAdvancedFilterOpen(true)}>Filtros avançados</button>
           <button className="ghost-button cadastros-toolbar-btn" type="button" onClick={handleDownloadCsvTemplate}>Baixar modelo CSV</button>
           <button className="ghost-button cadastros-toolbar-btn" type="button" onClick={handleDownloadXlsxTemplate}>Baixar modelo XLSX</button>
-        </div>
-      </div>
+        </>}
+      />
 
       <section className="surface-panel panel-nested" style={{ marginBottom: 16 }}>
         <div className="panel-heading">
@@ -517,7 +516,7 @@ export default function CadastrosPage() {
         </div>
         {expandedPanels.preview ? (
           <div className="table-wrap">
-            <table className="data-table">
+            <table className="data-table management-table">
               <thead>
                 <tr>
                   <th>Órgão</th>
@@ -556,10 +555,11 @@ export default function CadastrosPage() {
       {catalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
-      <div className="actions-inline" style={{ marginBottom: 16, flexWrap: 'wrap' }}>
+      <div className="actions-inline management-tabs" role="group" aria-label="Categorias de cadastros">
         <button
           className={activeTab === 'organizations' ? 'app-button' : 'ghost-button'}
           type="button"
+          aria-pressed={activeTab === 'organizations'}
           onClick={() => setActiveTab('organizations')}
         >
           Órgãos ({organizations.length})
@@ -567,6 +567,7 @@ export default function CadastrosPage() {
         <button
           className={activeTab === 'departments' ? 'app-button' : 'ghost-button'}
           type="button"
+          aria-pressed={activeTab === 'departments'}
           onClick={() => setActiveTab('departments')}
         >
           Departamentos ({departments.length})
@@ -574,6 +575,7 @@ export default function CadastrosPage() {
         <button
           className={activeTab === 'allocations' ? 'app-button' : 'ghost-button'}
           type="button"
+          aria-pressed={activeTab === 'allocations'}
           onClick={() => setActiveTab('allocations')}
         >
           Lotações ({allocations.length})
@@ -582,6 +584,7 @@ export default function CadastrosPage() {
           <button
             className={activeTab === 'infractions' ? 'app-button' : 'ghost-button'}
             type="button"
+            aria-pressed={activeTab === 'infractions'}
             onClick={() => setActiveTab('infractions')}
           >
             Infrações CTB
@@ -603,7 +606,7 @@ export default function CadastrosPage() {
           {expandedPanels.organizations ? (
             <>
 
-          <div className="filter-inline" style={{ marginBottom: 14 }}>
+          <div className="filter-inline operation-toolbar">
             <input
               id="search-organization-input"
               className="app-input"
@@ -649,7 +652,7 @@ export default function CadastrosPage() {
           ) : null}
 
           <div className="table-wrap">
-            <table className="data-table">
+            <table className="data-table management-table">
               <thead>
                 <tr>
                   {canWrite ? <th>Seleção</th> : null}
@@ -759,7 +762,7 @@ export default function CadastrosPage() {
             </form>
           ) : null}
 
-          <div className="filter-inline" style={{ marginBottom: 14 }}>
+          <div className="filter-inline operation-toolbar">
             <SearchableSelect
               value={selectedOrganizationFilter}
               onChange={(value) => {
@@ -790,7 +793,7 @@ export default function CadastrosPage() {
           ) : null}
 
           <div className="table-wrap">
-            <table className="data-table">
+            <table className="data-table management-table">
               <thead>
                 <tr>
                   {canWrite ? <th>Seleção</th> : null}
@@ -913,7 +916,7 @@ export default function CadastrosPage() {
             </form>
           ) : null}
 
-          <div className="filter-inline" style={{ marginBottom: 14 }}>
+          <div className="filter-inline operation-toolbar">
             <SearchableSelect
               value={selectedOrganizationFilter}
               onChange={(value) => {
@@ -958,7 +961,7 @@ export default function CadastrosPage() {
           ) : null}
 
           <div className="table-wrap">
-            <table className="data-table">
+            <table className="data-table management-table">
               <thead>
                 <tr>
                   {canWrite ? <th>Seleção</th> : null}

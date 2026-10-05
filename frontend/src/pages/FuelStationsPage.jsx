@@ -1,3 +1,5 @@
+import StatusChip from '../components/ui/StatusChip'
+import PageHeader from '../components/ui/PageHeader'
 import { useEffect, useMemo, useState } from 'react'
 import Modal from '../components/Modal'
 import StationLocationPicker from '../components/StationLocationPicker'
@@ -307,20 +309,18 @@ export default function FuelStationsPage() {
   }
 
   return (
-    <div className="surface-panel">
-      <div className="panel-heading">
-        <div>
-          <h2 className="section-title">Postos de combustível</h2>
-          <p className="section-copy">Cadastro administrativo de postos credenciados, relatórios institucionais e vínculos de usuários.</p>
-        </div>
-        <div className="actions-inline">
+    <div className="surface-panel operation-page management-page management-page--stations">
+      <PageHeader
+        title="Postos de combustível"
+        description="Cadastro administrativo de postos credenciados, relatórios institucionais e vínculos de usuários."
+        actions={<>
           {canCreateStation ? <button className="app-button" type="button" onClick={openCreateModal}>Novo posto</button> : null}
           <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
-        </div>
-      </div>
+        </>}
+      />
 
-      <div className="toolbar-row" style={{ marginBottom: 18 }}>
+      <div className="toolbar-row operation-toolbar">
         <div className="filter-inline">
           <input
             className="app-input"
@@ -361,7 +361,7 @@ export default function FuelStationsPage() {
 
       <div className="surface-panel panel-nested" style={{ marginBottom: 16 }}>
         <div className="table-wrap table-wrap-wide">
-          <table className="data-table data-table-wide">
+          <table className="data-table management-table data-table-wide">
             <thead>
               <tr>
                 <th>Nome</th>
@@ -404,9 +404,9 @@ export default function FuelStationsPage() {
                     )}
                   </td>
                   <td data-label="Status">
-                    <span className={`status-badge ${station.active ? 'status-ATIVO' : 'status-INATIVO'}`}>
+                    <StatusChip tone={station.active ? 'success' : 'neutral'}>
                       {station.active ? 'Ativo' : 'Inativo'}
-                    </span>
+                    </StatusChip>
                   </td>
                   <td data-label="Atualizado em">{formatDate(station.updated_at)}</td>
                   <td data-label="Ações">
@@ -438,7 +438,7 @@ export default function FuelStationsPage() {
           {canCreateStation ? <button type="button" className="app-button" onClick={createLink} disabled={!selectedStationId || !userId}>Vincular usuário</button> : null}
         </div>
         <div className="table-wrap">
-          <table className="data-table">
+          <table className="data-table management-table">
             <thead><tr><th>Usuário</th><th>E-mail</th><th>Status</th><th>Ações</th></tr></thead>
             <tbody>
               {!selectedStationId ? <tr><td colSpan={4}><div className="empty-state">Selecione um posto para gerenciar os vínculos.</div></td></tr> : null}

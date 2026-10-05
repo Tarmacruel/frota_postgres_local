@@ -1,3 +1,4 @@
+import PageHeader from '../components/ui/PageHeader'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Area,
@@ -751,23 +752,21 @@ export default function PaymentProcessesPage() {
   const closeProcessDetail = useCallback(() => setSelectedProcess(null), [])
 
   return (
-    <div className="page-shell payment-process-page payment-workflow-page">
-      <section className="panel-heading payment-workflow-heading">
-        <div>
-          <h1 className="section-title">Processos de pagamento</h1>
-          <p className="section-copy">Workflow financeiro de combustíveis e manutenção por fatura, contrato, etapa e pendência.</p>
-        </div>
-        <div className="payment-process-actions">
+    <div className="page-shell payment-process-page payment-workflow-page management-page management-page--payments">
+      <PageHeader
+        title="Processos de pagamento"
+        description="Workflow financeiro de combustíveis e manutenção por fatura, contrato, etapa e pendência."
+        actions={<>
           {canManage ? <button className="app-button" type="button" onClick={openCreateProcess}>Novo processo</button> : null}
           <button type="button" className="secondary-button" onClick={previewPdfReport} disabled={reporting}>{reporting ? 'Gerando PDF...' : 'Relatório PDF'}</button>
           <button type="button" className="secondary-button" onClick={exportCurrent}>Exportar XLSX</button>
-        </div>
-      </section>
+        </>}
+      />
 
       {error ? <div className="alert alert-error">{error}</div> : null}
       {feedback ? <div className="alert alert-success">{feedback}</div> : null}
 
-      <section className="payment-workflow-tabs" aria-label="Modos do módulo">
+      <section className="payment-workflow-tabs management-tabs" aria-label="Modos do módulo">
         {[
           { value: 'processes', label: 'Processos' },
           { value: 'imports', label: 'Importacao' },
@@ -775,7 +774,7 @@ export default function PaymentProcessesPage() {
           { value: 'contracts', label: 'Contratos' },
           { value: 'suppliers', label: 'Fornecedores' },
         ].map((tab) => (
-          <button key={tab.value} type="button" className={`status-pill ${activeView === tab.value ? 'active' : ''}`} onClick={() => setActiveView(tab.value)}>
+          <button key={tab.value} type="button" aria-pressed={activeView === tab.value} className={`status-pill ${activeView === tab.value ? 'active' : ''}`} onClick={() => setActiveView(tab.value)}>
             {tab.label}
           </button>
         ))}
@@ -847,7 +846,7 @@ export default function PaymentProcessesPage() {
                 <span className="muted">{pagination.total} registro(s)</span>
               </div>
               <div className="table-wrap table-wrap-wide">
-                <table className="data-table payment-process-table payment-workflow-table">
+                <table className="data-table management-table payment-process-table payment-workflow-table">
                   <thead>
                     <tr>
                       <th>Processo</th>
@@ -1342,12 +1341,12 @@ function ImportsView({
           <span className="muted">{importResult ? `${importResult.total_rows} linha(s)` : 'Aguardando importação'}</span>
         </div>
         {importResult ? (
-          <div className="payment-import-result payment-import-result-grid">
+          <div className="payment-import-result payment-import-result-grid" role="status">
             <span>{importResult.total_rows} linhas</span>
             <span>{importResult.created} criadas</span>
             <span>{importResult.updated} atualizadas</span>
             <span>{importResult.skipped} ignoradas</span>
-            <span>{importResult.errors} erros</span>
+            <span className={importResult.errors ? 'management-result-error' : ''}>{importResult.errors} erros</span>
           </div>
         ) : (
           <div className="empty-state">Nenhuma importação executada nesta sessão.</div>
@@ -1516,6 +1515,7 @@ function ContractManagementView({ contracts, suppliers }) {
                 key={item.contract_id}
                 type="button"
                 className={`payment-management-rank-row ${selectedContractId === item.contract_id ? 'is-selected' : ''}`}
+                aria-pressed={selectedContractId === item.contract_id}
                 onClick={() => setSelectedContractId(item.contract_id)}
               >
                 <span>
@@ -1759,7 +1759,7 @@ function ContractsView({
             {canManage ? <button className="app-button" type="button" onClick={openCreateContract}>Novo contrato</button> : null}
           </div>
           <div className="table-wrap table-wrap-wide">
-            <table className="data-table payment-contract-table">
+            <table className="data-table management-table payment-contract-table">
               <thead>
                 <tr>
                   <th>Fornecedor</th>
@@ -2015,7 +2015,10 @@ function SuppliersView({
   return (
     <section className="payment-workspace">
       <div className="toolbar-card payment-process-panel payment-process-list-panel">
-        <h2 className="section-title">Fornecedores</h2>
+        <div className="payment-section-head">
+          <h2 className="section-title">Fornecedores</h2>
+          <span className="muted">{suppliers.length} fornecedor(es)</span>
+        </div>
         <div className="payment-supplier-list">
           {suppliers.map((supplier) => (
             <div key={supplier.id} className="payment-supplier-row">

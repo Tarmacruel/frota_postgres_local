@@ -1,3 +1,4 @@
+import PageHeader from '../components/ui/PageHeader'
 import { useEffect, useMemo, useState } from 'react'
 import api from '../api/client'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
@@ -191,19 +192,17 @@ export default function AuditPage() {
   }
 
   return (
-    <div className="surface-panel">
-      <div className="panel-heading">
-        <div>
-          <h2 className="section-title">Auditoria administrativa</h2>
-          <p className="section-copy">Acompanhe criações, edições e exclusões registradas nas áreas sensíveis do sistema.</p>
-        </div>
-        <div className="actions-inline">
+    <div className="surface-panel operation-page management-page management-page--audit">
+      <PageHeader
+        title="Auditoria administrativa"
+        description="Acompanhe criações, edições e exclusões registradas nas áreas sensíveis do sistema."
+        actions={<>
           <button className="secondary-button" type="button" onClick={handleExportPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
-        </div>
-      </div>
+        </>}
+      />
 
-      <div className="toolbar-row" style={{ marginBottom: 18 }}>
+      <div className="toolbar-row operation-toolbar">
         <div className="filter-inline">
           <input
             className="app-input"
@@ -247,7 +246,7 @@ export default function AuditPage() {
 
       <div className="surface-panel panel-nested">
         <div className="table-wrap table-wrap-wide">
-          <table className="data-table data-table-wide">
+          <table className="data-table data-table-wide management-table">
             <thead>
               <tr>
                 <th>Data</th>
