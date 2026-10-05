@@ -1,34 +1,50 @@
 # Status — evolução do frontend Frota PMTF
 
-**Branch:** feature/frontend-evolution-hml
+**Branch:** `feature/frontend-evolution-hml`
 
-**HEAD inicial da Fase 5:** d34be2d
+**HEAD de partida das Fases 6/7:** `1ec4886`
 
-**Commit funcional da Fase 5:** f14da97
+**Data:** 05/10/2026
 
-**Data:** 01/10/2026
+**Fase atual:** Fase 7 — QA e acabamento concluídos em homologação, com ressalvas registradas.
 
-**Fase atual:** Fase 5 concluída. Fase 6 ainda não autorizada.
+**Entrega:** alterações versionadas localmente, incluindo Fases 6/7, demanda funcional posterior e os 11 SVGs autorizados. Sem publicação em produção.
 
-## Entrega
+## Versionamento — 05/10/2026
 
-Abastecimentos, Histórico de abastecimentos, Ordens abertas, Sinistros e Multas foram alinhados à fundação visual operacional. As telas usam `PageHeader`, filtros consistentes, `VehicleThumbnail`, `StatusChip` e `ActionMenu` conforme a densidade e a frequência das ações.
+- `ed47ddd` — Fase 6: gestão e administração.
+- `4a2c0d0` — Fase 7: QA responsivo, temas e teclado.
+- `20b124a` — Retificação auditável do comprovante de abastecimento, testes e evidências com dados fictícios.
+- Miniaturas SVG e este STATUS incluídos no commit de consolidação, conforme pedido explícito do usuário.
 
-Comprovantes, links públicos, PDFs, XLSX, assinatura, prazos, confirmação, retificação, cancelamento, anexos e permissões foram preservados. Em Ordens abertas, confirmar abastecimento permanece visível; comprovante e assinatura estão no menu contextual. Em Abastecimentos, comprovante permanece visível; link público, download, ajuste de prazo e cancelamento estão no menu contextual.
+Os commits preservam as entregas separadas para revisão e rollback. O versionamento não altera o código validado nem realiza publicação ou push. Capturas e logs locais das Fases 6/7 continuam preservados nas exclusões já existentes.
 
-Nenhuma API, backend, migration ou configuração de produção foi alterada.
+## Resultado de HML
 
-## Validação
+QA visual, responsivo, teclado, claro/escuro e regressão executados. Conferidas 17 rotas e cinco abas de pagamentos em 1366×768, 1600×900, 1920×1080, 1024×768, 768×1024 e 390×844. Matriz principal de 252 combinações sem overflow da página ou alertas de erro de carregamento, seguida de retestes dirigidos das correções finais.
 
-| Comando | Fase 5 | Baseline Fase 4 |
-| --- | --- | --- |
-| Teste direto de Abastecimentos (`--pool=forks`) | 6 aprovados | 6 aprovados antes da mudança visual |
-| `npm run test` | 179 aprovados, 16 falhas preexistentes/intermitentes | 179 aprovados, 16 falhas preexistentes |
-| `npm run test -- --pool=forks` | 195 aprovados | 195 aprovados |
-| `npm run lint` | 0 erros, 46 avisos | 0 erros, 46 avisos |
-| `npm run build` | Aprovado | Aprovado |
+Corrigidos foco da sidebar móvel, busca e painéis de pagamento; acesso por teclado a processos, contratos e lotes; cabeçalhos e filtros esticados; larguras e rolagem de tabelas; grid de Importar/Exportar; contraste de controles/status e alertas de Análises; espaçamento do formulário de pagamento em portal. Não foram adicionadas funcionalidades. A página de pagamentos recebeu ajustes locais por subcomponente, sem refactor integral.
 
-Inspeção real em 1366×768 nos temas claro e escuro nas rotas `/abastecimentos`, `/ordens-abastecimento`, `/sinistros` e `/multas`. O Histórico foi conferido dentro de Abastecimentos. [Relatório da Fase 5](PHASE_5_INCIDENTS_FUEL.md) e [ExecPlan](EXECPLAN.md).
+48 cenários de modais, 18 de painéis laterais, seis de menus, abas complementares e busca global conferidos. Cinco XLSX e cinco PDFs gerados pelos fluxos existentes. Auditoria mantém todos os dados técnicos; gráficos mantêm séries, legendas, cores e semântica. Backend, APIs, autenticação, permissões e regras de negócio preservados. Os 11 SVGs preexistentes mantêm os hashes anteriores.
+
+## Quality gates
+
+| Verificação | Resultado final |
+| --- | --- |
+| `npm run test` | **183 aprovados/16 falhas**, 40 arquivos; runner padrão ainda instável |
+| `npm run test -- --pool=forks` | **199/199 aprovados**, 40 arquivos |
+| Suítes das duas falhas intermediárias, execução isolada padrão | Baseline 11/11; final 12/12 |
+| PossessionTripsModal, execução isolada padrão | Baseline 5/5; final 5/5 |
+| Testes dirigidos de teclado/foco | 13/13 aprovados |
+| `npm run lint` | **0 erros/46 avisos**, mesmo baseline |
+| `npm run build` | **aprovado** |
+| `git diff --check` | aprovado |
+
+Baseline padrão: 180 aprovados/15 falhas; reexecução em cópia isolada anterior à Fase 7: 175/20. Execução intermediária: 197/2, com as duas suítes aprovadas isoladamente antes/depois. A última execução reproduziu os mesmos 15 nomes do baseline inicial e uma falha adicional em PossessionTripsModal, arquivo não alterado cujos cinco testes passaram isolados antes/depois. Comparação nominal registrada em `failure-comparison.json`; suíte completa com forks aprovada. Quatro testes de regressão foram adicionados para os defeitos de teclado corrigidos. O gate padrão não está integralmente aprovado.
+
+[Relatório final de HML e evidências](PHASE_7_HML_REPORT.md) · [ExecPlan da Fase 7](EXECPLAN_PHASE_7.md) · [Entrega anterior da Fase 6](PHASE_6_MANAGEMENT.md).
+
+Evidências locais: `output/playwright/phase-7/`. Logs, snapshot anterior e diff exclusivo: `storage/loan-tests/frontend-evolution-phase7/`. [Site de HML](https://testefrota.sirel.com.br/) verificado com HTTP 200 e assets iguais à origem local de testes.
 
 ## Fases
 
@@ -38,11 +54,23 @@ Inspeção real em 1366×768 nos temas claro e escuro nas rotas `/abastecimentos
 - [x] Fase 3 — dashboard
 - [x] Fase 4 — módulos operacionais centrais
 - [x] Fase 5 — abastecimento, ordens, sinistros e multas
-- [ ] Fase 6 — gestão e administração
-- [ ] Fase 7 — QA, responsividade e acabamento
+- [x] Fase 6 — gestão e administração
+- [x] Fase 7 — QA, responsividade e acabamento em HML
 
-## Pendências
+## Pendências e limites
 
-O runner padrão mantém 16 falhas intermitentes em cinco suítes preexistentes; o pool `forks` aprova os 195 testes. Permanecem 46 avisos antigos de lint e boards alvo 01/02 duplicados. As 11 alterações externas nos SVGs de miniaturas continuam fora dos commits desta entrega.
+- Instabilidade do runner padrão e 46 avisos antigos de lint.
+- PDF legado de Auditoria com colunas estreitas e paginação excessiva; gerador e conteúdo preservados, pendência separada do redesign.
+- Fluxos de escrita, confirmação e assinatura não concluídos no navegador; entradas/formulários e testes existentes conferidos, sem operações de negócio em nome do usuário.
+- Matriz visual no Edge com perfil de testes; sem certificação integral de acessibilidade ou validação completa em outros motores/perfis.
+- Pendência anterior dos boards 01/02 duplicados mantida. Os SVGs externos foram incluídos no versionamento por autorização explícita.
 
-**Parar e aguardar autorização da Fase 6.**
+**Parado após a Fase 7, conforme solicitado. Não publicar em produção nem iniciar nova fase.**
+
+## Demanda funcional posterior — 05/10/2026
+
+Implementada a retificação opcional do comprovante de abastecimento, a pedido do usuário, sem iniciar outra fase visual. Arquivo anterior preservado, troca auditável na mesma requisição dos dados e permissões existentes mantidas. Backend: 26 testes aprovados. Frontend: 208/208 com forks; runner padrão 206/208, com as duas suítes envolvidas aprovadas em execução dirigida (27/27 junto às suítes da alteração); lint sem erros e com os mesmos 46 avisos; build aprovado. QA local com dados fictícios em claro/escuro e desktop/celular.
+
+Publicada em **https://testefrota.sirel.com.br/abastecimentos** após o usuário instruir a continuação. Reiniciada apenas a API do runtime isolado 6969; PostgreSQL 5441 preservado. Pelo domínio público: HTTP 200, aplicação/banco saudáveis, contrato JSON/multipart ativo e nove assets com hashes iguais ao build validado. Evidência: `storage/loan-tests/fuel-receipt-rectification/publication.json`. Sem publicação em produção ou retificação de abastecimentos reais.
+
+[Relatório, arquivos, baseline, limites e screenshots](FUEL_RECEIPT_RECTIFICATION.md).
