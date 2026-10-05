@@ -17,6 +17,9 @@
   --ui-border-soft: #e7ecf3;
   --ui-primary: #2563eb;
   --ui-primary-hover: #1d4ed8;
+  --ui-action-bg: #2563eb;
+  --ui-action-hover: #1d4ed8;
+  --ui-action-text: #ffffff;
   --ui-success: #16a36a;
   --ui-warning: #d99016;
   --ui-danger: #e5484d;
@@ -448,6 +451,7 @@ body.internal-app-active .app-sidebar .icon-button:hover {
 
 body.internal-app-active .content-shell {
   gap: var(--ui-space-2);
+  align-content: start;
 }
 
 body.internal-app-active .app-topbar {
@@ -1441,7 +1445,7 @@ body.internal-app-active .app-shell .management-page .ghost-button {
 }
 body.internal-app-active .app-shell .management-page .secondary-button:hover,
 body.internal-app-active .app-shell .management-page .ghost-button:hover {
-  color: var(--ui-primary);
+  color: var(--ui-info-text);
   background: var(--ui-surface-hover);
 }
 .management-page .panel-nested,
@@ -1658,4 +1662,122 @@ body.internal-app-active .app-shell .management-page .ghost-button:hover {
   .management-page .ui-page-header { flex-wrap: wrap; }
   .management-page .ui-page-header__actions { justify-content: flex-start; }
   .management-page--analytics .dashboard-grid { grid-template-columns: minmax(0, 1fr); }
+}
+
+/* Phase 7 — keyboard QA: an off-canvas drawer must not retain hidden tab stops. */
+@media (max-width: 1179px) {
+  body.internal-app-active .app-shell .app-sidebar { visibility: hidden; }
+  body.internal-app-active .app-shell .app-sidebar.is-open { visibility: visible; }
+}
+
+/* Use the same readable action treatment in both themes, without affecting charts. */
+body.internal-app-active .app-button,
+body.internal-app-active .status-pill.active,
+body.internal-app-active .pagination-page.is-active {
+  color: var(--ui-action-text);
+  background: var(--ui-action-bg);
+  border-color: var(--ui-action-bg);
+}
+body.internal-app-active .app-button:hover:not(:disabled),
+body.internal-app-active .status-pill.active:hover,
+body.internal-app-active .pagination-page.is-active:hover {
+  background: var(--ui-action-hover);
+}
+body.internal-app-active .app-shell .secondary-button,
+body.internal-app-active .app-shell .mini-button:not(.danger),
+body.internal-app-active .modal-shell .secondary-button,
+body.internal-app-active .modal-shell .mini-button:not(.danger) {
+  color: var(--ui-info-text);
+  border-color: var(--ui-control-border);
+}
+.operation-page .operation-toolbar .status-pills {
+  align-items: flex-start;
+  align-content: flex-start;
+}
+
+body.internal-app-active .app-shell .operation-page .loan-table-wrap {
+  overflow-x: auto;
+}
+
+.payment-process-open,
+.management-record-open {
+  border: 0;
+  padding: 0;
+  background: transparent;
+  color: var(--ui-info-text);
+  font: inherit;
+  font-weight: 700;
+  text-align: left;
+  cursor: pointer;
+}
+
+.payment-process-open:hover,
+.management-record-open:hover {
+  text-decoration: underline;
+}
+
+.payment-process-open:focus-visible,
+.management-record-open:focus-visible {
+  outline: 2px solid var(--ui-info-text);
+  outline-offset: 3px;
+}
+
+/* Portal forms do not inherit spacing variables from the payment page. */
+.modal-shell .payment-process-form {
+  --payment-process-inner-gap: var(--ui-space-3);
+}
+
+body.internal-app-active .status-badge.status-ATIVO,
+body.internal-app-active .status-badge.audit-action-CREATE {
+  color: var(--ui-success-text);
+}
+
+body.internal-app-active .status-badge.status-MANUTENCAO,
+body.internal-app-active .status-badge.status-PRODUCAO {
+  color: var(--ui-warning-text);
+}
+
+body.internal-app-active .status-badge.status-INATIVO,
+body.internal-app-active .status-badge.audit-action-DELETE {
+  color: var(--ui-danger-text);
+}
+
+body.internal-app-active .status-badge.status-POSTO,
+body.internal-app-active .status-badge.audit-action-UPDATE {
+  color: var(--ui-info-text);
+}
+
+/* Keep severity hues while giving insight text a surface for the active theme. */
+.management-page--analytics .insight-critical {
+  background: color-mix(in srgb, var(--analytics-critical) 8%, var(--ui-surface));
+}
+.management-page--analytics .insight-high {
+  background: color-mix(in srgb, var(--analytics-high) 8%, var(--ui-surface));
+}
+.management-page--analytics .insight-medium {
+  background: color-mix(in srgb, var(--analytics-medium) 10%, var(--ui-surface));
+}
+
+.management-page--imports,
+.management-page--imports .data-import-stack,
+.management-page--imports .data-import-detail-stack {
+  grid-template-columns: minmax(0, 1fr);
+}
+.management-page--imports > *,
+.management-page--imports .data-import-stack > * { min-width: 0; }
+
+@media (max-width: 720px) {
+  /* Preserve the existing mobile row cards; desktop column widths must not clip them. */
+  .app-shell .operation-page .operation-table,
+  .app-shell .operation-page .operation-table td,
+  .app-shell .management-page .management-table,
+  .app-shell .management-page .management-table td {
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+  }
+  .app-shell .management-page .table-wrap { max-width: 100%; overflow-x: auto; }
+  .management-page .ui-page-header__copy { flex: 0 1 auto; }
+  .operation-page--fines .ui-page-header__copy { max-width: none; }
 }

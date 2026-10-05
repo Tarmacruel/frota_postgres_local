@@ -1,5 +1,17 @@
 ﻿# ExecPlan — Fase 0 — Baseline e segurança
 
+## Continuação autorizada — Fase 7 — 05/10/2026
+
+QA final de homologação concluído. Plano em [EXECPLAN_PHASE_7.md](EXECPLAN_PHASE_7.md), evidências, arquivos e ressalvas em [PHASE_7_HML_REPORT.md](PHASE_7_HML_REPORT.md). Conferidas as seis resoluções, claro/escuro, teclado, modais, painéis, abas, busca e exportações. Correções limitadas ao redesign, preservando dados de Auditoria, gráficos e regras de negócio.
+
+Gates: 199/199 com forks; última execução padrão 183 aprovados/16 falhas (15 do baseline e uma variável em arquivo não alterado, com 5/5 isolados antes/depois); lint 0 erros/46 avisos; build e diff-check aprovados. Site HML HTTP 200. STATUS atualizado. Encerrado na Fase 7, sem produção e sem avançar.
+
+## Continuação autorizada — Fase 6 — 05/10/2026
+
+Concluída em homologação a partir de `1ec4886`. O plano detalhado e as cinco subetapas de pagamento estão em [EXECPLAN_PHASE_6.md](EXECPLAN_PHASE_6.md); entrega, arquivos e evidências em [PHASE_6_MANAGEMENT.md](PHASE_6_MANAGEMENT.md). Todas as sete telas foram evoluídas, preservando comportamento, dados de Auditoria e cores/semântica dos gráficos.
+
+Gates finais: 195/195 com forks; runner padrão 179 aprovados/16 falhas idênticas às reproduzidas no HEAD anterior isolado; lint 0 erros/46 avisos; build aprovado. Inspeção de 22 combinações de tela/aba e tema sem erros de carregamento nem overflow da página. STATUS atualizado. Parar; Fase 7 não autorizada.
+
 ## Continuação autorizada — Fase 5 — 01/10/2026
 
 Objetivo: evoluir Abastecimentos, seu Histórico, Ordens abertas, Sinistros e Multas com a fundação visual existente. Distinguir ação principal, consulta e ação crítica; reduzir fileiras de botões somente quando todos os comandos continuarem acessíveis. Preservar comprovantes, links públicos, PDF/XLSX, assinatura, prazos, confirmação, retificação, cancelamento, paginação, permissões e chamadas atuais.

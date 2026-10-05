@@ -105,6 +105,23 @@ describe('Layout global shell', () => {
     mocks.pendingLoans.mockResolvedValue({ data: { total: 0 } })
   })
 
+  it('mantém o teclado no drawer aberto e restaura o acionador ao fechar por Escape', async () => {
+    const user = userEvent.setup()
+    renderLayout('/vehicles')
+    const trigger = screen.getByRole('button', { name: 'Abrir navegação' })
+    await user.click(trigger)
+    const navigation = screen.getByRole('complementary', { name: 'Navegação principal' })
+    await waitFor(() => expect(navigation.contains(document.activeElement)).toBe(true))
+    const first = document.activeElement
+    await user.tab({ shift: true })
+    expect(within(navigation).getByRole('button', { name: 'Encerrar sessão' })).toHaveFocus()
+    await user.tab()
+    expect(first).toHaveFocus()
+    await user.keyboard('{Escape}')
+    expect(navigation).not.toHaveClass('is-open')
+    expect(trigger).toHaveFocus()
+  })
+
   it('preserva navegação, identidade, tema e preferência da sidebar', async () => {
     const user = userEvent.setup()
     const { container } = renderLayout('/vehicles')

@@ -954,7 +954,7 @@ export default function DataImportsPage() {
                   <tr><td colSpan={4}><div className="empty-state">Nenhum lote enviado.</div></td></tr>
                 ) : batches.map((batch) => (
                   <tr key={batch.id} className={selectedBatch?.id === batch.id ? 'is-focused-row' : ''} onClick={() => setSelectedBatch(batch)}>
-                    <td data-label="Arquivo"><strong>{batch.source_filename}</strong><br /><span className="muted">{formatDate(batch.created_at)}</span></td>
+                    <td data-label="Arquivo"><button type="button" className="management-record-open" aria-pressed={selectedBatch?.id === batch.id} onClick={(event) => { event.stopPropagation(); setSelectedBatch(batch) }}>{batch.source_filename}</button><br /><span className="muted">{formatDate(batch.created_at)}</span></td>
                     <td data-label="Tipo">{entityLabel(batch.entity_type)}</td>
                     <td data-label="Status"><StatusChip tone={batch.status === 'APPLIED' ? 'success' : batch.status === 'ERROR' ? 'danger' : batch.status === 'CANCELLED' ? 'neutral' : 'warning'}>{statusLabel(batch.status)}</StatusChip></td>
                     <td data-label="Linhas">{batch.summary?.total_rows || 0}</td>

@@ -18,6 +18,7 @@ import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
 import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
+import { useDialogFocus } from '../hooks/useDialogFocus'
 import { getApiErrorMessage } from '../utils/apiError'
 import { previewRowsToPdf } from '../utils/exportData'
 
@@ -866,7 +867,7 @@ export default function PaymentProcessesPage() {
                       <tr><td colSpan={8}><div className="empty-state">Nenhum processo encontrado.</div></td></tr>
                     ) : records.map((item) => (
                       <tr key={item.id} className={selectedProcess?.id === item.id ? 'is-selected' : ''} onClick={() => openProcess(item.id)}>
-                        <td data-label="Processo"><strong>{item.process_number}</strong><br /><span className="muted">{kindLabel(item.kind)} . {item.system || '-'}</span></td>
+                        <td data-label="Processo"><button type="button" className="payment-process-open" onClick={(event) => { event.stopPropagation(); openProcess(item.id) }}>{item.process_number}</button><br /><span className="muted">{kindLabel(item.kind)} . {item.system || '-'}</span></td>
                         <td data-label="Etapa"><span className={`status-badge status-${statusTone(item.stage)}`}>{item.stage_label || stageLabel(item.stage)}</span><br /><span className="muted">{item.stage_owner || '-'}</span></td>
                         <td data-label="Fornecedor / contrato"><strong>{item.supplier_name || '-'}</strong><br /><span className="muted">{item.contract_number || '-'}</span></td>
                         <td data-label="NF / fatura"><strong>{item.invoice_number || '-'}</strong><br /><span className="muted">{item.billing_number || '-'}</span></td>
@@ -1134,22 +1135,7 @@ function ProcessDetail({
   onDelete,
   onClose,
 }) {
-  useEffect(() => {
-    if (!process) return undefined
-
-    const previousOverflow = document.body.style.overflow
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') onClose()
-    }
-
-    document.body.style.overflow = 'hidden'
-    window.addEventListener('keydown', handleKeyDown)
-
-    return () => {
-      document.body.style.overflow = previousOverflow
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [process, onClose])
+  const dialogRef = useDialogFocus(Boolean(process), onClose)
 
   if (!process) {
     return null
@@ -1157,7 +1143,7 @@ function ProcessDetail({
 
   return (
     <div className="payment-detail-drawer-backdrop" role="presentation" onMouseDown={onClose}>
-      <aside
+      <aside ref={dialogRef} tabIndex={-1}
         className="toolbar-card payment-process-panel payment-detail-panel payment-detail-drawer"
         role="dialog"
         aria-modal="true"
@@ -1681,25 +1667,13 @@ function ManagementDetailTable({ rows, type }) {
 }
 
 function KpiDrawer({ kpi, detail, rows, onClose }) {
-  useEffect(() => {
-    if (!kpi) return undefined
-    const previousOverflow = document.body.style.overflow
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') onClose()
-    }
-    document.body.style.overflow = 'hidden'
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.body.style.overflow = previousOverflow
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [kpi, onClose])
+  const dialogRef = useDialogFocus(Boolean(kpi), onClose)
 
   if (!kpi) return null
 
   return (
     <div className="payment-detail-drawer-backdrop" role="presentation" onMouseDown={onClose}>
-      <aside className="toolbar-card payment-process-panel payment-detail-panel payment-detail-drawer payment-kpi-drawer" role="dialog" aria-modal="true" aria-labelledby="payment-kpi-title" onMouseDown={(event) => event.stopPropagation()}>
+      <aside ref={dialogRef} tabIndex={-1} className="toolbar-card payment-process-panel payment-detail-panel payment-detail-drawer payment-kpi-drawer" role="dialog" aria-modal="true" aria-labelledby="payment-kpi-title" onMouseDown={(event) => event.stopPropagation()}>
         <div className="payment-detail-header">
           <div>
             <span className="muted">Indicador</span>
@@ -1779,7 +1753,7 @@ function ContractsView({
                 ) : contracts.map((contract) => (
                   <tr key={contract.id} className={selectedContract?.id === contract.id ? 'is-selected' : ''} onClick={() => setSelectedContract(contract)}>
                     <td data-label="Fornecedor"><strong>{contract.supplier_name || '-'}</strong><br /><span className="muted">{kindLabel(contract.kind)}</span></td>
-                    <td data-label="Número"><strong>{contract.number}</strong><br /><span className="muted">{contract.contract_type || '-'}</span></td>
+                    <td data-label="Número"><button type="button" className="management-record-open" aria-pressed={selectedContract?.id === contract.id} onClick={(event) => { event.stopPropagation(); setSelectedContract(contract) }}>{contract.number}</button><br /><span className="muted">{contract.contract_type || '-'}</span></td>
                     <td data-label="Status"><span className={`status-badge status-${statusTone(contract.status)}`}>{contract.status}</span></td>
                     <td data-label="Vigencia">{formatDate(contract.valid_from)} a {formatDate(contract.valid_until)}</td>
                     <td data-label="Atualizado">{formatCurrency(contract.value_updated)}</td>
@@ -1885,28 +1859,13 @@ function ContractFormDrawer({
   saveContract,
   onClose,
 }) {
-  useEffect(() => {
-    if (!open) return undefined
-
-    const previousOverflow = document.body.style.overflow
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') onClose()
-    }
-
-    document.body.style.overflow = 'hidden'
-    window.addEventListener('keydown', handleKeyDown)
-
-    return () => {
-      document.body.style.overflow = previousOverflow
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [open, onClose])
+  const dialogRef = useDialogFocus(open, onClose)
 
   if (!open) return null
 
   return (
     <div className="payment-detail-drawer-backdrop" role="presentation" onMouseDown={onClose}>
-      <aside
+      <aside ref={dialogRef} tabIndex={-1}
         className="toolbar-card payment-process-panel payment-detail-panel payment-detail-drawer payment-contract-form-drawer"
         role="dialog"
         aria-modal="true"

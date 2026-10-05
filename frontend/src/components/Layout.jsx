@@ -29,6 +29,8 @@ export default function Layout() {
   const pendingLoans = usePendingVehicleLoans(user?.id, !accessBlocked && canView('vehicle_loans'))
   const canCreateFuelSupplyOrders = canCreate('fuel_supply_orders')
   const mainRef = useRef(null)
+  const navRef = useRef(null)
+  const navTriggerRef = useRef(null)
   const fuelSupplyOrdersBatchGuideUserRef = useRef(null)
 
   const [navOpen, setNavOpen] = useState(false)
@@ -148,6 +150,46 @@ export default function Layout() {
   useEffect(() => {
     setNavOpen(false)
   }, [location.pathname])
+
+  useEffect(() => {
+    if (!navOpen || window.innerWidth >= 1180) return undefined
+    const sidebar = navRef.current
+    const trigger = navTriggerRef.current
+    const previousOverflow = document.body.style.overflow
+    const choices = () => Array.from(sidebar.querySelectorAll('a[href], button:not(:disabled)'))
+      .filter((element) => getComputedStyle(element).display !== 'none' && getComputedStyle(element).visibility !== 'hidden')
+    const frame = window.requestAnimationFrame(() => (choices()[0] || sidebar).focus())
+    document.body.style.overflow = 'hidden'
+    function handleNavigationKey(event) {
+      // A dialog opened from the drawer owns its own keyboard boundary.
+      if (document.querySelector('[role="dialog"]')) return
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setNavOpen(false)
+      } else if (event.key === 'Tab') {
+        const stops = choices()
+        const first = stops[0]
+        const last = stops.at(-1)
+        if (!sidebar.contains(document.activeElement) || (event.shiftKey && document.activeElement === first)) {
+          event.preventDefault()
+          ;(event.shiftKey ? last : first)?.focus()
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          first?.focus()
+        }
+      }
+    }
+    const closeOnDesktop = () => { if (window.innerWidth >= 1180) setNavOpen(false) }
+    window.addEventListener('keydown', handleNavigationKey)
+    window.addEventListener('resize', closeOnDesktop)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleNavigationKey)
+      window.removeEventListener('resize', closeOnDesktop)
+      if (window.innerWidth < 1180) trigger?.focus()
+    }
+  }, [navOpen])
 
   useEffect(() => {
     const resetScroll = () => {
@@ -417,7 +459,7 @@ export default function Layout() {
 
       <button type="button" className={`sidebar-scrim${navOpen ? ' is-visible' : ''}`} aria-label="Fechar navegação" onClick={() => setNavOpen(false)} />
 
-      <aside className={`app-sidebar${navOpen ? ' is-open' : ''}${sidebarCompact ? ' is-compact' : ''}`} aria-label="Navegação principal">
+      <aside ref={navRef} id="app-navigation" tabIndex={-1} className={`app-sidebar${navOpen ? ' is-open' : ''}${sidebarCompact ? ' is-compact' : ''}`} aria-label="Navegação principal">
         <div className="sidebar-head">
           <div className="brand-block">
             <div className="brand-mark brand-mark-official">
@@ -466,7 +508,7 @@ export default function Layout() {
       <div className="content-shell">
         <header className="app-topbar">
           <div className="topbar-leading">
-            <button type="button" className="icon-button mobile-only" aria-label={navOpen ? 'Fechar navegação' : 'Abrir navegação'} aria-expanded={navOpen} onClick={() => setNavOpen((current) => !current)}>
+            <button ref={navTriggerRef} type="button" className="icon-button mobile-only" aria-label={navOpen ? 'Fechar navegação' : 'Abrir navegação'} aria-expanded={navOpen} aria-controls="app-navigation" onClick={() => setNavOpen((current) => !current)}>
               <AppIcon name="menu" className="app-icon" />
             </button>
 
@@ -482,9 +524,6 @@ export default function Layout() {
               className="topbar-search-trigger"
               aria-label="Abrir busca global"
               onClick={() => {
-                if (!accessBlocked) setSearchOpen(true)
-              }}
-              onFocus={() => {
                 if (!accessBlocked) setSearchOpen(true)
               }}
               disabled={accessBlocked}
