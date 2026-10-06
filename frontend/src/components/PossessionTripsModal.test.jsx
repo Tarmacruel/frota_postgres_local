@@ -146,7 +146,10 @@ describe('PossessionTripsModal', () => {
       />,
     )
 
-    await user.type(await screen.findByRole('textbox', { name: 'Finalidade' }), 'Entrega de documentos')
+    // Wait for the modal's initial focus before typing in a different field.
+    // Otherwise the scheduled focus can interrupt userEvent typing on CI.
+    await waitFor(() => expect(screen.getByRole('textbox', { name: 'Origem' })).toHaveFocus())
+    await user.type(screen.getByRole('textbox', { name: 'Finalidade' }), 'Entrega de documentos')
     const odometer = screen.getByRole('spinbutton', { name: 'Hodômetro inicial (km)' })
     await user.clear(odometer)
     await user.type(odometer, '100')
