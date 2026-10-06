@@ -60,13 +60,23 @@ Scripts no mesmo diretório: `qa-chrome.js` e `qa-edge.js`, com contas exclusiva
 
 ## Ambiente, pendências e reversão
 
-QA em servidor local 6971, build isolado e banco descartável `loan_workflow_*` no cluster de testes 5441. Nenhuma migration no banco de trabalho, alteração da versão servida em 6969 ou publicação em produção. Nenhum arquivo de deploy de produção alterado.
+QA inicial em servidor local 6971, build isolado e banco descartável `loan_workflow_*` no cluster de testes 5441. Durante essa validação, o banco de trabalho e a versão servida em 6969 foram preservados. A publicação posterior autorizada está registrada abaixo. Nenhum arquivo de deploy de produção alterado.
 
 Ao encerrar, o servidor e as duas sessões de navegador de QA foram fechados e o banco fictício descartável foi removido. Build, logs e screenshots foram preservados para revisão.
 
-Entrega pronta para revisão do código e das evidências. Disponibilização no endereço público de homologação permanece pendente: exige aplicar migration 0049 antes de iniciar a API atualizada e servir o build validado. Nenhuma outra fase iniciada. Chrome e Edge usam Chromium; não há certificação de Firefox/Safari ou acessibilidade integral.
+Entrega disponível para validação no endereço público de homologação. Nenhuma outra fase iniciada. Chrome e Edge usam Chromium; não há certificação de Firefox/Safari ou acessibilidade integral.
 
 Reversão: retirar somente esta implementação e, se necessário, executar downgrade após retirar o código consumidor. A tabela de sugestões é independente da auditoria; removê-la não remove registros de auditoria.
+
+## Publicação autorizada — 06/10/2026
+
+Publicado o código do commit `7fcbc6b` em **https://testefrota.sirel.com.br**, servido pelo runtime isolado `127.0.0.1:6969`. Backup do banco de homologação e do frontend anterior em `storage/loan-tests/assisted-justifications/before-publication/`.
+
+Aplicada somente a migration `0048_possession_rectification` → `0049_justification_suggestions` no banco `frota_emprestimos_testes`, porta 5441, após validação do diretório do cluster e das configurações de homologação. Confirmadas as permissões SELECT/INSERT/UPDATE/DELETE da conta da aplicação na nova tabela. Reiniciada somente a API de testes; PostgreSQL preservado em execução.
+
+Verificação pós-publicação na origem local e no domínio público: aplicação/banco saudáveis, página HTTP 200, GET/DELETE de sugestões presentes no OpenAPI e hashes SHA-256 dos 17 assets JS/CSS do build validado correspondentes. A consulta sem sessão retorna 401. A tabela de sugestões iniciou vazia, sem importação de histórico. Nenhuma operação funcional foi executada em dados existentes durante a publicação.
+
+Evidência local: `storage/loan-tests/assisted-justifications/publication.json`. Produção permanece inalterada.
 
 ## Arquivos de implementação e testes
 

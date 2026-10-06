@@ -29,7 +29,7 @@ Entrega funcional independente das fases concluídas do redesign. Implementar mo
 
 ## Resultado e pendências
 
-Concluída para validação em homologação local isolada. Não publicada no endereço público de homologação nem em produção. Disponibilização no runtime público permanece pendente e exige migration 0049 antes de iniciar a API atualizada. Nenhuma outra fase iniciada.
+Concluída e publicada em homologação em 06/10/2026, após autorização expressa do usuário: https://testefrota.sirel.com.br. Migration 0049 aplicada antes de ativar a API atualizada, com backup prévio e verificação de permissões, saúde e hashes dos assets. Detalhes no relatório final. Produção inalterada; nenhuma outra fase iniciada.
 
 Os nove testes ignorados da suíte ampla exigem a variável legada `PHASE3_TEST_DATABASE_URL`; testes reais de integração utilizaram `LOAN_MIGRATION_TESTS=1` e bancos descartáveis. QA visual não constitui certificação de todos os motores de navegador ou acessibilidade integral.
 

@@ -85,3 +85,9 @@ Frontend: **226/226 aprovados no comando padrão**, lint 0 erros/46 avisos preex
 **Entrega encerrada para validação. Não publicada no endereço público de homologação nem em produção.** Banco de trabalho e runtime 6969 preservados; testes usaram bancos descartáveis e build isolado. Nenhuma nova fase do redesign foi iniciada.
 
 [Relatório, arquivos, testes, screenshots e limites](ASSISTED_JUSTIFICATIONS.md) · [ExecPlan próprio](EXECPLAN_REASON_SUGGESTIONS.md).
+
+### Publicação das justificativas assistidas — 06/10/2026
+
+Após autorização expressa, commit `7fcbc6b` publicado em **https://testefrota.sirel.com.br**. Backup prévio do banco e frontend; migration 0049 aplicada somente no banco de homologação da porta 5441; reiniciada somente a API local 6969. Verificados saúde da aplicação/banco, permissões da conta da API, endpoints novos no OpenAPI, exigência de sessão (401 sem autenticação) e correspondência SHA-256 dos 17 assets JS/CSS no domínio público. Histórico de sugestões inicialmente vazio. Nenhuma operação de negócio em dados existentes e nenhuma alteração em produção.
+
+Evidência: `storage/loan-tests/assisted-justifications/publication.json`. Detalhes e reversão no [relatório atualizado](ASSISTED_JUSTIFICATIONS.md).
