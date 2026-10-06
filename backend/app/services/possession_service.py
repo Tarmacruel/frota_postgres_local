@@ -1297,6 +1297,7 @@ class PossessionService:
             "public_number": record.public_number,
             "vehicle_id": record.vehicle_id,
             "vehicle_plate": record.vehicle.plate if record.vehicle else "",
+            "vehicle_type": getattr(record.vehicle, "vehicle_type", None),
             "vehicle_brand": record.vehicle.brand if record.vehicle else None,
             "vehicle_model": record.vehicle.model if record.vehicle else None,
             "vehicle_description": self._build_vehicle_description(record),

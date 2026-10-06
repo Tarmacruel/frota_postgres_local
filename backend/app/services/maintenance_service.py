@@ -214,6 +214,7 @@ class MaintenanceService:
             "responsible_organization_id": getattr(record, "responsible_organization_id", None),
             "vehicle_id": record.vehicle_id,
             "vehicle_plate": record.vehicle.plate if record.vehicle else "",
+            "vehicle_type": getattr(record.vehicle, "vehicle_type", None),
             "start_date": record.start_date,
             "end_date": record.end_date,
             "service_description": record.service_description,

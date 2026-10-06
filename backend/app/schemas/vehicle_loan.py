@@ -85,6 +85,7 @@ class LoanEventOut(BaseModel):
 
 class LoanView(LoanOut):
     vehicle_plate: str
+    vehicle_type: str | None = None
     origin_organization_name: str | None = None
     recipient_organization_name: str | None = None
     origin_allocation_name: str | None = None

@@ -130,7 +130,7 @@ export default function VehicleLoansPage() {
         <div className="loan-table-wrap operation-table-card"><table className="loan-table operation-table"><thead><tr><th>Veículo</th><th>Origem → recebedora</th><th>Situação</th><th>Prazo</th><th>Consulta</th></tr></thead><tbody>
           {rows.length === 0 && <tr><td colSpan={5}>Nenhum empréstimo encontrado para estes filtros.</td></tr>}
           {rows.map((loan) => <tr key={loan.id} className={loan.id === selectedId ? 'loan-selected' : ''}>
-            <td><div className="operation-vehicle-identity"><VehicleThumbnail vehicleType={catalog.vehicles.find((vehicle) => vehicle.id === loan.vehicle_id)?.vehicle_type} plate={loan.vehicle_plate} /><span><strong>{loan.vehicle_plate}</strong></span></div></td>
+            <td><div className="operation-vehicle-identity"><VehicleThumbnail vehicleType={loan.vehicle_type} plate={loan.vehicle_plate} /><span><strong>{loan.vehicle_plate}</strong></span></div></td>
             <td>{loan.origin_organization_name}<br /><span aria-label="para">→ </span>{loan.recipient_organization_name}</td>
             <td><StatusChip tone={getLoanStatusTone(loan.status)}>{loanStatuses[loan.status]}</StatusChip>{loan.regularized_at && <small className="loan-regularized">Inclusão retroativa</small>}</td>
             <td>{loan.expected_return_at ? formatLoanDate(loan.expected_return_at) : 'Indeterminado'}</td>
@@ -146,7 +146,7 @@ export default function VehicleLoansPage() {
       {detailLoading && <p role="status">Carregando dados, pendências e histórico…</p>}
       {detailError && <p role="alert" className="loan-error">{detailError} <button className="ghost-button" onClick={refresh}>Recarregar detalhe</button></p>}
       {detail && <>
-        <h3 className="loan-detail-title"><VehicleThumbnail vehicleType={catalog.vehicles.find((vehicle) => vehicle.id === detail.vehicle_id)?.vehicle_type} plate={detail.vehicle_plate} /><span>{detail.vehicle_plate}</span><StatusChip tone={getLoanStatusTone(detail.status)}>{loanStatuses[detail.status]}</StatusChip></h3>
+        <h3 className="loan-detail-title"><VehicleThumbnail vehicleType={detail.vehicle_type} plate={detail.vehicle_plate} /><span>{detail.vehicle_plate}</span><StatusChip tone={getLoanStatusTone(detail.status)}>{loanStatuses[detail.status]}</StatusChip></h3>
         {detail.regularized_at && <div className="loan-notice"><strong>Regularização administrativa registrada em {formatLoanDate(detail.regularized_at)}</strong><p>Referência: {detail.regularization_reference}</p><p>As datas efetivas foram informadas na regularização. Não representam aceites ou assinaturas realizados no passado.</p></div>}
         <div className="loan-actions">
           {editable && <ActionMenu label={`Mais ações do empréstimo de ${detail.vehicle_plate}`} items={[{ key: 'edit', label: 'Editar proposta', icon: 'catalog', disabled: !catalogReady || !context, onClick: () => setModal('edit') }]} />}

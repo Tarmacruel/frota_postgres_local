@@ -31,7 +31,7 @@ describe('fundação visual', () => {
   })
 
   it.each([
-    ['HATCH', 'hatch'], ['SEDAN', 'sedan'], ['SUV', 'suv'], ['PERUA_SW', 'suv'],
+    ['HATCH', 'hatch'], ['SEDAN', 'sedan'], ['SUV', 'suv'], ['PERUA_SW', 'wagon'],
     ['PICAPE', 'pickup'], ['VAN', 'van'], ['MICRO_ONIBUS', 'microbus'], ['ONIBUS', 'bus'],
     ['CAMINHAO', 'truck'], ['MOTOCICLETA', 'motorcycle'], ['MAQUINA', 'machine'],
     [null, 'default'], ['OUTRO', 'default'], [' sedan ', 'sedan'],

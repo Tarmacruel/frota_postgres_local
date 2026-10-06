@@ -13,8 +13,8 @@ async def describe_loans(db, records):
     items = [LoanOut.model_validate(row).model_dump() for row in records]
     if not items:
         return items
-    vehicles = dict((await db.execute(select(Vehicle.id, Vehicle.plate).where(
-        Vehicle.id.in_([item['vehicle_id'] for item in items])))).all())
+    vehicles = {row.id: row for row in (await db.execute(select(Vehicle.id, Vehicle.plate, Vehicle.vehicle_type).where(
+        Vehicle.id.in_([item['vehicle_id'] for item in items])))).all()}
     org_ids = {item[key] for item in items for key in ('origin_organization_id', 'recipient_organization_id')}
     names = dict((await db.execute(select(Organization.id, Organization.name).where(Organization.id.in_(org_ids)))).all())
     allocation_ids = {item[key] for item in items for key in ('origin_allocation_id', 'destination_allocation_id', 'return_allocation_id') if item[key]}
@@ -22,7 +22,9 @@ async def describe_loans(db, records):
         joinedload(Allocation.department).joinedload(Department.organization)))).all()
     labels = {row.id: row.display_name for row in allocations}
     for item in items:
-        item['vehicle_plate'] = vehicles.get(item['vehicle_id'], 'Veículo indisponível')
+        vehicle = vehicles.get(item['vehicle_id'])
+        item['vehicle_plate'] = vehicle.plate if vehicle else 'Veículo indisponível'
+        item['vehicle_type'] = vehicle.vehicle_type if vehicle else None
         for side in ('origin', 'recipient'):
             item[side + '_organization_name'] = names.get(item[side + '_organization_id'])
         for side in ('origin', 'destination', 'return'):

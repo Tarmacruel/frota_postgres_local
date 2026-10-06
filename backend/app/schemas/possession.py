@@ -145,6 +145,7 @@ class PossessionOut(BaseModel):
     public_number: int
     vehicle_id: UUID
     vehicle_plate: str
+    vehicle_type: str | None = None
     vehicle_brand: str | None
     vehicle_model: str | None
     vehicle_description: str | None

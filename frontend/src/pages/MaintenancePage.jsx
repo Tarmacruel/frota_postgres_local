@@ -397,7 +397,7 @@ export default function MaintenancePage() {
                   <tr key={record.id} className={focusedRecord?.id === record.id ? 'is-focused-row' : ''}>
                     <td data-label="Veículo">
                       <div className="operation-vehicle-identity">
-                        <VehicleThumbnail vehicleType={getRecordVehicle(record)?.vehicle_type} plate={record.vehicle_plate} />
+                        <VehicleThumbnail vehicleType={record.vehicle_type ?? getRecordVehicle(record)?.vehicle_type} plate={record.vehicle_plate} />
                         <span>
                           <strong>{record.vehicle_plate}</strong>
                           <small className="muted">{getRecordOrganizationName(record)}</small>

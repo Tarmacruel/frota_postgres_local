@@ -74,6 +74,7 @@ class ClaimOut(BaseModel):
     id: UUID
     vehicle_id: UUID
     vehicle_plate: str
+    vehicle_type: str | None = None
     driver_id: UUID | None
     driver_name: str | None
     data_ocorrencia: datetime

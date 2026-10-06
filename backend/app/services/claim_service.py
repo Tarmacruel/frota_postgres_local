@@ -568,6 +568,7 @@ class ClaimService:
             "responsible_organization_id": getattr(claim, "responsible_organization_id", None),
             "vehicle_id": claim.vehicle_id,
             "vehicle_plate": claim.vehicle.plate if claim.vehicle else "",
+            "vehicle_type": getattr(claim.vehicle, "vehicle_type", None),
             "driver_id": claim.driver_id,
             "driver_name": claim.driver.nome_completo if claim.driver else None,
             "data_ocorrencia": claim.data_ocorrencia,

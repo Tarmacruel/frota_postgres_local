@@ -639,6 +639,7 @@ class FuelSupplyOrderService:
             "status": item.status,
             "vehicle_id": item.vehicle_id,
             "vehicle_plate": item.vehicle.plate if item.vehicle else "",
+            "vehicle_type": getattr(item.vehicle, "vehicle_type", None),
             "vehicle_description": self._build_vehicle_description(item),
             "driver_id": item.driver_id,
             "driver_name": item.driver.nome_completo if item.driver else None,

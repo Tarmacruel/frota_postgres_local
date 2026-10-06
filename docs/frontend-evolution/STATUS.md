@@ -91,3 +91,11 @@ Frontend: **226/226 aprovados no comando padrão**, lint 0 erros/46 avisos preex
 Após autorização expressa, commit `7fcbc6b` publicado em **https://testefrota.sirel.com.br**. Backup prévio do banco e frontend; migration 0049 aplicada somente no banco de homologação da porta 5441; reiniciada somente a API local 6969. Verificados saúde da aplicação/banco, permissões da conta da API, endpoints novos no OpenAPI, exigência de sessão (401 sem autenticação) e correspondência SHA-256 dos 17 assets JS/CSS no domínio público. Histórico de sugestões inicialmente vazio. Nenhuma operação de negócio em dados existentes e nenhuma alteração em produção.
 
 Evidência: `storage/loan-tests/assisted-justifications/publication.json`. Detalhes e reversão no [relatório atualizado](ASSISTED_JUSTIFICATIONS.md).
+
+## Correção de miniaturas por tipo — 06/10/2026
+
+Corrigida a ausência de `vehicle_type` nas respostas de leitura que fazia várias telas usarem o SVG genérico. Campo autorizado pelo usuário, sem mudança de banco, permissões ou operações. Empréstimos agora lê o tipo do registro, sem depender do catálogo; Perua/SW possui SVG próprio. Tipos existentes e layouts preservados.
+
+Publicada em **https://testefrota.sirel.com.br**: backend 143 testes aprovados; frontend 227 aprovados; lint 0 erros/46 avisos preexistentes; build aprovado. QA com os 11 tipos, temas claro/escuro e celular. API/banco saudáveis e 25 arquivos JS/CSS/SVG verificados no domínio público. Sem migration ou alteração de produção.
+
+[ExecPlan, arquivos, evidências e limites](EXECPLAN_VEHICLE_THUMBNAILS.md).

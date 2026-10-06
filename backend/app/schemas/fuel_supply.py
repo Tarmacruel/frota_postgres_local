@@ -62,6 +62,7 @@ class FuelSupplyOut(BaseModel):
     id: UUID
     vehicle_id: UUID
     vehicle_plate: str
+    vehicle_type: str | None = None
     driver_id: UUID | None
     driver_name: str | None
     organization_id: UUID | None
@@ -275,6 +276,7 @@ class FuelSupplyOrderOut(BaseModel):
     status: FuelSupplyOrderStatus
     vehicle_id: UUID
     vehicle_plate: str
+    vehicle_type: str | None = None
     vehicle_description: str | None
     driver_id: UUID | None
     driver_name: str | None

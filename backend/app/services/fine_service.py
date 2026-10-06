@@ -209,6 +209,7 @@ class FineService:
             "responsible_organization_id": getattr(fine, "responsible_organization_id", None),
             "vehicle_id": fine.vehicle_id,
             "vehicle_plate": fine.vehicle.plate if fine.vehicle else "",
+            "vehicle_type": getattr(fine.vehicle, "vehicle_type", None),
             "driver_id": fine.driver_id,
             "driver_name": fine.driver.nome_completo if fine.driver else None,
             "infraction_type_id": fine.infraction_type_id,

@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 160 104" fill="none">
+  <title>Perua/SW</title>
+  <path d="M12 63 34 59 55 39Q59 35 67 35H128L140 59 149 65V78H12Z" fill="#DDE2EA" stroke="#2D3741" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M43 58 60 41H80V58ZM86 41H104V58H86ZM110 41H124L132 58H110Z" fill="#55B3C5" stroke="#2C4A52" stroke-width="2" stroke-linejoin="round"/>
+  <path d="M80 62V76M106 62V76M12 73H149M62 32H124" stroke="#838D98" stroke-width="2"/>
+  <path d="M69 64H75M95 64H101" stroke="#2D3741" stroke-width="2" stroke-linecap="round"/>
+  <path d="M14 65H26V70H13" fill="#F4F7FB"/>
+  <path d="M142 61H147V70H142Z" fill="#EB0D18"/>
+  <circle cx="39" cy="77" r="12" fill="#2D3741"/>
+  <circle cx="39" cy="77" r="6" fill="#838D98"/>
+  <circle cx="124" cy="77" r="12" fill="#2D3741"/>
+  <circle cx="124" cy="77" r="6" fill="#838D98"/>
+</svg>

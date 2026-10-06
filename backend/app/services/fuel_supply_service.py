@@ -471,6 +471,7 @@ class FuelSupplyService:
             "vehicle_loan_id": getattr(item, "vehicle_loan_id", None),
             "vehicle_id": item.vehicle_id,
             "vehicle_plate": item.vehicle.plate if item.vehicle else "",
+            "vehicle_type": getattr(item.vehicle, "vehicle_type", None),
             "driver_id": item.driver_id,
             "driver_name": item.driver.nome_completo if item.driver else None,
             "organization_id": item.organization_id,

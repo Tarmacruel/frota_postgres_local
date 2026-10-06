@@ -10,6 +10,7 @@ const auth = vi.hoisted(() => ({ user: { id: 'user', role: 'PRODUCAO', organizat
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: auth.user, canCreate: () => auth.write, canEdit: () => auth.write, canView: () => true }) }))
 vi.mock('../api/vehicleLoans', () => ({ vehicleLoansAPI: { list: vi.fn(), catalog: vi.fn(), get: vi.fn(), context: vi.fn(), events: vi.fn() } }))
 const loan = { id: 'one', vehicle_id: 'vehicle', vehicle_plate: 'ABC1234', version: 1, status: 'DRAFT',
+  vehicle_type: 'MOTOCICLETA',
   origin_organization_id: 'origin', recipient_organization_id: 'recipient', origin_organization_name: 'Saúde', recipient_organization_name: 'Educação', reason: 'Atividades de campo' }
 const context = { version: 1, minimum_odometer_km: '0', blockers: { open_possessions: 0, open_trips: 0, open_fuel_orders: 0 } }
 function mount(entry = '/emprestimos') { return render(<MemoryRouter initialEntries={[entry]}><VehicleLoansPage /></MemoryRouter>) }
@@ -91,4 +92,13 @@ it('dados de contexto de outra versão bloqueiam envio até atualização', asyn
   mount('/emprestimos?id=one')
   expect(await screen.findByRole('alert')).toHaveTextContent('mudou durante a consulta')
   expect(screen.getByRole('button', { name: 'Enviar para recebimento' })).toBeDisabled()
+})
+
+it('usa o tipo do registro na lista e no detalhe mesmo sem veículo no catálogo', async () => {
+  auth.write = false
+  mount('/emprestimos?id=one')
+  await screen.findByText('Histórico de ações')
+  const thumbnails = screen.getAllByRole('img', { name: /Miniatura ilustrativa de Motocicleta ABC1234/ })
+  expect(thumbnails).toHaveLength(2)
+  thumbnails.forEach((image) => expect(image).toHaveAttribute('src', '/vehicle-thumbnails/motorcycle.svg'))
 })

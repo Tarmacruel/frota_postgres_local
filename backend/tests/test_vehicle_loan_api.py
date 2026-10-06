@@ -156,6 +156,20 @@ async def test_delivery_and_return_are_atomic_and_audited(api):
 
 
 @pytest.mark.asyncio
+async def test_read_metadata_uses_registered_type_without_vehicle_catalog_access(api):
+    with psycopg.connect(**api.db) as connection:
+        connection.execute("UPDATE vehicles SET vehicle_type='MOTOCICLETA' WHERE id=%s", (api.ids['vehicle'],))
+    draft = await api.draft()
+    assert draft['vehicle_type'] == 'MOTOCICLETA'
+    response = await api.request('origin', 'GET', f"/{draft['id']}")
+    assert response.status_code == 200 and response.json()['vehicle_type'] == 'MOTOCICLETA'
+    listing = await api.request('origin', 'GET')
+    assert listing.status_code == 200
+    assert next(row for row in listing.json()['data'] if row['id'] == draft['id'])['vehicle_type'] == 'MOTOCICLETA'
+    assert (await api.request('outsider', 'GET', f"/{draft['id']}")).status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_scopes_permissions_and_admin_dual_control(api):
     for actor in ('standard', 'station'):
         assert (await api.request(actor, 'GET')).status_code == 403
