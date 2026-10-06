@@ -317,6 +317,8 @@ class PossessionTripService:
                     "trip_sequence": trip.sequence_number,
                     "reason": data.reason,
                 },
+                suggestion_context="trip_cancel",
+                suggestion_text=data.reason,
             )
             await self.db.flush()
             await self.db.commit()

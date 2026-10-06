@@ -1,3 +1,4 @@
+import '../test/mockJustificationSuggestions'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'

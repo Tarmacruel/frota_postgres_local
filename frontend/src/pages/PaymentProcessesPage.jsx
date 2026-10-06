@@ -1,3 +1,4 @@
+import JustificationField from '../components/JustificationField'
 import PageHeader from '../components/ui/PageHeader'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
@@ -1067,8 +1068,8 @@ export default function PaymentProcessesPage() {
               <>Processo <strong>{deleteProcessTarget.process_number}</strong> será removido definitivamente.</>
             ) : 'Selecione um processo para exclusão.'}
           </div>
-          <Field label="Justificativa da exclusão">
-            <textarea
+          <div className="form-field">
+            <JustificationField context="payment_delete" label="Justificativa da exclusão"
               className="app-textarea"
               rows="4"
               value={deleteProcessReason}
@@ -1079,7 +1080,7 @@ export default function PaymentProcessesPage() {
               placeholder="Ex.: cadastro duplicado na importação de junho."
               disabled={deletingProcess}
             />
-          </Field>
+          </div>
           <div className="actions-inline modal-actions">
             <button className="ghost-button" type="button" onClick={closeDeleteProcessModal} disabled={deletingProcess}>Cancelar</button>
             <button className="mini-button danger payment-delete-confirm" type="submit" disabled={deletingProcess || deleteProcessReason.trim().length < 8}>

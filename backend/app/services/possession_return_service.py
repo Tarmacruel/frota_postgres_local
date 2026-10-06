@@ -366,6 +366,8 @@ class PossessionReturnService:
                     "corrected_end_date": data.end_date.isoformat(),
                     "final_odometer_km": float(final_odometer),
                 },
+                suggestion_context="possession_return",
+                suggestion_text=data.correction_reason,
             )
             await self.db.flush()
             await self.db.commit()

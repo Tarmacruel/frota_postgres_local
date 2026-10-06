@@ -1,0 +1,47 @@
+async (page) => {
+  await page.getByRole('textbox', { name: 'Login institucional' }).fill('admin@justificativas.example.test');
+  await page.getByRole('textbox', { name: 'Sua senha' }).fill('TesteJustificativas2026!');
+  await page.getByRole('button', { name: 'Entrar no sistema' }).click();
+  await page.waitForURL('http://127.0.0.1:6971/');
+  await page.goto('http://127.0.0.1:6971/vehicles');
+  const edit = async () => {
+    await page.getByRole('button', { name: 'Mais ações do veículo JUS0A01' }).click();
+    await page.getByRole('menuitem', { name: 'Editar cadastro' }).click();
+  };
+  await edit();
+  const oldReason = 'Correção de dados de identificação do veículo preenchidos incorretamente no cadastro.';
+  await page.getByRole('button', { name: oldReason, exact: true }).waitFor();
+  await page.getByRole('button', { name: `Esquecer sugestão: ${oldReason}`, exact: true }).click();
+  await page.getByText('Sugestão esquecida. A auditoria foi preservada.').waitFor();
+  if (await page.getByRole('button', { name: oldReason, exact: true }).count()) throw new Error('Esquecimento não aplicado');
+  const auditResponse = await page.request.get('http://127.0.0.1:6971/api/audit?entity_type=VEHICLE');
+  const audit = await auditResponse.json();
+  if (!audit.some((row) => row.details?.reason === oldReason)) throw new Error('Auditoria anterior ausente');
+  await page.getByRole('button', { name: 'Ver modelos' }).click();
+  const model = page.getByRole('button', { name: 'Identificação do veículo', exact: true });
+  await model.focus();
+  await page.keyboard.press('Enter');
+  const reason = 'Correção de identificação revisada pelo administrador fictício.';
+  await page.getByRole('textbox', { name: 'Justificativa da edição' }).fill(reason);
+  await page.getByRole('button', { name: 'Atualizar veículo' }).click();
+  await page.getByRole('button', { name: 'Mais ações do veículo JUS0A01' }).waitFor();
+  await edit();
+  await page.getByRole('button', { name: reason, exact: true }).waitFor();
+  const response = await page.request.get('http://127.0.0.1:6971/api/justification-suggestions?context=vehicle_edit');
+  const result = await response.json();
+  if (result.history.length !== 1 || result.history[0].count !== 1 || result.history[0].text !== reason) throw new Error('Texto revisado não aprendido uma única vez');
+  await page.getByRole('textbox', { name: 'Justificativa da edição' }).scrollIntoViewIfNeeded();
+  await page.screenshot({ path: 'output/playwright/assisted-justifications/edge-learned-final-text.png' });
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await page.route('**/api/justification-suggestions?*', (route) => route.abort());
+  await edit();
+  await page.getByText('Sugestões indisponíveis. Você pode digitar a justificativa normalmente.').waitFor();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.getByRole('textbox', { name: 'Justificativa da edição' }).fill('Digitação manual disponível durante falha da consulta');
+  if (!(await page.getByRole('button', { name: 'Atualizar veículo' }).isEnabled())) throw new Error('Falha de sugestões bloqueou o formulário');
+  await page.screenshot({ path: 'output/playwright/assisted-justifications/edge-manual-fallback-mobile.png' });
+  if (await page.evaluate(() => document.documentElement.scrollWidth > innerWidth)) throw new Error('Overflow móvel');
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click();
+  await page.unroute('**/api/justification-suggestions?*');
+  return { browser: 'Edge', forgetPreservesAudit: true, keyboardSelection: true, learnedFinalEditedText: true, count: 1, manualOnNetworkFailure: true, mobileOverflow: false };
+}

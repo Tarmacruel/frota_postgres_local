@@ -1,3 +1,4 @@
+import JustificationField from '../components/JustificationField'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import DriverSelect from '../components/DriverSelect'
@@ -1211,7 +1212,8 @@ export default function PossessionPage() {
           </div>
           <div className="form-field modal-field-span">
             <label htmlFor="edit-possession-reason">Justificativa da retificação</label>
-            <textarea
+            <JustificationField context="possession"
+              disabled={savingEdit || editStale}
               id="edit-possession-reason"
               required minLength={8} maxLength={500}
               className="app-textarea"

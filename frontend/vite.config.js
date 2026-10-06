@@ -68,7 +68,9 @@ export default defineConfig(({ mode }) => {
       restoreMocks: true,
       fileParallelism: false,
       maxWorkers: 1,
-      pool: 'vmThreads',
+      // vmThreads reused mocked modules across files in the Windows baseline.
+      // Separate processes preserve module isolation for the full suite.
+      pool: 'forks',
     },
     optimizeDeps: {
       include: [

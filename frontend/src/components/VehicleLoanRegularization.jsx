@@ -1,3 +1,4 @@
+import JustificationField from './JustificationField'
 import { useEffect, useRef, useState } from 'react'
 import Modal from './Modal'
 import VehicleLoanSelect from './VehicleLoanSelect'
@@ -89,7 +90,10 @@ export default function VehicleLoanRegularization({ onClose, onSaved }) {
         {ended && <>{input('returned_at', 'Devolução efetiva (data e hora local)', 'datetime-local')}{select('return_allocation_id', 'Lotação de retorno', allocations(form.origin))}{input('return_odometer_km', 'Odômetro de devolução (km)', 'number')}{area('return_condition', 'Condições de devolução', 3)}</>}
         {area('reason', 'Motivo do empréstimo')}
         {area('document_reference', 'Referência documental (processo, protocolo ou termo existente)', 8, 1000)}
-        {area('justification', 'Justificativa da regularização administrativa', 15, 1000)}
+        <div className="loan-field">
+          <JustificationField label="Justificativa da regularização administrativa" context="loan_regularization" className="app-input" required minLength={15} maxLength={1000} rows={3}
+            value={form.justification} onChange={(event) => change('justification', event.target.value)} />
+        </div>
       </fieldset>
       <button className="ghost-button" disabled={!catalog || busy}>{busy ? 'Processando…' : 'Conferir prévia da regularização'}</button>
     </form>

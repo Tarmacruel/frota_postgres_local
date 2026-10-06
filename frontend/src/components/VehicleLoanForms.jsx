@@ -1,3 +1,4 @@
+import JustificationField from './JustificationField'
 import { useRef, useState } from 'react'
 import Modal from './Modal'
 import VehicleLoanSelect from './VehicleLoanSelect'
@@ -6,10 +7,10 @@ import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
 import { blockedLoanAction, loanActions } from '../utils/vehicleLoans'
 
-function Reason({ value, onChange, required }) {
-  return <label className="loan-field">Justificativa {required ? '(obrigatória)' : '(opcional)'}
-    <textarea className="app-input" value={value} onChange={(e) => onChange(e.target.value)} required={required} minLength={8} maxLength={1000} rows={3} />
-  </label>
+function Reason({ value, onChange, required, context, userId }) {
+  return <div className="loan-field">
+    <JustificationField label={`Justificativa ${required ? '(obrigatória)' : '(opcional)'}`} context={context} userId={userId} className="app-input" value={value} onChange={(e) => onChange(e.target.value)} required={required} minLength={8} maxLength={1000} rows={3} />
+  </div>
 }
 
 export function LoanProposalForm({ loan, catalog, user, onClose, onSaved, onRefresh }) {
@@ -84,7 +85,10 @@ export function LoanProposalForm({ loan, catalog, user, onClose, onSaved, onRefr
         <label className="loan-field">Odômetro de entrega (km)<input className="app-input" type="number" min="0" step="0.1" value={form.delivery_odometer_km} onChange={(e) => change('delivery_odometer_km', e.target.value)} /></label>
         <label className="loan-field">Condições de entrega<textarea className="app-input" minLength={3} maxLength={2000} value={form.delivery_condition} onChange={(e) => change('delivery_condition', e.target.value)} rows={3} /></label>
         <p className="section-copy">Odômetro e condições são obrigatórios para enviar a proposta.</p>
-        {user.role === 'ADMIN' && <><p>Você representa <strong>{ownerName || 'a secretaria de origem'}</strong> nesta ação.</p><Reason required value={form.justification} onChange={(value) => change('justification', value)} /></>}
+        {user.role === 'ADMIN' && <>
+          <p>Você representa <strong>{ownerName || 'a secretaria de origem'}</strong> nesta ação.</p>
+          <Reason context={loan ? "loan_proposal" : "loan_create"} userId={user.id} required value={form.justification} onChange={(value) => change('justification', value)} />
+        </>}
       </fieldset>
       <div className="actions-inline">
         <button className="app-button" disabled={busy || stale || !owner}>{busy ? 'Salvando…' : 'Salvar rascunho'}</button>
@@ -145,7 +149,7 @@ export function LoanActionForm({ operation, loan, context, catalog, user, onClos
           <p>Referência mínima: {context?.minimum_odometer_km ?? '—'} km. Confira o valor no veículo.</p>
           <label className="loan-field">Condições de devolução<textarea className="app-input" required minLength={3} maxLength={2000} value={condition} onChange={(e) => setCondition(e.target.value)} rows={3} /></label>
         </>}
-        <Reason required={user.role === 'ADMIN' || action.reason} value={justification} onChange={setJustification} />
+        <Reason context={`loan_${operation}`} userId={user.id} required={user.role === 'ADMIN' || action.reason} value={justification} onChange={setJustification} />
       </fieldset>
       <button className="app-button" disabled={busy || stale || Boolean(blocked)}>{busy ? 'Processando…' : action.label}</button>
       {stale && <button type="button" className="ghost-button" onClick={onRefresh}>Recarregar dados e revisar</button>}

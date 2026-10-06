@@ -1,3 +1,4 @@
+import JustificationField from './JustificationField'
 import { useMemo, useRef, useState } from 'react'
 import { fuelSuppliesAPI } from '../api/fuelSupplies'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -202,7 +203,7 @@ export default function FuelSupplyRectifyForm({ record, onClose, onSuccess }) {
       </div>
       <div className="form-field modal-field-span">
         <label htmlFor="rectify-reason">Justificativa da retificação</label>
-        <textarea id="rectify-reason" className="app-textarea" rows="3" value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} minLength={10} maxLength={1000} required />
+        <JustificationField context="fuel_supply" id="rectify-reason" className="app-textarea" rows="3" value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} minLength={10} maxLength={1000} required disabled={submitting} />
         <small className="muted">A justificativa e os valores anterior e novo ficarão registrados na auditoria.</small>
       </div>
 

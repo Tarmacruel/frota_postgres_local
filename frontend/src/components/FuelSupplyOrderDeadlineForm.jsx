@@ -1,3 +1,4 @@
+import JustificationField from './JustificationField'
 import { useMemo, useState } from 'react'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -71,7 +72,7 @@ export default function FuelSupplyOrderDeadlineForm({ order, onClose, onSuccess 
       </div>
       <div className="form-field modal-field-span">
         <label htmlFor="deadline-reason">Justificativa</label>
-        <textarea id="deadline-reason" className="app-textarea" rows="4" value={reason} onChange={(event) => setReason(event.target.value)} minLength={10} maxLength={1000} required />
+        <JustificationField context={isExpired ? 'order_reopen' : 'order_extend'} id="deadline-reason" className="app-textarea" rows="4" value={reason} onChange={(event) => setReason(event.target.value)} minLength={10} maxLength={1000} required disabled={submitting} />
         <small className="muted">Situação, prazo anterior, prazo novo e justificativa serão auditados.</small>
       </div>
       <div className="actions-inline modal-actions">

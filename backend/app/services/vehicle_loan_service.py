@@ -26,6 +26,20 @@ def conflict(code, message, **context):
     raise HTTPException(409, detail={'code': code, 'message': message, **context})
 
 
+LOAN_SUGGESTION_CONTEXTS = {
+    'CREATED': 'loan_create',
+    'RECTIFIED': 'loan_proposal',
+    'SUBMITTED': 'loan_submit',
+    'RECEIPT_ACCEPTED': 'loan_accept',
+    'REJECTED': 'loan_reject',
+    'CANCELLED': 'loan_cancel',
+    'RETURN_SUBMITTED': 'loan_request-return',
+    'RETURN_ACCEPTED': 'loan_accept-return',
+    'RETURN_REJECTED': 'loan_reject-return',
+    'RETURN_CANCELLED': 'loan_cancel-return',
+}
+
+
 class VehicleLoanService:
     def __init__(self, db):
         self.db = db
@@ -203,7 +217,7 @@ class VehicleLoanService:
             represented_organization_id=data.acting_organization_id, justification=data.justification,
             effective_at=effective_at, details=details))
         await AuditService(self.db).record(actor=user, action=f'LOAN_{kind}', entity_type='VEHICLE_LOAN',
-            entity_id=loan.id, entity_label=str(loan.id), details=details)
+            entity_id=loan.id, entity_label=str(loan.id), details=details, suggestion_context=LOAN_SUGGESTION_CONTEXTS[kind], suggestion_text=data.justification)
 
     async def create(self, data, user):
         async with self.mutation():

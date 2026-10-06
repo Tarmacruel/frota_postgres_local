@@ -1,3 +1,4 @@
+import JustificationField from '../components/JustificationField'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import AccordionSection from '../components/AccordionSection'
@@ -1170,7 +1171,8 @@ export default function VehiclesPage() {
               <div className="form-grid modal-form-grid">
                 <div className="form-field modal-field-span">
                   <label htmlFor="edit_reason">Justificativa da edição</label>
-                  <textarea
+                  <JustificationField context="vehicle_edit"
+                    disabled={submitting || modalCatalogLoading}
                     id="edit_reason"
                     className="app-textarea"
                     rows="4"

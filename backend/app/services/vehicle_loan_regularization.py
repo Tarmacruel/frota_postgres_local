@@ -194,5 +194,5 @@ class VehicleLoanRegularizationService:
                 represented_organization_id=origin.organization_id, effective_at=data.started_at,
                 created_at=now, justification=data.justification, details=details))
             await AuditService(self.db).record(actor=user, action='LOAN_REGULARIZED', entity_type='VEHICLE_LOAN',
-                entity_id=loan.id, entity_label=str(loan.id), details=details)
+                entity_id=loan.id, entity_label=str(loan.id), details=details, suggestion_context="loan_regularization", suggestion_text=data.justification)
             return LoanOut.model_validate(loan)

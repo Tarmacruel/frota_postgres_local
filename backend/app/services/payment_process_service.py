@@ -310,6 +310,8 @@ class PaymentProcessService:
                 entity_id=record.id,
                 entity_label=record.process_number,
                 details=details,
+                suggestion_context="payment_delete",
+                suggestion_text=data.reason,
             )
             await self.repository.delete(record)
             await self._normalize_legacy_contract_values({contract_id})

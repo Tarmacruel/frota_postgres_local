@@ -1,3 +1,4 @@
+import FuelSupplyOrderCancelForm from '../components/FuelSupplyOrderCancelForm'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
@@ -148,6 +149,8 @@ export default function FuelSuppliesPage() {
   const [batchTourReplayToken, setBatchTourReplayToken] = useState(0)
   const [supplyToRectify, setSupplyToRectify] = useState(null)
   const [orderToAdjust, setOrderToAdjust] = useState(null)
+  const [orderToCancel, setOrderToCancel] = useState(null)
+  const [cancellingOrder, setCancellingOrder] = useState(false)
 
   useEffect(() => {
     const action = searchParams.get('acao')
@@ -318,20 +321,7 @@ export default function FuelSuppliesPage() {
       setError('Você não tem permissão para cancelar ordens de abastecimento.')
       return
     }
-    if (!window.confirm(`Cancelar a ordem ${formatOrderNumber(order)}?`)) return
-
-    const reason = window.prompt('Motivo do cancelamento (opcional):', '')
-    if (reason === null) return
-
-    try {
-      setError('')
-      setFeedback('')
-      await fuelSupplyOrdersAPI.cancel(order.id, { reason: reason.trim() || null })
-      setFeedback(`Ordem ${formatOrderNumber(order)} cancelada com sucesso.`)
-      await loadOrders()
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível cancelar a ordem de abastecimento.'))
-    }
+    setOrderToCancel(order)
   }
 
   function buildOrderReportFilters() {
@@ -759,6 +749,16 @@ export default function FuelSuppliesPage() {
         />
       </Modal>
 
+      <Modal open={Boolean(orderToCancel)} title={`Cancelar ordem ${orderToCancel ? formatOrderNumber(orderToCancel) : ''}`}
+        description="Confirme o cancelamento da ordem de abastecimento. O motivo é opcional."
+        canClose={!cancellingOrder} onClose={() => setOrderToCancel(null)}>
+        {orderToCancel && <FuelSupplyOrderCancelForm order={orderToCancel} onBusy={setCancellingOrder}
+          onClose={() => setOrderToCancel(null)} onSaved={() => {
+            setFeedback(`Ordem ${formatOrderNumber(orderToCancel)} cancelada com sucesso.`)
+            setOrderToCancel(null)
+            loadOrders()
+          }} />}
+      </Modal>
       <Modal
         open={isBatchOrderModalOpen && canCreateOrder}
         onClose={() => setIsBatchOrderModalOpen(false)}

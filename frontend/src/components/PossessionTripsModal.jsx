@@ -1,3 +1,4 @@
+import JustificationField from './JustificationField'
 import { useEffect, useRef, useState } from 'react'
 import { possessionAPI } from '../api/possession'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -436,7 +437,7 @@ export default function PossessionTripsModal({
             </div>
             <div className="form-field modal-field-span">
               <label htmlFor="trip-cancel-reason">Justificativa do cancelamento</label>
-              <textarea ref={firstFieldRef} id="trip-cancel-reason" className="app-textarea" rows="4" minLength={8} maxLength={1000} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} aria-describedby="trip-cancel-help" />
+              <JustificationField context="trip_cancel" ref={firstFieldRef} id="trip-cancel-reason" className="app-textarea" rows="4" minLength={8} maxLength={1000} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} aria-describedby="trip-cancel-help" />
               <span id="trip-cancel-help" className="helper-text">Entre 8 e 1.000 caracteres. A justificativa será auditada.</span>
             </div>
             <div className="actions-inline modal-actions">

@@ -322,6 +322,8 @@ class PossessionService:
                         "replacement_reason": normalized_reason,
                         "previous_ended_at": effective_start.isoformat(),
                     },
+                    suggestion_context="possession_replace",
+                    suggestion_text=normalized_reason,
                 )
             if pending_admin_notification_payload:
                 await self.admin_notifications.notify(
@@ -754,6 +756,8 @@ class PossessionService:
                     "document_replaced": bool(loan_term_payload),
                     "added_photo_count": len(photo_payloads),
                 },
+                suggestion_context="possession",
+                suggestion_text=data.edit_reason,
             )
             await self.db.flush()
             await self.db.commit()

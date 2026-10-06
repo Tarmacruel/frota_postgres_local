@@ -106,6 +106,8 @@ class AuditService:
         entity_label: str,
         details: dict | None = None,
         request_context: RequestAuditContext | None = None,
+        suggestion_context: str | None = None,
+        suggestion_text: str | None = None,
     ) -> AuditLog:
         sanitized_details = jsonable_encoder(_sanitize_audit_value(details)) if details is not None else {}
         context = request_context or get_request_audit_context()
@@ -122,5 +124,9 @@ class AuditService:
             entity_label=entity_label,
             details=sanitized_details or None,
         )
-        return await self.audit_logs.create(audit_log)
+        record = await self.audit_logs.create(audit_log)
+        if suggestion_context and suggestion_text:
+            from app.services.justification_suggestions import remember
+            await remember(self.db, actor.id, suggestion_context, suggestion_text)
+        return record
     "device_public_key",

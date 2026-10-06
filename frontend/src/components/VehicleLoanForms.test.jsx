@@ -1,9 +1,11 @@
+import '../test/mockJustificationSuggestions'
 import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { LoanActionForm, LoanProposalForm } from './VehicleLoanForms'
 import { vehicleLoansAPI } from '../api/vehicleLoans'
 import { availableLoanActions, blockedLoanAction, loanActions } from '../utils/vehicleLoans'
+
 
 vi.mock('../api/vehicleLoans', () => ({ vehicleLoansAPI: { create: vi.fn(), update: vi.fn(), act: vi.fn() } }))
 const user = { id: 'sender', role: 'PRODUCAO', organization_id: 'origin' }
@@ -70,6 +72,11 @@ describe('Proposta e ações de empréstimo', () => {
     render(<LoanProposalForm loan={loan} catalog={catalog} user={{ ...user, role: 'ADMIN' }} onSaved={vi.fn()} />)
     await actor.click(screen.getByRole('button', { name: 'Salvar rascunho' }))
     expect(vehicleLoansAPI.update).not.toHaveBeenCalled()
+    await actor.click(screen.getByRole('button', { name: 'Ver modelos', exact: true }))
+    await actor.click(screen.getByRole('button', { name: 'Dados de entrega', exact: true }))
+    expect(screen.getByLabelText('Justificativa (obrigatória)').value).toContain('Retificação do odômetro')
+    expect(vehicleLoansAPI.update).not.toHaveBeenCalled()
+    await actor.clear(screen.getByLabelText('Justificativa (obrigatória)'))
     await actor.type(screen.getByLabelText('Justificativa (obrigatória)'), 'Representação autorizada para teste')
     await actor.click(screen.getByRole('button', { name: 'Salvar rascunho' }))
     expect(vehicleLoansAPI.update).toHaveBeenCalledWith('loan', expect.objectContaining({ expected_version: 3, acting_organization_id: 'origin', justification: 'Representação autorizada para teste' }))
@@ -92,6 +99,7 @@ describe('Proposta e ações de empréstimo', () => {
   it('solicita devolução com lotação da origem, odômetro editado e condições', async () => {
     const actor = userEvent.setup()
     render(<LoanActionForm operation="request-return" loan={{ ...loan, status: 'ACTIVE' }} context={context} catalog={catalog} user={{ ...user, organization_id: 'recipient' }} onSaved={vi.fn()} />)
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Lotação de retorno' })).toHaveFocus())
     expect(screen.getByLabelText('Odômetro de devolução (km)')).toHaveValue(123.4)
     await actor.clear(screen.getByLabelText('Odômetro de devolução (km)'))
     await actor.type(screen.getByLabelText('Odômetro de devolução (km)'), '150')

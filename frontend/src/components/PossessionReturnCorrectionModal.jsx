@@ -1,3 +1,4 @@
+import JustificationField from './JustificationField'
 import { useRef } from 'react'
 import Modal from './Modal'
 
@@ -38,7 +39,7 @@ export default function PossessionReturnCorrectionModal({ record, context, form,
         </div>
         <div className="form-field modal-field-span">
           <label htmlFor="correction-reason">Justificativa administrativa</label>
-          <textarea id="correction-reason" className="app-textarea" rows="3" minLength="8" maxLength="1000" required value={form.correction_reason} onChange={(event) => onChange({ correction_reason: event.target.value })} disabled={saving} />
+          <JustificationField context="possession_return" id="correction-reason" className="app-textarea" rows="3" minLength="8" maxLength="1000" required value={form.correction_reason} onChange={(event) => onChange({ correction_reason: event.target.value })} disabled={saving} />
         </div>
         <section className="possession-return-declaration modal-field-span" aria-labelledby="correction-declaration-title">
           <div className="possession-return-declaration-heading"><strong id="correction-declaration-title">Declaração v{context.declaration.version}</strong></div>

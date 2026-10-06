@@ -148,6 +148,8 @@ class ClaimService:
                 entity_id=claim.id,
                 entity_label=f"{vehicle.plate} - {claim.tipo.value}",
                 details=self._serialize(claim, attachments=attachment_records),
+                suggestion_context="claim_close",
+                suggestion_text=data.justificativa_encerramento,
             )
             await self.db.commit()
         except IntegrityError as exc:
@@ -241,6 +243,8 @@ class ClaimService:
                         attachments=[*remaining_attachments, *new_attachment_records],
                     ),
                 },
+                suggestion_context="claim_close",
+                suggestion_text=data.justificativa_encerramento if data.justificativa_encerramento != before.get("justificativa_encerramento") else None,
             )
             await self.db.commit()
         except IntegrityError as exc:

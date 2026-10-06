@@ -140,6 +140,8 @@ class FuelSupplyService:
                     "changes": changes,
                     "recalculated_supply_ids": [str(item_id) for item_id in recalculated_supply_ids],
                 },
+                suggestion_context="fuel_supply",
+                suggestion_text=payload.reason,
             )
             await self.db.commit()
         except Exception:

@@ -74,6 +74,57 @@
   --ui-shadow-menu: 0 18px 44px rgb(0 0 0 / 0.45);
 }
 
+/* Reusable correction reason suggestions, including forms rendered in portals. */
+.reason-suggestions {
+  display: grid;
+  gap: var(--ui-space-2);
+  min-width: 0;
+  padding: var(--ui-space-3);
+  border: 1px solid var(--ui-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface-subtle);
+  color: var(--ui-text);
+  font-size: 0.82rem;
+}
+.reason-suggestions small { color: var(--ui-text-muted); }
+.reason-suggestions__heading,
+.reason-suggestions__presets {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+}
+.reason-suggestions__heading { justify-content: space-between; }
+.reason-suggestions button { font: inherit; cursor: pointer; }
+.reason-suggestions__preset,
+.reason-suggestions__text {
+  border: 1px solid var(--ui-control-border);
+  border-radius: var(--ui-radius-control);
+  background: var(--ui-surface);
+  color: var(--ui-text);
+  padding: var(--ui-space-2) var(--ui-space-3);
+  text-align: left;
+  overflow-wrap: anywhere;
+}
+.reason-suggestions__preset:hover:not(:disabled),
+.reason-suggestions__text:hover:not(:disabled) { background: var(--ui-surface-hover); }
+.reason-suggestions button[aria-pressed='true'] { border-color: var(--ui-primary); color: var(--ui-info-text); }
+.reason-suggestions__link { border: 0; padding: var(--ui-space-1); background: transparent; color: var(--ui-info-text); text-decoration: underline; }
+.reason-suggestions__history { display: grid; gap: var(--ui-space-2); }
+.reason-suggestions__history-row { display: flex; align-items: center; gap: var(--ui-space-2); min-width: 0; }
+.reason-suggestions__text { flex: 1; min-width: 0; }
+.reason-suggestions button:disabled { opacity: 0.6; cursor: default; }
+.reason-suggestions button:focus-visible { outline: 2px solid var(--ui-primary); outline-offset: 2px; }
+.reason-suggestions__confirmation {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--ui-space-2);
+  min-width: 0;
+  padding-top: var(--ui-space-2);
+  border-top: 1px solid var(--ui-border);
+}
+.reason-suggestions__confirmation p { flex-basis: 100%; margin: 0; overflow-wrap: anywhere; }
+
 /* Foundation primitives -------------------------------------------------- */
 
 .ui-page-header {

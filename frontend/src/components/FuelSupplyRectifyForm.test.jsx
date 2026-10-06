@@ -1,9 +1,11 @@
+import '../test/mockJustificationSuggestions'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fuelSuppliesAPI } from '../api/fuelSupplies'
 import FuelSupplyRectifyForm from './FuelSupplyRectifyForm'
 
 vi.mock('../api/fuelSupplies', () => ({ fuelSuppliesAPI: { rectify: vi.fn() } }))
+vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: { id: 'fuel-operator' } }) }))
 
 const record = {
   id: 'supply-1', vehicle_plate: 'ABC1D23', supplied_at: '2026-09-23T13:21:00Z',
@@ -109,5 +111,26 @@ describe('retificação do comprovante de abastecimento', () => {
     expect(fuelSuppliesAPI.rectify).toHaveBeenCalledOnce()
     expect(screen.getByLabelText('Novo comprovante (opcional)')).toBeDisabled()
     await act(async () => finish({ data: {} }))
+  })
+
+  it('seleciona modelo, confirma substituição e salva o texto escolhido', async () => {
+    const callbacks = setup()
+    selectReceipt(receipt())
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Ver modelos', exact: true })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'Ver modelos', exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: 'Comprovante', exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: 'Substituir texto', exact: true }))
+    expect(fuelSuppliesAPI.rectify).not.toHaveBeenCalled()
+    expect(screen.getByLabelText('Justificativa da retificação').value).toContain('Substituição do comprovante')
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar retificação' }))
+    await waitFor(() => expect(callbacks.onSuccess).toHaveBeenCalledOnce())
+  })
+
+  it('apresenta rejeição da API sem fechar a retificação', async () => {
+    fuelSuppliesAPI.rectify.mockRejectedValueOnce({ response: { data: { detail: 'Correção rejeitada' } } })
+    setup()
+    selectReceipt(receipt())
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar retificação' }))
+    await screen.findByText('Correção rejeitada')
   })
 })

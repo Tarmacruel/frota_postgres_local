@@ -14,6 +14,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.api.routes.admin_notifications import router as admin_notifications_router
 from app.api.routes.analytics import router as analytics_router
 from app.api.routes.audit import router as audit_router
+from app.api.routes.justification_suggestions import router as justification_suggestions_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.claims import router as claims_router
 from app.api.routes.data_imports import router as data_imports_router
@@ -192,6 +193,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"detail": safe_errors, "request_id": _request_id(request)},
     )
 
+app.include_router(justification_suggestions_router)
 app.include_router(auth_router)
 app.include_router(audit_router)
 app.include_router(admin_notifications_router)

@@ -1,3 +1,4 @@
+import JustificationField from './JustificationField'
 import { useEffect, useRef, useState } from 'react'
 import { possessionAPI } from '../api/possession'
 import DriverSelect from './DriverSelect'
@@ -557,7 +558,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess, onUnautho
           </label>
           <div className="form-field">
             <label htmlFor="replacement-reason">Justificativa da substituição</label>
-            <textarea
+            <JustificationField context="possession_replace"
               id="replacement-reason"
               className="app-textarea"
               rows="3"

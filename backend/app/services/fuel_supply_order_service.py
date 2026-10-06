@@ -391,6 +391,8 @@ class FuelSupplyOrderService:
             entity_id=order.id,
             entity_label=f"{order.vehicle.plate if order.vehicle else order.vehicle_id} - {order.id}",
             details={"reason": payload.reason},
+            suggestion_context="order_cancel",
+            suggestion_text=payload.reason,
         )
         await self.db.commit()
         return await self.get_order(order.id, current_user=current_user)
@@ -445,6 +447,8 @@ class FuelSupplyOrderService:
                 "previous_expires_at": previous_expires_at,
                 "new_expires_at": payload.expires_at,
             },
+            suggestion_context="order_reopen" if was_expired else "order_extend",
+            suggestion_text=payload.reason,
         )
         await self.db.commit()
         return await self.get_order(order.id, current_user=current_user)

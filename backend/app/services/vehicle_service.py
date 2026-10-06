@@ -282,6 +282,8 @@ class VehicleService:
                         "location": updated_active.display_name if updated_active else None,
                     },
                 },
+                suggestion_context="vehicle_edit",
+                suggestion_text=data.edit_reason,
             )
             await self.db.flush()
             await self.db.refresh(vehicle)

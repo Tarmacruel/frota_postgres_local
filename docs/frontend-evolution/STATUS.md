@@ -74,3 +74,14 @@ Implementada a retificação opcional do comprovante de abastecimento, a pedido 
 Publicada em **https://testefrota.sirel.com.br/abastecimentos** após o usuário instruir a continuação. Reiniciada apenas a API do runtime isolado 6969; PostgreSQL 5441 preservado. Pelo domínio público: HTTP 200, aplicação/banco saudáveis, contrato JSON/multipart ativo e nove assets com hashes iguais ao build validado. Evidência: `storage/loan-tests/fuel-receipt-rectification/publication.json`. Sem publicação em produção ou retificação de abastecimentos reais.
 
 [Relatório, arquivos, baseline, limites e screenshots](FUEL_RECEIPT_RECTIFICATION.md).
+
+
+## Demanda funcional — justificativas assistidas — 05/10/2026
+
+Implementada e validada em homologação local isolada, com catálogo de 22 finalidades e histórico pessoal sincronizado pela conta. Justificativas, permissões e auditoria preservadas; cancelamento de ordem agora utiliza modal com motivo opcional. Migration aditiva 0049, sem importação de histórico antigo.
+
+Frontend: **226/226 aprovados no comando padrão**, lint 0 erros/46 avisos preexistentes e build aprovado. A instabilidade do vmThreads foi investigada com 13 suítes isoladas e execução completa em forks; o runner padrão agora usa forks. Backend: 169 aprovados/9 ignorados na suíte ampla e 17 aprovados na verificação dirigida final. QA com duas contas fictícias, Chrome/Edge, claro/escuro e celular.
+
+**Entrega encerrada para validação. Não publicada no endereço público de homologação nem em produção.** Banco de trabalho e runtime 6969 preservados; testes usaram bancos descartáveis e build isolado. Nenhuma nova fase do redesign foi iniciada.
+
+[Relatório, arquivos, testes, screenshots e limites](ASSISTED_JUSTIFICATIONS.md) · [ExecPlan próprio](EXECPLAN_REASON_SUGGESTIONS.md).

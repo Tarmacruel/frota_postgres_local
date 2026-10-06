@@ -1,7 +1,9 @@
+import '../test/mockJustificationSuggestions'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import PossessionPage from './PossessionPage'
+
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
@@ -33,6 +35,7 @@ vi.mock('../api/possession', () => ({
 }))
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({
+    user: { id: 'possession-operator' },
     canCreate: (module) => module === 'possession',
     canEdit: (module) => module === 'possession' && mocks.canEdit,
     isAdmin: mocks.isAdmin,
@@ -191,6 +194,11 @@ describe('PossessionPage', () => {
     fireEvent.change(end, { target: { value: '2026-07-13T16:30' } })
     fireEvent.change(screen.getByLabelText('Odômetro inicial (km)'), { target: { value: '99' } })
     fireEvent.change(screen.getByLabelText('Odômetro final (km)'), { target: { value: '109' } })
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Ver modelos', exact: true })).toBeEnabled())
+    fireEvent.click(screen.getByRole('button', { name: 'Ver modelos', exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: 'Odômetros', exact: true }))
+    expect(screen.getByLabelText('Justificativa da retificação').value).toContain('Correção dos odômetros')
+    expect(mocks.update).not.toHaveBeenCalled()
     fireEvent.change(screen.getByLabelText('Justificativa da retificação'), { target: { value: 'Conferência administrativa conjunta' } })
     expect(screen.getByRole('button', { name: 'Salvar retificação' })).toBeDisabled()
     fireEvent.click(screen.getByLabelText(/Li integralmente/))
