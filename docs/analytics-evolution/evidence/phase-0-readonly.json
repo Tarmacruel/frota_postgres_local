@@ -1,0 +1,1627 @@
+{
+  "observed_at": "2026-10-06T19:14:44.064041+00:00",
+  "environment": "isolated homologation; not production statistics",
+  "queries": {
+    "vehicles": {
+      "sql": "SELECT count(*) total, count(*) FILTER (WHERE tank_capacity_liters IS NULL OR tank_capacity_liters <= 0) missing_valid_tank, count(*) FILTER (WHERE owner_organization_id IS NULL) missing_owner FROM vehicles",
+      "columns": [
+        "total",
+        "missing_valid_tank",
+        "missing_owner"
+      ],
+      "rows": [
+        [
+          284,
+          248,
+          0
+        ]
+      ]
+    },
+    "vehicle_status": {
+      "sql": "SELECT status::text, count(*) FROM vehicles GROUP BY status ORDER BY status",
+      "columns": [
+        "status",
+        "count"
+      ],
+      "rows": [
+        [
+          "ATIVO",
+          252
+        ],
+        [
+          "INATIVO",
+          25
+        ],
+        [
+          "MANUTENCAO",
+          7
+        ]
+      ]
+    },
+    "fuel": {
+      "sql": "SELECT count(*) total, count(*) FILTER (WHERE total_amount IS NULL) missing_amount, count(*) FILTER (WHERE driver_id IS NULL) missing_driver, count(*) FILTER (WHERE organization_id IS NULL) missing_organization, count(*) FILTER (WHERE consumption_km_l IS NULL) missing_consumption FROM fuel_supplies",
+      "columns": [
+        "total",
+        "missing_amount",
+        "missing_driver",
+        "missing_organization",
+        "missing_consumption"
+      ],
+      "rows": [
+        [
+          188,
+          0,
+          188,
+          0,
+          20
+        ]
+      ]
+    },
+    "odometer_regressions": {
+      "sql": "SELECT count(*) FROM (SELECT odometer_km, lag(odometer_km) OVER (PARTITION BY vehicle_id ORDER BY supplied_at, created_at, id) previous FROM fuel_supplies) q WHERE odometer_km < previous",
+      "columns": [
+        "count"
+      ],
+      "rows": [
+        [
+          5
+        ]
+      ]
+    },
+    "maintenance": {
+      "sql": "SELECT count(*) total, count(*) FILTER (WHERE end_date IS NULL) open, count(*) FILTER (WHERE responsible_organization_id IS NULL) missing_responsibility FROM maintenance_records",
+      "columns": [
+        "total",
+        "open",
+        "missing_responsibility"
+      ],
+      "rows": [
+        [
+          2,
+          0,
+          2
+        ]
+      ]
+    },
+    "fines": {
+      "sql": "SELECT status::text, count(*) total, count(*) FILTER (WHERE driver_id IS NULL) missing_driver, count(*) FILTER (WHERE responsible_organization_id IS NULL) missing_responsibility FROM fines GROUP BY status ORDER BY status",
+      "columns": [
+        "status",
+        "total",
+        "missing_driver",
+        "missing_responsibility"
+      ],
+      "rows": [
+        [
+          "PENDENTE",
+          2,
+          1,
+          2
+        ]
+      ]
+    },
+    "claims": {
+      "sql": "SELECT count(*) total, count(*) FILTER (WHERE driver_id IS NULL) missing_driver, count(*) FILTER (WHERE valor_estimado IS NULL) missing_estimate FROM claims",
+      "columns": [
+        "total",
+        "missing_driver",
+        "missing_estimate"
+      ],
+      "rows": [
+        [
+          1,
+          0,
+          0
+        ]
+      ]
+    },
+    "possession": {
+      "sql": "SELECT count(*) total, count(*) FILTER (WHERE end_date IS NOT NULL) ended, count(*) FILTER (WHERE end_date IS NOT NULL AND (start_odometer_km IS NULL OR end_odometer_km IS NULL)) ended_without_odometer, count(*) FILTER (WHERE end_odometer_km < start_odometer_km) regressive FROM vehicle_possession",
+      "columns": [
+        "total",
+        "ended",
+        "ended_without_odometer",
+        "regressive"
+      ],
+      "rows": [
+        [
+          1283,
+          1146,
+          34,
+          16
+        ]
+      ]
+    },
+    "schema": {
+      "sql": "SELECT table_name, column_name, data_type, is_nullable FROM information_schema.columns WHERE table_schema='public' AND table_name IN ('vehicles','fuel_supplies','vehicle_possession','maintenance_records','fines','claims','fleet_analytics_snapshots','payment_processes','payment_process_references') ORDER BY table_name, ordinal_position",
+      "columns": [
+        "table_name",
+        "column_name",
+        "data_type",
+        "is_nullable"
+      ],
+      "rows": [
+        [
+          "claims",
+          "id",
+          "uuid",
+          "NO"
+        ],
+        [
+          "claims",
+          "vehicle_id",
+          "uuid",
+          "NO"
+        ],
+        [
+          "claims",
+          "driver_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "claims",
+          "data_ocorrencia",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "claims",
+          "tipo",
+          "USER-DEFINED",
+          "NO"
+        ],
+        [
+          "claims",
+          "descricao",
+          "text",
+          "NO"
+        ],
+        [
+          "claims",
+          "local",
+          "character varying",
+          "NO"
+        ],
+        [
+          "claims",
+          "boletim_ocorrencia",
+          "character varying",
+          "YES"
+        ],
+        [
+          "claims",
+          "valor_estimado",
+          "numeric",
+          "YES"
+        ],
+        [
+          "claims",
+          "status",
+          "USER-DEFINED",
+          "NO"
+        ],
+        [
+          "claims",
+          "justificativa_encerramento",
+          "text",
+          "YES"
+        ],
+        [
+          "claims",
+          "anexos",
+          "jsonb",
+          "YES"
+        ],
+        [
+          "claims",
+          "created_by",
+          "uuid",
+          "NO"
+        ],
+        [
+          "claims",
+          "created_at",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "claims",
+          "updated_at",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "claims",
+          "responsible_organization_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "claims",
+          "vehicle_loan_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "fines",
+          "id",
+          "uuid",
+          "NO"
+        ],
+        [
+          "fines",
+          "vehicle_id",
+          "uuid",
+          "NO"
+        ],
+        [
+          "fines",
+          "driver_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "fines",
+          "ticket_number",
+          "character varying",
+          "NO"
+        ],
+        [
+          "fines",
+          "infraction_date",
+          "date",
+          "NO"
+        ],
+        [
+          "fines",
+          "due_date",
+          "date",
+          "YES"
+        ],
+        [
+          "fines",
+          "amount",
+          "numeric",
+          "NO"
+        ],
+        [
+          "fines",
+          "description",
+          "text",
+          "NO"
+        ],
+        [
+          "fines",
+          "location",
+          "character varying",
+          "YES"
+        ],
+        [
+          "fines",
+          "status",
+          "USER-DEFINED",
+          "NO"
+        ],
+        [
+          "fines",
+          "created_by",
+          "uuid",
+          "NO"
+        ],
+        [
+          "fines",
+          "created_at",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "fines",
+          "updated_at",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "fines",
+          "infraction_type_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "fines",
+          "infraction_time",
+          "time without time zone",
+          "YES"
+        ],
+        [
+          "fines",
+          "communication_number",
+          "character varying",
+          "YES"
+        ],
+        [
+          "fines",
+          "sent_date",
+          "date",
+          "YES"
+        ],
+        [
+          "fines",
+          "process_number",
+          "character varying",
+          "YES"
+        ],
+        [
+          "fines",
+          "source_status",
+          "character varying",
+          "YES"
+        ],
+        [
+          "fines",
+          "imported_driver_name",
+          "character varying",
+          "YES"
+        ],
+        [
+          "fines",
+          "notes",
+          "text",
+          "YES"
+        ],
+        [
+          "fines",
+          "source_import_row_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "fines",
+          "responsible_organization_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "fines",
+          "vehicle_loan_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "id",
+          "uuid",
+          "NO"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "period_start",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "period_end",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "vehicle_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "driver_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "vehicle_type",
+          "character varying",
+          "NO"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "scope",
+          "character varying",
+          "NO"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "total_km",
+          "double precision",
+          "NO"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "total_liters",
+          "double precision",
+          "NO"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "fuel_cost",
+          "numeric",
+          "NO"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "maintenance_cost",
+          "numeric",
+          "NO"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "fines_cost",
+          "numeric",
+          "NO"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "consumption_l_100km",
+          "double precision",
+          "YES"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "tco_cost_per_km",
+          "double precision",
+          "YES"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "driver_risk_score",
+          "double precision",
+          "YES"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "anomalies_count",
+          "integer",
+          "NO"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "category_average_consumption",
+          "double precision",
+          "YES"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "category_average_tco",
+          "double precision",
+          "YES"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "market_benchmark_tco",
+          "double precision",
+          "YES"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "extra_payload",
+          "jsonb",
+          "YES"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "notes",
+          "text",
+          "YES"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "created_at",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "fuel_supplies",
+          "id",
+          "uuid",
+          "NO"
+        ],
+        [
+          "fuel_supplies",
+          "vehicle_id",
+          "uuid",
+          "NO"
+        ],
+        [
+          "fuel_supplies",
+          "driver_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "fuel_supplies",
+          "organization_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "fuel_supplies",
+          "supplied_at",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "fuel_supplies",
+          "odometer_km",
+          "double precision",
+          "NO"
+        ],
+        [
+          "fuel_supplies",
+          "liters",
+          "double precision",
+          "NO"
+        ],
+        [
+          "fuel_supplies",
+          "total_amount",
+          "numeric",
+          "YES"
+        ],
+        [
+          "fuel_supplies",
+          "fuel_station",
+          "character varying",
+          "YES"
+        ],
+        [
+          "fuel_supplies",
+          "notes",
+          "text",
+          "YES"
+        ],
+        [
+          "fuel_supplies",
+          "consumption_km_l",
+          "double precision",
+          "YES"
+        ],
+        [
+          "fuel_supplies",
+          "is_consumption_anomaly",
+          "boolean",
+          "NO"
+        ],
+        [
+          "fuel_supplies",
+          "anomaly_details",
+          "text",
+          "YES"
+        ],
+        [
+          "fuel_supplies",
+          "receipt_path",
+          "character varying",
+          "NO"
+        ],
+        [
+          "fuel_supplies",
+          "receipt_mime_type",
+          "character varying",
+          "NO"
+        ],
+        [
+          "fuel_supplies",
+          "receipt_size_bytes",
+          "integer",
+          "NO"
+        ],
+        [
+          "fuel_supplies",
+          "receipt_uploaded_at",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "fuel_supplies",
+          "created_at",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "fuel_supplies",
+          "updated_at",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "fuel_supplies",
+          "fuel_station_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "fuel_supplies",
+          "fuel_type",
+          "character varying",
+          "YES"
+        ],
+        [
+          "fuel_supplies",
+          "additive_type",
+          "character varying",
+          "YES"
+        ],
+        [
+          "fuel_supplies",
+          "additive_quantity_liters",
+          "double precision",
+          "YES"
+        ],
+        [
+          "fuel_supplies",
+          "fuel_supply_order_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "fuel_supplies",
+          "vehicle_loan_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "maintenance_records",
+          "id",
+          "uuid",
+          "NO"
+        ],
+        [
+          "maintenance_records",
+          "vehicle_id",
+          "uuid",
+          "NO"
+        ],
+        [
+          "maintenance_records",
+          "start_date",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "maintenance_records",
+          "end_date",
+          "timestamp with time zone",
+          "YES"
+        ],
+        [
+          "maintenance_records",
+          "service_description",
+          "text",
+          "NO"
+        ],
+        [
+          "maintenance_records",
+          "parts_replaced",
+          "text",
+          "YES"
+        ],
+        [
+          "maintenance_records",
+          "total_cost",
+          "numeric",
+          "NO"
+        ],
+        [
+          "maintenance_records",
+          "created_by",
+          "uuid",
+          "NO"
+        ],
+        [
+          "maintenance_records",
+          "created_at",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "maintenance_records",
+          "updated_at",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "maintenance_records",
+          "responsible_organization_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "maintenance_records",
+          "vehicle_loan_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "payment_process_references",
+          "id",
+          "uuid",
+          "NO"
+        ],
+        [
+          "payment_process_references",
+          "process_id",
+          "uuid",
+          "NO"
+        ],
+        [
+          "payment_process_references",
+          "reference_type",
+          "USER-DEFINED",
+          "NO"
+        ],
+        [
+          "payment_process_references",
+          "external_id",
+          "character varying",
+          "YES"
+        ],
+        [
+          "payment_process_references",
+          "label",
+          "character varying",
+          "NO"
+        ],
+        [
+          "payment_process_references",
+          "description",
+          "text",
+          "YES"
+        ],
+        [
+          "payment_process_references",
+          "created_at",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "payment_processes",
+          "id",
+          "uuid",
+          "NO"
+        ],
+        [
+          "payment_processes",
+          "import_key",
+          "character varying",
+          "NO"
+        ],
+        [
+          "payment_processes",
+          "process_number",
+          "character varying",
+          "NO"
+        ],
+        [
+          "payment_processes",
+          "kind",
+          "USER-DEFINED",
+          "NO"
+        ],
+        [
+          "payment_processes",
+          "system",
+          "character varying",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "status",
+          "character varying",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "billing_number",
+          "character varying",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "invoice_number",
+          "character varying",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "invoice_type",
+          "character varying",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "unit_name",
+          "character varying",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "organization_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "issue_date",
+          "date",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "process_type",
+          "character varying",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "amount",
+          "numeric",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "supplier_name",
+          "character varying",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "contract_number",
+          "character varying",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "contract_balance",
+          "numeric",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "location",
+          "character varying",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "notes",
+          "text",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "source_filename",
+          "character varying",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "source_sheet",
+          "character varying",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "created_by_user_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "updated_by_user_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "created_at",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "payment_processes",
+          "updated_at",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "payment_processes",
+          "stage",
+          "USER-DEFINED",
+          "NO"
+        ],
+        [
+          "payment_processes",
+          "supplier_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "contract_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "competence_month",
+          "date",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "due_date",
+          "date",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "paid_at",
+          "date",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "assigned_to_user_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "stage_owner",
+          "character varying",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "status_note",
+          "text",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "commitment_number",
+          "character varying",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "commitment_date",
+          "date",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "liquidation_number",
+          "character varying",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "liquidation_date",
+          "date",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "payment_order_number",
+          "character varying",
+          "YES"
+        ],
+        [
+          "payment_processes",
+          "payment_order_date",
+          "date",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "id",
+          "uuid",
+          "NO"
+        ],
+        [
+          "vehicle_possession",
+          "vehicle_id",
+          "uuid",
+          "NO"
+        ],
+        [
+          "vehicle_possession",
+          "driver_name",
+          "character varying",
+          "NO"
+        ],
+        [
+          "vehicle_possession",
+          "driver_document",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "driver_contact",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "start_date",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "vehicle_possession",
+          "end_date",
+          "timestamp with time zone",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "observation",
+          "text",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "created_at",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "vehicle_possession",
+          "photo_path",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "photo_mime_type",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "photo_size_bytes",
+          "integer",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "photo_captured_at",
+          "timestamp with time zone",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "capture_latitude",
+          "double precision",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "capture_longitude",
+          "double precision",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "capture_accuracy_meters",
+          "double precision",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "document_path",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "document_name",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "document_mime_type",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "document_size_bytes",
+          "integer",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "document_uploaded_at",
+          "timestamp with time zone",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "driver_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "start_odometer_km",
+          "double precision",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "end_odometer_km",
+          "double precision",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "return_document_path",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "return_document_name",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "return_document_mime_type",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "return_document_size_bytes",
+          "integer",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "return_document_uploaded_at",
+          "timestamp with time zone",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "loan_term_validation_code",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "return_term_validation_code",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "public_number",
+          "bigint",
+          "NO"
+        ],
+        [
+          "vehicle_possession",
+          "updated_at",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "vehicle_possession",
+          "responsible_organization_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "vehicle_loan_id",
+          "uuid",
+          "YES"
+        ],
+        [
+          "vehicle_possession",
+          "revision",
+          "integer",
+          "NO"
+        ],
+        [
+          "vehicles",
+          "id",
+          "uuid",
+          "NO"
+        ],
+        [
+          "vehicles",
+          "plate",
+          "character varying",
+          "NO"
+        ],
+        [
+          "vehicles",
+          "brand",
+          "character varying",
+          "NO"
+        ],
+        [
+          "vehicles",
+          "model",
+          "character varying",
+          "NO"
+        ],
+        [
+          "vehicles",
+          "status",
+          "USER-DEFINED",
+          "NO"
+        ],
+        [
+          "vehicles",
+          "created_at",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "vehicles",
+          "updated_at",
+          "timestamp with time zone",
+          "NO"
+        ],
+        [
+          "vehicles",
+          "chassis_number",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicles",
+          "ownership_type",
+          "USER-DEFINED",
+          "NO"
+        ],
+        [
+          "vehicles",
+          "vehicle_type",
+          "USER-DEFINED",
+          "NO"
+        ],
+        [
+          "vehicles",
+          "renavam",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicles",
+          "year",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicles",
+          "prefix",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicles",
+          "patrimonio_numero_frota",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicles",
+          "color",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicles",
+          "fuel_type",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicles",
+          "tank_capacity_liters",
+          "double precision",
+          "YES"
+        ],
+        [
+          "vehicles",
+          "transmission",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicles",
+          "city",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicles",
+          "state",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicles",
+          "registered_detran",
+          "boolean",
+          "YES"
+        ],
+        [
+          "vehicles",
+          "engine_spec",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicles",
+          "is_provisional",
+          "boolean",
+          "NO"
+        ],
+        [
+          "vehicles",
+          "provisional_source",
+          "character varying",
+          "YES"
+        ],
+        [
+          "vehicles",
+          "owner_organization_id",
+          "uuid",
+          "YES"
+        ]
+      ]
+    },
+    "active_drivers": {
+      "sql": "SELECT count(*) FROM drivers WHERE ativo IS TRUE",
+      "columns": [
+        "count"
+      ],
+      "rows": [
+        [
+          288
+        ]
+      ]
+    },
+    "fuel_30d_coverage": {
+      "sql": "SELECT count(*) vehicles_with_supply, count(*) FILTER (WHERE n=1) only_one_supply, count(*) FILTER (WHERE maximum=minimum) zero_distance FROM (SELECT vehicle_id, count(*) n, max(odometer_km) maximum, min(odometer_km) minimum FROM fuel_supplies WHERE supplied_at >= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' - INTERVAL '30 days' AND supplied_at <= date_trunc('day', now() AT TIME ZONE 'UTC') AT TIME ZONE 'UTC' GROUP BY vehicle_id) q",
+      "columns": [
+        "vehicles_with_supply",
+        "only_one_supply",
+        "zero_distance"
+      ],
+      "rows": [
+        [
+          13,
+          4,
+          4
+        ]
+      ]
+    },
+    "indexes": {
+      "sql": "SELECT tablename, indexname, indexdef FROM pg_indexes WHERE schemaname='public' AND tablename IN ('fuel_supplies','maintenance_records','fines','claims','fleet_analytics_snapshots','location_history') ORDER BY tablename,indexname",
+      "columns": [
+        "tablename",
+        "indexname",
+        "indexdef"
+      ],
+      "rows": [
+        [
+          "claims",
+          "claims_pkey",
+          "CREATE UNIQUE INDEX claims_pkey ON public.claims USING btree (id)"
+        ],
+        [
+          "claims",
+          "idx_claims_data",
+          "CREATE INDEX idx_claims_data ON public.claims USING btree (data_ocorrencia)"
+        ],
+        [
+          "claims",
+          "idx_claims_driver",
+          "CREATE INDEX idx_claims_driver ON public.claims USING btree (driver_id)"
+        ],
+        [
+          "claims",
+          "idx_claims_status",
+          "CREATE INDEX idx_claims_status ON public.claims USING btree (status)"
+        ],
+        [
+          "claims",
+          "idx_claims_vehicle",
+          "CREATE INDEX idx_claims_vehicle ON public.claims USING btree (vehicle_id)"
+        ],
+        [
+          "claims",
+          "ix_claims_responsible_organization_id",
+          "CREATE INDEX ix_claims_responsible_organization_id ON public.claims USING btree (responsible_organization_id)"
+        ],
+        [
+          "claims",
+          "ix_claims_vehicle_loan_id",
+          "CREATE INDEX ix_claims_vehicle_loan_id ON public.claims USING btree (vehicle_loan_id)"
+        ],
+        [
+          "fines",
+          "fines_pkey",
+          "CREATE UNIQUE INDEX fines_pkey ON public.fines USING btree (id)"
+        ],
+        [
+          "fines",
+          "idx_fines_driver",
+          "CREATE INDEX idx_fines_driver ON public.fines USING btree (driver_id)"
+        ],
+        [
+          "fines",
+          "idx_fines_due_date",
+          "CREATE INDEX idx_fines_due_date ON public.fines USING btree (due_date)"
+        ],
+        [
+          "fines",
+          "idx_fines_infraction_type_id",
+          "CREATE INDEX idx_fines_infraction_type_id ON public.fines USING btree (infraction_type_id)"
+        ],
+        [
+          "fines",
+          "idx_fines_source_import_row_id",
+          "CREATE INDEX idx_fines_source_import_row_id ON public.fines USING btree (source_import_row_id)"
+        ],
+        [
+          "fines",
+          "idx_fines_status",
+          "CREATE INDEX idx_fines_status ON public.fines USING btree (status)"
+        ],
+        [
+          "fines",
+          "idx_fines_vehicle",
+          "CREATE INDEX idx_fines_vehicle ON public.fines USING btree (vehicle_id)"
+        ],
+        [
+          "fines",
+          "ix_fines_responsible_organization_id",
+          "CREATE INDEX ix_fines_responsible_organization_id ON public.fines USING btree (responsible_organization_id)"
+        ],
+        [
+          "fines",
+          "ix_fines_vehicle_loan_id",
+          "CREATE INDEX ix_fines_vehicle_loan_id ON public.fines USING btree (vehicle_loan_id)"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "fleet_analytics_snapshots_pkey",
+          "CREATE UNIQUE INDEX fleet_analytics_snapshots_pkey ON public.fleet_analytics_snapshots USING btree (id)"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "idx_fleet_analytics_snapshot_created",
+          "CREATE INDEX idx_fleet_analytics_snapshot_created ON public.fleet_analytics_snapshots USING btree (created_at)"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "idx_fleet_analytics_snapshot_period",
+          "CREATE INDEX idx_fleet_analytics_snapshot_period ON public.fleet_analytics_snapshots USING btree (period_start, period_end)"
+        ],
+        [
+          "fleet_analytics_snapshots",
+          "idx_fleet_analytics_snapshot_scope",
+          "CREATE INDEX idx_fleet_analytics_snapshot_scope ON public.fleet_analytics_snapshots USING btree (vehicle_type, vehicle_id, driver_id)"
+        ],
+        [
+          "fuel_supplies",
+          "fuel_supplies_pkey",
+          "CREATE UNIQUE INDEX fuel_supplies_pkey ON public.fuel_supplies USING btree (id)"
+        ],
+        [
+          "fuel_supplies",
+          "idx_fuel_supplies_anomaly",
+          "CREATE INDEX idx_fuel_supplies_anomaly ON public.fuel_supplies USING btree (is_consumption_anomaly)"
+        ],
+        [
+          "fuel_supplies",
+          "idx_fuel_supplies_driver",
+          "CREATE INDEX idx_fuel_supplies_driver ON public.fuel_supplies USING btree (driver_id)"
+        ],
+        [
+          "fuel_supplies",
+          "idx_fuel_supplies_fuel_station_id",
+          "CREATE INDEX idx_fuel_supplies_fuel_station_id ON public.fuel_supplies USING btree (fuel_station_id)"
+        ],
+        [
+          "fuel_supplies",
+          "idx_fuel_supplies_organization",
+          "CREATE INDEX idx_fuel_supplies_organization ON public.fuel_supplies USING btree (organization_id)"
+        ],
+        [
+          "fuel_supplies",
+          "idx_fuel_supplies_supplied_at",
+          "CREATE INDEX idx_fuel_supplies_supplied_at ON public.fuel_supplies USING btree (supplied_at)"
+        ],
+        [
+          "fuel_supplies",
+          "idx_fuel_supplies_vehicle",
+          "CREATE INDEX idx_fuel_supplies_vehicle ON public.fuel_supplies USING btree (vehicle_id)"
+        ],
+        [
+          "fuel_supplies",
+          "ix_fuel_supplies_vehicle_loan_id",
+          "CREATE INDEX ix_fuel_supplies_vehicle_loan_id ON public.fuel_supplies USING btree (vehicle_loan_id)"
+        ],
+        [
+          "fuel_supplies",
+          "uq_fuel_supplies_order_id",
+          "CREATE UNIQUE INDEX uq_fuel_supplies_order_id ON public.fuel_supplies USING btree (fuel_supply_order_id)"
+        ],
+        [
+          "location_history",
+          "ix_location_history_allocation_id",
+          "CREATE INDEX ix_location_history_allocation_id ON public.location_history USING btree (allocation_id)"
+        ],
+        [
+          "location_history",
+          "ix_location_history_vehicle_id",
+          "CREATE INDEX ix_location_history_vehicle_id ON public.location_history USING btree (vehicle_id)"
+        ],
+        [
+          "location_history",
+          "location_history_pkey",
+          "CREATE UNIQUE INDEX location_history_pkey ON public.location_history USING btree (id)"
+        ],
+        [
+          "maintenance_records",
+          "idx_maintenance_created_by",
+          "CREATE INDEX idx_maintenance_created_by ON public.maintenance_records USING btree (created_by)"
+        ],
+        [
+          "maintenance_records",
+          "idx_maintenance_dates",
+          "CREATE INDEX idx_maintenance_dates ON public.maintenance_records USING btree (start_date, end_date)"
+        ],
+        [
+          "maintenance_records",
+          "idx_maintenance_vehicle",
+          "CREATE INDEX idx_maintenance_vehicle ON public.maintenance_records USING btree (vehicle_id)"
+        ],
+        [
+          "maintenance_records",
+          "ix_maintenance_records_responsible_organization_id",
+          "CREATE INDEX ix_maintenance_records_responsible_organization_id ON public.maintenance_records USING btree (responsible_organization_id)"
+        ],
+        [
+          "maintenance_records",
+          "ix_maintenance_records_vehicle_loan_id",
+          "CREATE INDEX ix_maintenance_records_vehicle_loan_id ON public.maintenance_records USING btree (vehicle_loan_id)"
+        ],
+        [
+          "maintenance_records",
+          "maintenance_records_pkey",
+          "CREATE UNIQUE INDEX maintenance_records_pkey ON public.maintenance_records USING btree (id)"
+        ]
+      ]
+    }
+  },
+  "read_only": true,
+  "migration": [
+    [
+      "0049_justification_suggestions"
+    ]
+  ]
+}

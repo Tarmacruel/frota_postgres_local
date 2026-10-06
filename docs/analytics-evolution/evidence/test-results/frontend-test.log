@@ -1,0 +1,12 @@
+
+> frota-pmtf-frontend@1.0.0 test
+> vitest run
+
+
+ RUN  v4.1.10 D:/FROTAS/frota_emprestimos_testes/frontend
+
+
+ Test Files  48 passed (48)
+      Tests  229 passed (229)
+   Start at  16:05:22
+   Duration  78.59s (transform 1.50s, setup 10.69s, import 5.57s, tests 32.79s, environment 22.06s)
