@@ -69,6 +69,42 @@ jobs:
         run: |
           mkdir -p deploy/.ci-uploads
           sudo chown 10001:10001 deploy/.ci-uploads
+      - name: Gerar configuracao descartavel do smoke test
+        run: |
+          python3 - <<'PY'
+          import json
+          from pathlib import Path
+          import secrets
+
+          password = secrets.token_urlsafe(32)
+          secret = secrets.token_urlsafe(48)
+          evidence_secret = secrets.token_urlsafe(48)
+          for value in (password, secret, evidence_secret):
+              print(f"::add-mask::{value}")
+          env_file = Path("deploy/ci.env").resolve()
+          values = {
+              "FROTA_ENV_FILE": str(env_file),
+              "FROTA_APP_IMAGE": "frota-app:ci",
+              "FROTA_APP_BIND_ADDRESS": "127.0.0.1",
+              "FROTA_APP_PORT": "8000",
+              "FROTA_UPLOADS_DIR": str(Path("deploy/.ci-uploads").resolve()),
+              "POSTGRES_DB": "frota_ci",
+              "POSTGRES_USER": "frota_ci",
+              "POSTGRES_PASSWORD": password,
+              "DATABASE_URL": f"postgresql+asyncpg://frota_ci:{password}@postgres:5432/frota_ci",
+              "SECRET_KEY": secret,
+              "SIGNATURE_EVIDENCE_SECRET": evidence_secret,
+              "STORAGE_DIR": "/data/uploads",
+              "APP_ENV": "production",
+              "COOKIE_SECURE": "true",
+              "CORS_ORIGINS": json.dumps(["https://frota.example.test"]),
+              "CSRF_TRUSTED_ORIGINS": json.dumps(["https://frota.example.test"]),
+              "TRUSTED_HOSTS": json.dumps(["localhost", "127.0.0.1"]),
+              "TRUSTED_PROXY_NETWORKS": json.dumps(["127.0.0.1/32"]),
+          }
+          env_file.write_text("".join(f"{key}={value}\n" for key, value in values.items()), encoding="utf-8")
+          env_file.chmod(0o600)
+          PY
       - name: Validar Compose
         run: docker compose --env-file deploy/ci.env -f deploy/compose.production.yml config
       - name: Construir imagem de producao
