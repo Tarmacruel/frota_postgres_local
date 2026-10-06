@@ -101,3 +101,11 @@ Publicada em **https://testefrota.sirel.com.br**: backend 143 testes aprovados; 
 [ExecPlan, arquivos, evidências e limites](EXECPLAN_VEHICLE_THUMBNAILS.md).
 
 **Ajuste posterior solicitado em 06/10/2026:** Perua/SW voltou a usar a miniatura anterior (`suv.svg`); o novo `wagon.svg` foi removido do código-fonte. Publicado em homologação, com 227 testes aprovados, lint sem erros (46 avisos anteriores), build aprovado e arquivos publicados conferidos. A correspondência pelo tipo cadastrado continua ativa em todas as listagens. Produção inalterada.
+
+## Promoção integral para produção — 06/10/2026
+
+Após autorização expressa do usuário, todas as alterações desde a base `12150b1` da homologação isolada foram publicadas em **https://frota.sirel.com.br**, versão `503dc86`. Seis migrations aplicadas (0044–0049), com backups, ensaio em cópia restaurada e preservação das contagens existentes. Configurações próprias da produção mantidas; nenhum dado de homologação importado.
+
+Backend completo: 547 aprovados/19 ignorados; frontend final: 227 aprovados; lint sem erros/46 avisos anteriores; build específico de produção aprovado. Saúde, autenticação, headers e 24 arquivos publicados conferidos. `main` permanece inalterada, reservada para a próxima etapa.
+
+[Plano, resultados, backups e evidências da publicação](../PRODUCTION_RELEASE_20261006.md).
