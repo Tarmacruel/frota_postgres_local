@@ -1,8 +1,9 @@
 from __future__ import annotations
 
 from datetime import datetime, timedelta, timezone
+from inspect import signature
 from types import SimpleNamespace
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, Mock
 from uuid import uuid4
 
 import pytest
@@ -10,7 +11,7 @@ from fastapi import HTTPException
 from pydantic import ValidationError
 from sqlalchemy.exc import IntegrityError
 
-from app.api.deps import require_admin
+from app.api.routes.possession import update_possession, correct_possession_return_confirmation
 from app.models.user import UserRole
 from app.schemas.possession import PossessionAdminUpdate
 from app.services.document_signature_service import DocumentSignatureService
@@ -69,6 +70,8 @@ def _payload(record, **changes) -> PossessionAdminUpdate:
         "start_odometer_km": record.start_odometer_km,
         "end_odometer_km": record.end_odometer_km,
         "edit_reason": "Correção administrativa de teste",
+        "vehicle_condition_notes": "Sem avarias" if record.end_date else None,
+        "declaration_accepted": bool(record.end_date),
     }
     values.update(changes)
     return PossessionAdminUpdate(**values)
@@ -76,6 +79,7 @@ def _payload(record, **changes) -> PossessionAdminUpdate:
 
 def _service(record, monkeypatch):
     db = AsyncMock()
+    db.add = Mock()
     service = PossessionService(db)
     service.possessions.get_by_id = AsyncMock(return_value=record)
     service.possessions.get_by_id_for_update = AsyncMock(return_value=record)
@@ -188,8 +192,34 @@ async def test_admin_rectification_reports_database_conflict(monkeypatch):
 
 
 @pytest.mark.asyncio
-async def test_admin_rectification_requires_admin_permission():
-    with pytest.raises(HTTPException) as exc:
-        await require_admin(_user(UserRole.PRODUCAO))
+@pytest.mark.parametrize("endpoint", [update_possession, correct_possession_return_confirmation])
+@pytest.mark.parametrize("role", list(UserRole))
+@pytest.mark.parametrize("can_edit", [True, False, None])
+async def test_rectification_endpoint_permissions(endpoint, role, can_edit):
+    user = _user(role)
+    permission = None if can_edit is None else SimpleNamespace(
+        can_view=True, can_create=True, can_edit=can_edit, can_delete=False,
+    )
+    db = AsyncMock()
+    db.execute.return_value = SimpleNamespace(scalar_one_or_none=lambda: permission)
+    parameters = signature(endpoint).parameters
+    role_guard = parameters["current_user"].default.dependency
+    permission_guard = parameters["_permission"].default.dependency
 
-    assert exc.value.status_code == 403
+    async def authorize():
+        await role_guard(current_user=user)
+        await permission_guard(db=db, current_user=user)
+
+    if role in {UserRole.ADMIN, UserRole.PRODUCAO} and can_edit is not False:
+        await authorize()
+    else:
+        with pytest.raises(HTTPException) as exc:
+            await authorize()
+        assert exc.value.status_code == 403
+
+
+@pytest.fixture(autouse=True)
+def operational_attribution_collaborator(monkeypatch):
+    """These unit tests use fake sessions; temporal scope has PostgreSQL integration tests."""
+    from unittest.mock import AsyncMock
+    monkeypatch.setattr("app.services.possession_service.attribute_operation", AsyncMock())

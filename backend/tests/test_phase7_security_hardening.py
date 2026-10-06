@@ -5,8 +5,10 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from fastapi import HTTPException
 from pydantic import ValidationError
+from sqlalchemy.exc import SQLAlchemyError
 
 from app.core.config import Settings, settings
+from app import main as main_module
 from app.models.user import UserRole
 from app.repositories.search_repository import SearchRepository
 from app.services.possession_service import PossessionService
@@ -49,6 +51,14 @@ def test_production_configuration_accepts_explicit_https_baseline():
     assert configured.COOKIE_SECURE is True
 
 
+def test_settings_accepts_windows_utf8_bom(tmp_path, monkeypatch):
+    monkeypatch.delenv("DATABASE_URL", raising=False)
+    env_file = tmp_path / ".env"
+    env_file.write_text("DATABASE_URL=sqlite+aiosqlite:///./bom-regression.db\n", encoding="utf-8-sig")
+    configured = Settings(_env_file=env_file)
+    assert configured.DATABASE_URL == "sqlite+aiosqlite:///./bom-regression.db"
+
+
 @pytest.mark.asyncio
 async def test_security_headers_and_request_size_limit(client):
     health = await client.get("/api/health")
@@ -67,6 +77,28 @@ async def test_security_headers_and_request_size_limit(client):
     assert too_large.status_code == 413
     assert too_large.json()["code"] == "REQUEST_BODY_TOO_LARGE"
     assert too_large.headers["cache-control"] == "no-store"
+
+
+@pytest.mark.asyncio
+async def test_readiness_reports_database_state(client):
+    response = await client.get("/api/health/ready")
+
+    assert response.status_code == 200
+    assert response.json()["database"] == "ok"
+
+
+@pytest.mark.asyncio
+async def test_readiness_returns_503_when_database_is_unavailable(client, monkeypatch):
+    class UnavailableEngine:
+        def connect(self):
+            raise SQLAlchemyError("database unavailable")
+
+    monkeypatch.setattr(main_module, "engine", UnavailableEngine())
+
+    response = await client.get("/api/health/ready")
+
+    assert response.status_code == 503
+    assert response.json()["detail"] == "Banco de dados indisponível"
 
 
 def test_storage_resolution_blocks_absolute_and_parent_paths(tmp_path, monkeypatch):

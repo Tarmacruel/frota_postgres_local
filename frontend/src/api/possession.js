@@ -1,11 +1,13 @@
 import api from './client'
 
 export const possessionAPI = {
+  getOdometerSuggestion: (params) => api.get('/possession/odometer-suggestion', { params }),
   list: (params) => api.get('/possession', { params }),
   listPaginated: (params) => api.get('/possession/paginated', { params }),
   listActive: () => api.get('/possession/active'),
   create: (data) => api.post('/possession', data),
   update: (id, data) => api.put(`/possession/${id}`, data),
+  getRectificationContext: (id) => api.get(`/possession/${id}/rectification-context`),
   end: (id, data) => api.put(`/possession/${id}/end`, data),
   getReturnContext: (id) => api.get(`/possession/${id}/return-context`),
   listReturnConfirmations: (id) => api.get(`/possession/${id}/return-confirmations`),

@@ -1,5 +1,6 @@
 from app.models.admin_notification import AdminNotification
 from app.models.audit_log import AuditLog
+from app.models.justification_suggestion import JustificationSuggestion
 from app.models.claim import Claim, ClaimStatus, ClaimType
 from app.models.claim_attachment import ClaimAttachment
 from app.models.data_import import (
@@ -12,12 +13,25 @@ from app.models.data_import import (
 )
 from app.models.driver import Driver, DriverLicenseCategory
 from app.models.document_signature import (
+    CertificateSigningSession,
+    CertificateSigningSessionStatus,
     DigitalDocument,
+    DigitalDocumentArtifact,
+    DigitalDocumentArtifactType,
     DigitalDocumentStatus,
     DigitalDocumentType,
     DocumentSignature,
+    DocumentSignatureMethod,
     DocumentSignatureRequest,
     DocumentSignatureRequestStatus,
+    DocumentSignatureValidation,
+    DocumentSignatureValidationStatus,
+    HomologationSigningTarget,
+    SignatureAgentDevice,
+    SignatureAgentDeviceStatus,
+    SignatureAgentPairing,
+    SignatureAgentPairingStatus,
+    SignatureAgentRequestNonce,
 )
 from app.models.fine import Fine, FineInfraction, FineStatus
 from app.models.fuel_station import FuelStation, FuelStationUser
@@ -41,8 +55,10 @@ from app.models.payment_process import (
 )
 from app.models.user import User, UserRole
 from app.models.user_permission import UserPermission
+from app.models.user_feature_acknowledgement import UserFeatureAcknowledgement
 from app.models.user_report_preference import UserReportPreference
 from app.models.vehicle import Vehicle, VehicleOwnershipType, VehicleStatus, VehicleType
+from app.models.vehicle_loan import VehicleLoan, VehicleLoanEvent
 from app.models.location_history import LocationHistory
 from app.models.maintenance import MaintenanceRecord
 from app.models.possession import VehiclePossession
@@ -55,6 +71,9 @@ from app.models.possession_trip import (
 )
 
 __all__ = [
+    "JustificationSuggestion",
+    "VehicleLoan",
+    "VehicleLoanEvent",
     "AdminNotification",
     "AuditLog",
     "Claim",
@@ -69,12 +88,25 @@ __all__ = [
     "DataImportSuggestedAction",
     "Driver",
     "DriverLicenseCategory",
+    "CertificateSigningSession",
+    "CertificateSigningSessionStatus",
     "DigitalDocument",
+    "DigitalDocumentArtifact",
+    "DigitalDocumentArtifactType",
     "DigitalDocumentStatus",
     "DigitalDocumentType",
     "DocumentSignature",
+    "DocumentSignatureMethod",
     "DocumentSignatureRequest",
     "DocumentSignatureRequestStatus",
+    "DocumentSignatureValidation",
+    "DocumentSignatureValidationStatus",
+    "HomologationSigningTarget",
+    "SignatureAgentDevice",
+    "SignatureAgentDeviceStatus",
+    "SignatureAgentPairing",
+    "SignatureAgentPairingStatus",
+    "SignatureAgentRequestNonce",
     "Fine",
     "FineInfraction",
     "FineStatus",
@@ -102,6 +134,7 @@ __all__ = [
     "User",
     "UserRole",
     "UserPermission",
+    "UserFeatureAcknowledgement",
     "UserReportPreference",
     "Vehicle",
     "VehicleOwnershipType",

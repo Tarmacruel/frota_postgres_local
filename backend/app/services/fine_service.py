@@ -6,9 +6,11 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
+from app.services.operational_scope import attribute_operation, ensure_record_visible
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.organization_scope import production_scope_is_empty, scoped_organization_id
+from app.core.driver_registration import ensure_driver_registration
 from app.models.fine import Fine, FineInfraction, FineStatus
 from app.models.user import User
 from app.repositories.driver_repository import DriverRepository
@@ -56,25 +58,26 @@ class FineService:
         fine = await self.fines.get_by_id(fine_id)
         if not fine:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Multa não encontrada")
-        await self._ensure_vehicle_visible_to_user(fine.vehicle_id, current_user)
+        await ensure_record_visible(self.db, fine, current_user)
         return self._serialize(fine)
 
     async def create(self, data: FineCreate, current_user: User) -> dict:
         vehicle = await self.vehicles.get_by_id(data.vehicle_id)
         if not vehicle:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
-        await self._ensure_vehicle_visible_to_user(data.vehicle_id, current_user)
 
         infraction = await self._require_active_infraction(data.infraction_type_id)
         if data.driver_id:
             driver = await self.drivers.get_by_id(data.driver_id)
             if not driver:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
+            ensure_driver_registration(driver)
 
         payload = data.model_dump()
         payload["description"] = payload.get("description") or infraction.description
         fine = Fine(created_by=current_user.id, **payload)
         try:
+            await attribute_operation(self.db, fine, current_user, new=True)
             await self.fines.create(fine)
             await self.audit.record(
                 actor=current_user,
@@ -95,13 +98,16 @@ class FineService:
         if not fine:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Multa não encontrada")
 
-        await self._ensure_vehicle_visible_to_user(fine.vehicle_id, current_user)
+        await ensure_record_visible(self.db, fine, current_user)
+        await attribute_operation(self.db, fine, current_user)
 
         payload = data.model_dump(exclude_unset=True)
-        if "driver_id" in payload and payload["driver_id"]:
-            driver = await self.drivers.get_by_id(payload["driver_id"])
+        next_driver_id = payload.get("driver_id", fine.driver_id)
+        if next_driver_id:
+            driver = await self.drivers.get_by_id(next_driver_id)
             if not driver:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
+            ensure_driver_registration(driver)
         if "infraction_type_id" in payload and payload["infraction_type_id"]:
             infraction = await self._require_active_infraction(payload["infraction_type_id"])
             payload["description"] = payload.get("description") or infraction.description
@@ -109,6 +115,7 @@ class FineService:
         before = self._serialize(fine)
         for field, value in payload.items():
             setattr(fine, field, value)
+        await attribute_operation(self.db, fine, current_user)
 
         try:
             await self.audit.record(
@@ -198,8 +205,11 @@ class FineService:
     def _serialize(self, fine: Fine) -> dict:
         return {
             "id": fine.id,
+            "vehicle_loan_id": getattr(fine, "vehicle_loan_id", None),
+            "responsible_organization_id": getattr(fine, "responsible_organization_id", None),
             "vehicle_id": fine.vehicle_id,
             "vehicle_plate": fine.vehicle.plate if fine.vehicle else "",
+            "vehicle_type": getattr(fine.vehicle, "vehicle_type", None),
             "driver_id": fine.driver_id,
             "driver_name": fine.driver.nome_completo if fine.driver else None,
             "infraction_type_id": fine.infraction_type_id,

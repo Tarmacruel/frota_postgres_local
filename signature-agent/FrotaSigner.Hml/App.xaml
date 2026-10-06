@@ -1,0 +1,9 @@
+<Application x:Class="FrotaSigner.Hml.App"
+             xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+             xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+             ShutdownMode="OnMainWindowClose">
+  <Application.Resources>
+    <SolidColorBrush x:Key="NavyBrush" Color="#16324F" />
+    <SolidColorBrush x:Key="AmberBrush" Color="#F3A712" />
+  </Application.Resources>
+</Application>

@@ -347,6 +347,7 @@ export default function PossessionReportBuilder({ vehicles = EMPTY_VEHICLES, ini
               <div className="report-driver-filter">
                 <span>Condutor</span>
                 <DriverSelect
+                  requireRegistration={false}
                   value={filters.driver_id}
                   onChange={(driver) => setFilters({ ...filters, driver_id: driver?.id || '' })}
                   placeholder="Todos os condutores"
@@ -396,7 +397,7 @@ export default function PossessionReportBuilder({ vehicles = EMPTY_VEHICLES, ini
                   maxLength={100}
                   value={filters.search}
                   onChange={(event) => setFilters({ ...filters, search: event.target.value })}
-                  placeholder={metadata?.can_export_xlsx ? 'Placa, condutor, finalidade ou destino' : 'Placa ou número da posse'}
+                  placeholder={metadata?.can_export_xlsx ? 'Placa, condutor, matrícula, finalidade ou destino' : 'Placa ou número da posse'}
                 />
               </label>
             </div>

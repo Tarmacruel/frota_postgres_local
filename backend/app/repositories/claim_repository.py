@@ -1,10 +1,13 @@
 from __future__ import annotations
 
+from datetime import time
 from uuid import UUID
 from sqlalchemy import func, or_, select
+from app.repositories.vehicle_scope import record_visible
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 from app.models.claim import Claim, ClaimStatus, ClaimType
+from app.models.driver import Driver
 from app.models.location_history import LocationHistory
 from app.models.master_data import Allocation, Department
 
@@ -52,20 +55,9 @@ class ClaimRepository:
             stmt = stmt.where(Claim.vehicle_id == vehicle_id)
             count_stmt = count_stmt.where(Claim.vehicle_id == vehicle_id)
         if organization_id:
-            stmt = (
-                stmt
-                .join(LocationHistory, (LocationHistory.vehicle_id == Claim.vehicle_id) & LocationHistory.end_date.is_(None))
-                .join(Allocation, Allocation.id == LocationHistory.allocation_id)
-                .join(Department, Department.id == Allocation.department_id)
-                .where(Department.organization_id == organization_id)
-            )
-            count_stmt = (
-                count_stmt
-                .join(LocationHistory, (LocationHistory.vehicle_id == Claim.vehicle_id) & LocationHistory.end_date.is_(None))
-                .join(Allocation, Allocation.id == LocationHistory.allocation_id)
-                .join(Department, Department.id == Allocation.department_id)
-                .where(Department.organization_id == organization_id)
-            )
+            predicate = record_visible(Claim.vehicle_id, Claim.data_ocorrencia, organization_id)
+            stmt = stmt.where(predicate)
+            count_stmt = count_stmt.where(predicate)
         if status:
             stmt = stmt.where(Claim.status == status)
             count_stmt = count_stmt.where(Claim.status == status)
@@ -78,6 +70,7 @@ class ClaimRepository:
                 Claim.descricao.ilike(term),
                 Claim.local.ilike(term),
                 Claim.boletim_ocorrencia.ilike(term),
+                Claim.driver.has(Driver.matricula.ilike(term)),
             )
             stmt = stmt.where(filter_clause)
             count_stmt = count_stmt.where(filter_clause)

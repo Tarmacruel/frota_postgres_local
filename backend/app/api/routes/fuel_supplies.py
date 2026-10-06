@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from datetime import datetime
 from uuid import UUID
-from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
+from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse
 from pydantic import ValidationError
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.datastructures import UploadFile as StarletteUploadFile
 from app.api.deps import require_permission
 from app.db.session import get_db_session
 from app.models.user import User
@@ -125,14 +126,52 @@ async def get_fuel_supply(
     return await FuelSupplyService(db).get(supply_id, current_user=current_user)
 
 
-@router.patch("/{supply_id}", response_model=FuelSupplyOut)
+async def parse_rectify_request(request: Request):
+    """Keep JSON corrections compatible; multipart carries JSON data plus a receipt."""
+    if request.headers.get("content-type", "").lower().startswith("multipart/form-data"):
+        async with request.form() as form:
+            data = form.get("payload")
+            receipt = form.get("receipt")
+            if not isinstance(data, str):
+                raise HTTPException(422, "Dados da retificação são obrigatórios")
+            if receipt is not None and not isinstance(receipt, StarletteUploadFile):
+                raise HTTPException(422, "Comprovante deve ser um arquivo")
+            try:
+                payload = FuelSupplyRectify.model_validate_json(data)
+            except ValidationError as exc:
+                raise RequestValidationError(exc.errors()) from exc
+            yield payload, receipt
+    else:
+        try:
+            data = await request.json()
+        except ValueError as exc:
+            raise HTTPException(422, "Dados da retificação inválidos") from exc
+        try:
+            payload = FuelSupplyRectify.model_validate(data)
+        except ValidationError as exc:
+            raise RequestValidationError(exc.errors()) from exc
+        yield payload, None
+
+
+@router.patch("/{supply_id}", response_model=FuelSupplyOut, openapi_extra={
+    "requestBody": {"required": True, "content": {
+        "application/json": {"schema": FuelSupplyRectify.model_json_schema()},
+        "multipart/form-data": {"schema": {
+            "type": "object", "required": ["payload"], "properties": {
+                "payload": {"type": "string", "description": "Dados de FuelSupplyRectify em JSON"},
+                "receipt": {"type": "string", "format": "binary"},
+            },
+        }},
+    }},
+})
 async def rectify_fuel_supply(
     supply_id: UUID,
-    payload: FuelSupplyRectify,
+    correction: tuple[FuelSupplyRectify, UploadFile | None] = Depends(parse_rectify_request),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("fuel_supplies", "edit")),
 ):
-    return await FuelSupplyService(db).rectify(supply_id, payload, current_user)
+    payload, receipt = correction
+    return await FuelSupplyService(db).rectify(supply_id, payload, current_user, receipt=receipt)
 
 
 @router.get("/{supply_id}/receipt")

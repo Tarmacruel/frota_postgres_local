@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 from sqlalchemy import func, select
+from app.repositories.vehicle_scope import record_visible
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.models.location_history import LocationHistory
@@ -95,16 +96,7 @@ class MaintenanceRepository:
         return items, total
 
     def _filter_by_active_organization(self, stmt, organization_id: UUID):
-        return (
-            stmt
-            .join(LocationHistory, LocationHistory.vehicle_id == MaintenanceRecord.vehicle_id)
-            .join(Allocation, Allocation.id == LocationHistory.allocation_id)
-            .join(Department, Department.id == Allocation.department_id)
-            .where(
-                LocationHistory.end_date.is_(None),
-                Department.organization_id == organization_id,
-            )
-        )
+        return stmt.where(record_visible(MaintenanceRecord.vehicle_id, MaintenanceRecord.start_date, organization_id))
 
     async def create(self, record: MaintenanceRecord) -> MaintenanceRecord:
         self.db.add(record)

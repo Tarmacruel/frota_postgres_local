@@ -1,0 +1,281 @@
+{
+  "fuel_supply": [
+    {
+      "id": "amount",
+      "label": "Litros ou valor",
+      "text": "Correção da quantidade abastecida ou do valor lançado."
+    },
+    {
+      "id": "odometer",
+      "label": "Odômetro",
+      "text": "Correção do odômetro informado incorretamente no lançamento do abastecimento."
+    },
+    {
+      "id": "receipt",
+      "label": "Comprovante",
+      "text": "Substituição do comprovante anexado incorretamente pelo documento correspondente ao abastecimento."
+    },
+    {
+      "id": "date",
+      "label": "Data e hora",
+      "text": "Correção da data e hora do abastecimento informadas incorretamente no lançamento."
+    },
+    {
+      "id": "fuel",
+      "label": "Combustível ou aditivo",
+      "text": "Correção da identificação do combustível ou dos dados do aditivo."
+    },
+    {
+      "id": "notes",
+      "label": "Observações",
+      "text": "Correção das observações do abastecimento para esclarecer as informações do lançamento."
+    }
+  ],
+  "possession": [
+    {
+      "id": "dates",
+      "label": "Datas da posse",
+      "text": "Correção das datas ou horários de entrega e devolução informados incorretamente no lançamento da posse."
+    },
+    {
+      "id": "odometer",
+      "label": "Odômetros",
+      "text": "Correção dos odômetros de entrega ou devolução informados incorretamente no lançamento da posse."
+    },
+    {
+      "id": "driver",
+      "label": "Dados do condutor",
+      "text": "Correção dos dados do condutor vinculados ao registro da posse."
+    },
+    {
+      "id": "documents",
+      "label": "Documentos ou fotos",
+      "text": "Correção dos documentos ou fotos vinculados à posse para corresponderem à entrega ou devolução registrada."
+    },
+    {
+      "id": "condition",
+      "label": "Condições do veículo",
+      "text": "Correção da descrição das condições do veículo na devolução."
+    },
+    {
+      "id": "notes",
+      "label": "Observações",
+      "text": "Correção das observações da posse para esclarecer as informações do lançamento."
+    }
+  ],
+  "vehicle_edit": [
+    {
+      "id": "identity",
+      "label": "Identificação do veículo",
+      "text": "Correção de dados de identificação do veículo preenchidos incorretamente no cadastro."
+    },
+    {
+      "id": "allocation",
+      "label": "Lotação",
+      "text": "Correção da lotação cadastrada para refletir a vinculação administrativa do veículo."
+    },
+    {
+      "id": "status",
+      "label": "Situação do veículo",
+      "text": "Atualização da situação do veículo."
+    },
+    {
+      "id": "ownership",
+      "label": "Tipo de propriedade",
+      "text": "Correção do tipo de propriedade informado no cadastro do veículo."
+    }
+  ],
+  "loan_proposal": [
+    {
+      "id": "destination",
+      "label": "Secretaria ou lotação",
+      "text": "Retificação da secretaria recebedora ou da lotação de destino da proposta."
+    },
+    {
+      "id": "delivery",
+      "label": "Dados de entrega",
+      "text": "Retificação do odômetro ou das condições de entrega informados incorretamente na proposta de empréstimo."
+    },
+    {
+      "id": "deadline",
+      "label": "Previsão de devolução",
+      "text": "Retificação da previsão de devolução para corresponder ao período previsto para o empréstimo."
+    },
+    {
+      "id": "reason",
+      "label": "Motivo do empréstimo",
+      "text": "Retificação do motivo da proposta para esclarecer a finalidade do empréstimo entre secretarias."
+    }
+  ],
+  "order_reopen": [
+    {
+      "id": "confirmation",
+      "label": "Concluir confirmação",
+      "text": "Reabertura do prazo para concluir a confirmação do abastecimento e anexar o comprovante correspondente."
+    },
+    {
+      "id": "schedule",
+      "label": "Reprogramação",
+      "text": "Reabertura da ordem em razão da reprogramação do abastecimento do veículo."
+    },
+    {
+      "id": "deadline",
+      "label": "Prazo insuficiente",
+      "text": "Reabertura da ordem porque o prazo anterior foi insuficiente para concluir o atendimento."
+    }
+  ],
+  "order_extend": [
+    {
+      "id": "schedule",
+      "label": "Reprogramação",
+      "text": "Prorrogação do prazo em razão da reprogramação do abastecimento do veículo."
+    },
+    {
+      "id": "confirmation",
+      "label": "Concluir confirmação",
+      "text": "Prorrogação do prazo para concluir a confirmação do abastecimento e anexar o comprovante correspondente."
+    },
+    {
+      "id": "deadline",
+      "label": "Prazo insuficiente",
+      "text": "Prorrogação da ordem porque o prazo previsto é insuficiente para concluir o atendimento."
+    }
+  ],
+  "possession_replace": [
+    {
+      "id": "responsible",
+      "label": "Troca de responsável",
+      "text": "Substituição da posse em razão da troca do responsável pelo veículo."
+    }
+  ],
+  "possession_return": [
+    {
+      "id": "odometer",
+      "label": "Odômetro de devolução",
+      "text": "Correção da quilometragem informada incorretamente na devolução."
+    },
+    {
+      "id": "date",
+      "label": "Data de devolução",
+      "text": "Correção da data de devolução informada incorretamente no lançamento."
+    }
+  ],
+  "trip_cancel": [
+    {
+      "id": "duplicate",
+      "label": "Rota duplicada",
+      "text": "Cancelamento de rota cadastrada em duplicidade."
+    },
+    {
+      "id": "schedule",
+      "label": "Viagem cancelada",
+      "text": "Cancelamento da rota porque a viagem prevista não será realizada."
+    }
+  ],
+  "order_cancel": [
+    {
+      "id": "duplicate",
+      "label": "Ordem duplicada",
+      "text": "Cancelamento de ordem de abastecimento cadastrada em duplicidade."
+    },
+    {
+      "id": "schedule",
+      "label": "Abastecimento cancelado",
+      "text": "Cancelamento da ordem porque o abastecimento previsto não será realizado."
+    }
+  ],
+  "claim_close": [
+    {
+      "id": "no_cost",
+      "label": "Sem custo de reparo",
+      "text": "Encerramento do sinistro sem necessidade de despesa de reparo."
+    },
+    {
+      "id": "finished",
+      "label": "Tratamento concluído",
+      "text": "Encerramento do sinistro após conclusão das providências relacionadas ao registro."
+    }
+  ],
+  "payment_delete": [
+    {
+      "id": "duplicate",
+      "label": "Processo duplicado",
+      "text": "Exclusão de processo de pagamento cadastrado em duplicidade."
+    },
+    {
+      "id": "incorrect",
+      "label": "Cadastro indevido",
+      "text": "Exclusão de processo de pagamento cadastrado indevidamente."
+    }
+  ],
+  "loan_create": [
+    {
+      "id": "representation",
+      "label": "Registro administrativo",
+      "text": "Registro administrativo da proposta de empréstimo em representação da secretaria de origem."
+    }
+  ],
+  "loan_regularization": [
+    {
+      "id": "legacy",
+      "label": "Registro anterior",
+      "text": "Inclusão administrativa de empréstimo anterior à implantação deste fluxo no sistema."
+    }
+  ],
+  "loan_submit": [
+    {
+      "id": "representation",
+      "label": "Envio administrativo",
+      "text": "Envio administrativo da proposta em representação da secretaria de origem."
+    }
+  ],
+  "loan_accept": [
+    {
+      "id": "representation",
+      "label": "Recebimento administrativo",
+      "text": "Registro administrativo do recebimento em representação da secretaria recebedora."
+    }
+  ],
+  "loan_reject": [
+    {
+      "id": "unsuitable",
+      "label": "Veículo inadequado",
+      "text": "Rejeição da proposta porque o veículo não atende à necessidade da secretaria recebedora."
+    }
+  ],
+  "loan_cancel": [
+    {
+      "id": "no_need",
+      "label": "Necessidade encerrada",
+      "text": "Cancelamento da proposta porque o empréstimo deixou de ser necessário."
+    }
+  ],
+  "loan_request-return": [
+    {
+      "id": "finished",
+      "label": "Uso concluído",
+      "text": "Solicitação de devolução porque o uso do veículo pela secretaria foi concluído."
+    }
+  ],
+  "loan_accept-return": [
+    {
+      "id": "representation",
+      "label": "Devolução administrativa",
+      "text": "Registro administrativo da devolução em representação da secretaria de origem."
+    }
+  ],
+  "loan_reject-return": [
+    {
+      "id": "incorrect",
+      "label": "Dados divergentes",
+      "text": "Rejeição da devolução por divergência nos dados informados na solicitação."
+    }
+  ],
+  "loan_cancel-return": [
+    {
+      "id": "continued",
+      "label": "Continuidade do uso",
+      "text": "Retirada da solicitação de devolução em razão da continuidade do uso do veículo."
+    }
+  ]
+}

@@ -13,6 +13,8 @@ from uuid import UUID
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy import Text, cast, func, or_, select
 from sqlalchemy.exc import IntegrityError
+from app.services.operational_scope import attribute_operation, ensure_registration_manager
+from app.core.vehicle_handoff import lock_vehicle_handoff, prevent_loan_location_bypass
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -565,6 +567,10 @@ class DataImportService:
         }
         official_extra = {key: value for key, value in official_extra.items() if value is not None}
         triage_extra = {column: raw.get(column) for column in DRIVER_TRIAGE_EXTRA_COLUMNS if self._present(raw.get(column))}
+        if not official_extra.get("matricula"):
+            errors.append("Campo obrigatório ausente: matricula")
+        elif len(official_extra["matricula"]) > 30:
+            errors.append("Matrícula deve ter no máximo 30 caracteres")
         return mapped, official_extra, triage_extra, errors, conflicts
 
     def _map_fine(self, raw: dict, key_counts: dict, context: dict) -> tuple[dict, dict, dict, list[str], list[str]]:
@@ -670,11 +676,14 @@ class DataImportService:
                 ownership_type=VehicleOwnershipType(data["ownership_type"]),
                 status=VehicleStatus(data["status"]),
             )
+            vehicle.owner_organization_id = await self.db.scalar(select(Department.organization_id).join(Allocation, Allocation.department_id == Department.id).where(Allocation.id == allocation_id))
             self._assign_vehicle_extra(vehicle, data)
             self.db.add(vehicle)
             await self.db.flush()
             self.db.add(LocationHistory(vehicle_id=vehicle.id, allocation_id=allocation_id, department="Importação de dados"))
         else:
+            await lock_vehicle_handoff(self.db, vehicle.id)
+            await ensure_registration_manager(self.db, vehicle.id, current_user)
             for field in ("plate", "chassis_number", "brand", "model"):
                 if data.get(field):
                     setattr(vehicle, field, data[field])
@@ -684,6 +693,7 @@ class DataImportService:
             self._assign_vehicle_extra(vehicle, data)
             active = await self._get_active_vehicle_history(vehicle.id)
             if not active or active.allocation_id != allocation_id:
+                await prevent_loan_location_bypass(self.db, vehicle.id)
                 if active:
                     active.end_date = datetime.now(timezone.utc)
                 self.db.add(LocationHistory(vehicle_id=vehicle.id, allocation_id=allocation_id, department="Importação de dados"))
@@ -759,6 +769,7 @@ class DataImportService:
             for field, value in payload.items():
                 setattr(fine, field, value)
 
+        await attribute_operation(self.db, fine, current_user, new=action == "CREATE")
         await self.db.flush()
         await self.audit.record(
             actor=current_user,
@@ -797,7 +808,9 @@ class DataImportService:
         for field in DRIVER_OFFICIAL_EXTRA_FIELDS:
             if field not in data:
                 continue
-            if field in {"data_nascimento", "data_emissao_cnh"}:
+            if field == "matricula":
+                payload[field] = str(data[field] or "").strip()
+            elif field in {"data_nascimento", "data_emissao_cnh"}:
                 payload[field] = self._date_from_iso(data[field])
             elif field == "ultimo_abastecimento":
                 payload[field] = self._datetime_from_iso(data[field])
@@ -810,8 +823,11 @@ class DataImportService:
             required = ("plate", "brand", "model", "vehicle_type", "ownership_type", "status", "allocation_id")
             return [f"Campo obrigatório ausente: {field}" for field in required if not data.get(field)]
         if entity_type == DataImportEntityType.DRIVER:
-            required = ("nome_completo", "documento", "organization_id", "cnh_categoria")
-            return [f"Campo obrigatório ausente: {field}" for field in required if not data.get(field)]
+            required = ("nome_completo", "documento", "organization_id", "cnh_categoria", "matricula")
+            errors = [f"Campo obrigatório ausente: {field}" for field in required if not str(data.get(field) or "").strip()]
+            if len(str(data.get("matricula") or "").strip()) > 30:
+                errors.append("Matrícula deve ter no máximo 30 caracteres")
+            return errors
         errors = [f"Campo obrigatório ausente: {field}" for field in ("ticket_number", "infraction_date", "amount") if not data.get(field)]
         if not data.get("vehicle_id") and not data.get("provisional_vehicle"):
             errors.append("Campo obrigatório ausente: vehicle_id")

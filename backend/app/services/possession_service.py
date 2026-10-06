@@ -9,10 +9,13 @@ from zipfile import BadZipFile, ZipFile
 from fastapi import HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select
+from app.services.operational_scope import attribute_operation, ensure_record_visible
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.config import settings
+from app.core.driver_registration import ensure_driver_registration
 from app.core.organization_scope import production_scope_is_empty, scoped_organization_id
-from app.models.possession import VehiclePossession
+from app.models.possession import VehiclePossession, PossessionRevision
 from app.models.possession_photo import VehiclePossessionPhoto
 from app.models.possession_trip import VehiclePossessionTripStatus
 from app.models.user import User, UserRole
@@ -131,8 +134,18 @@ class PossessionService:
     async def list_active(self, current_user: User | None = None) -> list[dict]:
         return await self.list(active=True, current_user=current_user)
 
-    async def get_current_driver(self, vehicle_id: UUID, current_user: User | None = None) -> dict:
+    async def get_odometer_suggestion(
+        self, vehicle_id: UUID, start_date: datetime, current_user: User,
+    ) -> dict | None:
         await self._ensure_vehicle_exists(vehicle_id, current_user=current_user)
+        return await self.possessions.get_odometer_suggestion(vehicle_id, start_date)
+
+    async def get_current_driver(self, vehicle_id: UUID, current_user: User | None = None) -> dict:
+        organization_id = scoped_organization_id(current_user)
+        if production_scope_is_empty(current_user) or (
+            organization_id is not None and not await self.vehicles.is_vehicle_visible(vehicle_id, organization_id)
+        ):
+            raise HTTPException(404, "Veículo não encontrado")
         record = await self.possessions.get_active_by_vehicle(vehicle_id)
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Nenhum condutor ativo encontrado para este veículo")
@@ -190,6 +203,8 @@ class PossessionService:
         try:
             if not await self.possessions.lock_vehicle(data.vehicle_id):
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
+            # A handoff may have committed while this request waited for the lock.
+            await self._ensure_vehicle_visible_to_user(data.vehicle_id, current_user)
             current_active = await self.possessions.get_active_by_vehicle(data.vehicle_id, for_update=True)
             normalized_reason = replacement_reason.strip() if replacement_reason else None
             pending_admin_notification_payload: dict | None = None
@@ -236,6 +251,7 @@ class PossessionService:
 
                 previous_end_odometer = current_active.end_odometer_km
                 current_active.end_date = effective_start
+                current_active.revision = (getattr(current_active, 'revision', None) or 1) + 1
                 if current_active.end_odometer_km is None and data.start_odometer_km is not None:
                     current_active.end_odometer_km = data.start_odometer_km
                 if previous_end_odometer is not None and data.start_odometer_km is not None:
@@ -250,6 +266,7 @@ class PossessionService:
                             "replaced_at": effective_start.isoformat(),
                         }
 
+            await attribute_operation(self.db, possession, current_user, new=True)
             await self.possessions.create(possession)
 
             if initial_trip is not None:
@@ -305,6 +322,8 @@ class PossessionService:
                         "replacement_reason": normalized_reason,
                         "previous_ended_at": effective_start.isoformat(),
                     },
+                    suggestion_context="possession_replace",
+                    suggestion_text=normalized_reason,
                 )
             if pending_admin_notification_payload:
                 await self.admin_notifications.notify(
@@ -402,6 +421,7 @@ class PossessionService:
             )
 
         possession.end_date = effective_end
+        possession.revision = (getattr(possession, 'revision', None) or 1) + 1
         if "observation" in payload:
             possession.observation = payload["observation"]
         if "end_odometer_km" in payload:
@@ -468,6 +488,24 @@ class PossessionService:
 
         return await self._get_by_id(possession.id, current_user)
 
+    async def rectification_context(self, possession_id, current_user):
+        from app.services.possession_return_service import PossessionReturnService
+        record = await self.possessions.get_by_id(possession_id)
+        if record is None:
+            raise HTTPException(404, 'Registro de posse não encontrado')
+        await self._ensure_possession_visible_to_user(record, current_user)
+        await self.possessions.lock_vehicle(record.vehicle_id)
+        record = await self.possessions.get_by_id(possession_id, populate_existing=True)
+        history = (await self.db.scalars(select(PossessionRevision).where(PossessionRevision.possession_id == possession_id)
+            .order_by(PossessionRevision.version.desc()))).all()
+        def public_snapshot(value):
+            return {key: item for key, item in value.items() if not key.endswith('_path')}
+        return {'possession': await self._serialize_with_signatures(record, can_view_location=self._can_view_location(current_user),
+                    can_view_personal_data=self._can_view_personal_data(current_user), current_user=current_user),
+                'return_context': await PossessionReturnService(self.db).get_context(possession_id, current_user),
+                'revisions': [{'version': row.version, 'actor_name': row.actor_name, 'reason': row.reason,
+                    'created_at': row.created_at, 'before': public_snapshot(row.before), 'after': public_snapshot(row.after)} for row in history]}
+
     async def admin_update(
         self,
         possession_id: UUID,
@@ -489,6 +527,13 @@ class PossessionService:
         possession = await self.possessions.get_by_id_for_update(possession_id)
         if not possession:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
+        current_revision = getattr(possession, 'revision', None) or 1
+        if data.expected_revision is not None and data.expected_revision != current_revision:
+            raise HTTPException(409, detail={'code': 'POSSESSION_REVISION_CONFLICT',
+                'message': 'A posse foi alterada após a abertura da tela. Recarregue a retificação e revise os dados.'})
+        for instant in (data.start_date, data.end_date):
+            if instant is not None and (instant.tzinfo is None or instant.utcoffset() is None):
+                raise HTTPException(422, 'Informe datas com fuso horário.')
         if return_term_document is not None:
             await self.db.rollback()
             raise HTTPException(
@@ -508,22 +553,18 @@ class PossessionService:
                     "message": "Use o encerramento com declaração autenticada para finalizar uma posse ativa.",
                 },
             )
-        if current_confirmation and (
-            data.end_date != possession.end_date
-            or data.end_odometer_km != possession.end_odometer_km
-        ):
-            await self.db.rollback()
-            raise HTTPException(
-                status_code=status.HTTP_409_CONFLICT,
-                detail={
-                    "code": "RETURN_CONFIRMATION_CORRECTION_REQUIRED",
-                    "message": "Data ou hodômetro de devolução com confirmação exigem correção administrativa versionada.",
-                },
-            )
+        if possession.end_date is not None and data.end_date is None:
+            raise HTTPException(409, 'Uma posse encerrada não pode ser reaberta por retificação. Corrija as datas mantendo a devolução.')
+        if data.end_date is not None and (data.end_odometer_km is None or not data.vehicle_condition_notes
+                or not data.vehicle_condition_notes.strip() or not data.declaration_accepted):
+            raise HTTPException(422, 'Informe o odômetro final, as condições do veículo e confirme a declaração da retificação.')
+        if data.end_odometer_km is not None and data.start_odometer_km is not None and data.end_odometer_km < data.start_odometer_km:
+            raise HTTPException(422, 'O odômetro final não pode ser inferior ao inicial.')
         if data.end_date is not None and data.end_date < data.start_date:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data final não pode ser anterior ao início da posse")
 
         existing_trips = await self.trips.list_by_possession(possession_id)
+        existing_trips = [trip for trip in existing_trips if trip.status != VehiclePossessionTripStatus.CANCELADA]
         if data.end_date is not None and any(
             trip.status == VehiclePossessionTripStatus.EM_ANDAMENTO for trip in existing_trips
         ):
@@ -552,6 +593,12 @@ class PossessionService:
                 },
             )
 
+        for trip in existing_trips:
+            if data.start_odometer_km is not None and trip.start_odometer_km is not None and data.start_odometer_km > trip.start_odometer_km:
+                raise HTTPException(409, 'O odômetro inicial não pode superar o início de uma rota registrada.')
+            if data.end_odometer_km is not None and trip.end_odometer_km is not None and data.end_odometer_km < trip.end_odometer_km:
+                raise HTTPException(409, 'O odômetro final não pode ser inferior ao retorno de uma rota registrada.')
+
         selected_driver = await self._resolve_driver_snapshot(
             driver_id=data.driver_id,
             fallback_name=data.driver_name,
@@ -573,6 +620,11 @@ class PossessionService:
         photo_payloads = await self._read_and_validate_admin_photos(new_photos or [], new_photo_metadata or [])
         existing_entries = self._serialize_photo_entries(possession, can_view_location=self._can_view_location(current_user))
         before = {
+            "revision": current_revision,
+            "document_path": possession.document_path,
+            "return_document_path": possession.return_document_path,
+            "vehicle_condition_notes": current_confirmation.vehicle_condition_notes if current_confirmation else None,
+            "return_confirmation_version": current_confirmation.version if current_confirmation else None,
             "driver_id": str(possession.driver_id) if possession.driver_id else None,
             "driver_name": possession.driver_name,
             "driver_document": possession.driver_document,
@@ -597,15 +649,18 @@ class PossessionService:
         possession.observation = data.observation
         possession.start_odometer_km = data.start_odometer_km
         possession.end_odometer_km = data.end_odometer_km
+        await attribute_operation(self.db, possession, current_user)
 
-        old_document_path = self._resolve_document_path(possession.document_path) if possession.document_path else None
-        old_document_path_str = possession.document_path
-        old_return_document_path = self._resolve_document_path(possession.return_document_path) if possession.return_document_path else None
-        old_return_document_path_str = possession.return_document_path
         stored_loan_term_path: Path | None = None
         stored_return_term_path: Path | None = None
         stored_photo_paths: list[Path] = []
         try:
+            new_confirmation = None
+            if data.end_date is not None:
+                from app.services.possession_return_service import PossessionReturnService
+                new_confirmation = await PossessionReturnService(self.db).stage_rectification(
+                    possession, current_confirmation, notes=' '.join(data.vehicle_condition_notes.split()),
+                    reason=data.edit_reason, user=current_user)
             if loan_term_payload:
                 relative_document_path, stored_loan_term_path = self._build_document_storage_paths(
                     possession.id,
@@ -660,6 +715,11 @@ class PossessionService:
             )
 
             after = {
+                "revision": current_revision + 1,
+                "document_path": possession.document_path,
+                "return_document_path": possession.return_document_path,
+                "vehicle_condition_notes": new_confirmation.vehicle_condition_notes if new_confirmation else None,
+                "return_confirmation_version": new_confirmation.version if new_confirmation else None,
                 "driver_id": str(possession.driver_id) if possession.driver_id else None,
                 "driver_name": possession.driver_name,
                 "driver_document": possession.driver_document,
@@ -676,6 +736,10 @@ class PossessionService:
                 "photo_count": len(existing_entries) + len(photo_payloads),
             }
 
+            possession.revision = current_revision + 1
+            self.db.add(PossessionRevision(possession_id=possession.id, version=possession.revision,
+                actor_user_id=current_user.id, actor_name=current_user.name, reason=data.edit_reason,
+                before=before, after=after))
             await self.audit.record(
                 actor=current_user,
                 action="UPDATE",
@@ -692,6 +756,8 @@ class PossessionService:
                     "document_replaced": bool(loan_term_payload),
                     "added_photo_count": len(photo_payloads),
                 },
+                suggestion_context="possession",
+                suggestion_text=data.edit_reason,
             )
             await self.db.flush()
             await self.db.commit()
@@ -723,10 +789,7 @@ class PossessionService:
             self._cleanup_files(stored_photo_paths)
             raise
 
-        if loan_term_payload and old_document_path and old_document_path_str != possession.document_path:
-            self._cleanup_file(old_document_path)
-        if return_term_payload and old_return_document_path and old_return_document_path_str != possession.return_document_path:
-            self._cleanup_file(old_return_document_path)
+        # Prior attachments remain stored and referenced by immutable revisions.
 
         return await self._get_by_id(possession.id, current_user)
 
@@ -869,7 +932,7 @@ class PossessionService:
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
         await self._ensure_possession_visible_to_user(record, current_user)
-        await self.db.refresh(record, attribute_names=["vehicle", "photos"])
+        await self.db.refresh(record, attribute_names=["vehicle", "photos", "return_confirmations"])
         return await self._serialize_with_signatures(
             record,
             can_view_location=self._can_view_location(current_user),
@@ -894,7 +957,7 @@ class PossessionService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
     async def _ensure_possession_visible_to_user(self, possession: VehiclePossession, current_user: User | None) -> None:
-        await self._ensure_vehicle_visible_to_user(possession.vehicle_id, current_user)
+        await ensure_record_visible(self.db, possession, current_user)
 
     async def _resolve_driver_snapshot(
         self,
@@ -918,6 +981,7 @@ class PossessionService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor selecionado não encontrado")
         if not driver.ativo:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Condutor selecionado está inativo")
+        ensure_driver_registration(driver)
 
         return {
             "driver_id": driver.id,
@@ -1108,7 +1172,7 @@ class PossessionService:
     def _build_document_storage_paths(self, possession_id: UUID, document_mime_type: str, *, document_kind: str = "loan") -> tuple[str, Path]:
         extension = DOCUMENT_EXTENSIONS[document_mime_type]
         suffix = "" if document_kind == "loan" else f"-{document_kind}"
-        relative_path = Path("possession_documents") / f"{possession_id}{suffix}{extension}"
+        relative_path = Path("possession_documents") / f"{possession_id}{suffix}-{uuid4().hex}{extension}"
         absolute_path = Path(settings.STORAGE_DIR) / relative_path
         return relative_path.as_posix(), absolute_path
 
@@ -1175,7 +1239,7 @@ class PossessionService:
         far_future = datetime.max.replace(tzinfo=timezone.utc)
         effective_end_a = end_a or far_future
         effective_end_b = end_b or far_future
-        return start_a <= effective_end_b and start_b <= effective_end_a
+        return start_a < effective_end_b and start_b < effective_end_a
 
     def _sanitize_document_name(self, original_filename: str) -> str:
         normalized = sub(r"[^A-Za-z0-9._-]+", "-", original_filename.strip())
@@ -1223,17 +1287,23 @@ class PossessionService:
         loan_term_url = f"/api/possession/{record.id}/documents/loan-term" if record.document_path and can_view_personal_data else None
         return_term_url = f"/api/possession/{record.id}/documents/return-term" if record.return_document_path and can_view_personal_data else None
         current_confirmation = next((item for item in getattr(record, "return_confirmations", []) if item.is_current), None)
+        driver = getattr(record, "driver", None) if can_view_personal_data else None
 
         return {
             "id": record.id,
+            "revision": getattr(record, 'revision', None) or 1,
+            "vehicle_loan_id": getattr(record, "vehicle_loan_id", None),
+            "responsible_organization_id": getattr(record, "responsible_organization_id", None),
             "public_number": record.public_number,
             "vehicle_id": record.vehicle_id,
             "vehicle_plate": record.vehicle.plate if record.vehicle else "",
+            "vehicle_type": getattr(record.vehicle, "vehicle_type", None),
             "vehicle_brand": record.vehicle.brand if record.vehicle else None,
             "vehicle_model": record.vehicle.model if record.vehicle else None,
             "vehicle_description": self._build_vehicle_description(record),
             "driver_id": record.driver_id if can_view_personal_data else None,
             "driver_name": record.driver_name if can_view_personal_data else "Identidade protegida",
+            "driver_matricula": driver.matricula if driver else None,
             "driver_document": record.driver_document if can_view_personal_data else self._mask_document(record.driver_document),
             "driver_contact": record.driver_contact if can_view_personal_data else None,
             "start_date": record.start_date,

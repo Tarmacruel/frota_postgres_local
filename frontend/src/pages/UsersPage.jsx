@@ -1,9 +1,12 @@
+import StatusChip from '../components/ui/StatusChip'
+import PageHeader from '../components/ui/PageHeader'
 import { useEffect, useMemo, useState } from 'react'
 import Modal from '../components/Modal'
 import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
+import { getCpfError } from '../utils/cpf'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 import { PERMISSION_ACTIONS, PERMISSION_MODULES, normalizePermissions } from '../utils/permissions'
 import { getRoleLabel } from '../utils/roles'
@@ -20,6 +23,7 @@ const initialForm = {
 const roleOptions = ['ADMIN', 'PRODUCAO', 'POSTO', 'PADRAO']
 
 function permissionExceedsPossessionCeiling(moduleKey, actionKey, role) {
+  if (moduleKey === 'vehicle_loans') return actionKey === 'delete' || !['ADMIN', 'PRODUCAO'].includes(role)
   if (moduleKey !== 'possession') return false
   if (actionKey === 'delete') return true
   if (role === 'PADRAO') return actionKey !== 'view'
@@ -42,6 +46,9 @@ export default function UsersPage() {
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [formError, setFormError] = useState('')
+  const [cpfError, setCpfError] = useState('')
+  const [permissionsError, setPermissionsError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [permissionsModalOpen, setPermissionsModalOpen] = useState(false)
@@ -98,12 +105,16 @@ export default function UsersPage() {
   }, [])
 
   function openCreateModal() {
+    setCpfError('')
+    setFormError('')
     setEditingUser(null)
     setForm(initialForm)
     setIsModalOpen(true)
   }
 
   function openEditModal(user) {
+    setCpfError('')
+    setFormError('')
     setEditingUser(user)
     setForm({
       name: user.name,
@@ -117,6 +128,8 @@ export default function UsersPage() {
   }
 
   function closeModal() {
+    setCpfError('')
+    setFormError('')
     setEditingUser(null)
     setForm(initialForm)
     setIsModalOpen(false)
@@ -129,6 +142,7 @@ export default function UsersPage() {
   }
 
   async function openPermissionsModal(user) {
+    setPermissionsError('')
     setPermissionsUser(user)
     setPermissionsForm(normalizePermissions(user.permissions))
     setPermissionsModalOpen(true)
@@ -138,7 +152,7 @@ export default function UsersPage() {
       const { data } = await api.get(`/users/${user.id}/permissions`)
       setPermissionsForm(normalizePermissions(data.permissions))
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível carregar as permissões do usuário.'))
+      setPermissionsError(getApiErrorMessage(err, 'Não foi possível carregar as permissões do usuário.'))
     } finally {
       setPermissionsLoading(false)
     }
@@ -166,6 +180,7 @@ export default function UsersPage() {
 
   async function savePermissions() {
     if (!permissionsUser) return
+    setPermissionsError('')
     try {
       setPermissionsSaving(true)
       setError('')
@@ -175,7 +190,7 @@ export default function UsersPage() {
       closePermissionsModal()
       await loadUsers()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível salvar as permissões do usuário.'))
+      setPermissionsError(getApiErrorMessage(err, 'Não foi possível salvar as permissões do usuário.'))
     } finally {
       setPermissionsSaving(false)
     }
@@ -183,12 +198,23 @@ export default function UsersPage() {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    setFormError('')
+    setCpfError('')
     if (!editingUser && !form.cpf.trim()) {
-      setError('Informe o CPF do usuario.')
+      setFormError('Informe o CPF do usuário com os 11 números do documento.')
       return
     }
+    if (form.cpf.trim()) {
+      const message = getCpfError(form.cpf)
+      if (message) {
+        setCpfError(message)
+        setFormError(message)
+        document.getElementById('user-cpf')?.focus()
+        return
+      }
+    }
     if (!form.organization_id) {
-      setError('Selecione a secretaria do usuário.')
+      setFormError('Selecione a secretaria do usuário na lista.')
       return
     }
 
@@ -216,7 +242,7 @@ export default function UsersPage() {
       closeModal()
       await loadUsers()
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível salvar o usuário.'))
+      setFormError(getApiErrorMessage(err, 'Não foi possível salvar o usuário. Tente novamente.'))
     } finally {
       setSubmitting(false)
     }
@@ -312,20 +338,18 @@ export default function UsersPage() {
   }
 
   return (
-    <div className="surface-panel">
-      <div className="panel-heading">
-        <div>
-          <h2 className="section-title">Gestão de usuários</h2>
-          <p className="section-copy">Gerencie perfis administrativos, operadores de produção, postos credenciados e usuários apenas de consulta.</p>
-        </div>
-        <div className="actions-inline">
+    <div className="surface-panel operation-page management-page management-page--users">
+      <PageHeader
+        title="Gestão de usuários"
+        description="Gerencie perfis administrativos, operadores de produção, postos credenciados e usuários apenas de consulta."
+        actions={<>
           <button className="app-button" type="button" onClick={openCreateModal}>Novo usuário</button>
           <button className="secondary-button" type="button" onClick={handleExportPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
-        </div>
-      </div>
+        </>}
+      />
 
-      <div className="toolbar-row" style={{ marginBottom: 18 }}>
+      <div className="toolbar-row operation-toolbar">
         <div className="filter-inline">
           <input
             className="app-input"
@@ -383,7 +407,7 @@ export default function UsersPage() {
 
       <div className="surface-panel panel-nested">
         <div className="table-wrap table-wrap-wide">
-          <table className="data-table data-table-wide">
+          <table className="data-table data-table-wide management-table">
             <thead>
               <tr>
                 <th>Nome</th>
@@ -421,14 +445,14 @@ export default function UsersPage() {
                     <td data-label="CPF">{user.cpf_masked || 'Pendente'}</td>
                     <td data-label="Secretaria">{user.organization_name || 'Não informada'}</td>
                     <td data-label="Perfil">
-                      <span className={`status-badge ${user.role === 'ADMIN' ? 'status-ATIVO' : user.role === 'PRODUCAO' ? 'status-PRODUCAO' : user.role === 'POSTO' ? 'status-POSTO' : 'status-INATIVO'}`}>
+                      <StatusChip tone={user.role === 'ADMIN' ? 'success' : user.role === 'PRODUCAO' ? 'info' : user.role === 'POSTO' ? 'warning' : 'neutral'}>
                         {getRoleLabel(user.role)}
-                      </span>
+                      </StatusChip>
                     </td>
                     <td data-label="Senha">
-                      <span className={`status-badge ${user.must_change_password ? 'status-MANUTENCAO' : 'status-ATIVO'}`}>
+                      <StatusChip tone={user.must_change_password ? 'warning' : 'success'}>
                         {user.must_change_password ? 'Troca pendente' : 'Regularizada'}
-                      </span>
+                      </StatusChip>
                     </td>
                     <td data-label="Criado em">{formatDate(user.created_at)}</td>
                     <td data-label="Atualizado em">{formatDate(user.updated_at)}</td>
@@ -452,7 +476,10 @@ export default function UsersPage() {
         title={editingUser ? 'Editar usuário' : 'Novo usuário'}
         description="Defina o perfil correto para cada pessoa: administração total, operação de produção, posto credenciado ou consulta."
         onClose={closeModal}
+        canClose={!submitting}
       >
+        {formError ? <div role="alert" className="alert alert-error" style={{ marginBottom: 16 }}>{formError}</div> : null}
+        {catalogError ? <div role="alert" className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError}</div> : null}
         <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
           <div className="form-field modal-field-span">
             <label htmlFor="user-name">Nome completo</label>
@@ -481,9 +508,18 @@ export default function UsersPage() {
               className="app-input"
               placeholder={editingUser ? (editingUser.cpf_masked || 'Preencha somente para substituir') : '000.000.000-00'}
               value={form.cpf}
-              onChange={(event) => setForm({ ...form, cpf: event.target.value })}
+              onChange={(event) => {
+                setForm({ ...form, cpf: event.target.value })
+                if (cpfError) {
+                  setCpfError('')
+                  setFormError('')
+                }
+              }}
+              aria-invalid={Boolean(cpfError)}
+              aria-describedby={cpfError ? 'user-cpf-error' : undefined}
               inputMode="numeric"
             />
+            {cpfError ? <span id="user-cpf-error" style={{ color: 'var(--danger)' }}>{cpfError}</span> : null}
           </div>
           <div className="form-field">
             <label htmlFor="user-password">{editingUser ? 'Redefinir senha provisória (opcional)' : 'Senha provisória'}</label>
@@ -519,7 +555,7 @@ export default function UsersPage() {
             <button className="app-button" type="submit" disabled={submitting}>
               {submitting ? 'Salvando...' : editingUser ? 'Atualizar usuário' : 'Criar usuário'}
             </button>
-            <button className="ghost-button" type="button" onClick={closeModal}>Cancelar</button>
+            <button className="ghost-button" type="button" disabled={submitting} onClick={closeModal}>Cancelar</button>
           </div>
         </form>
       </Modal>
@@ -530,12 +566,13 @@ export default function UsersPage() {
         description="Defina acesso por módulo e ação operacional."
         onClose={closePermissionsModal}
       >
+        {permissionsError ? <div role="alert" className="alert alert-error" style={{ marginBottom: 16 }}>{permissionsError}</div> : null}
         {permissionsLoading ? (
           <div className="empty-state">Carregando permissões...</div>
         ) : (
           <div className="stack">
             <div className="table-wrap table-wrap-wide">
-              <table className="data-table data-table-wide">
+              <table className="data-table data-table-wide management-table">
                 <thead>
                   <tr>
                     <th>Módulo</th>

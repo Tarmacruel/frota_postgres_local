@@ -1,0 +1,100 @@
+name: frota
+
+services:
+  postgres:
+    image: postgres:16.13-bookworm
+    restart: unless-stopped
+    env_file:
+      - ${FROTA_ENV_FILE:-/etc/frota/production.env}
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:?POSTGRES_DB must be set}
+      POSTGRES_USER: ${POSTGRES_USER:?POSTGRES_USER must be set}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?POSTGRES_PASSWORD must be set}
+    volumes:
+      - frota_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - frota_internal
+
+  app:
+    image: ${FROTA_APP_IMAGE:-frota-app:local}
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    init: true
+    env_file:
+      - ${FROTA_ENV_FILE:-/etc/frota/production.env}
+    depends_on:
+      postgres:
+        condition: service_healthy
+    ports:
+      - "${FROTA_APP_BIND_ADDRESS:-0.0.0.0}:${FROTA_APP_PORT:-8000}:8000"
+    volumes:
+      - type: bind
+        source: ${FROTA_UPLOADS_DIR:?FROTA_UPLOADS_DIR must be set}
+        target: /data/uploads
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=128m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "python",
+          "-c",
+          "from urllib.request import urlopen; response = urlopen('http://127.0.0.1:8000/api/health/ready', timeout=3); assert response.status == 200",
+        ]
+      interval: 15s
+      timeout: 5s
+      retries: 8
+      start_period: 30s
+    logging:
+      driver: local
+      options:
+        max-size: "10m"
+        max-file: "5"
+    networks:
+      - frota_internal
+
+  migrate:
+    image: ${FROTA_APP_IMAGE:-frota-app:local}
+    env_file:
+      - ${FROTA_ENV_FILE:-/etc/frota/production.env}
+    command: ["alembic", "upgrade", "head"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    read_only: true
+    tmpfs:
+      - /tmp:rw,noexec,nosuid,size=64m
+    security_opt:
+      - no-new-privileges:true
+    cap_drop:
+      - ALL
+    restart: "no"
+    profiles: ["migration"]
+    networks:
+      - frota_internal
+
+networks:
+  frota_internal:
+    driver: bridge
+
+volumes:
+  frota_postgres:
+    name: frota_postgres

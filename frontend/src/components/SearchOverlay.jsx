@@ -12,6 +12,10 @@ export default function SearchOverlay({ open, onClose, onSelect }) {
   const [error, setError] = useState('')
   const [activeIndex, setActiveIndex] = useState(0)
   const inputRef = useRef(null)
+  const panelRef = useRef(null)
+  const onCloseRef = useRef(onClose)
+
+  useEffect(() => { onCloseRef.current = onClose }, [onClose])
 
   const groupedResults = useMemo(() => groupSearchResults(results), [results])
   const flatResults = useMemo(() => results, [results])
@@ -26,19 +30,37 @@ export default function SearchOverlay({ open, onClose, onSelect }) {
     }
 
     const previousOverflow = document.body.style.overflow
+    const previousFocus = document.activeElement
     document.body.style.overflow = 'hidden'
-    window.setTimeout(() => inputRef.current?.focus(), 40)
+    const focusTimer = window.setTimeout(() => inputRef.current?.focus(), 40)
 
     const handleKeyDown = (event) => {
-      if (event.key === 'Escape') onClose()
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        onCloseRef.current()
+      } else if (event.key === 'Tab') {
+        const stops = Array.from(panelRef.current.querySelectorAll('input:not(:disabled), button:not(:disabled), a[href], [tabindex="0"]'))
+          .filter((element) => getComputedStyle(element).display !== 'none' && getComputedStyle(element).visibility !== 'hidden')
+        const first = stops[0]
+        const last = stops.at(-1)
+        if (!panelRef.current.contains(document.activeElement) || (event.shiftKey && document.activeElement === first)) {
+          event.preventDefault()
+          ;(event.shiftKey ? last : first)?.focus()
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          first?.focus()
+        }
+      }
     }
 
     window.addEventListener('keydown', handleKeyDown)
     return () => {
       document.body.style.overflow = previousOverflow
+      window.clearTimeout(focusTimer)
       window.removeEventListener('keydown', handleKeyDown)
+      if (previousFocus instanceof HTMLElement && document.contains(previousFocus)) previousFocus.focus()
     }
-  }, [open, onClose])
+  }, [open])
 
   useEffect(() => {
     if (!open) return undefined
@@ -94,6 +116,7 @@ export default function SearchOverlay({ open, onClose, onSelect }) {
   return createPortal(
     <div className="search-overlay-backdrop" role="presentation" onClick={onClose}>
       <section
+        ref={panelRef}
         className="search-overlay-panel"
         role="dialog"
         aria-modal="true"

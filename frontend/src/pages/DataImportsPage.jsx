@@ -1,3 +1,5 @@
+import PageHeader from '../components/ui/PageHeader'
+import StatusChip from '../components/ui/StatusChip'
 import { useEffect, useMemo, useState } from 'react'
 import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
@@ -633,9 +635,9 @@ export default function DataImportsPage() {
             <span className="eyebrow">Linha {row.row_number} do lote</span>
             <strong>{actionLabel(row.suggested_action)} {row.matched_by ? `por ${row.matched_by}` : 'sem match'}</strong>
           </div>
-          <span className={`status-badge status-${row.status === 'APPROVED' || row.status === 'APPLIED' ? 'ATIVO' : row.status === 'ERROR' || row.status === 'REJECTED' ? 'INATIVO' : 'MANUTENCAO'}`}>
+          <StatusChip tone={row.status === 'APPROVED' || row.status === 'APPLIED' ? 'success' : row.status === 'ERROR' || row.status === 'REJECTED' ? 'danger' : 'warning'}>
             {statusLabel(row.status)}
-          </span>
+          </StatusChip>
         </div>
         <div className="data-import-search-fields">
           {mappedPreview.map(([key, value]) => (
@@ -888,13 +890,8 @@ export default function DataImportsPage() {
   }
 
   return (
-    <div className="page-shell data-import-page">
-      <section className="panel-heading">
-        <div>
-          <h1 className="section-title">Importação e exportação de dados</h1>
-          <p className="section-copy">Analise relatórios externos, aprove linha a linha e integre somente dados revisados ao cadastro oficial.</p>
-        </div>
-      </section>
+    <div className="page-shell data-import-page management-page management-page--imports">
+      <PageHeader title="Importação e exportação de dados" description="Analise relatórios externos, aprove linha a linha e integre somente dados revisados ao cadastro oficial." />
 
       {error ? <div className="alert alert-error">{error}</div> : null}
       {feedback ? <div className="alert alert-success">{feedback}</div> : null}
@@ -908,11 +905,11 @@ export default function DataImportsPage() {
           <span>Linhas no lote</span>
           <strong>{summary.total_rows || 0}</strong>
         </div>
-        <div className="metric-card">
+        <div className="metric-card management-metric--warning">
           <span>Conflitos</span>
           <strong>{summary.conflicts || 0}</strong>
         </div>
-        <div className="metric-card">
+        <div className="metric-card management-metric--danger">
           <span>Erros</span>
           <strong>{summary.errors || 0}</strong>
         </div>
@@ -941,7 +938,7 @@ export default function DataImportsPage() {
         <section className="toolbar-card data-import-panel">
           <h2 className="section-title">Lotes</h2>
           <div className="table-wrap">
-            <table className="data-table">
+            <table className="data-table management-table">
               <thead>
                 <tr>
                   <th>Arquivo</th>
@@ -957,9 +954,9 @@ export default function DataImportsPage() {
                   <tr><td colSpan={4}><div className="empty-state">Nenhum lote enviado.</div></td></tr>
                 ) : batches.map((batch) => (
                   <tr key={batch.id} className={selectedBatch?.id === batch.id ? 'is-focused-row' : ''} onClick={() => setSelectedBatch(batch)}>
-                    <td data-label="Arquivo"><strong>{batch.source_filename}</strong><br /><span className="muted">{formatDate(batch.created_at)}</span></td>
+                    <td data-label="Arquivo"><button type="button" className="management-record-open" aria-pressed={selectedBatch?.id === batch.id} onClick={(event) => { event.stopPropagation(); setSelectedBatch(batch) }}>{batch.source_filename}</button><br /><span className="muted">{formatDate(batch.created_at)}</span></td>
                     <td data-label="Tipo">{entityLabel(batch.entity_type)}</td>
-                    <td data-label="Status"><span className={`status-badge status-${batch.status === 'APPLIED' ? 'ATIVO' : 'MANUTENCAO'}`}>{statusLabel(batch.status)}</span></td>
+                    <td data-label="Status"><StatusChip tone={batch.status === 'APPLIED' ? 'success' : batch.status === 'ERROR' ? 'danger' : batch.status === 'CANCELLED' ? 'neutral' : 'warning'}>{statusLabel(batch.status)}</StatusChip></td>
                     <td data-label="Linhas">{batch.summary?.total_rows || 0}</td>
                   </tr>
                 ))}
@@ -970,11 +967,11 @@ export default function DataImportsPage() {
 
         <section className="toolbar-card data-import-panel">
           <div className="data-import-tabs">
-            <div className="status-pills">
-              <button type="button" className={`status-pill ${activeTab === 'review' ? 'active' : ''}`} onClick={() => setActiveTab('review')}>Revisão</button>
-              <button type="button" className={`status-pill ${activeTab === 'search' ? 'active' : ''}`} onClick={() => setActiveTab('search')}>Busca</button>
-              <button type="button" className={`status-pill ${activeTab === 'fields' ? 'active' : ''}`} onClick={() => setActiveTab('fields')}>Campos extras</button>
-              <button type="button" className={`status-pill ${activeTab === 'exports' ? 'active' : ''}`} onClick={() => setActiveTab('exports')}>Exportar</button>
+            <div className="status-pills management-tabs" role="group" aria-label="Ferramentas de importação">
+              <button type="button" className={`status-pill ${activeTab === 'review' ? 'active' : ''}`} aria-pressed={activeTab === 'review'} onClick={() => setActiveTab('review')}>Revisão</button>
+              <button type="button" className={`status-pill ${activeTab === 'search' ? 'active' : ''}`} aria-pressed={activeTab === 'search'} onClick={() => setActiveTab('search')}>Busca</button>
+              <button type="button" className={`status-pill ${activeTab === 'fields' ? 'active' : ''}`} aria-pressed={activeTab === 'fields'} onClick={() => setActiveTab('fields')}>Campos extras</button>
+              <button type="button" className={`status-pill ${activeTab === 'exports' ? 'active' : ''}`} aria-pressed={activeTab === 'exports'} onClick={() => setActiveTab('exports')}>Exportar</button>
             </div>
           </div>
 
@@ -1079,7 +1076,7 @@ export default function DataImportsPage() {
                 <span className="metric-inline"><strong>{actionCounts.UPDATE || 0}</strong><span>atualizar</span></span>
               </div>
               <div className="table-wrap table-wrap-wide">
-                <table className="data-table data-table-wide">
+                <table className="data-table management-table data-table-wide">
                   <thead>
                     <tr>
                       <th>Linha</th>
@@ -1099,7 +1096,7 @@ export default function DataImportsPage() {
                       <tr key={row.id}>
                         <td data-label="Linha">{row.row_number}</td>
                         <td data-label="Ação">{actionLabel(row.suggested_action)}<br /><span className="muted">{row.matched_by || 'sem match'}</span></td>
-                        <td data-label="Status"><span className={`status-badge status-${row.status === 'APPROVED' || row.status === 'APPLIED' ? 'ATIVO' : row.status === 'ERROR' || row.status === 'REJECTED' ? 'INATIVO' : 'MANUTENCAO'}`}>{statusLabel(row.status)}</span></td>
+                        <td data-label="Status"><StatusChip tone={row.status === 'APPROVED' || row.status === 'APPLIED' ? 'success' : row.status === 'ERROR' || row.status === 'REJECTED' ? 'danger' : 'warning'}>{statusLabel(row.status)}</StatusChip></td>
                         <td data-label="Dados oficiais">
                           <div className="stack data-import-cell-stack">
                             {Object.entries(row.mapped_data || {}).slice(0, 6).map(([key, value]) => <span key={key}><strong>{key}:</strong> {String(value)}</span>)}

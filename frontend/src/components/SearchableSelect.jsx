@@ -13,6 +13,10 @@ export default function SearchableSelect({
   allowClear = false,
   clearLabel = 'Limpar seleção',
   ariaLabel,
+  remoteSearch = false,
+  onSearch,
+  loading = false,
+  loadingLabel = 'Buscando...',
 }) {
   const rootRef = useRef(null)
   const inputRef = useRef(null)
@@ -28,8 +32,11 @@ export default function SearchableSelect({
   )
 
   const filteredOptions = useMemo(() => {
+    if (remoteSearch) return options
+
     const term = query.trim().toLowerCase()
     if (!term) return options
+
     return options.filter((option) => {
       const haystack = [option.label, option.description, option.keywords]
         .filter(Boolean)
@@ -37,7 +44,12 @@ export default function SearchableSelect({
         .toLowerCase()
       return haystack.includes(term)
     })
-  }, [options, query])
+  }, [options, query, remoteSearch])
+
+  useEffect(() => {
+    if (!open || !remoteSearch) return
+    onSearch?.(query)
+  }, [open, query, remoteSearch, onSearch])
 
   useEffect(() => {
     if (!open) {
@@ -93,6 +105,7 @@ export default function SearchableSelect({
     window.addEventListener('keydown', handleKeyDown)
     window.addEventListener('resize', measureAndPositionPanel)
     window.addEventListener('scroll', measureAndPositionPanel, true)
+
     return () => {
       window.removeEventListener('mousedown', handlePointerDown)
       window.removeEventListener('keydown', handleKeyDown)
@@ -112,7 +125,10 @@ export default function SearchableSelect({
   }
 
   return (
-    <div ref={rootRef} className={`searchable-select${open ? ' is-open' : ''}${openUpward ? ' opens-upward' : ''}${disabled ? ' is-disabled' : ''}`}>
+    <div
+      ref={rootRef}
+      className={`searchable-select${open ? ' is-open' : ''}${openUpward ? ' opens-upward' : ''}${disabled ? ' is-disabled' : ''}`}
+    >
       <button
         type="button"
         className="searchable-select-trigger"
@@ -148,7 +164,9 @@ export default function SearchableSelect({
               ) : null}
 
               <div className="searchable-select-options" onWheel={handleWheel}>
-                {filteredOptions.length === 0 ? (
+                {loading ? (
+                  <div className="searchable-select-empty">{loadingLabel}</div>
+                ) : filteredOptions.length === 0 ? (
                   <div className="searchable-select-empty">{emptyLabel}</div>
                 ) : (
                   filteredOptions.map((option) => (

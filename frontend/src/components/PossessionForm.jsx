@@ -1,3 +1,4 @@
+import JustificationField from './JustificationField'
 import { useEffect, useRef, useState } from 'react'
 import { possessionAPI } from '../api/possession'
 import DriverSelect from './DriverSelect'
@@ -104,6 +105,10 @@ export default function PossessionForm({ vehicles, onClose, onSuccess, onUnautho
     observation: '',
   })
   const [submitting, setSubmitting] = useState(false)
+  const [odometerSuggestion, setOdometerSuggestion] = useState(null)
+  const [odometerSuggestionStatus, setOdometerSuggestionStatus] = useState('idle')
+  const odometerEditedRef = useRef(false)
+  const odometerRequestRef = useRef(0)
   const [error, setError] = useState('')
   const [initialTripEnabled, setInitialTripEnabled] = useState(false)
   const [initialTrip, setInitialTrip] = useState({
@@ -133,6 +138,36 @@ export default function PossessionForm({ vehicles, onClose, onSuccess, onUnautho
   const draftPreviewUrlRef = useRef('')
   const submittingRef = useRef(false)
   const secureCaptureContext = isSecureCaptureContext()
+
+  useEffect(() => {
+    const requestId = ++odometerRequestRef.current
+    let cancelled = false
+    setOdometerSuggestion(null)
+    if (!odometerEditedRef.current) {
+      setForm((current) => ({ ...current, start_odometer_km: '' }))
+    }
+    const startDate = form.start_date ? new Date(form.start_date) : new Date()
+    if (!form.vehicle_id || Number.isNaN(startDate.getTime())) {
+      setOdometerSuggestionStatus('idle')
+      return undefined
+    }
+    setOdometerSuggestionStatus('loading')
+    possessionAPI.getOdometerSuggestion({
+      vehicle_id: form.vehicle_id,
+      start_date: startDate.toISOString(),
+    }).then(({ data }) => {
+      if (cancelled || requestId !== odometerRequestRef.current) return
+      setOdometerSuggestion(data)
+      setOdometerSuggestionStatus('ready')
+      if (!odometerEditedRef.current) {
+        setForm((current) => ({ ...current, start_odometer_km: data?.odometer_km ?? '' }))
+      }
+    }).catch(() => {
+      if (cancelled || requestId !== odometerRequestRef.current) return
+      setOdometerSuggestionStatus('error')
+    })
+    return () => { cancelled = true }
+  }, [form.vehicle_id, form.start_date])
 
   useEffect(() => {
     if (captureState !== 'preview' || !videoRef.current || !streamRef.current) return undefined
@@ -233,8 +268,12 @@ export default function PossessionForm({ vehicles, onClose, onSuccess, onUnautho
   }
 
   function handleVehicleChange(value) {
+    if (value === form.vehicle_id) return
+    odometerRequestRef.current += 1
+    odometerEditedRef.current = false
+    setOdometerSuggestion(null)
     const selectedVehicle = vehicles.find((vehicle) => vehicle.id === value)
-    setForm((current) => ({ ...current, vehicle_id: value }))
+    setForm((current) => ({ ...current, vehicle_id: value, start_odometer_km: '' }))
     setReplacementConflict(null)
     setReplacementConfirmed(false)
     setReplacementReason('')
@@ -519,7 +558,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess, onUnautho
           </label>
           <div className="form-field">
             <label htmlFor="replacement-reason">Justificativa da substituição</label>
-            <textarea
+            <JustificationField context="possession_replace"
               id="replacement-reason"
               className="app-textarea"
               rows="3"
@@ -540,7 +579,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess, onUnautho
         <SearchableSelect
           value={form.vehicle_id}
           onChange={handleVehicleChange}
-          options={vehicles.map(buildVehicleOption)}
+          options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(buildVehicleOption)}
           placeholder="Selecione o veículo"
           searchPlaceholder="Buscar veículo por placa, modelo, chassi ou lotação"
           emptyLabel="Nenhum veículo disponível."
@@ -554,7 +593,10 @@ export default function PossessionForm({ vehicles, onClose, onSuccess, onUnautho
           type="datetime-local"
           className="app-input"
           value={form.start_date}
-          onChange={(event) => setForm({ ...form, start_date: event.target.value })}
+          onChange={(event) => {
+            odometerRequestRef.current += 1
+            setForm({ ...form, start_date: event.target.value })
+          }}
         />
       </div>
 
@@ -567,9 +609,21 @@ export default function PossessionForm({ vehicles, onClose, onSuccess, onUnautho
           step="0.1"
           className="app-input"
           value={form.start_odometer_km}
-          onChange={(event) => setForm({ ...form, start_odometer_km: event.target.value })}
+          onChange={(event) => {
+            odometerEditedRef.current = true
+            setForm({ ...form, start_odometer_km: event.target.value })
+          }}
+          aria-describedby="possession-odometer-help"
           placeholder="Informe a quilometragem inicial"
         />
+        <div id="possession-odometer-help" className="helper-text" aria-live="polite">
+          {odometerSuggestionStatus === 'loading' && <span>Buscando último odômetro...</span>}
+          {odometerSuggestionStatus === 'error' && <span>Sugestão de odômetro indisponível. Informe o valor manualmente.</span>}
+          {odometerSuggestion && <span>Último encerramento em {new Date(odometerSuggestion.end_date).toLocaleDateString('pt-BR')}: {Number(odometerSuggestion.odometer_km).toLocaleString('pt-BR')} km.</span>}
+          {odometerSuggestion && form.start_odometer_km !== '' && Number(form.start_odometer_km) < odometerSuggestion.odometer_km && (
+            <p role="status">O odômetro informado é menor que o último encerramento. Confira a digitação antes de registrar. Você pode continuar com este valor.</p>
+          )}
+        </div>
       </div>
 
       <div className="form-field">

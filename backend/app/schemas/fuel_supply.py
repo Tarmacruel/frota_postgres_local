@@ -58,9 +58,11 @@ class FuelSupplyFilter(BaseModel):
 class FuelSupplyOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    vehicle_loan_id: UUID | None = None
     id: UUID
     vehicle_id: UUID
     vehicle_plate: str
+    vehicle_type: str | None = None
     driver_id: UUID | None
     driver_name: str | None
     organization_id: UUID | None
@@ -126,6 +128,34 @@ class FuelSupplyOrderCreate(BaseModel):
             return None
         normalized = value.strip()
         return normalized or None
+
+
+class FuelSupplyOrderBatchItem(BaseModel):
+    vehicle_id: UUID
+    requested_liters: float | None = Field(default=None, gt=0)
+
+
+class FuelSupplyOrderBatchCreate(BaseModel):
+    items: list[FuelSupplyOrderBatchItem] = Field(min_length=2)
+    organization_id: UUID | None = None
+    fuel_station_id: UUID
+    expires_at: datetime
+    notes: str | None = Field(default=None, max_length=4000)
+
+    @field_validator("notes")
+    @classmethod
+    def normalize_order_text(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = value.strip()
+        return normalized or None
+
+    @model_validator(mode="after")
+    def require_distinct_vehicles(self) -> "FuelSupplyOrderBatchCreate":
+        vehicle_ids = [item.vehicle_id for item in self.items]
+        if len(vehicle_ids) != len(set(vehicle_ids)):
+            raise ValueError("Não é permitido repetir veículos no mesmo lote")
+        return self
 
 
 class FuelSupplyOrderConfirm(BaseModel):
@@ -238,6 +268,7 @@ class FuelSupplyOrderDeadlineUpdate(BaseModel):
 class FuelSupplyOrderOut(BaseModel):
     model_config = ConfigDict(from_attributes=True)
 
+    vehicle_loan_id: UUID | None = None
     id: UUID
     request_number: str
     validation_code: str
@@ -245,6 +276,7 @@ class FuelSupplyOrderOut(BaseModel):
     status: FuelSupplyOrderStatus
     vehicle_id: UUID
     vehicle_plate: str
+    vehicle_type: str | None = None
     vehicle_description: str | None
     driver_id: UUID | None
     driver_name: str | None
@@ -283,6 +315,11 @@ class FuelSupplyOrderOut(BaseModel):
 
 class FuelSupplyOrderListResponse(PaginatedResponse[FuelSupplyOrderOut]):
     pass
+
+
+class FuelSupplyOrderBatchResponse(BaseModel):
+    created_count: int
+    orders: list[FuelSupplyOrderOut]
 
 
 class FuelSupplyOrderPublicOut(BaseModel):

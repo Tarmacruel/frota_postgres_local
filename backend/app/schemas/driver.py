@@ -58,7 +58,14 @@ class DriverBase(BaseModel):
 
 
 class DriverCreate(DriverBase):
-    pass
+    matricula: str = Field(min_length=1, max_length=30)
+
+    @field_validator("matricula", mode="before")
+    @classmethod
+    def require_registration(cls, value):
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("Informe a matrícula do condutor")
+        return value.strip()
 
 
 class DriverUpdate(BaseModel):
@@ -78,6 +85,13 @@ class DriverUpdate(BaseModel):
     data_emissao_cnh: date | None = None
     ultimo_abastecimento: datetime | None = None
     ativo: bool | None = None
+
+    @field_validator("matricula", mode="before")
+    @classmethod
+    def require_registration_when_provided(cls, value):
+        if not isinstance(value, str) or not value.strip():
+            raise ValueError("Informe a matrícula do condutor")
+        return value.strip()
 
     @field_validator("nome_completo")
     @classmethod

@@ -1,10 +1,17 @@
 .env
+.env.*
 *.env
+*.env.backup
+frontend/.env.local
 !.env.example
+!.env.*.example
 
 __pycache__/
 *.py[cod]
 .pytest_cache/
+/.tmp-cert-pgtest/
+/backend/test.db
+/backend/test.db-*
 
 .venv/
 venv/
@@ -12,13 +19,34 @@ venv/
 node_modules/
 frontend/node_modules/
 frontend/dist/
+signature-agent/**/bin/
+signature-agent/**/obj/
+signature-agent/artifacts/
 backend/storage/
 storage/backups/
 storage/logs/
 storage/runtime/
+storage/hotfix-backups/
+storage/deploy-verification/
+/output/playwright/driver-registration-*.png
+/output/playwright/phase3-*.png
+/output/playwright/phase4-*.png
+/output/playwright/phase6-*.png
+/output/playwright/fuel-order-defaults.png
+/output/playwright/possession-*-dark.png
+/output/playwright/possession-*-light.png
+deploy/.ci-uploads/
+/data/
+/postgres-data/
+/restore/
+/.runtime-secure/
+/storage/homologation/
+/storage/migration-*/
+/storage/loan-tests/
 
 
 .playwright-mcp/
+.playwright-cli/
 *.out.log
 *.err.log
 

@@ -2,6 +2,7 @@ import api from './client'
 
 export const fuelSupplyOrdersAPI = {
   create: (data) => api.post('/fuel-supply-orders', data),
+  createBatch: (data) => api.post('/fuel-supply-orders/batch', data),
   listOpen: (params) => api.get('/fuel-supply-orders', { params: { ...params, status: 'OPEN' } }),
   list: (params) => api.get('/fuel-supply-orders', { params }),
   listAllForReport: async (params = {}) => {

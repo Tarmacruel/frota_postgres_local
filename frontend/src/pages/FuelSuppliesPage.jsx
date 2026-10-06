@@ -1,11 +1,15 @@
+import FuelSupplyOrderCancelForm from '../components/FuelSupplyOrderCancelForm'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
 import FuelSupplyOrderCreateForm from '../components/FuelSupplyOrderCreateForm'
+import FuelSupplyOrderBatchCreateForm from '../components/FuelSupplyOrderBatchCreateForm'
 import FuelSupplyOrderDeadlineForm from '../components/FuelSupplyOrderDeadlineForm'
 import FuelSupplyRectifyForm from '../components/FuelSupplyRectifyForm'
+import GuidedTour from '../components/GuidedTour'
+import { ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 import api from '../api/client'
 import { fuelStationsAPI } from '../api/fuelStations'
 import { masterDataAPI } from '../api/masterData'
@@ -19,7 +23,6 @@ import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 import {
   formatCurrencyBRL,
   formatOrderNumber,
-  getOrderStatusClass,
   getOrderStatusLabel,
   resolvePublicValidationUrl,
 } from '../utils/fuelSupplyOrders'
@@ -32,6 +35,14 @@ const ORDER_STATUS_OPTIONS = [
   { value: 'EXPIRED', label: 'Expiradas' },
   { value: 'CANCELLED', label: 'Canceladas' },
 ]
+
+function getOrderStatusTone(status) {
+  if (status === 'COMPLETED') return 'success'
+  if (status === 'OPEN') return 'info'
+  if (status === 'EXPIRED') return 'warning'
+  if (status === 'CANCELLED') return 'danger'
+  return 'neutral'
+}
 
 function formatDate(value) {
   if (!value) return '-'
@@ -122,7 +133,7 @@ export default function FuelSuppliesPage() {
   const [vehicles, setVehicles] = useState([])
   const [organizations, setOrganizations] = useState([])
   const [fuelStations, setFuelStations] = useState([])
-  const [filters, setFilters] = useState({ vehicle_id: '', organization_id: '', fuel_station_id: '', only_anomalies: '' })
+  const [filters, setFilters] = useState(() => ({ vehicle_id: searchParams.get('vehicle_id') || '', organization_id: '', fuel_station_id: '', only_anomalies: '' }))
   const [orderFilters, setOrderFilters] = useState({ status: 'TODOS', organization_id: '', fuel_station_id: '', created_from: '', created_to: '' })
   const [search, setSearch] = useState('')
   const [orderSearch, setOrderSearch] = useState('')
@@ -134,15 +145,27 @@ export default function FuelSuppliesPage() {
   const [currentHistoryPage, setCurrentHistoryPage] = useState(1)
   const [currentOrdersPage, setCurrentOrdersPage] = useState(1)
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
+  const [isBatchOrderModalOpen, setIsBatchOrderModalOpen] = useState(false)
+  const [batchTourReplayToken, setBatchTourReplayToken] = useState(0)
   const [supplyToRectify, setSupplyToRectify] = useState(null)
   const [orderToAdjust, setOrderToAdjust] = useState(null)
+  const [orderToCancel, setOrderToCancel] = useState(null)
+  const [cancellingOrder, setCancellingOrder] = useState(false)
 
   useEffect(() => {
-    if (searchParams.get('acao') !== 'nova-ordem') return
-    if (canCreateOrder) setIsOrderModalOpen(true)
+    const action = searchParams.get('acao')
+    if (!['nova-ordem', 'nova-ordem-lote'].includes(action)) return
+    const shouldStartBatchTour = action === 'nova-ordem-lote' && searchParams.get('guia') === '1'
+
+    if (canCreateOrder) {
+      if (action === 'nova-ordem') setIsOrderModalOpen(true)
+      if (action === 'nova-ordem-lote') setIsBatchOrderModalOpen(true)
+      if (shouldStartBatchTour) setBatchTourReplayToken((current) => current + 1)
+    }
 
     const nextSearchParams = new URLSearchParams(searchParams)
     nextSearchParams.delete('acao')
+    if (shouldStartBatchTour) nextSearchParams.delete('guia')
     setSearchParams(nextSearchParams, { replace: true })
   }, [canCreateOrder, searchParams, setSearchParams])
 
@@ -298,20 +321,7 @@ export default function FuelSuppliesPage() {
       setError('Você não tem permissão para cancelar ordens de abastecimento.')
       return
     }
-    if (!window.confirm(`Cancelar a ordem ${formatOrderNumber(order)}?`)) return
-
-    const reason = window.prompt('Motivo do cancelamento (opcional):', '')
-    if (reason === null) return
-
-    try {
-      setError('')
-      setFeedback('')
-      await fuelSupplyOrdersAPI.cancel(order.id, { reason: reason.trim() || null })
-      setFeedback(`Ordem ${formatOrderNumber(order)} cancelada com sucesso.`)
-      await loadOrders()
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível cancelar a ordem de abastecimento.'))
-    }
+    setOrderToCancel(order)
   }
 
   function buildOrderReportFilters() {
@@ -444,18 +454,48 @@ export default function FuelSuppliesPage() {
     setOrderFilters({ status: 'TODOS', organization_id: '', fuel_station_id: '', created_from: '', created_to: '' })
   }
 
+  function openBatchOrderTour() {
+    if (!canCreateOrder) return
+    setIsBatchOrderModalOpen(true)
+    setBatchTourReplayToken((current) => current + 1)
+  }
+
+  const batchTourSteps = useMemo(() => [
+    {
+      selector: '[data-tour="fuel-batch-create"]',
+      title: 'Nova ordem em lote',
+      description: 'Use este atalho para preparar várias ordens de abastecimento de uma vez, sem substituir a emissão individual.',
+      placement: 'bottom',
+    },
+    {
+      selector: '[data-tour="fuel-batch-vehicles"]',
+      title: 'Selecione os veículos',
+      description: 'Marque dois ou mais veículos. O sistema emitirá uma ordem independente para cada seleção.',
+    },
+    {
+      selector: '[data-tour="fuel-batch-liters"]',
+      title: 'Ajuste os litros quando necessário',
+      description: 'Defina um valor padrão e altere somente os veículos que precisarem de um limite diferente.',
+    },
+    {
+      selector: '[data-tour="fuel-batch-review"]',
+      title: 'Revise e emita',
+      description: 'Confira os dados compartilhados e cada veículo antes de confirmar. Depois, cada ordem terá comprovante e acompanhamento próprios.',
+    },
+  ], [])
+
   return (
-    <div className="surface-panel">
-      <div className="panel-heading">
-        <div>
-          <h2 className="section-title">Gestão de abastecimentos</h2>
-          <p className="section-copy">Emita ordens para os postos vinculados e acompanhe o histórico confirmado com comprovantes e alertas de consumo.</p>
-        </div>
-        <div className="actions-inline">
+    <div className="surface-panel operation-page operation-page--fuel-supplies">
+      <PageHeader
+        title="Gestão de abastecimentos"
+        description="Emita ordens para os postos vinculados e acompanhe o histórico confirmado com comprovantes e alertas de consumo."
+        actions={<>
           {canCreateOrder ? <button className="app-button" type="button" onClick={() => setIsOrderModalOpen(true)}>Nova ordem</button> : null}
+          {canCreateOrder ? <button className="secondary-button" data-tour="fuel-batch-create" type="button" onClick={() => setIsBatchOrderModalOpen(true)}>Nova ordem em lote</button> : null}
+          {canCreateOrder ? <button className="ghost-button" type="button" onClick={openBatchOrderTour}>Ver guia rápido</button> : null}
           <button className="ghost-button" type="button" onClick={() => { loadOrders(); loadRecords() }}>Atualizar painel</button>
-        </div>
-      </div>
+        </>}
+      />
 
       <div className="panel-metrics">
         <div className="metric-inline">
@@ -496,7 +536,7 @@ export default function FuelSuppliesPage() {
         </div>
       ) : null}
 
-      {canViewOrders ? <div className="surface-panel panel-nested" style={{ marginBottom: 16 }}>
+      {canViewOrders ? <div className="surface-panel panel-nested operation-module operation-module--orders">
         <div className="panel-heading">
           <div>
             <h3 className="section-title">Ordens de abastecimento</h3>
@@ -508,7 +548,7 @@ export default function FuelSuppliesPage() {
           </div>
         </div>
 
-        <div className="filter-inline">
+        <div className="operation-toolbar filter-inline">
           <input className="app-input" placeholder="Buscar ordem por placa, secretaria, posto, solicitante ou observação" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} />
           <select className="app-select" value={orderFilters.status} onChange={(event) => setOrderFilters((prev) => ({ ...prev, status: event.target.value }))}>
             {ORDER_STATUS_OPTIONS.map((option) => (
@@ -554,8 +594,8 @@ export default function FuelSuppliesPage() {
           <button className="ghost-button" type="button" onClick={clearOrderFilters}>Limpar filtros</button>
         </div>
 
-        <div className="table-wrap table-wrap-wide">
-          <table className="data-table data-table-wide">
+        <div className="table-wrap table-wrap-wide operation-table-card">
+          <table className="data-table data-table-wide operation-table">
             <thead>
               <tr>
                 <th>Ordem</th>
@@ -575,9 +615,12 @@ export default function FuelSuppliesPage() {
                 <tr key={order.id}>
                   <td data-label="Ordem"><strong>{formatOrderNumber(order)}</strong></td>
                   <td data-label="Veículo">
-                    <div className="stack">
+                    <div className="operation-vehicle-identity">
+                      <VehicleThumbnail vehicleType={order.vehicle_type} plate={order.vehicle_plate} />
+                      <span>
                       <strong>{order.vehicle_plate || '-'}</strong>
                       <span className="muted">{order.organization_name || 'Sem secretaria informada'}</span>
+                      </span>
                     </div>
                   </td>
                   <td data-label="Posto">
@@ -592,7 +635,7 @@ export default function FuelSuppliesPage() {
                     </div>
                   </td>
                   <td data-label="Situação">
-                    <span className={`status-badge ${getOrderStatusClass(order.status)}`}>{getOrderStatusLabel(order.status)}</span>
+                    <StatusChip tone={getOrderStatusTone(order.status)}>{getOrderStatusLabel(order.status)}</StatusChip>
                   </td>
                   <td data-label="Prazo">{formatDate(order.expires_at)}</td>
                   <td data-label="Solicitante">
@@ -603,16 +646,17 @@ export default function FuelSuppliesPage() {
                   </td>
                   <td data-label="Litros previstos">{formatNumber(order.requested_liters)}</td>
                   <td data-label="Ações">
-                    <div className="actions-inline">
+                    <div className="operation-row-actions">
                       <button type="button" className="mini-button" onClick={() => handlePreviewOrderDocument(order)}>Comprovante</button>
-                      <button type="button" className="mini-button" onClick={() => handleCopyPublicLink(order)}>Link público</button>
-                      <button type="button" className="mini-button" onClick={() => handleDownloadOrderDocument(order)}>Baixar PDF</button>
-                      {canAdjustOrderDeadline && ['OPEN', 'EXPIRED'].includes(order.status) ? (
-                        <button type="button" className="mini-button" onClick={() => setOrderToAdjust(order)}>
-                          {order.status === 'EXPIRED' ? 'Reabrir prazo' : 'Prorrogar prazo'}
-                        </button>
-                      ) : null}
-                      {order.status === 'OPEN' && canEditOrder ? <button type="button" className="mini-button danger" onClick={() => handleCancelOrder(order)}>Cancelar</button> : null}
+                      <ActionMenu
+                        label={`Mais ações da ordem ${formatOrderNumber(order)}`}
+                        items={[
+                          { key: 'public-link', label: 'Copiar link público', onClick: () => handleCopyPublicLink(order) },
+                          { key: 'pdf', label: 'Baixar PDF', onClick: () => handleDownloadOrderDocument(order) },
+                          canAdjustOrderDeadline && ['OPEN', 'EXPIRED'].includes(order.status) ? { key: 'deadline', label: order.status === 'EXPIRED' ? 'Reabrir prazo' : 'Prorrogar prazo', onClick: () => setOrderToAdjust(order) } : null,
+                          order.status === 'OPEN' && canEditOrder ? { key: 'cancel', label: 'Cancelar ordem', tone: 'danger', onClick: () => handleCancelOrder(order) } : null,
+                        ]}
+                      />
                     </div>
                   </td>
                 </tr>
@@ -623,7 +667,7 @@ export default function FuelSuppliesPage() {
         <Pagination currentPage={currentOrdersPage} totalPages={totalOrdersPages} onPageChange={setCurrentOrdersPage} />
       </div> : null}
 
-      <div className="surface-panel panel-nested">
+      <div className="surface-panel panel-nested operation-module operation-module--fuel-history">
         <div className="panel-heading">
           <div>
             <h3 className="section-title">Histórico de abastecimentos</h3>
@@ -631,9 +675,9 @@ export default function FuelSuppliesPage() {
           </div>
         </div>
 
-        <div className="filter-inline" style={{ marginBottom: 12 }}>
+        <div className="operation-toolbar filter-inline">
           <input className="app-input" placeholder="Buscar por placa, secretaria, posto, combustível ou aditivo" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(buildVehicleOption)]} placeholder="Filtrar veículo" />
+          <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veículos' }, ...(filters.vehicle_id && !vehicles.some((item) => item.id === filters.vehicle_id) ? [{ value: filters.vehicle_id, label: 'Veiculo do historico de emprestimo' }] : []), ...vehicles.map(buildVehicleOption)]} placeholder="Filtrar veículo" />
           <SearchableSelect value={filters.organization_id} onChange={(value) => setFilters((prev) => ({ ...prev, organization_id: value }))} options={organizationFilterOptions} placeholder="Filtrar secretaria" />
           <SearchableSelect value={filters.fuel_station_id} onChange={(value) => setFilters((prev) => ({ ...prev, fuel_station_id: value }))} options={[{ value: '', label: 'Todos os postos' }, ...fuelStations.map(buildStationOption)]} placeholder="Filtrar posto" />
           <select className="app-input" value={filters.only_anomalies} onChange={(event) => setFilters((prev) => ({ ...prev, only_anomalies: event.target.value }))}>
@@ -643,8 +687,8 @@ export default function FuelSuppliesPage() {
           <button className="ghost-button" type="button" onClick={clearHistoryFilters}>Limpar filtros</button>
         </div>
 
-        <div className="table-wrap table-wrap-wide">
-          <table className="data-table data-table-wide">
+        <div className="table-wrap table-wrap-wide operation-table-card">
+          <table className="data-table data-table-wide operation-table">
             <thead>
               <tr>
                 <th>Veículo</th>
@@ -665,7 +709,7 @@ export default function FuelSuppliesPage() {
               {!historyLoading && paginatedRecords.length === 0 ? <tr><td colSpan={11}><div className="empty-state">Nenhum abastecimento encontrado.</div></td></tr> : null}
               {!historyLoading && paginatedRecords.map((record) => (
                 <tr key={record.id}>
-                  <td data-label="Veículo">{record.vehicle_plate}</td>
+                  <td data-label="Veículo"><div className="operation-vehicle-identity"><VehicleThumbnail vehicleType={record.vehicle_type} plate={record.vehicle_plate} /><strong>{record.vehicle_plate}</strong></div></td>
                   <td data-label="Data">{formatDate(record.supplied_at)}</td>
                   <td data-label="Secretaria">{record.organization_name || '-'}</td>
                   <td data-label="Posto">{record.fuel_station_name || record.fuel_station || '-'}</td>
@@ -674,7 +718,7 @@ export default function FuelSuppliesPage() {
                   <td data-label="Combustível">{record.fuel_type || '-'}</td>
                   <td data-label="Aditivo">{formatAdditiveDetails(record, formatNumber)}</td>
                   <td data-label="Km/l">{formatNumber(record.consumption_km_l)}</td>
-                  <td data-label="Alerta">{record.is_consumption_anomaly ? <span className="status-chip warning">Alerta</span> : '-'}</td>
+                  <td data-label="Alerta">{record.is_consumption_anomaly ? <StatusChip tone="warning">Alerta</StatusChip> : <StatusChip tone="success">Regular</StatusChip>}</td>
                   <td data-label="Ações">
                     <div className="actions-inline">
                       <a className="mini-button" href={record.receipt_url} target="_blank" rel="noreferrer">Comprovante</a>
@@ -705,11 +749,48 @@ export default function FuelSuppliesPage() {
         />
       </Modal>
 
+      <Modal open={Boolean(orderToCancel)} title={`Cancelar ordem ${orderToCancel ? formatOrderNumber(orderToCancel) : ''}`}
+        description="Confirme o cancelamento da ordem de abastecimento. O motivo é opcional."
+        canClose={!cancellingOrder} onClose={() => setOrderToCancel(null)}>
+        {orderToCancel && <FuelSupplyOrderCancelForm order={orderToCancel} onBusy={setCancellingOrder}
+          onClose={() => setOrderToCancel(null)} onSaved={() => {
+            setFeedback(`Ordem ${formatOrderNumber(orderToCancel)} cancelada com sucesso.`)
+            setOrderToCancel(null)
+            loadOrders()
+          }} />}
+      </Modal>
+      <Modal
+        open={isBatchOrderModalOpen && canCreateOrder}
+        onClose={() => setIsBatchOrderModalOpen(false)}
+        title="Nova ordem de abastecimento em lote"
+        description="Emita ordens separadas para vários veículos, com posto, prazo e observações compartilhados."
+      >
+        <FuelSupplyOrderBatchCreateForm
+          vehicles={vehicles}
+          organizations={organizations}
+          fuelStations={fuelStations}
+          onClose={() => setIsBatchOrderModalOpen(false)}
+          onSuccess={({ message }) => {
+            setFeedback(message)
+            setLastIssuedOrder(null)
+            loadOrders()
+          }}
+        />
+      </Modal>
+
+      {batchTourReplayToken > 0 ? (
+        <GuidedTour
+          steps={batchTourSteps}
+          storageKey="frota-fuel-supply-orders-batch-tour-v1"
+          replayToken={batchTourReplayToken}
+        />
+      ) : null}
+
       <Modal
         open={Boolean(supplyToRectify) && canRectifySupply}
         onClose={() => setSupplyToRectify(null)}
         title="Retificar confirmação de abastecimento"
-        description="Corrija os dados confirmados mantendo os valores anteriores e a justificativa na auditoria."
+        description="Corrija os dados confirmados ou substitua o comprovante, mantendo os valores anteriores e a justificativa na auditoria."
       >
         {supplyToRectify ? (
           <FuelSupplyRectifyForm

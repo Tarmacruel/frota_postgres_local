@@ -11,6 +11,7 @@ from fastapi import HTTPException, status
 from fastapi.encoders import jsonable_encoder
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
+from app.services.operational_scope import ensure_record_visible
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
@@ -26,9 +27,11 @@ from app.core.possession_responsibility import (
 from app.core.security import verify_password
 from app.models.document_signature import (
     DigitalDocument,
+    DigitalDocumentArtifactType,
     DigitalDocumentStatus,
     DigitalDocumentType,
     DocumentSignature,
+    DocumentSignatureMethod,
     DocumentSignatureRequest,
     DocumentSignatureRequestStatus,
 )
@@ -66,7 +69,17 @@ class DocumentSignatureService:
     async def create_document(self, data: DigitalDocumentCreate, current_user: User) -> dict:
         self._ensure_ready()
         self._ensure_module_permission(current_user, data.document_type, "edit")
+        from app.services.vehicle_loan_document_service import LOAN_DOCUMENT_TYPES
+        if data.document_type in LOAN_DOCUMENT_TYPES:
+            from app.services.vehicle_loan_service import VehicleLoanService
+            await VehicleLoanService(self.db).get(data.source_id, current_user, lock=True)
+            existing = await self._get_active_document(data.document_type, data.source_id)
+            if not existing:
+                raise HTTPException(409, 'O termo é emitido automaticamente no aceite da operação')
+            await self._ensure_document_visible(existing, current_user)
+            return self._serialize_document(existing)
         self._ensure_possession_term_mutation_allowed(current_user, data.document_type)
+        await self._ensure_source_writer(data.document_type, data.source_id, current_user)
         context = await self._build_document_context(data.document_type, data.source_id, current_user=current_user)
         await self._lock_source(data.document_type, data.source_id)
         context = await self._build_document_context(
@@ -79,6 +92,17 @@ class DocumentSignatureService:
 
         existing = await self._get_active_document(data.document_type, data.source_id, for_update=True)
         if existing and existing.content_hash == context["content_hash"]:
+            from app.services.document_artifact_service import DocumentArtifactService
+
+            if settings.CANONICAL_DOCUMENT_ARTIFACTS_ENABLED and DocumentArtifactService.supports_canonical_artifact(
+                existing.document_type
+            ):
+                await DocumentArtifactService(self.db).ensure_canonical_artifact(
+                    existing,
+                    current_user=current_user,
+                )
+                await self.db.commit()
+                existing = await self._get_document(existing.id) or existing
             return self._serialize_document(existing)
 
         if existing:
@@ -105,6 +129,15 @@ class DocumentSignatureService:
 
         try:
             await self.db.flush()
+            from app.services.document_artifact_service import DocumentArtifactService
+
+            if settings.CANONICAL_DOCUMENT_ARTIFACTS_ENABLED and DocumentArtifactService.supports_canonical_artifact(
+                document.document_type
+            ):
+                await DocumentArtifactService(self.db).ensure_canonical_artifact(
+                    document,
+                    current_user=current_user,
+                )
             await self.db.refresh(document)
             await self._record_audit(
                 current_user,
@@ -140,6 +173,68 @@ class DocumentSignatureService:
         if include_restricted:
             return payload
         return self.sanitize_summary_for_restricted_view(payload)
+
+    async def get_authorized_document(
+        self,
+        document_id: UUID,
+        current_user: User,
+        *,
+        require_evidence_access: bool = False,
+    ) -> DigitalDocument:
+        """Authorize internal artifact/validation reads without exposing the snapshot."""
+        self._ensure_ready()
+        document = await self._require_document(document_id)
+        self._ensure_module_permission(current_user, document.document_type, "view")
+        await self._ensure_document_visible(document, current_user)
+        if require_evidence_access and current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="Acesso ao artefato probatório restrito a perfis autorizados",
+            )
+        return document
+
+    async def get_document_for_certificate_signing(
+        self,
+        document_id: UUID,
+        current_user: User,
+    ) -> DigitalDocument:
+        """Lock and revalidate a document before starting/finalising ICP-Brasil signing."""
+        self._ensure_ready()
+        initial = await self._require_document(document_id)
+        from app.services.vehicle_loan_document_service import LOAN_DOCUMENT_TYPES
+        if initial.document_type in LOAN_DOCUMENT_TYPES:
+            raise HTTPException(409, 'Este termo utiliza assinatura eletrônica interna por senha')
+        self._ensure_module_permission(current_user, initial.document_type, "edit")
+        self._ensure_possession_term_mutation_allowed(current_user, initial.document_type)
+        await self._ensure_document_visible(initial, current_user)
+        await self._lock_source(initial.document_type, initial.source_id)
+        document = await self._require_document(document_id, for_update=True)
+        self._ensure_module_permission(current_user, document.document_type, "edit")
+        self._ensure_possession_term_mutation_allowed(current_user, document.document_type)
+        await self._ensure_document_visible(
+            document,
+            current_user,
+            refresh_source=True,
+            supersede_stale=True,
+        )
+        if document.status in {DigitalDocumentStatus.SUPERSEDED, DigitalDocumentStatus.CANCELLED}:
+            raise HTTPException(
+                status_code=status.HTTP_409_CONFLICT,
+                detail="Documento nÃ£o estÃ¡ mais disponÃ­vel para assinatura",
+            )
+        if current_user.must_change_password or not current_user.cpf:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="UsuÃ¡rio nÃ£o estÃ¡ apto a assinar com certificado",
+            )
+        if any(signature.signer_user_id == current_user.id for signature in document.signatures):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="UsuÃ¡rio jÃ¡ assinou este documento")
+        if not self._can_user_sign_document(document, current_user):
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="UsuÃ¡rio nÃ£o estÃ¡ autorizado a assinar este documento",
+            )
+        return document
 
     async def sign_document(self, document_id: UUID, data: DocumentSignInput, current_user: User) -> dict:
         self._ensure_ready()
@@ -183,8 +278,14 @@ class DocumentSignatureService:
             signer_cpf_hash=hash_cpf(current_user.cpf),
             content_hash=document.content_hash,
             signature_fingerprint=self._build_signature_fingerprint(document, current_user, now),
+            signature_method=DocumentSignatureMethod.INTERNAL_PASSWORD,
             signed_at=now,
         )
+        from app.services.vehicle_loan_document_service import LOAN_DOCUMENT_TYPES, representative
+        if document.document_type in LOAN_DOCUMENT_TYPES:
+            represented = representative(document, current_user)
+            signature.signer_organization_id = UUID(represented['organization_id'])
+            signature.signer_organization_name = represented['organization_name']
         document.signatures.append(signature)
 
         for request in document.signature_requests:
@@ -222,6 +323,7 @@ class DocumentSignatureService:
     async def request_joint_signature(self, document_id: UUID, data: JointSignatureRequestInput, current_user: User) -> dict:
         self._ensure_ready()
         document = await self._require_document(document_id)
+        self._ensure_flexible_signers(document)
         self._ensure_module_permission(current_user, document.document_type, "edit")
         self._ensure_possession_term_mutation_allowed(current_user, document.document_type)
         await self._ensure_document_visible(document, current_user)
@@ -292,10 +394,10 @@ class DocumentSignatureService:
             select(DocumentSignatureRequest)
             .options(
                 joinedload(DocumentSignatureRequest.document).selectinload(DigitalDocument.signatures),
-                joinedload(DocumentSignatureRequest.document).selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requester),
-                joinedload(DocumentSignatureRequest.document).selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requested_signer),
-                joinedload(DocumentSignatureRequest.requester),
-                joinedload(DocumentSignatureRequest.requested_signer),
+                joinedload(DocumentSignatureRequest.document).selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requester).options(selectinload(User.permission_entries), joinedload(User.organization)),
+                joinedload(DocumentSignatureRequest.document).selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requested_signer).options(selectinload(User.permission_entries), joinedload(User.organization)),
+                joinedload(DocumentSignatureRequest.requester).options(selectinload(User.permission_entries), joinedload(User.organization)),
+                joinedload(DocumentSignatureRequest.requested_signer).options(selectinload(User.permission_entries), joinedload(User.organization)),
             )
             .where(
                 DocumentSignatureRequest.requested_signer_user_id == current_user.id,
@@ -327,6 +429,7 @@ class DocumentSignatureService:
                         "title": request.document.title,
                         "status": request.document.status,
                         "content_hash_short": request.document.content_hash[:12],
+                        "source_id": request.document.source_id,
                     },
                 }
             )
@@ -335,6 +438,7 @@ class DocumentSignatureService:
     async def decline_request(self, request_id: UUID, current_user: User) -> dict:
         self._ensure_ready()
         initial_request = await self._require_request(request_id)
+        self._ensure_flexible_signers(initial_request.document)
         if not initial_request.document:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento digital não encontrado")
         self._ensure_module_permission(current_user, initial_request.document.document_type, "edit")
@@ -385,6 +489,7 @@ class DocumentSignatureService:
     async def cancel_request(self, request_id: UUID, current_user: User) -> dict:
         self._ensure_ready()
         initial_request = await self._require_request(request_id)
+        self._ensure_flexible_signers(initial_request.document)
         if not initial_request.document:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Documento digital não encontrado")
         self._ensure_module_permission(current_user, initial_request.document.document_type, "edit")
@@ -575,10 +680,10 @@ class DocumentSignatureService:
         )
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
-        await self._ensure_vehicle_visible_to_user(record.vehicle_id, current_user)
+        await ensure_record_visible(self.db, record, current_user)
 
         title = f"Termo de Posse e Responsabilidade nº {record.public_number}"
-        organization_id = getattr(record.driver, "organization_id", None) or getattr(current_user, "organization_id", None)
+        organization_id = getattr(record, "responsible_organization_id", None)
         evidence = sorted(
             (
                 {
@@ -648,7 +753,7 @@ class DocumentSignatureService:
         )
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de posse não encontrado")
-        await self._ensure_vehicle_visible_to_user(record.vehicle_id, current_user)
+        await ensure_record_visible(self.db, record, current_user)
 
         is_return = document_type == DigitalDocumentType.POSSESSION_RETURN_TERM
         if is_return and record.end_date is None:
@@ -657,7 +762,7 @@ class DocumentSignatureService:
         validation_code = record.return_term_validation_code if is_return else record.loan_term_validation_code
         public_path = self._build_possession_public_path(validation_code, term_type="return" if is_return else "loan")
         title = f"Termo de {'devolução' if is_return else 'empréstimo'} - {record.vehicle.plate if record.vehicle else record.vehicle_id}"
-        organization_id = getattr(record.driver, "organization_id", None) or getattr(current_user, "organization_id", None)
+        organization_id = getattr(record, "responsible_organization_id", None)
 
         snapshot = {
             "document_type": document_type,
@@ -723,6 +828,7 @@ class DocumentSignatureService:
         public_path = f"{PUBLIC_FUEL_ORDER_PATH_PREFIX}/{order.validation_code}"
         title = f"Ordem de abastecimento {self._build_order_number(order)}"
         snapshot = {
+            "schema_version": "fuel-supply-order.v1",
             "document_type": DigitalDocumentType.FUEL_SUPPLY_ORDER,
             "source_type": SOURCE_FUEL_SUPPLY_ORDER,
             "source_id": str(order.id),
@@ -745,6 +851,8 @@ class DocumentSignatureService:
                 "id": str(order.fuel_station_id) if order.fuel_station_id else None,
                 "name": order.fuel_station_ref.name if order.fuel_station_ref else None,
                 "cnpj": order.fuel_station_ref.cnpj if order.fuel_station_ref else None,
+                "address": order.fuel_station_ref.address if order.fuel_station_ref else None,
+                "phone": order.fuel_station_ref.phone if order.fuel_station_ref else None,
             },
             "created_by_name": order.creator.name if order.creator else None,
             "confirmed_by_name": order.confirmer.name if order.confirmer else None,
@@ -797,14 +905,7 @@ class DocumentSignatureService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Veículo não encontrado")
 
     async def _ensure_order_visible_to_user(self, order: FuelSupplyOrder, current_user: User) -> None:
-        organization_id = scoped_organization_id(current_user)
-        if organization_id is None:
-            if production_scope_is_empty(current_user):
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento não encontrada")
-            return
-        if order.organization_id == organization_id:
-            return
-        await self._ensure_vehicle_visible_to_user(order.vehicle_id, current_user)
+        await ensure_record_visible(self.db, order, current_user)
 
     async def _ensure_station_access(self, *, current_user: User, order: FuelSupplyOrder) -> None:
         if not order.fuel_station_id:
@@ -821,6 +922,13 @@ class DocumentSignatureService:
         refresh_source: bool = False,
         supersede_stale: bool = False,
     ) -> None:
+        from app.services.vehicle_loan_document_service import LOAN_DOCUMENT_TYPES
+        if document.document_type in LOAN_DOCUMENT_TYPES:
+            from app.services.vehicle_loan_service import VehicleLoanService
+            await VehicleLoanService(self.db).get(document.source_id, current_user)
+            if document.content_hash != self.build_hash_for_snapshot(document.snapshot):
+                raise HTTPException(409, 'A integridade do termo não foi confirmada')
+            return
         if document.source_type == SOURCE_POSSESSION:
             context = await self._build_document_context(
                 document.document_type,
@@ -858,6 +966,8 @@ class DocumentSignatureService:
 
     def _ensure_module_permission(self, user: User, document_type: str, action: str) -> None:
         module = self._permission_module_for_document_type(document_type)
+        if module == 'vehicle_loans' and user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
+            raise HTTPException(403, 'Perfil não autorizado para termos entre secretarias')
         field = f"can_{action}"
         if not bool(user.permissions.get(module, {}).get(field)):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permissão insuficiente para o documento")
@@ -876,14 +986,42 @@ class DocumentSignatureService:
             )
 
     def _can_user_sign_document(self, document: DigitalDocument, current_user: User) -> bool:
+        from app.services.vehicle_loan_document_service import LOAN_DOCUMENT_TYPES, may_sign
+        if document.document_type in LOAN_DOCUMENT_TYPES:
+            return may_sign(document, current_user)
         if current_user.role == UserRole.ADMIN:
             return True
+        org = scoped_organization_id(current_user)
+        responsible = getattr(document, "organization_id", None)
+        if responsible is not None and responsible != org:
+            return False
         if document.created_by_user_id == current_user.id:
             return True
         return any(
             request.status == DocumentSignatureRequestStatus.PENDING and request.requested_signer_user_id == current_user.id
             for request in document.signature_requests
         )
+
+    async def _ensure_source_writer(self, document_type, source_id, current_user):
+        """Shared history is readable; creating its signature workflow requires responsibility."""
+        org = scoped_organization_id(current_user)
+        if org is None and not production_scope_is_empty(current_user):
+            return
+        from app.repositories.vehicle_loan_repository import VehicleLoanRepository
+        from app.services.operational_scope import occurred_at
+        if document_type in {DigitalDocumentType.POSSESSION_RESPONSIBILITY_TERM,
+                             DigitalDocumentType.POSSESSION_LOAN_TERM,
+                             DigitalDocumentType.POSSESSION_RETURN_TERM}:
+            record = await self.possessions.get_by_id(source_id)
+        else:
+            record = await self.orders.get_by_id(source_id)
+        if record is None:
+            raise HTTPException(404, "Registro não encontrado")
+        responsible = getattr(record, 'responsible_organization_id', None) or getattr(record, 'organization_id', None)
+        if responsible is None:
+            responsible, _ = await VehicleLoanRepository(self.db).responsibility_at(record.vehicle_id, occurred_at(record))
+        if org is None or org != responsible:
+            raise HTTPException(403, "Somente a secretaria responsável pode criar o documento operacional")
 
     def _ensure_signer_can_be_requested(self, *, current_user: User, requested_signer: User) -> None:
         if requested_signer.must_change_password:
@@ -920,6 +1058,16 @@ class DocumentSignatureService:
         )
 
     async def _refresh_document_status(self, document: DigitalDocument, *, now: datetime) -> None:
+        from app.services.vehicle_loan_document_service import LOAN_DOCUMENT_TYPES
+        if document.document_type in LOAN_DOCUMENT_TYPES:
+            expected = {item['user_id'] for item in document.snapshot['representatives']}
+            actual = {str(signature.signer_user_id) for signature in document.signatures}
+            complete = len(expected) == 2 and expected.issubset(actual)
+            document.required_signatures = 2
+            document.status = DigitalDocumentStatus.COMPLETED if complete else DigitalDocumentStatus.PENDING
+            document.completed_at = (document.completed_at or now) if complete else None
+            document.updated_at = now
+            return
         joint_requests = [
             request
             for request in document.signature_requests
@@ -960,6 +1108,8 @@ class DocumentSignatureService:
         document.updated_at = now
 
     async def _lock_source(self, document_type: str, source_id: UUID) -> None:
+        from app.services.vehicle_loan_document_service import LOAN_DOCUMENT_TYPES
+        from app.models.vehicle_loan import VehicleLoan
         if document_type in {
             DigitalDocumentType.POSSESSION_RESPONSIBILITY_TERM,
             DigitalDocumentType.POSSESSION_LOAN_TERM,
@@ -968,6 +1118,8 @@ class DocumentSignatureService:
             source_model = VehiclePossession
         else:
             source_model = FuelSupplyOrder
+        if document_type in LOAN_DOCUMENT_TYPES:
+            source_model = VehicleLoan
         result = await self.db.execute(
             select(source_model.vehicle_id).where(source_model.id == source_id)
         )
@@ -1007,8 +1159,10 @@ class DocumentSignatureService:
             select(DigitalDocument)
             .options(
                 selectinload(DigitalDocument.signatures),
-                selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requester),
-                selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requested_signer),
+                selectinload(DigitalDocument.artifacts),
+                selectinload(DigitalDocument.signature_validations),
+                selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requester).options(selectinload(User.permission_entries), joinedload(User.organization)),
+                selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requested_signer).options(selectinload(User.permission_entries), joinedload(User.organization)),
             )
             .where(
                 DigitalDocument.document_type == document_type,
@@ -1027,8 +1181,10 @@ class DocumentSignatureService:
             select(DigitalDocument)
             .options(
                 selectinload(DigitalDocument.signatures),
-                selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requester),
-                selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requested_signer),
+                selectinload(DigitalDocument.artifacts),
+                selectinload(DigitalDocument.signature_validations),
+                selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requester).options(selectinload(User.permission_entries), joinedload(User.organization)),
+                selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requested_signer).options(selectinload(User.permission_entries), joinedload(User.organization)),
             )
             .where(DigitalDocument.id == document_id)
         )
@@ -1053,10 +1209,10 @@ class DocumentSignatureService:
             select(DocumentSignatureRequest)
             .options(
                 joinedload(DocumentSignatureRequest.document).selectinload(DigitalDocument.signatures),
-                joinedload(DocumentSignatureRequest.document).selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requester),
-                joinedload(DocumentSignatureRequest.document).selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requested_signer),
-                joinedload(DocumentSignatureRequest.requester),
-                joinedload(DocumentSignatureRequest.requested_signer),
+                joinedload(DocumentSignatureRequest.document).selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requester).options(selectinload(User.permission_entries), joinedload(User.organization)),
+                joinedload(DocumentSignatureRequest.document).selectinload(DigitalDocument.signature_requests).joinedload(DocumentSignatureRequest.requested_signer).options(selectinload(User.permission_entries), joinedload(User.organization)),
+                joinedload(DocumentSignatureRequest.requester).options(selectinload(User.permission_entries), joinedload(User.organization)),
+                joinedload(DocumentSignatureRequest.requested_signer).options(selectinload(User.permission_entries), joinedload(User.organization)),
             )
             .where(DocumentSignatureRequest.id == request_id)
         )
@@ -1089,6 +1245,11 @@ class DocumentSignatureService:
     ) -> dict:
         pending_count = sum(1 for request in document.signature_requests if request.status == DocumentSignatureRequestStatus.PENDING)
         declined_count = sum(1 for request in document.signature_requests if request.status == DocumentSignatureRequestStatus.DECLINED)
+        artifacts = list(getattr(document, "artifacts", []) or [])
+        signature_counts_by_method: dict[str, int] = {}
+        for signature in document.signatures:
+            method = getattr(signature, "signature_method", None) or DocumentSignatureMethod.INTERNAL_PASSWORD
+            signature_counts_by_method[method] = signature_counts_by_method.get(method, 0) + 1
         payload = {
             "document_id": document.id,
             "document_type": document.document_type,
@@ -1104,6 +1265,24 @@ class DocumentSignatureService:
             "pending_count": pending_count,
             "declined_count": declined_count,
             "is_complete": document.status == DigitalDocumentStatus.COMPLETED,
+            "signature_counts_by_method": signature_counts_by_method,
+            "canonical_artifact_available": any(
+                item.artifact_type == DigitalDocumentArtifactType.CANONICAL_PDF
+                for item in artifacts
+            ),
+            "certified_artifact_available": any(
+                item.artifact_type == DigitalDocumentArtifactType.CERTIFIED_PDF
+                for item in artifacts
+            ),
+            "certificate_signing_enabled": bool(
+                settings.CERTIFICATE_SIGNING_ENABLED
+                and document.source_type != 'VEHICLE_LOAN'
+                and settings.SIGNATURE_AGENT_ENABLED
+                and any(
+                    item.artifact_type == DigitalDocumentArtifactType.CANONICAL_PDF
+                    for item in artifacts
+                )
+            ),
             "signatures": [self._serialize_signature(signature) for signature in document.signatures],
             "requests": [self._serialize_request(request) for request in document.signature_requests],
             "created_by_user_id": document.created_by_user_id,
@@ -1136,36 +1315,39 @@ class DocumentSignatureService:
             "pending_count": summary.get("pending_count", 0),
             "declined_count": summary.get("declined_count", 0),
             "is_complete": bool(summary.get("is_complete")),
+            "signature_counts_by_method": dict(summary.get("signature_counts_by_method") or {}),
+            "canonical_artifact_available": bool(summary.get("canonical_artifact_available")),
+            "certified_artifact_available": bool(summary.get("certified_artifact_available")),
+            "certificate_signing_enabled": False,
             "signatures": [],
             "requests": [],
         }
 
     @staticmethod
     def sanitize_summary_for_legacy_public_view(summary: dict) -> dict:
-        """Preserve historical public validation without exposing contact or request data."""
-        payload = {
-            **summary,
-            "signatures": [
-                {
-                    key: value
-                    for key, value in signature.items()
-                    if key in {
-                        "id",
-                        "signer_name",
-                        "signer_role",
-                        "content_hash",
-                        "signature_fingerprint",
-                        "signed_at",
-                    }
-                }
-                for signature in summary.get("signatures", [])
-            ],
+        """Return workflow status only; never publish people or evidence data."""
+        return {
+            "document_id": None,
+            "document_type": summary.get("document_type"),
+            "source_id": None,
+            "status": summary.get("status", UNSIGNED_STATUS),
+            "title": summary.get("title"),
+            "content_hash": None,
+            "content_hash_short": None,
+            "public_validation_code": None,
+            "public_validation_path": None,
+            "required_signatures": summary.get("required_signatures", 1),
+            "signed_count": summary.get("signed_count", 0),
+            "pending_count": 0,
+            "declined_count": 0,
+            "is_complete": bool(summary.get("is_complete")),
+            "signature_counts_by_method": {},
+            "canonical_artifact_available": False,
+            "certified_artifact_available": False,
+            "certificate_signing_enabled": False,
+            "signatures": [],
             "requests": [],
         }
-        payload.pop("snapshot", None)
-        payload.pop("evidence_hmac", None)
-        payload.pop("created_by_user_id", None)
-        return payload
 
     def _serialize_signature(self, signature: DocumentSignature) -> dict:
         return {
@@ -1178,6 +1360,17 @@ class DocumentSignatureService:
             "signer_cpf_masked": signature.signer_cpf_masked,
             "content_hash": signature.content_hash,
             "signature_fingerprint": signature.signature_fingerprint,
+            "signature_method": getattr(signature, "signature_method", None) or DocumentSignatureMethod.INTERNAL_PASSWORD,
+            "signature_format": getattr(signature, "signature_format", None),
+            "artifact_id": getattr(signature, "artifact_id", None),
+            "certificate_fingerprint": getattr(signature, "certificate_fingerprint", None),
+            "certificate_issuer_summary": getattr(signature, "certificate_issuer_summary", None),
+            "certificate_serial_masked": getattr(signature, "certificate_serial_masked", None),
+            "certificate_valid_from": getattr(signature, "certificate_valid_from", None),
+            "certificate_valid_until": getattr(signature, "certificate_valid_until", None),
+            "signature_policy_oid": getattr(signature, "signature_policy_oid", None),
+            "timestamped_at": getattr(signature, "timestamped_at", None),
+            "validation_status": getattr(signature, "validation_status", None),
             "signed_at": signature.signed_at,
         }
 
@@ -1212,6 +1405,10 @@ class DocumentSignatureService:
             "pending_count": 0,
             "declined_count": 0,
             "is_complete": False,
+            "signature_counts_by_method": {},
+            "canonical_artifact_available": False,
+            "certified_artifact_available": False,
+            "certificate_signing_enabled": False,
             "signatures": [],
             "requests": [],
         }
@@ -1273,6 +1470,9 @@ class DocumentSignatureService:
         return f"AB-{str(order.id).split('-')[0].upper()}"
 
     def _permission_module_for_document_type(self, document_type: str) -> str:
+        from app.services.vehicle_loan_document_service import LOAN_DOCUMENT_TYPES
+        if document_type in LOAN_DOCUMENT_TYPES:
+            return 'vehicle_loans'
         if document_type in {
             DigitalDocumentType.POSSESSION_RESPONSIBILITY_TERM,
             DigitalDocumentType.POSSESSION_LOAN_TERM,
@@ -1286,3 +1486,9 @@ class DocumentSignatureService:
     def _ensure_ready(self) -> None:
         if self.db is None:
             raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Serviço de assinatura indisponível")
+
+    @staticmethod
+    def _ensure_flexible_signers(document):
+        from app.services.vehicle_loan_document_service import LOAN_DOCUMENT_TYPES
+        if document and document.document_type in LOAN_DOCUMENT_TYPES:
+            raise HTTPException(409, 'Os dois representantes da operação são obrigatórios e não podem ser substituídos neste termo')

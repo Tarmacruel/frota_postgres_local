@@ -1,0 +1,72 @@
+/* Opaque light-theme surfaces keep boundaries visible on washed-out displays.
+   Keep this palette scoped so the dark theme retains its own contrast values. */
+:root:not([data-theme='dark']) {
+  --ink-strong: #172b45;
+  --ink-soft: #43566d;
+  --surface: #ffffff;
+  --surface-strong: #ffffff;
+  --surface-muted: #edf2f8;
+  --surface-gradient: linear-gradient(180deg, #ffffff, #f4f7fb);
+  --line: #8a9aaf;
+  --line-soft: #a3b1c3;
+  --control-line: #75859c;
+  --body-bg: #e8eef5;
+  --hover-surface: #e3ebf6;
+  --chip-surface: #e8eef6;
+  --table-head: #dfe7f1;
+  --table-row-hover: #e2ecfa;
+  --shadow: 0 6px 20px rgba(24, 44, 70, .12);
+}
+
+:root:not([data-theme='dark']) :is(.app-input, .app-select, .app-textarea, .searchable-select-trigger) {
+  background-color: #ffffff;
+  border-color: var(--control-line);
+  color: var(--ink-strong);
+}
+
+:root:not([data-theme='dark']) :is(input, textarea)::placeholder {
+  color: #52647a;
+  opacity: 1;
+}
+
+:root:not([data-theme='dark']) :is(.app-input, .app-select, .app-textarea):focus {
+  border-color: var(--navy);
+}
+
+:root:not([data-theme='dark']) :is(button, a, input, select, textarea, summary):focus-visible {
+  outline: 2px solid #2452e8;
+  outline-offset: 3px;
+}
+
+:root:not([data-theme='dark']) :is(.ghost-button, .secondary-button, .mini-button) {
+  border: 1px solid var(--control-line);
+}
+
+:root:not([data-theme='dark']) :is(.data-table, .loan-table) th {
+  color: #243d5b;
+  background: var(--table-head);
+  border-bottom: 2px solid var(--line);
+}
+
+:root:not([data-theme='dark']) :is(.data-table, .loan-table) td {
+  border-bottom-color: var(--line);
+}
+
+:root:not([data-theme='dark']) :is(.data-table, .loan-table) tbody tr:nth-child(even) {
+  background: #f3f6fa;
+}
+
+:root:not([data-theme='dark']) :is(.data-table, .loan-table) tbody tr:hover {
+  background: var(--table-row-hover);
+}
+
+:root:not([data-theme='dark']) :is(.data-table tbody tr.is-focused-row, .loan-table tbody tr.loan-selected) {
+  background: #dce8fc;
+  box-shadow: inset 3px 0 #2452e8;
+}
+
+:root:not([data-theme='dark']) .nav-link.active {
+  background: #dce8fc;
+  border-color: #6e8dc4;
+  color: #163b9b;
+}

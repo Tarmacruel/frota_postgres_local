@@ -239,7 +239,12 @@ try {
         }
     }
 
-    Remove-Item -LiteralPath $workDir -Recurse -Force
+    $resolvedWorkDir = [IO.Path]::GetFullPath($workDir)
+    $resolvedBackupRoot = (Get-NormalizedPath $backupRootAbsolute) + [IO.Path]::DirectorySeparatorChar
+    if (-not $resolvedWorkDir.StartsWith($resolvedBackupRoot, [StringComparison]::OrdinalIgnoreCase)) {
+        throw "Diretorio temporario de backup fora da pasta autorizada: $resolvedWorkDir"
+    }
+    Remove-Item -LiteralPath $resolvedWorkDir -Recurse -Force
 
     Remove-OldBackups -Path $backupRootAbsolute -KeepCount $RetentionCount
     if ($mirrorRootAbsolute -and ((Get-NormalizedPath $mirrorRootAbsolute) -ne (Get-NormalizedPath $backupRootAbsolute))) {

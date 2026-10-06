@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from sqlalchemy import and_, or_, select
+from app.repositories.vehicle_scope import vehicle_visible, record_visible
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import aliased, joinedload, load_only
 from app.models.location_history import LocationHistory
@@ -50,12 +51,7 @@ class SearchRepository:
             .limit(limit)
         )
         if organization_id:
-            stmt = (
-                stmt
-                .join(Allocation, Allocation.id == active_history.allocation_id)
-                .join(Department, Department.id == Allocation.department_id)
-                .where(Department.organization_id == organization_id)
-            )
+            stmt = stmt.where(vehicle_visible(Vehicle.id, organization_id))
         result = await self.db.execute(stmt)
         rows = list(result.all())
         if include_personal_data:
@@ -106,14 +102,7 @@ class SearchRepository:
             .limit(limit)
         )
         if organization_id:
-            active_history = aliased(LocationHistory)
-            stmt = (
-                stmt
-                .join(active_history, and_(active_history.vehicle_id == VehiclePossession.vehicle_id, active_history.end_date.is_(None)))
-                .join(Allocation, Allocation.id == active_history.allocation_id)
-                .join(Department, Department.id == Allocation.department_id)
-                .where(Department.organization_id == organization_id)
-            )
+            stmt = stmt.where(record_visible(VehiclePossession.vehicle_id, VehiclePossession.start_date, organization_id))
         result = await self.db.execute(stmt)
         return list(result.scalars().unique().all())
 
@@ -136,13 +125,6 @@ class SearchRepository:
             .limit(limit)
         )
         if organization_id:
-            active_history = aliased(LocationHistory)
-            stmt = (
-                stmt
-                .join(active_history, and_(active_history.vehicle_id == MaintenanceRecord.vehicle_id, active_history.end_date.is_(None)))
-                .join(Allocation, Allocation.id == active_history.allocation_id)
-                .join(Department, Department.id == Allocation.department_id)
-                .where(Department.organization_id == organization_id)
-            )
+            stmt = stmt.where(record_visible(MaintenanceRecord.vehicle_id, MaintenanceRecord.start_date, organization_id))
         result = await self.db.execute(stmt)
         return list(result.scalars().unique().all())

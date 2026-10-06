@@ -3,8 +3,10 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 from sqlalchemy import func, or_, select
+from app.repositories.vehicle_scope import record_visible
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
+from app.models.driver import Driver
 from app.models.location_history import LocationHistory
 from app.models.master_data import Allocation, Department
 from app.models.possession import VehiclePossession
@@ -173,6 +175,7 @@ class PossessionRepository:
                         VehiclePossession.driver_name.ilike(term),
                         VehiclePossession.driver_document.ilike(term),
                         VehiclePossession.driver_contact.ilike(term),
+                        VehiclePossession.driver.has(Driver.matricula.ilike(term)),
                     ]
                 )
             search_predicate = or_(*search_conditions)
@@ -185,16 +188,27 @@ class PossessionRepository:
         return items, total
 
     def _filter_by_active_organization(self, stmt, organization_id: UUID):
-        return (
-            stmt
-            .join(LocationHistory, LocationHistory.vehicle_id == VehiclePossession.vehicle_id)
-            .join(Allocation, Allocation.id == LocationHistory.allocation_id)
-            .join(Department, Department.id == Allocation.department_id)
+        return stmt.where(record_visible(VehiclePossession.vehicle_id, VehiclePossession.start_date, organization_id))
+
+    async def get_odometer_suggestion(self, vehicle_id: UUID, start_date: datetime):
+        result = await self.db.execute(
+            select(VehiclePossession.end_odometer_km, VehiclePossession.end_date)
             .where(
-                LocationHistory.end_date.is_(None),
-                Department.organization_id == organization_id,
+                VehiclePossession.vehicle_id == vehicle_id,
+                VehiclePossession.end_date <= start_date,
+                VehiclePossession.end_odometer_km.is_not(None),
             )
+            .order_by(
+                VehiclePossession.end_date.desc(),
+                VehiclePossession.created_at.desc(),
+                VehiclePossession.id.desc(),
+            )
+            .limit(1)
         )
+        record = result.first()
+        if record is None:
+            return None
+        return {"odometer_km": record.end_odometer_km, "end_date": record.end_date}
 
     async def get_active_by_vehicle(
         self,

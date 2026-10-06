@@ -1,3 +1,5 @@
+import JustificationField from '../components/JustificationField'
+import PageHeader from '../components/ui/PageHeader'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   Area,
@@ -17,6 +19,7 @@ import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
 import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
+import { useDialogFocus } from '../hooks/useDialogFocus'
 import { getApiErrorMessage } from '../utils/apiError'
 import { previewRowsToPdf } from '../utils/exportData'
 
@@ -751,23 +754,21 @@ export default function PaymentProcessesPage() {
   const closeProcessDetail = useCallback(() => setSelectedProcess(null), [])
 
   return (
-    <div className="page-shell payment-process-page payment-workflow-page">
-      <section className="panel-heading payment-workflow-heading">
-        <div>
-          <h1 className="section-title">Processos de pagamento</h1>
-          <p className="section-copy">Workflow financeiro de combustíveis e manutenção por fatura, contrato, etapa e pendência.</p>
-        </div>
-        <div className="payment-process-actions">
+    <div className="page-shell payment-process-page payment-workflow-page management-page management-page--payments">
+      <PageHeader
+        title="Processos de pagamento"
+        description="Workflow financeiro de combustíveis e manutenção por fatura, contrato, etapa e pendência."
+        actions={<>
           {canManage ? <button className="app-button" type="button" onClick={openCreateProcess}>Novo processo</button> : null}
           <button type="button" className="secondary-button" onClick={previewPdfReport} disabled={reporting}>{reporting ? 'Gerando PDF...' : 'Relatório PDF'}</button>
           <button type="button" className="secondary-button" onClick={exportCurrent}>Exportar XLSX</button>
-        </div>
-      </section>
+        </>}
+      />
 
       {error ? <div className="alert alert-error">{error}</div> : null}
       {feedback ? <div className="alert alert-success">{feedback}</div> : null}
 
-      <section className="payment-workflow-tabs" aria-label="Modos do módulo">
+      <section className="payment-workflow-tabs management-tabs" aria-label="Modos do módulo">
         {[
           { value: 'processes', label: 'Processos' },
           { value: 'imports', label: 'Importacao' },
@@ -775,7 +776,7 @@ export default function PaymentProcessesPage() {
           { value: 'contracts', label: 'Contratos' },
           { value: 'suppliers', label: 'Fornecedores' },
         ].map((tab) => (
-          <button key={tab.value} type="button" className={`status-pill ${activeView === tab.value ? 'active' : ''}`} onClick={() => setActiveView(tab.value)}>
+          <button key={tab.value} type="button" aria-pressed={activeView === tab.value} className={`status-pill ${activeView === tab.value ? 'active' : ''}`} onClick={() => setActiveView(tab.value)}>
             {tab.label}
           </button>
         ))}
@@ -847,7 +848,7 @@ export default function PaymentProcessesPage() {
                 <span className="muted">{pagination.total} registro(s)</span>
               </div>
               <div className="table-wrap table-wrap-wide">
-                <table className="data-table payment-process-table payment-workflow-table">
+                <table className="data-table management-table payment-process-table payment-workflow-table">
                   <thead>
                     <tr>
                       <th>Processo</th>
@@ -867,7 +868,7 @@ export default function PaymentProcessesPage() {
                       <tr><td colSpan={8}><div className="empty-state">Nenhum processo encontrado.</div></td></tr>
                     ) : records.map((item) => (
                       <tr key={item.id} className={selectedProcess?.id === item.id ? 'is-selected' : ''} onClick={() => openProcess(item.id)}>
-                        <td data-label="Processo"><strong>{item.process_number}</strong><br /><span className="muted">{kindLabel(item.kind)} . {item.system || '-'}</span></td>
+                        <td data-label="Processo"><button type="button" className="payment-process-open" onClick={(event) => { event.stopPropagation(); openProcess(item.id) }}>{item.process_number}</button><br /><span className="muted">{kindLabel(item.kind)} . {item.system || '-'}</span></td>
                         <td data-label="Etapa"><span className={`status-badge status-${statusTone(item.stage)}`}>{item.stage_label || stageLabel(item.stage)}</span><br /><span className="muted">{item.stage_owner || '-'}</span></td>
                         <td data-label="Fornecedor / contrato"><strong>{item.supplier_name || '-'}</strong><br /><span className="muted">{item.contract_number || '-'}</span></td>
                         <td data-label="NF / fatura"><strong>{item.invoice_number || '-'}</strong><br /><span className="muted">{item.billing_number || '-'}</span></td>
@@ -1067,8 +1068,8 @@ export default function PaymentProcessesPage() {
               <>Processo <strong>{deleteProcessTarget.process_number}</strong> será removido definitivamente.</>
             ) : 'Selecione um processo para exclusão.'}
           </div>
-          <Field label="Justificativa da exclusão">
-            <textarea
+          <div className="form-field">
+            <JustificationField context="payment_delete" label="Justificativa da exclusão"
               className="app-textarea"
               rows="4"
               value={deleteProcessReason}
@@ -1079,7 +1080,7 @@ export default function PaymentProcessesPage() {
               placeholder="Ex.: cadastro duplicado na importação de junho."
               disabled={deletingProcess}
             />
-          </Field>
+          </div>
           <div className="actions-inline modal-actions">
             <button className="ghost-button" type="button" onClick={closeDeleteProcessModal} disabled={deletingProcess}>Cancelar</button>
             <button className="mini-button danger payment-delete-confirm" type="submit" disabled={deletingProcess || deleteProcessReason.trim().length < 8}>
@@ -1135,22 +1136,7 @@ function ProcessDetail({
   onDelete,
   onClose,
 }) {
-  useEffect(() => {
-    if (!process) return undefined
-
-    const previousOverflow = document.body.style.overflow
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') onClose()
-    }
-
-    document.body.style.overflow = 'hidden'
-    window.addEventListener('keydown', handleKeyDown)
-
-    return () => {
-      document.body.style.overflow = previousOverflow
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [process, onClose])
+  const dialogRef = useDialogFocus(Boolean(process), onClose)
 
   if (!process) {
     return null
@@ -1158,7 +1144,7 @@ function ProcessDetail({
 
   return (
     <div className="payment-detail-drawer-backdrop" role="presentation" onMouseDown={onClose}>
-      <aside
+      <aside ref={dialogRef} tabIndex={-1}
         className="toolbar-card payment-process-panel payment-detail-panel payment-detail-drawer"
         role="dialog"
         aria-modal="true"
@@ -1342,12 +1328,12 @@ function ImportsView({
           <span className="muted">{importResult ? `${importResult.total_rows} linha(s)` : 'Aguardando importação'}</span>
         </div>
         {importResult ? (
-          <div className="payment-import-result payment-import-result-grid">
+          <div className="payment-import-result payment-import-result-grid" role="status">
             <span>{importResult.total_rows} linhas</span>
             <span>{importResult.created} criadas</span>
             <span>{importResult.updated} atualizadas</span>
             <span>{importResult.skipped} ignoradas</span>
-            <span>{importResult.errors} erros</span>
+            <span className={importResult.errors ? 'management-result-error' : ''}>{importResult.errors} erros</span>
           </div>
         ) : (
           <div className="empty-state">Nenhuma importação executada nesta sessão.</div>
@@ -1516,6 +1502,7 @@ function ContractManagementView({ contracts, suppliers }) {
                 key={item.contract_id}
                 type="button"
                 className={`payment-management-rank-row ${selectedContractId === item.contract_id ? 'is-selected' : ''}`}
+                aria-pressed={selectedContractId === item.contract_id}
                 onClick={() => setSelectedContractId(item.contract_id)}
               >
                 <span>
@@ -1681,25 +1668,13 @@ function ManagementDetailTable({ rows, type }) {
 }
 
 function KpiDrawer({ kpi, detail, rows, onClose }) {
-  useEffect(() => {
-    if (!kpi) return undefined
-    const previousOverflow = document.body.style.overflow
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') onClose()
-    }
-    document.body.style.overflow = 'hidden'
-    window.addEventListener('keydown', handleKeyDown)
-    return () => {
-      document.body.style.overflow = previousOverflow
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [kpi, onClose])
+  const dialogRef = useDialogFocus(Boolean(kpi), onClose)
 
   if (!kpi) return null
 
   return (
     <div className="payment-detail-drawer-backdrop" role="presentation" onMouseDown={onClose}>
-      <aside className="toolbar-card payment-process-panel payment-detail-panel payment-detail-drawer payment-kpi-drawer" role="dialog" aria-modal="true" aria-labelledby="payment-kpi-title" onMouseDown={(event) => event.stopPropagation()}>
+      <aside ref={dialogRef} tabIndex={-1} className="toolbar-card payment-process-panel payment-detail-panel payment-detail-drawer payment-kpi-drawer" role="dialog" aria-modal="true" aria-labelledby="payment-kpi-title" onMouseDown={(event) => event.stopPropagation()}>
         <div className="payment-detail-header">
           <div>
             <span className="muted">Indicador</span>
@@ -1759,7 +1734,7 @@ function ContractsView({
             {canManage ? <button className="app-button" type="button" onClick={openCreateContract}>Novo contrato</button> : null}
           </div>
           <div className="table-wrap table-wrap-wide">
-            <table className="data-table payment-contract-table">
+            <table className="data-table management-table payment-contract-table">
               <thead>
                 <tr>
                   <th>Fornecedor</th>
@@ -1779,7 +1754,7 @@ function ContractsView({
                 ) : contracts.map((contract) => (
                   <tr key={contract.id} className={selectedContract?.id === contract.id ? 'is-selected' : ''} onClick={() => setSelectedContract(contract)}>
                     <td data-label="Fornecedor"><strong>{contract.supplier_name || '-'}</strong><br /><span className="muted">{kindLabel(contract.kind)}</span></td>
-                    <td data-label="Número"><strong>{contract.number}</strong><br /><span className="muted">{contract.contract_type || '-'}</span></td>
+                    <td data-label="Número"><button type="button" className="management-record-open" aria-pressed={selectedContract?.id === contract.id} onClick={(event) => { event.stopPropagation(); setSelectedContract(contract) }}>{contract.number}</button><br /><span className="muted">{contract.contract_type || '-'}</span></td>
                     <td data-label="Status"><span className={`status-badge status-${statusTone(contract.status)}`}>{contract.status}</span></td>
                     <td data-label="Vigencia">{formatDate(contract.valid_from)} a {formatDate(contract.valid_until)}</td>
                     <td data-label="Atualizado">{formatCurrency(contract.value_updated)}</td>
@@ -1885,28 +1860,13 @@ function ContractFormDrawer({
   saveContract,
   onClose,
 }) {
-  useEffect(() => {
-    if (!open) return undefined
-
-    const previousOverflow = document.body.style.overflow
-    const handleKeyDown = (event) => {
-      if (event.key === 'Escape') onClose()
-    }
-
-    document.body.style.overflow = 'hidden'
-    window.addEventListener('keydown', handleKeyDown)
-
-    return () => {
-      document.body.style.overflow = previousOverflow
-      window.removeEventListener('keydown', handleKeyDown)
-    }
-  }, [open, onClose])
+  const dialogRef = useDialogFocus(open, onClose)
 
   if (!open) return null
 
   return (
     <div className="payment-detail-drawer-backdrop" role="presentation" onMouseDown={onClose}>
-      <aside
+      <aside ref={dialogRef} tabIndex={-1}
         className="toolbar-card payment-process-panel payment-detail-panel payment-detail-drawer payment-contract-form-drawer"
         role="dialog"
         aria-modal="true"
@@ -2015,7 +1975,10 @@ function SuppliersView({
   return (
     <section className="payment-workspace">
       <div className="toolbar-card payment-process-panel payment-process-list-panel">
-        <h2 className="section-title">Fornecedores</h2>
+        <div className="payment-section-head">
+          <h2 className="section-title">Fornecedores</h2>
+          <span className="muted">{suppliers.length} fornecedor(es)</span>
+        </div>
         <div className="payment-supplier-list">
           {suppliers.map((supplier) => (
             <div key={supplier.id} className="payment-supplier-row">

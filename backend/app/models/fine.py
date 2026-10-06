@@ -9,6 +9,7 @@ from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Index, Integer
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
+from app.models.operational_responsibility import OperationalResponsibilityMixin
 
 
 class FineStatus(str, enum.Enum):
@@ -48,7 +49,7 @@ class FineInfraction(Base):
     fines: Mapped[list["Fine"]] = relationship(back_populates="infraction_type")
 
 
-class Fine(Base):
+class Fine(OperationalResponsibilityMixin, Base):
     __tablename__ = "fines"
     __table_args__ = (
         Index("idx_fines_vehicle", "vehicle_id"),

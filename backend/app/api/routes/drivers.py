@@ -12,11 +12,14 @@ from app.services.driver_service import DriverService
 
 router = APIRouter(prefix="/api/drivers", tags=["Drivers"])
 
+ACTIVE_DRIVER_LIST_DEFAULT_LIMIT = 1000
+ACTIVE_DRIVER_LIST_MAX_LIMIT = 5000
+
 
 @router.get("/active", response_model=list[DriverOut])
 async def list_active_drivers(
     search: str | None = Query(default=None),
-    limit: int = Query(default=100, ge=1, le=200),
+    limit: int = Query(default=ACTIVE_DRIVER_LIST_DEFAULT_LIMIT, ge=1, le=ACTIVE_DRIVER_LIST_MAX_LIMIT),
     organization_id: UUID | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("drivers", "view")),

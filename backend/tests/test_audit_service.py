@@ -100,3 +100,38 @@ async def test_record_adds_request_context_and_redacts_sensitive_details():
     assert audit_log.details["access_token"] == "[REDACTED]"
     assert audit_log.details["attachment"] == "[BINARY_OMITTED]"
     assert "must-not-be-recorded" not in str(audit_log.details)
+
+
+@pytest.mark.asyncio
+async def test_certificate_secrets_and_identity_are_minimized_in_audit():
+    repository = FakeAuditRepository()
+    service = AuditService(db=None)
+    service.audit_logs = repository
+    actor = SimpleNamespace(
+        id=uuid4(),
+        name="Operador",
+        email="operador@example.invalid",
+        role=SimpleNamespace(value="ADMIN"),
+    )
+
+    audit_log = await service.record(
+        actor=actor,
+        action="CERTIFICATE_CLAIM",
+        entity_type="DIGITAL_DOCUMENT",
+        entity_id=uuid4(),
+        entity_label="Termo sintético",
+        details={
+            "certificate_subject": "CN=Nome Completo:52998224725",
+            "subject_alt_name": "2.16.76.1.3.1=0101199052998224725",
+            "raw_signature": "base64-signature",
+            "certificate_der": "base64-certificate-with-subject",
+            "pin": "1234",
+        },
+    )
+
+    assert audit_log.details["certificate_subject"].startswith("***")
+    assert "52998224725" not in audit_log.details["certificate_subject"]
+    assert audit_log.details["subject_alt_name"].startswith("***")
+    assert audit_log.details["raw_signature"] == "[REDACTED]"
+    assert audit_log.details["certificate_der"] == "[REDACTED]"
+    assert audit_log.details["pin"] == "[REDACTED]"

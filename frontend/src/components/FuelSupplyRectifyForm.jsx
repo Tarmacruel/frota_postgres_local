@@ -1,8 +1,12 @@
-import { useMemo, useState } from 'react'
+import JustificationField from './JustificationField'
+import { useMemo, useRef, useState } from 'react'
 import { fuelSuppliesAPI } from '../api/fuelSupplies'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
 import { ADDITIVE_TYPE_OPTIONS, FUEL_TYPE_OPTIONS, resolveOptionValue } from '../utils/fuelSupplyDetails'
+
+const MAX_RECEIPT_SIZE_BYTES = 8 * 1024 * 1024
+const ALLOWED_RECEIPT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
 
 function selectKnownOption(value, options) {
   if (!value) return { selected: '', other: '' }
@@ -29,10 +33,38 @@ export default function FuelSupplyRectifyForm({ record, onClose, onSuccess }) {
   })
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
+  const [receiptFile, setReceiptFile] = useState(null)
+  const [receiptError, setReceiptError] = useState('')
+  const receiptRef = useRef(null)
+  const submittingRef = useRef(false)
   const submitLabel = useMemo(() => (submitting ? 'Salvando retificação...' : 'Salvar retificação'), [submitting])
+
+  function clearReceipt() {
+    setReceiptFile(null)
+    setReceiptError('')
+    if (receiptRef.current) receiptRef.current.value = ''
+  }
+
+  function handleReceiptChange(event) {
+    const file = event.target.files?.[0] || null
+    setReceiptFile(null)
+    setReceiptError('')
+    if (!file) return
+    let message = ''
+    if (!ALLOWED_RECEIPT_TYPES.includes(file.type)) message = 'Comprovante deve ser PDF, JPG, PNG ou WEBP.'
+    else if (!file.size) message = 'Comprovante enviado está vazio.'
+    else if (file.size > MAX_RECEIPT_SIZE_BYTES) message = 'Comprovante deve ter no máximo 8 MB.'
+    if (message) {
+      setReceiptError(message)
+      if (receiptRef.current) receiptRef.current.value = ''
+      return
+    }
+    setReceiptFile(file)
+  }
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if (submittingRef.current || receiptError) return
     setError('')
     const fuelType = resolveOptionValue(form.fuel_type, form.fuel_type_other)
     const additiveType = form.additive_enabled ? resolveOptionValue(form.additive_type, form.additive_type_other) : null
@@ -59,8 +91,9 @@ export default function FuelSupplyRectifyForm({ record, onClose, onSuccess }) {
     }
 
     try {
+      submittingRef.current = true
       setSubmitting(true)
-      await fuelSuppliesAPI.rectify(record.id, {
+      const data = {
         supplied_at: new Date(form.supplied_at).toISOString(),
         odometer_km: Number(form.odometer_km),
         liters: Number(form.liters),
@@ -72,21 +105,29 @@ export default function FuelSupplyRectifyForm({ record, onClose, onSuccess }) {
           : null,
         notes: form.notes.trim() || null,
         reason: form.reason.trim(),
-      })
+      }
+      let payload = data
+      if (receiptFile) {
+        payload = new FormData()
+        payload.append('payload', JSON.stringify(data))
+        payload.append('receipt', receiptFile, receiptFile.name)
+      }
+      await fuelSuppliesAPI.rectify(record.id, payload)
       onSuccess?.(`Abastecimento do veículo ${record.vehicle_plate} retificado com sucesso.`)
       onClose?.()
     } catch (err) {
       setError(getApiErrorMessage(err, 'Não foi possível retificar o abastecimento.'))
     } finally {
+      submittingRef.current = false
       setSubmitting(false)
     }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
+    <form onSubmit={handleSubmit} className="form-grid modal-form-grid fuel-supply-rectify-form">
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
       <div className="alert alert-info modal-field-span">
-        O comprovante anexado será preservado. Valores derivados de consumo serão recalculados.
+        Você pode corrigir os dados e substituir o comprovante. Sem novo arquivo, o comprovante atual será mantido. Valores derivados de consumo serão recalculados quando necessário.
       </div>
 
       <div className="form-field">
@@ -148,17 +189,26 @@ export default function FuelSupplyRectifyForm({ record, onClose, onSuccess }) {
       ) : null}
 
       <div className="form-field modal-field-span">
+        <label htmlFor="rectify-receipt">Novo comprovante (opcional)</label>
+        {record.receipt_url ? <a href={record.receipt_url} target="_blank" rel="noreferrer">Ver comprovante atual</a> : null}
+        <input id="rectify-receipt" ref={receiptRef} type="file" className="app-input" accept=".pdf,image/jpeg,image/png,image/webp" onChange={handleReceiptChange} disabled={submitting} aria-describedby="rectify-receipt-help" aria-invalid={Boolean(receiptError)} />
+        <small id="rectify-receipt-help" className="muted">PDF, JPG, PNG ou WEBP, até 8 MB. O arquivo anterior será preservado para auditoria.</small>
+        {receiptError ? <small className="form-error" role="alert">{receiptError}</small> : null}
+        {receiptFile || receiptError ? <button type="button" className="ghost-button" onClick={clearReceipt} disabled={submitting}>Manter comprovante atual</button> : null}
+      </div>
+
+      <div className="form-field modal-field-span">
         <label htmlFor="rectify-notes">Observações</label>
         <textarea id="rectify-notes" className="app-textarea" rows="2" value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} maxLength={4000} />
       </div>
       <div className="form-field modal-field-span">
         <label htmlFor="rectify-reason">Justificativa da retificação</label>
-        <textarea id="rectify-reason" className="app-textarea" rows="3" value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} minLength={10} maxLength={1000} required />
+        <JustificationField context="fuel_supply" id="rectify-reason" className="app-textarea" rows="3" value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} minLength={10} maxLength={1000} required disabled={submitting} />
         <small className="muted">A justificativa e os valores anterior e novo ficarão registrados na auditoria.</small>
       </div>
 
       <div className="actions-inline modal-actions">
-        <button className="app-button" type="submit" disabled={submitting}>{submitLabel}</button>
+        <button className="app-button" type="submit" disabled={submitting || Boolean(receiptError)}>{submitLabel}</button>
         <button className="ghost-button" type="button" onClick={onClose} disabled={submitting}>Cancelar</button>
       </div>
     </form>

@@ -5,6 +5,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import and_, cast, func, or_, select
+from app.repositories.vehicle_scope import responsible_to
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 from sqlalchemy.types import String
@@ -303,17 +304,8 @@ class PaymentProcessRepository:
         stmt = select(MaintenanceRecord).options(joinedload(MaintenanceRecord.vehicle))
         filters = []
         if organization_ids:
-            stmt = (
-                stmt.join(LocationHistory, LocationHistory.vehicle_id == MaintenanceRecord.vehicle_id)
-                .join(Allocation, Allocation.id == LocationHistory.allocation_id)
-                .join(Department, Department.id == Allocation.department_id)
-            )
-            filters.extend(
-                [
-                    LocationHistory.end_date.is_(None),
-                    Department.organization_id.in_(organization_ids),
-                ]
-            )
+            filters.append(or_(*(responsible_to(MaintenanceRecord, MaintenanceRecord.start_date, org)
+                                  for org in organization_ids)))
         if start_at:
             filters.append(MaintenanceRecord.start_date >= start_at)
         if filters:

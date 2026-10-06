@@ -1,5 +1,6 @@
 export const PERMISSION_MODULES = [
   { key: 'vehicles', label: 'Veículos' },
+  { key: 'vehicle_loans', label: 'Empréstimos entre secretarias' },
   { key: 'possession', label: 'Posses' },
   { key: 'drivers', label: 'Condutores' },
   { key: 'maintenance', label: 'Manutenções' },

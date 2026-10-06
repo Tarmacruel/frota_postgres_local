@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import json
 from pathlib import Path
+from urllib.parse import urlparse
 from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
@@ -56,8 +57,25 @@ class Settings(BaseSettings):
     ]
     APP_ENV: str = "development"
     ENABLE_LEGACY_FUEL_SUPPLY_CREATE: bool = False
+    CERTIFICATE_SIGNING_ENABLED: bool = False
+    CANONICAL_DOCUMENT_ARTIFACTS_ENABLED: bool = False
+    SIGNATURE_AGENT_ENABLED: bool = False
+    HOMOLOGATION_CERTIFICATE_TARGETS_ONLY: bool = True
+    DIGITAL_DOCUMENT_ARTIFACTS_DIR: Path | None = None
+    CERTIFICATE_SIGNING_SESSION_TTL_SECONDS: int = Field(default=300, ge=60, le=600)
+    SIGNATURE_AGENT_PAIRING_TTL_SECONDS: int = Field(default=300, ge=60, le=600)
+    SIGNATURE_AGENT_PROOF_MAX_SKEW_SECONDS: int = Field(default=90, ge=30, le=300)
+    SIGNATURE_BACKEND_BASE_URL: str = "http://127.0.0.1:8010"
+    SIGNATURE_PREPARED_STATE_DIR: Path | None = None
+    SIGNATURE_AGENT_ARTIFACT_DIR: Path = BASE_DIR.parent / "signature-agent" / "artifacts" / "win-x64"
+    ICP_BRASIL_TRUST_STORE_DIR: Path | None = None
+    SIGNATURE_TSA_URL: str | None = None
+    SIGNATURE_TSA_USERNAME: str | None = None
+    SIGNATURE_TSA_PASSWORD: str | None = None
+    SIGNATURE_ALLOW_NETWORK_FETCHING: bool = False
+    SIGNATURE_REQUIRE_REVOCATION: bool = True
 
-    model_config = SettingsConfigDict(env_file=str(BASE_DIR / ".env"), extra="ignore")
+    model_config = SettingsConfigDict(env_file=str(BASE_DIR / ".env"), env_file_encoding="utf-8-sig", extra="ignore")
 
     @field_validator("CORS_ORIGINS", mode="before")
     @classmethod
@@ -80,9 +98,60 @@ class Settings(BaseSettings):
             return json.loads(value)
         return value
 
+    @field_validator(
+        "DIGITAL_DOCUMENT_ARTIFACTS_DIR",
+        "SIGNATURE_PREPARED_STATE_DIR",
+        "ICP_BRASIL_TRUST_STORE_DIR",
+        mode="before",
+    )
+    @classmethod
+    def parse_optional_path(cls, value):
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
+    @field_validator("SIGNATURE_AGENT_ARTIFACT_DIR", mode="before")
+    @classmethod
+    def parse_agent_artifact_path(cls, value):
+        if isinstance(value, str) and not value.strip():
+            return BASE_DIR.parent / "signature-agent" / "artifacts" / "win-x64"
+        return value
+
+    @field_validator(
+        "SIGNATURE_TSA_URL",
+        "SIGNATURE_TSA_USERNAME",
+        "SIGNATURE_TSA_PASSWORD",
+        mode="before",
+    )
+    @classmethod
+    def parse_optional_string(cls, value):
+        if isinstance(value, str) and not value.strip():
+            return None
+        return value
+
     @model_validator(mode="after")
     def validate_production_security(self):
         self.APP_ENV = self.APP_ENV.strip().lower()
+        backend_url = urlparse(self.SIGNATURE_BACKEND_BASE_URL)
+        if backend_url.scheme not in {"http", "https"} or not backend_url.hostname:
+            raise ValueError("SIGNATURE_BACKEND_BASE_URL deve ser uma URL HTTP(S) absoluta")
+        if self.CERTIFICATE_SIGNING_ENABLED:
+            if not self.CANONICAL_DOCUMENT_ARTIFACTS_ENABLED or not self.SIGNATURE_AGENT_ENABLED:
+                raise ValueError(
+                    "Assinatura por certificado exige artefatos canonicos e agente habilitados"
+                )
+            if self.ICP_BRASIL_TRUST_STORE_DIR is None or not self.SIGNATURE_TSA_URL:
+                raise ValueError(
+                    "Assinatura por certificado exige trust store ICP-Brasil e TSA configurados"
+                )
+            tsa_url = urlparse(self.SIGNATURE_TSA_URL)
+            local_hml_tsa = (
+                self.APP_ENV == "homologation"
+                and tsa_url.scheme == "http"
+                and tsa_url.hostname in {"127.0.0.1", "localhost"}
+            )
+            if tsa_url.scheme != "https" and not local_hml_tsa:
+                raise ValueError("SIGNATURE_TSA_URL deve usar HTTPS, salvo TSA local da homologacao")
         if self.APP_ENV != "production":
             return self
 

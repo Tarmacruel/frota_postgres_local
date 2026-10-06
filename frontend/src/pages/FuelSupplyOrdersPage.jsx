@@ -1,9 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import DocumentSignaturePanel from '../components/DocumentSignaturePanel'
 import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
 import FuelSupplyOrderConfirmForm from '../components/FuelSupplyOrderConfirmForm'
+import { ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 import { DIGITAL_DOCUMENT_TYPES } from '../api/documentSignatures'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { useAuth } from '../context/AuthContext'
@@ -38,7 +40,7 @@ function formatOrderNumber(order) {
 }
 
 function pickDeadline(order) {
-  return order.deadline_at || order.due_at || order.expected_supply_until || order.expected_at || null
+  return order.expires_at || order.deadline_at || order.due_at || order.expected_supply_until || order.expected_at || null
 }
 
 function getDeadlineMeta(order) {
@@ -66,6 +68,8 @@ function getDeadlineMeta(order) {
 }
 
 export default function FuelSupplyOrdersPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const focusedOrderId = searchParams.get('focus')
   const { canEdit } = useAuth()
   const canConfirmOrder = canEdit('fuel_supply_orders')
   const { organizations } = useMasterDataCatalog()
@@ -105,6 +109,21 @@ export default function FuelSupplyOrdersPage() {
   useEffect(() => {
     loadOrders()
   }, [organizationFilter])
+
+  useEffect(() => {
+    if (!focusedOrderId) return undefined
+    let mounted = true
+    fuelSupplyOrdersAPI.getById(focusedOrderId)
+      .then(({ data }) => {
+        if (mounted) setSignatureOrder(data)
+      })
+      .catch((err) => {
+        if (mounted) setError(getApiErrorMessage(err, 'Não foi possível abrir a ordem vinculada à assinatura pendente.'))
+      })
+    return () => {
+      mounted = false
+    }
+  }, [focusedOrderId])
 
   const filteredOrders = useMemo(() => {
     const term = search.trim().toLowerCase()
@@ -147,16 +166,22 @@ export default function FuelSupplyOrdersPage() {
     setOrders((current) => current.map((order) => (order.id === signatureOrder.id ? nextOrder : order)))
   }
 
-  return (
-    <div className="surface-panel">
-      <div className="panel-heading">
-        <div>
-          <h2 className="section-title">Ordens de abastecimento abertas</h2>
-          <p className="section-copy">Confirme abastecimentos pendentes e acompanhe prazos em tempo real.</p>
-        </div>
-      </div>
+  function closeSignatureOrder() {
+    setSignatureOrder(null)
+    if (!focusedOrderId) return
+    const next = new URLSearchParams(searchParams)
+    next.delete('focus')
+    setSearchParams(next, { replace: true })
+  }
 
-      <div className="toolbar-card">
+  return (
+    <div className="surface-panel operation-page operation-page--open-orders">
+      <PageHeader
+        title="Ordens de abastecimento abertas"
+        description="Confirme abastecimentos pendentes e acompanhe prazos em tempo real."
+      />
+
+      <div className="toolbar-card operation-toolbar">
         <div className="filter-inline">
           <input
             className="app-input"
@@ -178,9 +203,9 @@ export default function FuelSupplyOrdersPage() {
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
-      <div className="surface-panel panel-nested">
-        <div className="table-wrap table-wrap-wide">
-          <table className="data-table data-table-wide">
+      <div className="surface-panel panel-nested operation-module">
+        <div className="table-wrap table-wrap-wide operation-table-card">
+          <table className="data-table data-table-wide operation-table">
             <thead>
               <tr>
                 <th>Ordem</th>
@@ -202,9 +227,12 @@ export default function FuelSupplyOrdersPage() {
                   <tr key={order.id}>
                     <td data-label="Ordem">{formatOrderNumber(order)}</td>
                     <td data-label="Veículo">
-                      <div className="stack">
+                      <div className="operation-vehicle-identity">
+                        <VehicleThumbnail vehicleType={order.vehicle_type} plate={order.vehicle_plate} />
+                        <span>
                         <strong>{order.vehicle_plate || '-'}</strong>
                         <span className="muted">{order.organization_name || 'Sem secretaria informada'}</span>
+                        </span>
                       </div>
                     </td>
                     <td data-label="Posto">
@@ -221,7 +249,7 @@ export default function FuelSupplyOrdersPage() {
                     <td data-label="Solicitada em">{formatDate(order.requested_at || order.created_at)}</td>
                     <td data-label="Prazo">
                       <div>{formatDate(pickDeadline(order))}</div>
-                      <span className={`deadline-pill ${deadlineMeta.tone}`}>{deadlineMeta.label}</span>
+                      <StatusChip tone={deadlineMeta.tone}>{deadlineMeta.label}</StatusChip>
                     </td>
                     <td data-label="Solicitante">
                       <div className="stack">
@@ -231,10 +259,15 @@ export default function FuelSupplyOrdersPage() {
                     </td>
                     <td data-label="Litros previstos">{formatNumber(order.requested_liters)}</td>
                     <td data-label="Ações">
-                      <div className="actions-inline">
-                        <button className="mini-button" type="button" onClick={() => handlePreviewOrderDocument(order)}>Comprovante</button>
-                        <button className="mini-button" type="button" onClick={() => setSignatureOrder(order)}>Assinatura</button>
+                      <div className="operation-row-actions">
                         {canConfirmOrder ? <button className="app-button" type="button" onClick={() => setSelectedOrder(order)}>Confirmar abastecimento</button> : null}
+                        <ActionMenu
+                          label={`Mais ações da ordem ${formatOrderNumber(order)}`}
+                          items={[
+                            { key: 'receipt', label: 'Abrir comprovante', onClick: () => handlePreviewOrderDocument(order) },
+                            { key: 'signature', label: 'Consultar assinatura', onClick: () => setSignatureOrder(order) },
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -266,7 +299,7 @@ export default function FuelSupplyOrdersPage() {
 
       <Modal
         open={Boolean(signatureOrder)}
-        onClose={() => setSignatureOrder(null)}
+        onClose={closeSignatureOrder}
         title="Assinatura da ordem"
         description={signatureOrder ? `Assinatura eletrônica institucional da ordem ${formatOrderNumber(signatureOrder)}.` : ''}
       >
@@ -277,6 +310,7 @@ export default function FuelSupplyOrdersPage() {
             summary={signatureOrder.signature_summary}
             title="Assinatura da ordem de abastecimento"
             onChanged={handleOrderSignatureChanged}
+            readOnly={!canConfirmOrder}
           />
         ) : null}
       </Modal>

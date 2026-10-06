@@ -5,6 +5,8 @@ from uuid import UUID
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.models.document_signature import DocumentSignatureMethod
+
 
 class DigitalDocumentCreate(BaseModel):
     document_type: str = Field(max_length=60)
@@ -46,6 +48,17 @@ class DocumentSignatureOut(BaseModel):
     signer_cpf_masked: str | None = None
     content_hash: str
     signature_fingerprint: str
+    signature_method: str = DocumentSignatureMethod.INTERNAL_PASSWORD
+    signature_format: str | None = None
+    artifact_id: UUID | None = None
+    certificate_fingerprint: str | None = None
+    certificate_issuer_summary: str | None = None
+    certificate_serial_masked: str | None = None
+    certificate_valid_from: datetime | None = None
+    certificate_valid_until: datetime | None = None
+    signature_policy_oid: str | None = None
+    timestamped_at: datetime | None = None
+    validation_status: str | None = None
     signed_at: datetime
 
 
@@ -78,6 +91,10 @@ class DocumentSignatureSummaryOut(BaseModel):
     pending_count: int = 0
     declined_count: int = 0
     is_complete: bool = False
+    signature_counts_by_method: dict[str, int] = Field(default_factory=dict)
+    canonical_artifact_available: bool = False
+    certified_artifact_available: bool = False
+    certificate_signing_enabled: bool = False
     signatures: list[DocumentSignatureOut] = Field(default_factory=list)
     requests: list[DocumentSignatureRequestOut] = Field(default_factory=list)
 
@@ -90,3 +107,135 @@ class DigitalDocumentOut(DocumentSignatureSummaryOut):
     updated_at: datetime | None = None
     completed_at: datetime | None = None
     superseded_at: datetime | None = None
+
+
+class DigitalDocumentArtifactOut(BaseModel):
+    id: UUID
+    artifact_type: str
+    version: int
+    source_content_hash: str
+    content_sha256: str
+    media_type: str
+    size_bytes: int
+    created_at: datetime
+    download_path: str
+
+
+class DocumentSignatureValidationOut(BaseModel):
+    id: UUID
+    signature_id: UUID | None = None
+    artifact_id: UUID | None = None
+    status: str
+    validator: str
+    policy_oid: str | None = None
+    certificate_fingerprint: str | None = None
+    timestamped_at: datetime | None = None
+    validated_at: datetime
+
+
+class DocumentValidationSummaryOut(BaseModel):
+    document_id: UUID
+    document_type: str
+    document_status: str
+    content_hash: str
+    signature_counts_by_method: dict[str, int] = Field(default_factory=dict)
+    artifacts: list[DigitalDocumentArtifactOut] = Field(default_factory=list)
+    validations: list[DocumentSignatureValidationOut] = Field(default_factory=list)
+    certificate_signing_enabled: bool = False
+
+
+class SignatureAgentDeviceOut(BaseModel):
+    id: UUID
+    device_id: str
+    display_name: str
+    public_key_fingerprint: str
+    status: str
+    paired_at: datetime
+    last_seen_at: datetime | None = None
+    revoked_at: datetime | None = None
+
+
+class CertificateSigningSessionOut(BaseModel):
+    id: UUID
+    document_id: UUID
+    canonical_artifact_id: UUID
+    input_artifact_id: UUID
+    device_id: str | None = None
+    signer_user_id: UUID | None = None
+    status: str
+    expected_content_sha256: str
+    failure_code: str | None = None
+    expires_at: datetime
+    claimed_at: datetime | None = None
+    completed_at: datetime | None = None
+    cancelled_at: datetime | None = None
+    created_at: datetime
+    updated_at: datetime
+
+
+class CertificateSigningSessionCreateOut(CertificateSigningSessionOut):
+    one_time_token: str
+    agent_request: dict
+
+
+class CertificateSigningSessionCreateInput(BaseModel):
+    device_id: str | None = Field(
+        default=None,
+        min_length=64,
+        max_length=64,
+        pattern=r"^[0-9a-fA-F]{64}$",
+    )
+
+
+class CertificateClaimInput(BaseModel):
+    certificate_der: str = Field(min_length=128, max_length=65536)
+    certificate_chain: list[str] = Field(default_factory=list, max_length=12)
+    supported_algorithms: list[str] = Field(min_length=1, max_length=8)
+    device_id: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
+
+
+class CertificateClaimOut(BaseModel):
+    to_be_signed: str
+    signature_algorithm: str
+    completion_token: str
+    document_title: str
+    document_type: str
+    content_hash: str
+    environment: str
+    expires_at: datetime
+
+
+class CompleteCertificateSignatureInput(BaseModel):
+    raw_signature: str = Field(min_length=64, max_length=8192)
+    signature_algorithm: str = Field(min_length=3, max_length=20)
+    device_id: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
+
+
+class CompleteCertificateSignatureOut(BaseModel):
+    status: str
+    artifact_sha256: str
+
+
+class SignatureAgentPairingCreateOut(BaseModel):
+    id: UUID
+    pairing_id: UUID
+    status: str
+    expires_at: datetime
+    pairing_code: str
+    backend_base_url: str
+    agent_request: dict
+
+
+class SignatureAgentPairingCompleteInput(BaseModel):
+    pairing_code: str = Field(min_length=6, max_length=12, pattern=r"^[0-9]+$")
+    device_id: str = Field(min_length=64, max_length=64, pattern=r"^[0-9a-fA-F]{64}$")
+    device_public_key: str = Field(min_length=128, max_length=16384)
+    environment: str = Field(min_length=3, max_length=40)
+
+
+class SignatureAgentPairingOut(BaseModel):
+    id: UUID
+    status: str
+    expires_at: datetime
+    completed_at: datetime | None = None
+    device_id: str | None = None

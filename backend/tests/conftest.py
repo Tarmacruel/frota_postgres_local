@@ -6,11 +6,16 @@ from httpx import ASGITransport, AsyncClient
 # An explicit TEST_DATABASE_URL may point at a disposable PostgreSQL database;
 # production values from backend/.env must never leak into the test process.
 os.environ["APP_ENV"] = "testing"
+os.environ["CANONICAL_DOCUMENT_ARTIFACTS_ENABLED"] = "false"
+os.environ["CERTIFICATE_SIGNING_ENABLED"] = "false"
+os.environ["SIGNATURE_AGENT_ENABLED"] = "false"
 os.environ["DATABASE_URL"] = os.environ.get(
     "TEST_DATABASE_URL",
     "sqlite+aiosqlite:///./test.db",
 )
 os.environ["SECRET_KEY"] = "testsecret"
+os.environ["COOKIE_NAME"] = "access_token"
+os.environ["CSRF_COOKIE_NAME"] = "csrf_token"
 os.environ["CORS_ORIGINS"] = '["http://test", "http://localhost:8000"]'
 os.environ["CSRF_TRUSTED_ORIGINS"] = '["http://localhost:8000"]'
 os.environ["TRUSTED_HOSTS"] = '["test", "localhost", "127.0.0.1"]'

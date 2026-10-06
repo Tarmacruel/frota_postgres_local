@@ -7,6 +7,9 @@ import SearchOverlay from './SearchOverlay'
 import Modal from './Modal'
 import { adminNotificationsAPI } from '../api/adminNotifications'
 import { documentSignaturesAPI } from '../api/documentSignatures'
+import { featureGuidesAPI } from '../api/featureGuides'
+import usePendingVehicleLoans from '../hooks/usePendingVehicleLoans'
+import './VehicleLoanNotifications.css'
 
 const THEME_STORAGE_KEY = 'frota-theme'
 const SIDEBAR_STORAGE_KEY = 'frota-sidebar-compact'
@@ -23,7 +26,12 @@ export default function Layout() {
   const passwordChangeRequired = Boolean(mustChangePassword)
   const cpfRegistrationRequired = Boolean(mustRegisterCpf) && !passwordChangeRequired
   const accessBlocked = passwordChangeRequired || cpfRegistrationRequired
+  const pendingLoans = usePendingVehicleLoans(user?.id, !accessBlocked && canView('vehicle_loans'))
+  const canCreateFuelSupplyOrders = canCreate('fuel_supply_orders')
   const mainRef = useRef(null)
+  const navRef = useRef(null)
+  const navTriggerRef = useRef(null)
+  const fuelSupplyOrdersBatchGuideUserRef = useRef(null)
 
   const [navOpen, setNavOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
@@ -39,6 +47,9 @@ export default function Layout() {
   const [unreadNotifications, setUnreadNotifications] = useState(0)
   const [signatureRequestsOpen, setSignatureRequestsOpen] = useState(false)
   const [pendingSignatureRequests, setPendingSignatureRequests] = useState([])
+  const [fuelSupplyOrdersBatchGuideOpen, setFuelSupplyOrdersBatchGuideOpen] = useState(false)
+  const [fuelSupplyOrdersBatchGuideAcknowledging, setFuelSupplyOrdersBatchGuideAcknowledging] = useState(false)
+  const [fuelSupplyOrdersBatchGuideError, setFuelSupplyOrdersBatchGuideError] = useState('')
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined
@@ -49,7 +60,7 @@ export default function Layout() {
   const navSections = useMemo(() => {
     const sections = [
       {
-        title: 'Visao geral',
+        title: 'Visão geral',
         items: [
           { to: '/', label: 'Início', description: 'Resumo', icon: 'dashboard' },
         ],
@@ -58,6 +69,7 @@ export default function Layout() {
         title: 'Operacional',
         items: [
           { to: '/vehicles', label: 'Veículos', description: 'Frota', icon: 'vehicles' },
+          { to: '/emprestimos', label: 'Empréstimos', description: 'Entre secretarias', icon: 'vehicles' },
           { to: '/posses', label: 'Posses', description: 'Responsáveis', icon: 'drivers' },
           { to: '/condutores', label: 'Condutores', mobileLabel: 'Condut.', description: 'Motoristas', icon: 'users' },
           { to: '/manutencoes', label: 'Manutenções', description: 'Custos', icon: 'maintenance' },
@@ -71,6 +83,7 @@ export default function Layout() {
 
     const moduleByRoute = {
       '/vehicles': 'vehicles',
+      '/emprestimos': 'vehicle_loans',
       '/posses': 'possession',
       '/condutores': 'drivers',
       '/manutencoes': 'maintenance',
@@ -139,6 +152,46 @@ export default function Layout() {
   }, [location.pathname])
 
   useEffect(() => {
+    if (!navOpen || window.innerWidth >= 1180) return undefined
+    const sidebar = navRef.current
+    const trigger = navTriggerRef.current
+    const previousOverflow = document.body.style.overflow
+    const choices = () => Array.from(sidebar.querySelectorAll('a[href], button:not(:disabled)'))
+      .filter((element) => getComputedStyle(element).display !== 'none' && getComputedStyle(element).visibility !== 'hidden')
+    const frame = window.requestAnimationFrame(() => (choices()[0] || sidebar).focus())
+    document.body.style.overflow = 'hidden'
+    function handleNavigationKey(event) {
+      // A dialog opened from the drawer owns its own keyboard boundary.
+      if (document.querySelector('[role="dialog"]')) return
+      if (event.key === 'Escape') {
+        event.preventDefault()
+        setNavOpen(false)
+      } else if (event.key === 'Tab') {
+        const stops = choices()
+        const first = stops[0]
+        const last = stops.at(-1)
+        if (!sidebar.contains(document.activeElement) || (event.shiftKey && document.activeElement === first)) {
+          event.preventDefault()
+          ;(event.shiftKey ? last : first)?.focus()
+        } else if (!event.shiftKey && document.activeElement === last) {
+          event.preventDefault()
+          first?.focus()
+        }
+      }
+    }
+    const closeOnDesktop = () => { if (window.innerWidth >= 1180) setNavOpen(false) }
+    window.addEventListener('keydown', handleNavigationKey)
+    window.addEventListener('resize', closeOnDesktop)
+    return () => {
+      window.cancelAnimationFrame(frame)
+      document.body.style.overflow = previousOverflow
+      window.removeEventListener('keydown', handleNavigationKey)
+      window.removeEventListener('resize', closeOnDesktop)
+      if (window.innerWidth < 1180) trigger?.focus()
+    }
+  }, [navOpen])
+
+  useEffect(() => {
     const resetScroll = () => {
       window.scrollTo({ top: 0, left: 0, behavior: 'auto' })
       document.documentElement.scrollTop = 0
@@ -192,6 +245,38 @@ export default function Layout() {
     if (!cpfRegistrationRequired) return
     setSearchOpen(false)
   }, [cpfRegistrationRequired])
+
+  useEffect(() => {
+    if (!user?.id || accessBlocked || !canCreateFuelSupplyOrders) {
+      fuelSupplyOrdersBatchGuideUserRef.current = null
+      setFuelSupplyOrdersBatchGuideOpen(false)
+      setFuelSupplyOrdersBatchGuideError('')
+      return undefined
+    }
+
+    if (fuelSupplyOrdersBatchGuideUserRef.current === user.id) return undefined
+
+    let mounted = true
+
+    async function loadFuelSupplyOrdersBatchGuide() {
+      try {
+        const { data } = await featureGuidesAPI.getFuelSupplyOrdersBatch()
+        if (!mounted) return
+        fuelSupplyOrdersBatchGuideUserRef.current = user.id
+        if (!data?.acknowledged) setFuelSupplyOrdersBatchGuideOpen(true)
+      } catch {
+        if (mounted) {
+          fuelSupplyOrdersBatchGuideUserRef.current = user.id
+          setFuelSupplyOrdersBatchGuideOpen(false)
+        }
+      }
+    }
+
+    loadFuelSupplyOrdersBatchGuide()
+    return () => {
+      mounted = false
+    }
+  }, [accessBlocked, canCreateFuelSupplyOrders, user?.id])
 
 
   useEffect(() => {
@@ -273,8 +358,14 @@ export default function Layout() {
   function openPendingSignature(request) {
     const document = request.document || {}
     setSignatureRequestsOpen(false)
+    if (document.document_type?.startsWith('VEHICLE_LOAN_')) {
+      navigate(`/emprestimos?id=${encodeURIComponent(document.source_id)}`)
+      return
+    }
     if (document.document_type === 'FUEL_SUPPLY_ORDER') {
-      navigate('/ordens-abastecimento')
+      navigate(document.source_id
+        ? `/ordens-abastecimento?focus=${encodeURIComponent(document.source_id)}`
+        : '/ordens-abastecimento')
       return
     }
     if (document.source_id) {
@@ -321,14 +412,34 @@ export default function Layout() {
     }
   }
 
+  async function acknowledgeFuelSupplyOrdersBatchGuide({ openGuide = false } = {}) {
+    if (!openGuide) setFuelSupplyOrdersBatchGuideOpen(false)
+    if (fuelSupplyOrdersBatchGuideAcknowledging) return
+
+    setFuelSupplyOrdersBatchGuideAcknowledging(true)
+    setFuelSupplyOrdersBatchGuideError('')
+    try {
+      await featureGuidesAPI.acknowledgeFuelSupplyOrdersBatch()
+      setFuelSupplyOrdersBatchGuideOpen(false)
+      if (openGuide) navigate('/abastecimentos?acao=nova-ordem-lote&guia=1')
+    } catch {
+      setFuelSupplyOrdersBatchGuideError('Não foi possível registrar a visualização da novidade. Tente novamente.')
+    } finally {
+      setFuelSupplyOrdersBatchGuideAcknowledging(false)
+    }
+  }
+
   function renderNavLink(item) {
+    const pendingDescription = item.to === '/emprestimos' && pendingLoans > 0
+      ? `${pendingLoans} ${pendingLoans === 1 ? 'solicitação pendente' : 'solicitações pendentes'} de análise`
+      : ''
     return (
       <NavLink
         key={item.to}
         to={item.to}
         end={item.to === '/'}
-        title={item.description}
-        aria-label={`${item.label}. ${item.description}`}
+        title={pendingDescription || item.description}
+        aria-label={`${item.label}. ${item.description}${pendingDescription ? `. ${pendingDescription}` : ''}`}
         data-tooltip={item.description}
         className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
       >
@@ -338,6 +449,7 @@ export default function Layout() {
         <span className="nav-text">
           <span className="nav-label">{item.label}</span>
         </span>
+        {item.to === '/emprestimos' && pendingLoans > 0 && <span className="loan-nav-badge" aria-hidden="true">{pendingLoans > 99 ? '99+' : pendingLoans}</span>}
       </NavLink>
     )
   }
@@ -348,7 +460,7 @@ export default function Layout() {
 
       <button type="button" className={`sidebar-scrim${navOpen ? ' is-visible' : ''}`} aria-label="Fechar navegação" onClick={() => setNavOpen(false)} />
 
-      <aside className={`app-sidebar${navOpen ? ' is-open' : ''}${sidebarCompact ? ' is-compact' : ''}`}>
+      <aside ref={navRef} id="app-navigation" tabIndex={-1} className={`app-sidebar${navOpen ? ' is-open' : ''}${sidebarCompact ? ' is-compact' : ''}`} aria-label="Navegação principal">
         <div className="sidebar-head">
           <div className="brand-block">
             <div className="brand-mark brand-mark-official">
@@ -382,12 +494,14 @@ export default function Layout() {
               <strong>{user?.name || officialBrand.systemName}</strong>
               <span>{roleLabel}</span>
             </div>
-            <button type="button" className="icon-button account-action" aria-label="Alterar senha" onClick={() => setPasswordModalOpen(true)}>
-              <AppIcon name="users" className="app-icon" />
-            </button>
-            <button type="button" className="icon-button account-action" aria-label="Encerrar sessão" onClick={handleLogout}>
-              <AppIcon name="logout" className="app-icon" />
-            </button>
+            <div className="account-actions">
+              <button type="button" className="icon-button account-action" aria-label="Alterar senha" onClick={() => setPasswordModalOpen(true)}>
+                <AppIcon name="users" className="app-icon" />
+              </button>
+              <button type="button" className="icon-button account-action" aria-label="Encerrar sessão" onClick={handleLogout}>
+                <AppIcon name="logout" className="app-icon" />
+              </button>
+            </div>
           </div>
         </div>
       </aside>
@@ -395,7 +509,7 @@ export default function Layout() {
       <div className="content-shell">
         <header className="app-topbar">
           <div className="topbar-leading">
-            <button type="button" className="icon-button mobile-only" aria-label={navOpen ? 'Fechar navegação' : 'Abrir navegação'} aria-expanded={navOpen} onClick={() => setNavOpen((current) => !current)}>
+            <button ref={navTriggerRef} type="button" className="icon-button mobile-only" aria-label={navOpen ? 'Fechar navegação' : 'Abrir navegação'} aria-expanded={navOpen} aria-controls="app-navigation" onClick={() => setNavOpen((current) => !current)}>
               <AppIcon name="menu" className="app-icon" />
             </button>
 
@@ -413,9 +527,6 @@ export default function Layout() {
               onClick={() => {
                 if (!accessBlocked) setSearchOpen(true)
               }}
-              onFocus={() => {
-                if (!accessBlocked) setSearchOpen(true)
-              }}
               disabled={accessBlocked}
             >
               <span className="topbar-search-copy">
@@ -426,33 +537,38 @@ export default function Layout() {
             </button>
 
 
-            {isAdmin && !accessBlocked ? (
-              <button
-                type="button"
-                className="icon-button theme-button"
-                aria-label="Abrir central de notificações"
-                title="Central de notificações"
-                onClick={openNotificationsCenter}
-              >
-                <AppIcon name="audit" className="app-icon" />
-                {unreadNotifications > 0 ? <span className="badge-counter">{unreadNotifications > 99 ? '99+' : unreadNotifications}</span> : null}
+            <div className="topbar-system-actions" aria-label="Ações do sistema">
+              {isAdmin && !accessBlocked ? (
+                <button
+                  type="button"
+                  className="icon-button theme-button"
+                  aria-label="Abrir central de notificações"
+                  title="Central de notificações"
+                  onClick={openNotificationsCenter}
+                >
+                  <AppIcon name="audit" className="app-icon" />
+                  {unreadNotifications > 0 ? <span className="badge-counter">{unreadNotifications > 99 ? '99+' : unreadNotifications}</span> : null}
+                </button>
+              ) : null}
+              {!accessBlocked ? (
+                <button
+                  type="button"
+                  className="icon-button theme-button"
+                  aria-label="Abrir assinaturas pendentes"
+                  title="Assinaturas pendentes"
+                  onClick={() => setSignatureRequestsOpen(true)}
+                >
+                  <AppIcon name="audit" className="app-icon" />
+                  {pendingSignatureRequests.length > 0 ? <span className="badge-counter">{pendingSignatureRequests.length > 99 ? '99+' : pendingSignatureRequests.length}</span> : null}
+                </button>
+              ) : null}
+              <button type="button" className="icon-button theme-button" aria-label={darkMode ? 'Ativar modo claro' : 'Ativar modo escuro'} title={darkMode ? 'Modo claro' : 'Modo escuro'} onClick={() => setDarkMode((current) => !current)}>
+                <AppIcon name={darkMode ? 'sun' : 'moon'} className="app-icon" />
               </button>
-            ) : null}
-            {!accessBlocked ? (
-              <button
-                type="button"
-                className="icon-button theme-button"
-                aria-label="Abrir assinaturas pendentes"
-                title="Assinaturas pendentes"
-                onClick={() => setSignatureRequestsOpen(true)}
-              >
-                <AppIcon name="audit" className="app-icon" />
-                {pendingSignatureRequests.length > 0 ? <span className="badge-counter">{pendingSignatureRequests.length > 99 ? '99+' : pendingSignatureRequests.length}</span> : null}
-              </button>
-            ) : null}
-            <button type="button" className="icon-button theme-button" aria-label={darkMode ? 'Ativar modo claro' : 'Ativar modo escuro'} title={darkMode ? 'Modo claro' : 'Modo escuro'} onClick={() => setDarkMode((current) => !current)}>
-              <AppIcon name={darkMode ? 'sun' : 'moon'} className="app-icon" />
-            </button>
+              <span className="topbar-user" title={`${user?.name || officialBrand.systemName} · ${roleLabel}`} aria-label={`Usuário: ${user?.name || officialBrand.systemName}. Perfil: ${roleLabel}`}>
+                {getInitials(user?.name)}
+              </span>
+            </div>
           </div>
         </header>
 
@@ -528,7 +644,7 @@ export default function Layout() {
                 </div>
                 <div className="actions-inline" style={{ marginTop: 8 }}>
                   <button className="mini-button" type="button" onClick={() => openPendingSignature(request)}>Abrir origem</button>
-                  <button className="mini-button danger" type="button" onClick={() => declinePendingSignature(request.id)}>Recusar</button>
+                  {!request.document?.document_type?.startsWith('VEHICLE_LOAN_') && <button className="mini-button danger" type="button" onClick={() => declinePendingSignature(request.id)}>Recusar</button>}
                 </div>
               </div>
             ))}
@@ -580,6 +696,36 @@ export default function Layout() {
             <button className="ghost-button" type="button" onClick={handleLogout}>Sair</button>
           </div>
         </form>
+      </Modal>
+
+      <Modal
+        open={fuelSupplyOrdersBatchGuideOpen}
+        title="Novo: pedidos de abastecimento em lote"
+        description="Emita ordens independentes para vários veículos em uma única operação."
+        onClose={() => setFuelSupplyOrdersBatchGuideOpen(false)}
+      >
+        <div className="stack">
+          <p>Selecione os veículos, informe os dados compartilhados e revise cada ordem antes de emitir.</p>
+          <p className="muted">Cada veículo continuará com seu próprio comprovante, status e confirmação.</p>
+          {fuelSupplyOrdersBatchGuideError ? <div className="alert alert-error" role="alert">{fuelSupplyOrdersBatchGuideError}</div> : null}
+          <div className="actions-inline modal-actions">
+            <button
+              className="ghost-button"
+              type="button"
+              onClick={() => acknowledgeFuelSupplyOrdersBatchGuide()}
+            >
+              Agora não
+            </button>
+            <button
+              className="app-button"
+              type="button"
+              disabled={fuelSupplyOrdersBatchGuideAcknowledging}
+              onClick={() => acknowledgeFuelSupplyOrdersBatchGuide({ openGuide: true })}
+            >
+              {fuelSupplyOrdersBatchGuideAcknowledging ? 'Abrindo...' : 'Ver guia rápido'}
+            </button>
+          </div>
+        </div>
       </Modal>
     </div>
   )

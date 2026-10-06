@@ -9,6 +9,7 @@ from sqlalchemy import DateTime, Enum, ForeignKey, Index, Numeric, String, Text,
 from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
+from app.models.operational_responsibility import OperationalResponsibilityMixin
 
 
 class ClaimStatus(str, enum.Enum):
@@ -25,7 +26,7 @@ class ClaimType(str, enum.Enum):
     OUTRO = "OUTRO"
 
 
-class Claim(Base):
+class Claim(OperationalResponsibilityMixin, Base):
     __tablename__ = "claims"
     __table_args__ = (
         Index("idx_claims_vehicle", "vehicle_id"),

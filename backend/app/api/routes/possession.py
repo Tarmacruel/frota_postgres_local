@@ -3,7 +3,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 from uuid import UUID
-from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile
+from fastapi import APIRouter, Depends, File, Form, Query, Request, UploadFile, HTTPException
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, Response
 from pydantic import ValidationError
@@ -18,6 +18,7 @@ from app.schemas.possession import (
     PossessionCreate,
     PossessionListResponse,
     PossessionOut,
+    PossessionOdometerSuggestion,
     PossessionPhotoCreate,
     PossessionTermPublicOut,
     PossessionUpdate,
@@ -138,6 +139,9 @@ def parse_initial_trip(
 
 
 def parse_admin_update_form(
+    expected_revision: int = Form(..., ge=1),
+    vehicle_condition_notes: str | None = Form(default=None),
+    declaration_accepted: bool = Form(default=False),
     driver_id: UUID | None = Form(default=None),
     driver_name: str = Form(...),
     driver_document: str | None = Form(default=None),
@@ -151,6 +155,9 @@ def parse_admin_update_form(
 ) -> PossessionAdminUpdate:
     try:
         return PossessionAdminUpdate(
+            expected_revision=expected_revision,
+            vehicle_condition_notes=vehicle_condition_notes,
+            declaration_accepted=declaration_accepted,
             driver_name=driver_name,
             driver_id=driver_id,
             driver_document=driver_document,
@@ -244,6 +251,16 @@ async def list_possession_paginated(
         search=search,
         current_user=current_user,
     )
+
+
+@router.get("/odometer-suggestion", response_model=PossessionOdometerSuggestion | None)
+async def get_odometer_suggestion(
+    vehicle_id: UUID,
+    start_date: datetime,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("possession", "view")),
+):
+    return await PossessionService(db).get_odometer_suggestion(vehicle_id, start_date, current_user)
 
 
 @router.get("/active", response_model=list[PossessionOut])
@@ -348,10 +365,23 @@ async def correct_possession_return_confirmation(
     possession_id: UUID,
     data: PossessionReturnCorrection,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_writer),
     _permission: User = Depends(require_permission("possession", "edit")),
 ):
-    confirmation = await PossessionReturnService(db).correct(possession_id, data, current_user)
+    if data.expected_revision is None:
+        raise HTTPException(409, 'Abra a tela unificada Retificar posse para revisar a versão atual antes de salvar.')
+    service = PossessionService(db)
+    record = await service.possessions.get_by_id(possession_id)
+    if record is None:
+        raise HTTPException(404, 'Registro de posse não encontrado')
+    await service._ensure_possession_visible_to_user(record, current_user)
+    await service.admin_update(possession_id, PossessionAdminUpdate(
+        expected_revision=data.expected_revision, driver_id=record.driver_id, driver_name=record.driver_name,
+        driver_document=record.driver_document, driver_contact=record.driver_contact, start_date=record.start_date,
+        end_date=data.end_date, observation=record.observation, start_odometer_km=record.start_odometer_km,
+        end_odometer_km=data.end_odometer_km, vehicle_condition_notes=data.vehicle_condition_notes,
+        declaration_accepted=data.declaration_accepted, edit_reason=data.correction_reason), current_user)
+    confirmation = await service.return_confirmations.get_current(possession_id)
     return PossessionReturnService.serialize_confirmation(confirmation)
 
 
@@ -535,7 +565,7 @@ async def update_possession(
     return_term_document: UploadFile | None = File(default=None),
     new_photos: list[UploadFile] | None = File(default=None),
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_writer),
     _permission: User = Depends(require_permission("possession", "edit")),
 ):
     return await PossessionService(db).admin_update(
@@ -547,6 +577,13 @@ async def update_possession(
         new_photos=new_photos or [],
         new_photo_metadata=photo_metadata,
     )
+
+
+@router.get('/{possession_id}/rectification-context')
+async def get_rectification_context(possession_id: UUID, db: AsyncSession = Depends(get_db_session),
+                                    current_user: User = Depends(require_writer),
+                                    _permission: User = Depends(require_permission('possession', 'edit'))):
+    return await PossessionService(db).rectification_context(possession_id, current_user)
 
 
 @router.delete("/{possession_id}", response_model=MessageOut)

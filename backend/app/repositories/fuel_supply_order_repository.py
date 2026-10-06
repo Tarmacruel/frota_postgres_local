@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 from sqlalchemy import and_, func, or_, select, update
+from app.repositories.vehicle_scope import record_visible, responsible_to
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.models.fuel_supply_order import FuelSupplyOrder, FuelSupplyOrderStatus
@@ -113,18 +114,7 @@ class FuelSupplyOrderRepository:
         return records, total
 
     def _organization_scope_clause(self, organization_id: UUID):
-        vehicle_in_organization = (
-            select(LocationHistory.vehicle_id)
-            .join(Allocation, Allocation.id == LocationHistory.allocation_id)
-            .join(Department, Department.id == Allocation.department_id)
-            .where(
-                LocationHistory.vehicle_id == FuelSupplyOrder.vehicle_id,
-                LocationHistory.end_date.is_(None),
-                Department.organization_id == organization_id,
-            )
-            .exists()
-        )
-        return or_(FuelSupplyOrder.organization_id == organization_id, vehicle_in_organization)
+        return record_visible(FuelSupplyOrder.vehicle_id, FuelSupplyOrder.created_at, organization_id)
 
     async def expire_overdue(self, *, reference_time: datetime) -> int:
         result = await self.db.execute(

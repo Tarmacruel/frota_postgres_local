@@ -3,6 +3,14 @@ import { describe, expect, it } from 'vitest'
 import { getApiErrorMessage } from './apiError'
 
 describe('getApiErrorMessage', () => {
+  it.each([
+    ['cpf', 'CPF inválido. Confira os 11 números'],
+    ['password', 'Senha inválida. Informe entre 8 e 128 caracteres.'],
+    ['email', 'E-mail inválido. Informe um endereço'],
+    ['organization_id', 'Secretaria inválida. Selecione'],
+  ])('explica o campo %s mesmo quando a API antiga retorna mensagem genérica', (field, expected) => {
+    expect(getApiErrorMessage({ response: { data: { detail: [{ loc: ['body', field], msg: 'Valor inválido' }] } } })).toContain(expected)
+  })
   it('preserva a mensagem estruturada da API e a referência da requisição', () => {
     const error = {
       response: {
@@ -30,7 +38,7 @@ describe('getApiErrorMessage', () => {
       },
     }
 
-    expect(getApiErrorMessage(error)).toBe('Campo obrigatório. Valor inválido.')
+    expect(getApiErrorMessage(error)).toBe('Campo obrigatório. Um dos campos contém um valor inválido. Revise os dados preenchidos e tente novamente.')
   })
 
   it('usa o fallback sem expor a estrutura interna do erro', () => {

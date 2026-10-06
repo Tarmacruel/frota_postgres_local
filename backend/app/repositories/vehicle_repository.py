@@ -8,6 +8,7 @@ from sqlalchemy.orm import joinedload
 from app.models.location_history import LocationHistory
 from app.models.master_data import Allocation, Department
 from app.models.possession import VehiclePossession
+from app.repositories.vehicle_scope import vehicle_visible
 from app.models.vehicle import Vehicle, VehicleOwnershipType, VehicleStatus
 
 DEFAULT_VEHICLE_LIST_LIMIT = 1000
@@ -112,17 +113,12 @@ class VehicleRepository:
         result = await self.db.execute(stmt)
         return result.scalar_one_or_none() is not None
 
+    async def is_vehicle_visible(self, vehicle_id: UUID, organization_id: UUID) -> bool:
+        return await self.db.scalar(select(Vehicle.id).where(
+            Vehicle.id == vehicle_id, vehicle_visible(Vehicle.id, organization_id))) is not None
+
     def _filter_by_active_organization(self, stmt, organization_id: UUID):
-        return (
-            stmt
-            .join(LocationHistory, LocationHistory.vehicle_id == Vehicle.id)
-            .join(Allocation, Allocation.id == LocationHistory.allocation_id)
-            .join(Department, Department.id == Allocation.department_id)
-            .where(
-                LocationHistory.end_date.is_(None),
-                Department.organization_id == organization_id,
-            )
-        )
+        return stmt.where(vehicle_visible(Vehicle.id, organization_id))
 
     async def create(self, vehicle: Vehicle) -> Vehicle:
         self.db.add(vehicle)

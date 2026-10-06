@@ -1,3 +1,4 @@
+import PageHeader from '../components/ui/PageHeader'
 import { useEffect, useMemo, useState } from 'react'
 import { analyticsAPI } from '../api/analytics'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -111,9 +112,8 @@ export default function AdminAnalyticsDashboard() {
   }
 
   return (
-    <div className="surface-panel">
-      <h2 className="section-title">Análises administrativas</h2>
-      <p className="section-copy">Comparações por categoria de veículo, com KPIs e alertas acionáveis.</p>
+    <div className="surface-panel operation-page management-page management-page--analytics">
+      <PageHeader title="Análises administrativas" description="Comparações por categoria de veículo, com KPIs e alertas acionáveis." />
 
       <AdvancedFilters
         filters={filters}
@@ -126,7 +126,7 @@ export default function AdminAnalyticsDashboard() {
 
       {error ? <div className="alert alert-error">{error}</div> : null}
 
-      <div style={{ margin: '16px 0' }}>
+      <div className="management-analytics-kpis">
         <KPICards overview={overview} loading={loading} />
       </div>
 
@@ -135,12 +135,12 @@ export default function AdminAnalyticsDashboard() {
         <CostPerKmRanking rows={tco} />
       </div>
 
-      <div className="dashboard-grid" style={{ marginTop: 16 }}>
+      <div className="dashboard-grid management-analytics-row">
         <TrendChart rows={trend} />
         <SmartInsightsList insights={insights} />
       </div>
 
-      <div className="dashboard-grid" style={{ marginTop: 16 }}>
+      <div className="dashboard-grid management-analytics-row">
         <DriverRiskTable rows={driverRisk} />
         <VehicleDetailsTable efficiencyRows={efficiency.slice(0, 25)} tcoRows={tco} />
       </div>

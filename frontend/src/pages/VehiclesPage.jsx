@@ -1,3 +1,4 @@
+import JustificationField from '../components/JustificationField'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import AccordionSection from '../components/AccordionSection'
@@ -12,6 +13,7 @@ import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
+import { ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 
 const initialForm = {
   plate: '',
@@ -40,6 +42,13 @@ const ownershipOptions = [
   { value: 'LOCADO', label: 'Locado' },
   { value: 'CEDIDO', label: 'Cedido' },
 ]
+
+function getVehicleStatusTone(status) {
+  if (status === 'ATIVO') return 'success'
+  if (status === 'MANUTENCAO') return 'warning'
+  if (status === 'INATIVO') return 'neutral'
+  return 'info'
+}
 
 const unassignedOrganizationFilter = 'SEM_SECRETARIA'
 
@@ -180,7 +189,9 @@ function buildVehicleReportStatus(vehicle) {
 }
 
 function buildVehicleReportPlacement(vehicle) {
-  return `${buildVehicleOrganizationLabel(vehicle)}\n${buildVehicleReportLocationLabel(vehicle)}`
+  const origin = vehicle.owner_organization_name ? `Origem: ${vehicle.owner_organization_name}\n` : ''
+  const loan = vehicle.loan_status ? 'Em empréstimo\n' : ''
+  return `${origin}${loan}${buildVehicleOrganizationLabel(vehicle)}\n${buildVehicleReportLocationLabel(vehicle)}`
 }
 
 function buildVehicleOption(vehicle) {
@@ -464,6 +475,7 @@ export default function VehiclesPage() {
         buildVehicleOrganizationLabel(vehicle),
         buildVehicleLocationLabel(vehicle),
         vehicle.current_driver_name,
+        vehicle.owner_organization_name,
         getOwnershipLabel(vehicle.ownership_type),
       ]
         .filter(Boolean)
@@ -472,7 +484,7 @@ export default function VehiclesPage() {
     const vehicleOrganizationId = vehicle.current_location?.organization_id
     const matchesOrganization =
       organizationFilter === 'TODOS' ||
-      (organizationFilter === unassignedOrganizationFilter ? !vehicleOrganizationId : vehicleOrganizationId === organizationFilter)
+      (organizationFilter === unassignedOrganizationFilter ? !vehicleOrganizationId : (vehicleOrganizationId === organizationFilter || vehicle.owner_organization_id === organizationFilter))
     const matchesLocation = locationFilter === 'TODOS' || buildVehicleLocationLabel(vehicle) === locationFilter
     const matchesOwnership = ownershipFilter === 'TODOS' || vehicle.ownership_type === ownershipFilter
 
@@ -820,20 +832,20 @@ export default function VehiclesPage() {
   ]
 
   return (
-    <div className="surface-panel">
-      <div className="panel-heading">
-        <div>
-          <h2 className="section-title">Operação de veículos</h2>
-          <p className="section-copy">Gerencie placa, chassi, tipo do veículo e lotação estruturada sem sair da consulta principal.</p>
-        </div>
-        <div className="actions-inline">
+    <div className="surface-panel operation-page operation-page--vehicles">
+      <PageHeader
+        title="Operação de veículos"
+        description="Gerencie placa, chassi, tipo do veículo e lotação estruturada sem sair da consulta principal."
+        actions={(
+          <>
           {canCreateVehicle ? <button className="app-button" type="button" onClick={openNewVehicleModal}>Novo veículo</button> : null}
           <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
-      <div className="toolbar-card">
+      <div className="toolbar-card operation-toolbar">
         <div className="toolbar-row">
           <div className="status-pills">
             {statusOptions.map((option) => (
@@ -912,9 +924,9 @@ export default function VehiclesPage() {
       {catalogError || modalCatalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError || modalCatalogError}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
-      <div className="surface-panel panel-nested">
+      <div className="surface-panel panel-nested operation-table-card">
         <div className="table-wrap table-wrap-wide">
-          <table className="data-table data-table-wide">
+          <table className="data-table data-table-wide operation-table">
             <thead>
               <tr>
                 <th>Placa</th>
@@ -946,24 +958,40 @@ export default function VehiclesPage() {
               ) : (
                 paginatedVehicles.map((vehicle) => (
                   <tr key={vehicle.id} className={selectedVehicle?.id === vehicle.id ? 'is-focused-row' : ''}>
-                    <td data-label="Placa"><strong>{vehicle.plate}</strong></td>
+                    <td data-label="Placa">
+                      <div className="operation-vehicle-identity">
+                        <VehicleThumbnail vehicleType={vehicle.vehicle_type} plate={vehicle.plate} />
+                        <span>
+                          <strong>{vehicle.plate}</strong>
+                          {vehicle.loan_status ? <StatusChip tone="info">{vehicle.loan_status === 'RECEBIDO' ? 'Recebido por empréstimo' : 'Emprestado'}</StatusChip> : null}
+                        </span>
+                      </div>
+                    </td>
                     <td data-label="Chassi">{vehicle.chassis_number || 'Não informado'}</td>
                     <td data-label="Marca">{vehicle.brand}</td>
                     <td data-label="Modelo">{vehicle.model}</td>
                     <td data-label="Tipo veículo">{getVehicleTypeLabel(vehicle.vehicle_type)}</td>
                     <td data-label="Propriedade"><BadgeOwnership value={vehicle.ownership_type} /></td>
-                    <td data-label="Status"><span className={`status-badge status-${vehicle.status}`}>{vehicle.status}</span></td>
-                    <td data-label="Lotação atual">{buildVehicleLocationLabel(vehicle)}</td>
+                    <td data-label="Status"><StatusChip tone={getVehicleStatusTone(vehicle.status)}>{vehicle.status}</StatusChip></td>
+                    <td data-label="Lotação atual">
+                      {buildVehicleLocationLabel(vehicle)}
+                      {vehicle.owner_organization_name ? <small style={{ display: 'block' }}>Origem: {vehicle.owner_organization_name}</small> : null}
+                    </td>
                     <td data-label="Condutor atual"><DriverBadge name={vehicle.current_driver_name} /></td>
                     <td data-label="Atualizado em">{formatDate(vehicle.updated_at)}</td>
                     <td data-label="Ações">
-                      <div className="actions-inline">
+                      <div className="operation-row-actions">
                         <button type="button" className="mini-button" onClick={() => loadHistory(vehicle.id)}>
                           {selectedVehicle?.id === vehicle.id ? 'Fechar histórico' : 'Histórico'}
                         </button>
                         {selectedVehicle?.id === vehicle.id ? <span className="focus-inline">em foco</span> : null}
-                        {canEditVehicle ? <button type="button" className="mini-button" onClick={() => editVehicle(vehicle)}>Editar</button> : null}
-                        {canDeleteVehicle ? <button type="button" className="mini-button danger" onClick={() => handleDelete(vehicle.id)}>Excluir</button> : null}
+                        <ActionMenu
+                          label={`Mais ações do veículo ${vehicle.plate}`}
+                          items={[
+                            { key: 'edit', label: 'Editar cadastro', icon: 'catalog', hidden: !canEditVehicle || vehicle.can_manage_registration === false, onClick: () => editVehicle(vehicle) },
+                            { key: 'delete', label: 'Excluir veículo', icon: 'close', tone: 'danger', hidden: !canDeleteVehicle || vehicle.can_manage_registration === false, onClick: () => handleDelete(vehicle.id) },
+                          ]}
+                        />
                       </div>
                     </td>
                   </tr>
@@ -1143,7 +1171,8 @@ export default function VehiclesPage() {
               <div className="form-grid modal-form-grid">
                 <div className="form-field modal-field-span">
                   <label htmlFor="edit_reason">Justificativa da edição</label>
-                  <textarea
+                  <JustificationField context="vehicle_edit"
+                    disabled={submitting || modalCatalogLoading}
                     id="edit_reason"
                     className="app-textarea"
                     rows="4"

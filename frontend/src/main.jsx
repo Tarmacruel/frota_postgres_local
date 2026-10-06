@@ -2,6 +2,8 @@ import React from 'react'
 import ReactDOM from 'react-dom/client'
 import App from './App'
 import './styles.css'
+import './styles-light.css'
+import './styles/frontend-evolution.css'
 
 const savedTheme = window.localStorage.getItem('frota-theme') === 'dark' ? 'dark' : 'light'
 document.documentElement.dataset.theme = savedTheme

@@ -8,6 +8,7 @@ from uuid import UUID, uuid4
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
+from app.services.operational_scope import attribute_operation
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.request_context import get_request_audit_context, normalize_request_id
@@ -100,6 +101,42 @@ class PossessionReturnService:
         self.confirmations = PossessionReturnConfirmationRepository(db)
         self.audit = AuditService(db)
 
+    async def stage_rectification(self, possession, current, *, notes, reason, user):
+        """Append evidence inside the caller's unified correction transaction."""
+        latest_trip = await self.trips.get_latest_completed(possession.id)
+        final_odometer = _decimal_odometer(possession.end_odometer_km)
+        self._validate_return_values(possession, latest_trip, possession.end_date, final_odometer)
+        now = datetime.now(timezone.utc)
+        context = self._request_context()
+        version = await self.confirmations.next_version(possession.id)
+        new_id = uuid4()
+        payload = build_canonical_return_payload(possession=possession, user=user,
+            confirmed_at=now, returned_at=possession.end_date, final_odometer_km=final_odometer,
+            vehicle_condition_notes=notes, last_trip_id=latest_trip.id if latest_trip else None,
+            request_id=context['request_id'], version=version,
+            correction_of_hash=current.canonical_payload_hash if current else None)
+        if current:
+            current.is_current = False
+            current.superseded_at = now
+            current.superseded_by_confirmation_id = new_id
+            await self.db.flush()
+        confirmation = VehiclePossessionReturnConfirmation(id=new_id, possession_id=possession.id,
+            version=version, is_current=True, declaration_version=DECLARATION_VERSION,
+            declaration_text=DECLARATION_TEXT, canonical_payload_hash=canonical_payload_sha256(payload),
+            confirmed_by_user_id=user.id, confirmer_name=user.name, confirmer_email=user.email,
+            confirmer_role=user.role.value, confirmed_at=now, request_id=context['request_id'],
+            ip_address=context['ip_address'], user_agent=context['user_agent'],
+            final_odometer_km=final_odometer, vehicle_condition_notes=notes,
+            last_trip_id=latest_trip.id if latest_trip else None, admin_correction_reason=reason if current else None)
+        await self.confirmations.create(confirmation)
+        await self.audit.record(actor=user, action='POSSESSION_RETURN_CORRECTION', entity_type='POSSESSION',
+            entity_id=possession.id, entity_label=f'Posse {possession.public_number}',
+            details={'unified': True, 'correction_reason': reason, 'canonical_payload': payload,
+                     'previous_confirmation_id': str(current.id) if current else None,
+                     'confirmation_id': str(new_id), 'confirmation_version': version,
+                     'canonical_payload_hash': confirmation.canonical_payload_hash})
+        return confirmation
+
     async def get_context(self, possession_id: UUID, current_user: User) -> dict:
         possession = await self._visible_possession(possession_id, current_user)
         open_trip = await self.trips.get_open_by_possession(possession_id)
@@ -142,6 +179,8 @@ class PossessionReturnService:
         confirmed_at = datetime.now(timezone.utc)
         final_odometer = _decimal_odometer(data.end_odometer_km)
 
+        scoped_possession = await self._visible_possession(possession_id, current_user)
+        await attribute_operation(self.db, scoped_possession, current_user)
         try:
             possession = await self.possessions.get_by_id_for_update(possession_id)
             if possession is None:
@@ -198,6 +237,8 @@ class PossessionReturnService:
                 last_trip_id=latest_trip.id if latest_trip else None,
             )
             possession.end_date = data.end_date
+            possession.revision = (getattr(possession, 'revision', None) or 1) + 1
+            await attribute_operation(self.db, possession, current_user)
             possession.end_odometer_km = float(final_odometer)
             await self.confirmations.create(confirmation)
             await self.audit.record(
@@ -254,6 +295,8 @@ class PossessionReturnService:
         confirmed_at = datetime.now(timezone.utc)
         final_odometer = _decimal_odometer(data.end_odometer_km)
 
+        scoped_possession = await self._visible_possession(possession_id, current_user)
+        await attribute_operation(self.db, scoped_possession, current_user)
         try:
             possession = await self.possessions.get_by_id_for_update(possession_id)
             if possession is None or possession.end_date is None:
@@ -304,6 +347,7 @@ class PossessionReturnService:
             )
             previous_end_date = possession.end_date
             possession.end_date = data.end_date
+            await attribute_operation(self.db, possession, current_user)
             possession.end_odometer_km = float(final_odometer)
             await self.confirmations.create(confirmation)
             await self.audit.record(
@@ -322,6 +366,8 @@ class PossessionReturnService:
                     "corrected_end_date": data.end_date.isoformat(),
                     "final_odometer_km": float(final_odometer),
                 },
+                suggestion_context="possession_return",
+                suggestion_text=data.correction_reason,
             )
             await self.db.flush()
             await self.db.commit()

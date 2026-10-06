@@ -2,18 +2,23 @@ from __future__ import annotations
 
 import hmac
 import logging
+from app.core.validation_errors import validation_message
 from pathlib import Path
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.middleware.trustedhost import TrustedHostMiddleware
+from sqlalchemy import text
+from sqlalchemy.exc import SQLAlchemyError
 from app.api.routes.admin_notifications import router as admin_notifications_router
 from app.api.routes.analytics import router as analytics_router
 from app.api.routes.audit import router as audit_router
+from app.api.routes.justification_suggestions import router as justification_suggestions_router
 from app.api.routes.auth import router as auth_router
 from app.api.routes.claims import router as claims_router
 from app.api.routes.data_imports import router as data_imports_router
+from app.api.routes.document_signatures import artifact_router as document_artifacts_router
 from app.api.routes.document_signatures import router as document_signatures_router
 from app.api.routes.drivers import router as drivers_router
 from app.api.routes.fines import router as fines_router
@@ -28,10 +33,12 @@ from app.api.routes.payment_processes import router as payment_processes_router
 from app.api.routes.payment_processes import supplier_router as payment_suppliers_router
 from app.api.routes.possession import public_router as public_possession_terms_router
 from app.api.routes.possession import router as possession_router
+from app.api.routes.vehicle_loans import router as vehicle_loans_router
 from app.api.routes.search import router as search_router
 from app.api.routes.users import router as users_router
 from app.api.routes.vehicles import router as vehicles_router
 from app.core.config import settings
+from app.core.database import engine
 from app.core.request_context import (
     REQUEST_ID_HEADER,
     build_request_audit_context,
@@ -77,7 +84,7 @@ app.add_middleware(
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
     allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", REQUEST_ID_HEADER],
-    expose_headers=[REQUEST_ID_HEADER],
+    expose_headers=[REQUEST_ID_HEADER, "X-Document-Content-SHA256"],
 )
 app.add_middleware(RequestBodyLimitMiddleware, max_body_bytes=settings.MAX_REQUEST_BODY_BYTES)
 
@@ -176,7 +183,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
     safe_errors = [
         {
             "loc": error.get("loc", ()),
-            "msg": "Valor inválido",
+            "msg": validation_message(error),
             "type": error.get("type", "validation_error"),
         }
         for error in exc.errors()
@@ -186,6 +193,7 @@ async def validation_exception_handler(request: Request, exc: RequestValidationE
         content={"detail": safe_errors, "request_id": _request_id(request)},
     )
 
+app.include_router(justification_suggestions_router)
 app.include_router(auth_router)
 app.include_router(audit_router)
 app.include_router(admin_notifications_router)
@@ -193,10 +201,12 @@ app.include_router(users_router)
 app.include_router(master_data_router)
 app.include_router(data_imports_router)
 app.include_router(document_signatures_router)
+app.include_router(document_artifacts_router)
 app.include_router(drivers_router)
 app.include_router(vehicles_router)
 app.include_router(maintenance_router)
 app.include_router(possession_router)
+app.include_router(vehicle_loans_router)
 app.include_router(public_possession_terms_router)
 app.include_router(claims_router)
 app.include_router(fines_router)
@@ -214,6 +224,19 @@ app.include_router(analytics_router)
 @app.get("/api/health")
 async def health():
     return {"status": "ok", "app": "frota-pmtf"}
+
+
+@app.get("/api/health/ready")
+async def readiness():
+    """Report whether the application can serve requests that require PostgreSQL."""
+    try:
+        async with engine.connect() as connection:
+            await connection.execute(text("SELECT 1"))
+    except (OSError, TimeoutError, SQLAlchemyError):
+        logger.warning("Readiness check failed because PostgreSQL is unavailable")
+        raise HTTPException(status_code=503, detail="Banco de dados indisponível")
+
+    return {"status": "ok", "app": "frota-pmtf", "database": "ok"}
 
 
 @app.get("/")

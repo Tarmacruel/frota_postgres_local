@@ -11,6 +11,8 @@ from app.db.session import get_db_session
 from app.models.fuel_supply_order import FuelSupplyOrderStatus
 from app.models.user import User
 from app.schemas.fuel_supply import (
+    FuelSupplyOrderBatchCreate,
+    FuelSupplyOrderBatchResponse,
     FuelSupplyOrderCancel,
     FuelSupplyOrderConfirm,
     FuelSupplyOrderCreate,
@@ -59,6 +61,15 @@ async def create_fuel_supply_order(
     current_user: User = Depends(require_permission("fuel_supply_orders", "create")),
 ):
     return await FuelSupplyOrderService(db).create_order(data, current_user)
+
+
+@router.post("/batch", response_model=FuelSupplyOrderBatchResponse, status_code=status.HTTP_201_CREATED)
+async def create_fuel_supply_orders_batch(
+    data: FuelSupplyOrderBatchCreate,
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("fuel_supply_orders", "create")),
+):
+    return await FuelSupplyOrderService(db).create_batch(data, current_user)
 
 
 @router.get("", response_model=FuelSupplyOrderListResponse)

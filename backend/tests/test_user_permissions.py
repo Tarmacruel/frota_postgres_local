@@ -74,7 +74,10 @@ def test_default_permissions_preserve_current_roles():
     posto = default_permissions_for_role("POSTO")
     padrao = default_permissions_for_role("PADRAO")
 
-    assert all(all(flags.values()) for module, flags in admin.items() if module != "possession")
+    assert all(all(flags.values()) for module, flags in admin.items() if module not in {"possession", "vehicle_loans"})
+    assert admin['vehicle_loans'] == {'can_view': True, 'can_create': True, 'can_edit': True, 'can_delete': False}
+    assert producao['vehicle_loans'] == admin['vehicle_loans']
+    assert not any(posto['vehicle_loans'].values())
     assert admin["possession"] == {"can_view": True, "can_create": True, "can_edit": True, "can_delete": False}
     assert producao["vehicles"]["can_create"] is True
     assert producao["vehicles"]["can_delete"] is False

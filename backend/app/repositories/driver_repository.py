@@ -50,7 +50,7 @@ class DriverRepository:
 
         if search:
             term = f"%{search.strip()}%"
-            filter_clause = or_(Driver.nome_completo.ilike(term), Driver.documento.ilike(term), Organization.name.ilike(term))
+            filter_clause = or_(Driver.nome_completo.ilike(term), Driver.documento.ilike(term), Driver.matricula.ilike(term), Organization.name.ilike(term))
             stmt = stmt.where(filter_clause)
             count_stmt = count_stmt.where(filter_clause)
 
@@ -59,7 +59,7 @@ class DriverRepository:
         items = list((await self.db.execute(stmt)).scalars().all())
         return items, total
 
-    async def list_active(self, *, search: str | None = None, limit: int = 100, organization_id: UUID | None = None) -> list[Driver]:
+    async def list_active(self, *, search: str | None = None, limit: int = 1000, organization_id: UUID | None = None) -> list[Driver]:
         stmt = (
             select(Driver)
             .options(joinedload(Driver.organization))
@@ -70,7 +70,7 @@ class DriverRepository:
             stmt = stmt.where(Driver.organization_id == organization_id)
         if search:
             term = f"%{search.strip()}%"
-            stmt = stmt.where(or_(Driver.nome_completo.ilike(term), Driver.documento.ilike(term), Organization.name.ilike(term)))
+            stmt = stmt.where(or_(Driver.nome_completo.ilike(term), Driver.documento.ilike(term), Driver.matricula.ilike(term), Organization.name.ilike(term)))
         stmt = stmt.order_by(Driver.nome_completo.asc()).limit(limit)
         result = await self.db.execute(stmt)
         return list(result.scalars().all())

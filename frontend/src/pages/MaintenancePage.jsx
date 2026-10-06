@@ -11,6 +11,7 @@ import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
+import { ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 
 const statusOptions = [
   { value: 'TODAS', label: 'Todas' },
@@ -279,13 +280,12 @@ export default function MaintenancePage() {
   const closedCount = filteredRecords.length - openCount
 
   return (
-    <div className="surface-panel">
-      <div className="panel-heading">
-        <div>
-          <h2 className="section-title">Manutenções</h2>
-          <p className="section-copy">Acompanhe revisões concluídas e serviços ainda em aberto sem sair do painel principal.</p>
-        </div>
-        <div className="actions-inline">
+    <div className="surface-panel operation-page operation-page--maintenance">
+      <PageHeader
+        title="Manutenções"
+        description="Acompanhe revisões concluídas e serviços ainda em aberto sem sair do painel principal."
+        actions={(
+          <>
           {canCreateMaintenance ? (
             <button className="app-button" type="button" onClick={() => setIsModalOpen(true)}>
               Nova manutenção
@@ -293,10 +293,11 @@ export default function MaintenancePage() {
           ) : null}
           <button className="secondary-button" type="button" onClick={handleExportPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
-      <div className="toolbar-card">
+      <div className="toolbar-card operation-toolbar">
         <div className="toolbar-row">
           <div className="status-pills">
             {statusOptions.map((option) => (
@@ -365,9 +366,9 @@ export default function MaintenancePage() {
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
-      <div className="surface-panel panel-nested">
+      <div className="surface-panel panel-nested operation-table-card">
         <div className="table-wrap table-wrap-wide">
-          <table className="data-table data-table-wide">
+          <table className="data-table data-table-wide operation-table">
             <thead>
               <tr>
                 <th>Veículo</th>
@@ -395,9 +396,12 @@ export default function MaintenancePage() {
                 paginatedRecords.map((record) => (
                   <tr key={record.id} className={focusedRecord?.id === record.id ? 'is-focused-row' : ''}>
                     <td data-label="Veículo">
-                      <div className="stack">
-                        <strong>{record.vehicle_plate}</strong>
-                        <span className="muted">{getRecordOrganizationName(record)}</span>
+                      <div className="operation-vehicle-identity">
+                        <VehicleThumbnail vehicleType={record.vehicle_type ?? getRecordVehicle(record)?.vehicle_type} plate={record.vehicle_plate} />
+                        <span>
+                          <strong>{record.vehicle_plate}</strong>
+                          <small className="muted">{getRecordOrganizationName(record)}</small>
+                        </span>
                       </div>
                     </td>
                     <td data-label="Início">{formatDate(record.start_date)}</td>
@@ -412,23 +416,18 @@ export default function MaintenancePage() {
                     <td data-label="Peças">{record.parts_replaced || 'Sem observação'}</td>
                     <td data-label="Custo">{formatMoney(record.total_cost)}</td>
                     <td data-label="Status">
-                      <span className={`status-badge ${record.end_date ? 'status-ATIVO' : 'status-MANUTENCAO'}`}>
-                        {record.end_date ? 'CONCLUÍDA' : 'EM ANDAMENTO'}
-                      </span>
+                      <StatusChip tone={record.end_date ? 'success' : 'warning'}>{record.end_date ? 'CONCLUÍDA' : 'EM ANDAMENTO'}</StatusChip>
                     </td>
                     {canManageMaintenanceActions ? (
                       <td data-label="Ações">
-                        <div className="actions-inline">
-                          {canEditMaintenance ? (
-                            <button type="button" className="mini-button" onClick={() => { setEditingRecord(record); setIsModalOpen(true) }}>
-                              Editar
-                            </button>
-                          ) : null}
-                          {canDeleteMaintenance ? (
-                            <button type="button" className="mini-button danger" onClick={() => handleDelete(record.id)}>
-                              Excluir
-                            </button>
-                          ) : null}
+                        <div className="operation-row-actions">
+                          <ActionMenu
+                            label={`Mais ações da manutenção de ${record.vehicle_plate}`}
+                            items={[
+                              { key: 'edit', label: 'Editar', icon: 'maintenance', hidden: !canEditMaintenance, onClick: () => { setEditingRecord(record); setIsModalOpen(true) } },
+                              { key: 'delete', label: 'Excluir', icon: 'close', tone: 'danger', hidden: !canDeleteMaintenance, onClick: () => handleDelete(record.id) },
+                            ]}
+                          />
                         </div>
                       </td>
                     ) : null}

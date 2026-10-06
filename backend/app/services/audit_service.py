@@ -12,15 +12,38 @@ from app.core.request_context import RequestAuditContext, get_request_audit_cont
 _SECRET_KEYS = {
     "access_token",
     "authorization",
+    "certificate_chain",
+    "certificate_der",
+    "certificate_pfx",
     "cookie",
     "csrf_token",
     "password",
     "password_hash",
+    "pfx",
+    "pin",
+    "private_key",
+    "prepared_state",
+    "raw_signature",
     "refresh_token",
     "secret",
+    "signed_attributes",
     "token",
 }
-_PERSONAL_KEYS = {"contact", "cpf", "document", "driver_contact", "driver_document", "email", "phone", "telefone"}
+_PERSONAL_KEYS = {
+    "certificate_cpf",
+    "certificate_subject",
+    "contact",
+    "cpf",
+    "document",
+    "driver_contact",
+    "driver_document",
+    "email",
+    "phone",
+    "san",
+    "subject_alt_name",
+    "subject_dn",
+    "telefone",
+}
 
 
 def _mask_personal_value(value):
@@ -83,6 +106,8 @@ class AuditService:
         entity_label: str,
         details: dict | None = None,
         request_context: RequestAuditContext | None = None,
+        suggestion_context: str | None = None,
+        suggestion_text: str | None = None,
     ) -> AuditLog:
         sanitized_details = jsonable_encoder(_sanitize_audit_value(details)) if details is not None else {}
         context = request_context or get_request_audit_context()
@@ -99,4 +124,9 @@ class AuditService:
             entity_label=entity_label,
             details=sanitized_details or None,
         )
-        return await self.audit_logs.create(audit_log)
+        record = await self.audit_logs.create(audit_log)
+        if suggestion_context and suggestion_text:
+            from app.services.justification_suggestions import remember
+            await remember(self.db, actor.id, suggestion_context, suggestion_text)
+        return record
+    "device_public_key",

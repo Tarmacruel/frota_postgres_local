@@ -230,3 +230,10 @@ def test_create_schema_rejects_invalid_dates_and_negative_cost():
 
     with pytest.raises(ValidationError):
         MaintenanceCreate(**{**valid_data, "total_cost": Decimal("-0.01")})
+
+
+@pytest.fixture(autouse=True)
+def operational_attribution_collaborator(monkeypatch):
+    """These unit tests use fake sessions; temporal scope has PostgreSQL integration tests."""
+    from unittest.mock import AsyncMock
+    monkeypatch.setattr("app.services.maintenance_service.attribute_operation", AsyncMock())

@@ -1,7 +1,7 @@
 [CmdletBinding()]
 param(
-    [string]$SourceRoot = "\\Sad61svr001\licitacao.1\FROTAS\frota_postgres_local",
-    [string]$RuntimeRoot = "C:\FROTAS\frota_runtime",
+    [string]$SourceRoot = "",
+    [string]$RuntimeRoot = (Split-Path -Parent $PSScriptRoot),
     [string]$DataRoot = "",
     [int]$BackendPort = 8000,
     [int]$FrontendPort = 3000,
@@ -132,8 +132,9 @@ function Invoke-HttpCheck {
     }
     catch {
         $statusCode = 0
-        if ($_.Exception.Response) {
-            $statusCode = [int]$_.Exception.Response.StatusCode
+        $responseProperty = $_.Exception.PSObject.Properties["Response"]
+        if ($responseProperty -and $responseProperty.Value) {
+            $statusCode = [int]$responseProperty.Value.StatusCode
         }
 
         return [pscustomobject]@{
@@ -296,12 +297,12 @@ function Update-EnvFileValue {
 
     $lines = @()
     if (Test-Path -LiteralPath $Path) {
-        $lines = Get-Content -LiteralPath $Path
+        $lines = @(Get-Content -LiteralPath $Path -Encoding UTF8)
     }
 
     $found = $false
     $escapedName = [regex]::Escape($Name)
-    $updated = foreach ($line in $lines) {
+    $updated = @(foreach ($line in $lines) {
         if ($line -match "^$escapedName=") {
             $found = $true
             "$Name=$Value"
@@ -309,13 +310,17 @@ function Update-EnvFileValue {
         else {
             $line
         }
-    }
+    })
 
     if (-not $found) {
         $updated += "$Name=$Value"
     }
 
-    Set-Content -LiteralPath $Path -Value $updated -Encoding UTF8
+    # Keep an array even for a one-line file; += on a scalar concatenates keys.
+    $content = ($updated -join "`r`n") + "`r`n"
+    if (-not (Test-Path -LiteralPath $Path) -or [IO.File]::ReadAllText($Path) -cne $content) {
+        [IO.File]::WriteAllText($Path, $content, (New-Object System.Text.UTF8Encoding($false)))
+    }
 }
 
 function Get-EnvFileValue {
@@ -357,6 +362,10 @@ function Ensure-BackendRuntimeEnv {
     $backendRoot = Join-Path $RuntimeRoot "backend"
     $envFile = Join-Path $backendRoot ".env"
     $envExample = Join-Path $backendRoot ".env.example"
+
+    if (-not (Get-EnvFileValue -Path $envFile -Name "DATABASE_URL")) {
+        throw "DATABASE_URL ausente em $envFile. Restaure a configuracao de producao antes de iniciar."
+    }
 
     if (-not (Test-Path -LiteralPath $backendRoot)) {
         throw "Backend nao encontrado no runtime local: $backendRoot"
@@ -668,6 +677,9 @@ try {
     }
 
     Write-WatchdogLog -Message "Status final: backend=$backendOk frontend=$frontendOk postgres=$postgresOk cloudflared=$cloudflaredOk publico=$($publicHealth.Ok)"
+    if (-not ($backendOk -and $frontendOk -and $postgresOk -and $cloudflaredOk -and $publicHealth.Ok)) {
+        $exitCode = 1
+    }
     $state["lastRunAt"] = (Get-Date).ToString("o")
 }
 catch {

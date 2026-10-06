@@ -3,6 +3,7 @@ import SearchableSelect from './SearchableSelect'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
+import useFuelSupplyOrderForm from '../hooks/useFuelSupplyOrderForm'
 
 function buildVehicleOption(vehicle) {
   const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
@@ -28,15 +29,13 @@ function buildDefaultDeadline() {
   return toDateTimeLocalValue(deadline.toISOString())
 }
 
-export default function FuelSupplyOrderCreateForm({ vehicles, organizations, fuelStations, onClose, onSuccess }) {
-  const [form, setForm] = useState({
+export default function FuelSupplyOrderCreateForm({ vehicles = [], organizations = [], fuelStations = [], onClose, onSuccess }) {
+  const [form, setForm] = useFuelSupplyOrderForm(() => ({
     vehicle_id: '',
-    organization_id: '',
-    fuel_station_id: '',
     expires_at: buildDefaultDeadline(),
-    requested_liters: '',
+    requested_liters: '30',
     notes: '',
-  })
+  }), organizations, fuelStations)
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
 
@@ -99,9 +98,10 @@ export default function FuelSupplyOrderCreateForm({ vehicles, organizations, fue
         <SearchableSelect
           value={form.vehicle_id}
           onChange={(value) => setForm((current) => ({ ...current, vehicle_id: value }))}
-          options={vehicles.map(buildVehicleOption)}
+          options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(buildVehicleOption)}
           placeholder="Selecione o veículo"
           searchPlaceholder="Buscar veículo"
+          ariaLabel="Veículo"
         />
       </div>
 
@@ -113,6 +113,7 @@ export default function FuelSupplyOrderCreateForm({ vehicles, organizations, fue
           options={fuelStations.map(buildFuelStationOption)}
           placeholder="Selecione o posto"
           searchPlaceholder="Buscar posto"
+          ariaLabel="Posto"
         />
       </div>
 
@@ -124,6 +125,7 @@ export default function FuelSupplyOrderCreateForm({ vehicles, organizations, fue
           options={[{ value: '', label: 'Não informado' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))]}
           placeholder="Selecione o órgão"
           searchPlaceholder="Buscar órgão"
+          ariaLabel="Órgão solicitante"
         />
       </div>
 
@@ -139,8 +141,9 @@ export default function FuelSupplyOrderCreateForm({ vehicles, organizations, fue
       </div>
 
       <div className="form-field">
-        <label>Litros previstos</label>
+        <label htmlFor="fuel-order-requested-liters">Litros previstos</label>
         <input
+          id="fuel-order-requested-liters"
           type="number"
           min="0"
           step="0.01"

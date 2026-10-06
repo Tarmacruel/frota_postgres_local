@@ -9,10 +9,12 @@ import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 import { DRIVER_LICENSE_CATEGORY_OPTIONS } from '../constants/driverCategories'
+import { ActionMenu, PageHeader, StatusChip } from '../components/ui'
 
 const initialForm = {
   nome_completo: '',
   documento: '',
+  matricula: '',
   organization_id: '',
   contato: '',
   email: '',
@@ -32,9 +34,9 @@ function getCnhAlert(cnhDate) {
   const validade = new Date(cnhDate)
   validade.setHours(0, 0, 0, 0)
   const diffDays = Math.floor((validade - today) / (1000 * 60 * 60 * 24))
-  if (diffDays < 0) return { label: 'CNH vencida', tone: 'alert-error' }
-  if (diffDays <= 30) return { label: `Vence em ${diffDays} dias`, tone: 'alert-error' }
-  if (diffDays <= 60) return { label: `Vence em ${diffDays} dias`, tone: 'alert-info' }
+  if (diffDays < 0) return { label: 'CNH vencida', tone: 'danger' }
+  if (diffDays <= 30) return { label: `Vence em ${diffDays} dias`, tone: 'danger' }
+  if (diffDays <= 60) return { label: `Vence em ${diffDays} dias`, tone: 'warning' }
   return null
 }
 
@@ -75,6 +77,7 @@ export default function DriversPage() {
   const exportColumns = [
     { header: 'Nome completo', value: (item) => item.nome_completo },
     { header: 'Documento', value: (item) => item.documento },
+    { header: 'Matrícula', value: (item) => item.matricula || 'Não informada' },
     { header: 'Secretaria', value: (item) => item.organization_name || 'Não informada' },
     { header: 'Contato', value: (item) => item.contato || '-' },
     { header: 'E-mail', value: (item) => item.email || '-' },
@@ -108,16 +111,19 @@ export default function DriversPage() {
   }, [search, activeFilter, organizationFilter])
 
   function openCreateModal() {
+    setError('')
     setEditingRecord(null)
     setForm(initialForm)
     setIsModalOpen(true)
   }
 
   function openEditModal(record) {
+    setError('')
     setEditingRecord(record)
     setForm({
       nome_completo: record.nome_completo,
       documento: record.documento,
+      matricula: record.matricula || '',
       organization_id: record.organization_id || '',
       contato: record.contato || '',
       email: record.email || '',
@@ -135,6 +141,10 @@ export default function DriversPage() {
 
   async function handleSubmit(event) {
     event.preventDefault()
+    if (!form.matricula.trim()) {
+      setError('Informe a matrícula do condutor para prosseguir.')
+      return
+    }
     if ((editingRecord && !canEditDriver) || (!editingRecord && !canCreateDriver)) {
       setError('Você não tem permissão para salvar condutores.')
       return
@@ -149,6 +159,7 @@ export default function DriversPage() {
       setError('')
       const payload = {
         ...form,
+        matricula: form.matricula.trim(),
         contato: form.contato || null,
         email: form.email || null,
         cnh_validade: form.cnh_validade || null,
@@ -224,20 +235,20 @@ export default function DriversPage() {
   }
 
   return (
-    <div className="surface-panel">
-      <div className="panel-heading">
-        <div>
-          <h2 className="section-title">Condutores cadastrados</h2>
-          <p className="section-copy">Mantenha a base reutilizável de condutores para posse, busca e futuros módulos operacionais.</p>
-        </div>
-        <div className="actions-inline">
+    <div className="surface-panel operation-page operation-page--drivers">
+      <PageHeader
+        title="Condutores cadastrados"
+        description="Mantenha a base reutilizável de condutores para posse, busca e futuros módulos operacionais."
+        actions={(
+          <>
           {canCreateDriver ? <button className="app-button" type="button" onClick={openCreateModal}>Novo condutor</button> : null}
           <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
-        </div>
-      </div>
+          </>
+        )}
+      />
 
-      <div className="toolbar-card">
+      <div className="toolbar-card operation-toolbar">
         <div className="toolbar-row">
           <div className="status-pills">
             {['ATIVOS', 'TODOS', 'INATIVOS'].map((option) => (
@@ -247,7 +258,7 @@ export default function DriversPage() {
             ))}
           </div>
           <div className="filter-inline">
-            <input className="app-input" placeholder="Buscar por nome, documento ou secretaria" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <input className="app-input" placeholder="Buscar por nome, matrícula, documento ou secretaria" value={search} onChange={(event) => setSearch(event.target.value)} />
             <select className="app-select" value={organizationFilter} onChange={(event) => setOrganizationFilter(event.target.value)}>
               <option value="TODAS">Todas as secretarias</option>
               {organizations.map((organization) => (
@@ -287,13 +298,14 @@ export default function DriversPage() {
       {catalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
-      <div className="surface-panel panel-nested">
+      <div className="surface-panel panel-nested operation-table-card">
         <div className="table-wrap table-wrap-wide">
-          <table className="data-table data-table-wide">
+          <table className="data-table data-table-wide operation-table">
             <thead>
               <tr>
                 <th>Nome</th>
                 <th>Documento</th>
+                <th>Matrícula</th>
                 <th>Secretaria</th>
                 <th>Contato</th>
                 <th>E-mail</th>
@@ -305,9 +317,9 @@ export default function DriversPage() {
             </thead>
             <tbody>
               {loading ? (
-                <tr><td colSpan={canManageDriverActions ? 9 : 8} className="muted">Carregando condutores...</td></tr>
+                <tr><td colSpan={canManageDriverActions ? 10 : 9} className="muted">Carregando condutores...</td></tr>
               ) : !records.length ? (
-                <tr><td colSpan={canManageDriverActions ? 9 : 8}><div className="empty-state">Nenhum condutor encontrado para o filtro atual.</div></td></tr>
+                <tr><td colSpan={canManageDriverActions ? 10 : 9}><div className="empty-state">Nenhum condutor encontrado para o filtro atual.</div></td></tr>
               ) : (
                 records.map((record) => {
                   const cnhAlert = getCnhAlert(record.cnh_validade)
@@ -315,19 +327,25 @@ export default function DriversPage() {
                   <tr key={record.id}>
                     <td data-label="Nome"><strong>{record.nome_completo}</strong></td>
                     <td data-label="Documento">{record.documento}</td>
+                    <td data-label="Matrícula">{record.matricula || 'Não informada'}</td>
                     <td data-label="Secretaria">{record.organization_name || 'Não informada'}</td>
                     <td data-label="Contato">{record.contato || '-'}</td>
                     <td data-label="E-mail">{record.email || '-'}</td>
                     <td data-label="CNH">{record.cnh_categoria} {record.cnh_validade ? `| validade ${formatDate(record.cnh_validade)}` : ''}</td>
                     <td data-label="Alerta CNH">
-                      {cnhAlert ? <span className={`alert ${cnhAlert.tone}`}>{cnhAlert.label}</span> : '-'}
+                      {cnhAlert ? <StatusChip tone={cnhAlert.tone}>{cnhAlert.label}</StatusChip> : '-'}
                     </td>
-                    <td data-label="Status"><span className={`status-badge ${record.ativo ? 'status-ATIVO' : 'status-INATIVO'}`}>{record.ativo ? 'ATIVO' : 'INATIVO'}</span></td>
+                    <td data-label="Status"><StatusChip tone={record.ativo ? 'success' : 'neutral'}>{record.ativo ? 'ATIVO' : 'INATIVO'}</StatusChip></td>
                     {canManageDriverActions ? (
                       <td data-label="Ações">
-                        <div className="actions-inline">
-                          {canEditDriver ? <button type="button" className="mini-button" onClick={() => openEditModal(record)}>Editar</button> : null}
-                          {canDeleteDriver && record.ativo ? <button type="button" className="mini-button danger" onClick={() => handleDeactivate(record)}>Inativar</button> : null}
+                        <div className="operation-row-actions">
+                          <ActionMenu
+                            label={`Mais ações do condutor ${record.nome_completo}`}
+                            items={[
+                              { key: 'edit', label: 'Editar', icon: 'catalog', hidden: !canEditDriver, onClick: () => openEditModal(record) },
+                              { key: 'deactivate', label: 'Inativar', icon: 'close', tone: 'danger', hidden: !canDeleteDriver || !record.ativo, onClick: () => handleDeactivate(record) },
+                            ]}
+                          />
                         </div>
                       </td>
                     ) : null}
@@ -349,6 +367,7 @@ export default function DriversPage() {
         onClose={closeModal}
       >
         <form onSubmit={handleSubmit} className="stack">
+          {error ? <div className="alert alert-error" role="alert">{error}</div> : null}
           <AccordionSection title="Dados básicos" subtitle="Identificação e contato" open>
             <div className="form-grid modal-form-grid">
               <div className="form-field">
@@ -358,6 +377,10 @@ export default function DriversPage() {
               <div className="form-field">
                 <label htmlFor="driver-document">Documento</label>
                 <input id="driver-document" className="app-input" value={form.documento} onChange={(event) => setForm({ ...form, documento: event.target.value })} />
+              </div>
+              <div className="form-field">
+                <label htmlFor="driver-registration">Matrícula (obrigatória)</label>
+                <input id="driver-registration" className="app-input" required maxLength={30} value={form.matricula} onChange={(event) => setForm({ ...form, matricula: event.target.value })} />
               </div>
               <div className="form-field modal-field-span">
                 <label>Secretaria</label>

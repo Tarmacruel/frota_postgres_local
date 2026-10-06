@@ -5,6 +5,7 @@ import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 import { AppIcon } from '../components/AppIcon'
+import { StatCard } from '../components/ui'
 
 function formatDate(value) {
   if (!value) return 'Atual'
@@ -66,36 +67,20 @@ export default function DashboardPage() {
   }, [vehicles, maintenance, activePossessions])
 
   const metricCards = [
-    { label: 'Veículos ativos', value: stats.ativos, note: 'Disponíveis para uso imediato.' },
-    { label: 'Em manutenção', value: stats.manutencao, note: 'Demandam retorno operacional.' },
-    { label: 'Sem condutor', value: stats.semCondutor, note: 'Precisam de responsável definido.' },
-    { label: 'Pendências abertas', value: stats.manutencoesAbertas, note: 'Chamados de oficina em andamento.' },
+    { icon: 'vehicles', tone: 'info', label: 'Veículos ativos', value: stats.ativos, note: 'Em uso ou disponíveis' },
+    { icon: 'maintenance', tone: 'warning', label: 'Em manutenção', value: stats.manutencao, note: 'Demandam retorno operacional' },
+    { icon: 'drivers', tone: 'neutral', label: 'Sem condutor', value: stats.semCondutor, note: 'Aguardando posse' },
+    { icon: 'audit', tone: 'danger', label: 'Pendências abertas', value: stats.manutencoesAbertas, note: 'Precisam de atenção' },
   ]
 
   const primaryActions = [
+    { icon: 'vehicles', title: 'Abrir veículos ativos', description: 'Consulte a frota pronta para operação.', to: '/vehicles?status=ATIVO', cta: 'Consultar ativos' },
+    { icon: 'maintenance', title: 'Revisar manutenções abertas', description: 'Acompanhe serviços, custos e prazos.', to: '/manutencoes', cta: 'Abrir manutenções' },
+    { icon: 'drivers', title: 'Ver veículos sem condutor', description: 'Localize ativos sem posse vigente.', to: '/posses', cta: 'Abrir posses' },
     {
-      title: 'Abrir veículos ativos',
-      description: 'Vá direto para a frota pronta para operação e filtre apenas o que está liberado.',
-      to: '/vehicles?status=ATIVO',
-      cta: 'Consultar ativos',
-    },
-    {
-      title: 'Revisar manutenções abertas',
-      description: 'Priorize os veículos em oficina e acompanhe o custo e o prazo dos serviços.',
-      to: '/manutencoes',
-      cta: 'Abrir manutenções',
-    },
-    {
-      title: 'Ver veículos sem condutor',
-      description: 'Encontre rapidamente os ativos sem posse vigente para redistribuição.',
-      to: '/posses',
-      cta: 'Abrir posses',
-    },
-    {
+      icon: 'catalog',
       title: canCreateVehicle ? 'Cadastrar novo veículo' : 'Consultar base completa',
-      description: canCreateVehicle
-        ? 'Acesse o módulo principal da frota para cadastrar, editar e abrir históricos.'
-        : 'Acesse a base consolidada para pesquisa, filtros e emissão de relatórios.',
+      description: canCreateVehicle ? 'Inclua um veículo na frota municipal.' : 'Pesquise e filtre a base consolidada.',
       to: '/vehicles',
       cta: canCreateVehicle ? 'Gerenciar frota' : 'Consultar frota',
     },
@@ -108,153 +93,107 @@ export default function DashboardPage() {
 
   const adminActions = isAdmin
     ? [
-        {
-          title: 'Gestão de usuários',
-          description: 'Ajuste perfis administrativos, produção e leitura conforme a secretaria.',
-          to: '/users',
-          cta: 'Abrir usuários',
-        },
-        {
-          title: 'Auditoria administrativa',
-          description: 'Revise quem criou, editou ou removeu registros sensíveis da operação.',
-          to: '/auditoria',
-          cta: 'Abrir auditoria',
-        },
+        { icon: 'users', title: 'Gestão de usuários', description: 'Ajuste perfis e acessos por secretaria.', to: '/users', cta: 'Abrir usuários' },
+        { icon: 'audit', title: 'Auditoria administrativa', description: 'Revise alterações em registros sensíveis.', to: '/auditoria', cta: 'Abrir auditoria' },
       ]
     : []
 
-  return (
-    <div className="surface-panel">
-      <section className="hub-hero">
-        <div className="hub-hero-copy">
-          <span className="eyebrow" style={{ background: 'color-mix(in srgb, var(--navy) 10%, transparent)', color: 'var(--navy)' }}>
-            Hub operacional
-          </span>
-          <h2 className="section-title">Painel da frota municipal</h2>
-          <p>
-            Entre pelas ações que importam agora: frota ativa, pendências de manutenção, veículos sem condutor e atalhos rápidos para cadastro ou consulta.
-          </p>
-        </div>
+  const firstName = user?.name?.trim().split(/\s+/)[0]
 
-        <div className="actions-inline">
-          <button type="button" className="secondary-button" onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}>
-            Ver pendências
-          </button>
-          <Link to="/vehicles" className="app-button">
-            Abrir operação
-          </Link>
+  return (
+    <div className="surface-panel dashboard-page">
+      <header className="dashboard-intro">
+        <div>
+          <p className="dashboard-intro__eyebrow">Visão geral da operação</p>
+          <h1>Olá{firstName ? `, ${firstName}` : ''}!</h1>
+          <p>Acompanhe os indicadores e acesse as rotinas mais usadas da frota municipal.</p>
+        </div>
+        <div className="dashboard-intro__actions">
+          <button type="button" className="secondary-button" onClick={() => window.scrollTo({ top: document.body.scrollHeight, behavior: 'smooth' })}>Ver pendências</button>
+          <Link to="/vehicles" className="app-button">Abrir operação</Link>
+        </div>
+      </header>
+
+      {error ? <div className="alert alert-error dashboard-alert">{error}</div> : null}
+
+      <section className="dashboard-kpi-grid" aria-label="Indicadores da frota">
+        {metricCards.map((item) => <StatCard key={item.label} {...item} loading={loading} />)}
+      </section>
+
+      <section className="dashboard-section" aria-labelledby="dashboard-actions-title">
+        <div className="dashboard-section__heading">
+          <div><h2 id="dashboard-actions-title">Ações rápidas</h2><p>Atalhos para as rotinas mais frequentes.</p></div>
+        </div>
+        <div className="dashboard-quick-grid">
+          {primaryActions.map((item) => (
+            <Link key={item.title} to={item.to} className="dashboard-quick-action">
+              <span className="dashboard-quick-action__icon" aria-hidden="true"><AppIcon name={item.icon} className="app-icon" /></span>
+              <span className="dashboard-quick-action__copy"><strong>{item.title}</strong><small>{item.description}</small></span>
+              <span className="dashboard-quick-action__cta"><span>{item.cta}</span><AppIcon name="chevron-right" className="app-icon" /></span>
+            </Link>
+          ))}
         </div>
       </section>
 
-      {error ? <div className="alert alert-error" style={{ marginTop: 18 }}>{error}</div> : null}
-
-      <div className="metrics-grid" style={{ marginTop: 18 }}>
-        {metricCards.map((item) => (
-          <article key={item.label} className="metric-card">
-            <span>{item.label}</span>
-            <div className="metric-value">{loading ? '--' : item.value}</div>
-            <div className="metric-note">{item.note}</div>
-          </article>
-        ))}
-      </div>
-
-      <div className="hub-layout" style={{ marginTop: 24 }}>
-        <section className="hub-action-grid">
-          {primaryActions.map((item) => (
-            <Link key={item.title} to={item.to} className="hub-action-card">
-              <strong>{item.title}</strong>
-              <p>{item.description}</p>
-              <footer className="hub-card-footer">
-                <span>{item.cta}</span>
-                <AppIcon name="chevron-right" className="app-icon" />
-              </footer>
-            </Link>
-          ))}
-        </section>
-
-        <section className="hub-secondary-grid">
-          <article className="hub-side-card">
-            <strong>Leitura rápida do dia</strong>
-            <p>Hoje a base tem {loading ? '--' : stats.total} veículos, {loading ? '--' : stats.possesAtivas} posses ativas e {loading ? '--' : stats.inativos} registros inativos.</p>
-            <div className="panel-metrics" style={{ marginBottom: 0 }}>
-              <div className="metric-inline">
-                <strong>{loading ? '--' : stats.possesAtivas}</strong>
-                <span>posses ativas</span>
-              </div>
-              <div className="metric-inline">
-                <strong>{loading ? '--' : stats.inativos}</strong>
-                <span>inativos</span>
-              </div>
-            </div>
-          </article>
-
-          <article className="hub-side-card">
-            <strong>Atalhos do perfil {user?.role || '-'}</strong>
-            <p>
-              {canWrite
-                ? 'Seu perfil pode cadastrar e atualizar dados operacionais. Use o topo para busca global e a barra móvel para acessar os módulos principais.'
-                : 'Seu perfil está em modo consulta. Use filtros, busca global e exportações para localizar e compartilhar informações rapidamente.'}
-            </p>
-          </article>
-        </section>
-      </div>
-
-      <div className="dashboard-grid" style={{ marginTop: 24 }}>
-        <section className="surface-panel" style={{ padding: 0, boxShadow: 'none', background: 'transparent', border: '0' }}>
-          <div className="panel-heading">
-            <div>
-              <h3 className="section-title">Pendências e históricos recentes</h3>
-              <p className="section-copy">Os itens em aberto ficam reunidos aqui para encurtar o caminho entre leitura e ação.</p>
-            </div>
+      <div className="dashboard-lower-grid">
+        <section className="dashboard-panel dashboard-pending-panel" aria-labelledby="dashboard-pending-title">
+          <div className="dashboard-section__heading">
+            <div><h2 id="dashboard-pending-title">Pendências e históricos recentes</h2><p>Manutenções abertas que pedem acompanhamento.</p></div>
+            {!loading ? <span className="dashboard-count">{stats.manutencoesAbertas}</span> : null}
           </div>
-
-          <div className="hub-urgent-list">
+          <div className="dashboard-pending-list">
             {loading ? (
               <div className="empty-state">Carregando pendências operacionais...</div>
             ) : stats.manutencoesPendentes.length === 0 ? (
               <div className="empty-state">Nenhuma manutenção aberta no momento. A frota está sem chamados pendentes de oficina.</div>
             ) : (
               stats.manutencoesPendentes.map((item) => (
-                <Link key={item.id} to={`/manutencoes?focus=${item.id}`} className="hub-urgent-item">
-                  <header>
-                    <strong>{item.vehicle_plate}</strong>
-                    <span className="status-badge status-MANUTENCAO">EM ANDAMENTO</span>
-                  </header>
-                  <span>{item.service_description}</span>
-                  <footer>
-                    <span className="muted">Início {formatDate(item.start_date)}</span>
-                    <span className="muted">Atualizado {formatDate(item.updated_at)}</span>
-                  </footer>
+                <Link key={item.id} to={`/manutencoes?focus=${item.id}`} className="dashboard-pending-item">
+                  <span className="dashboard-pending-item__icon" aria-hidden="true"><AppIcon name="maintenance" className="app-icon" /></span>
+                  <span className="dashboard-pending-item__copy">
+                    <span className="dashboard-pending-item__title"><strong>{item.vehicle_plate}</strong><span className="status-badge status-MANUTENCAO">EM ANDAMENTO</span></span>
+                    <span>{item.service_description}</span>
+                    <small>Início {formatDate(item.start_date)} · Atualizado {formatDate(item.updated_at)}</small>
+                  </span>
+                  <AppIcon name="chevron-right" className="app-icon dashboard-pending-item__arrow" />
                 </Link>
               ))
             )}
           </div>
         </section>
 
-        <section className="hub-secondary-grid">
-          {adminActions.length > 0 ? (
-            adminActions.map((item) => (
-              <Link key={item.title} to={item.to} className="hub-side-card">
-                <strong>{item.title}</strong>
-                <p>{item.description}</p>
-                <footer className="hub-card-footer">
-                  <span>{item.cta}</span>
-                  <AppIcon name="chevron-right" className="app-icon" />
-                </footer>
-              </Link>
-            ))
-          ) : (
-            <article className="hub-side-card">
-              <strong>Consulta e relatórios</strong>
-              <p>As telas operacionais mantêm exportações em PDF e XLSX com identidade institucional da Prefeitura para compartilhamento imediato.</p>
-              <footer className="hub-card-footer">
-                <span>Usar relatórios</span>
-                <AppIcon name="spark" className="app-icon" />
-              </footer>
-            </article>
-          )}
-        </section>
+        <aside className="dashboard-side-stack">
+          <section className="dashboard-panel dashboard-day-panel" aria-labelledby="dashboard-day-title">
+            <div className="dashboard-section__heading"><div><h2 id="dashboard-day-title">Leitura rápida do dia</h2><p>Resumo da base neste momento.</p></div></div>
+            <div className="dashboard-day-metrics">
+              <div><strong>{loading ? '--' : stats.possesAtivas}</strong><span>posses ativas</span></div>
+              <div><strong>{loading ? '--' : stats.inativos}</strong><span>inativos</span></div>
+            </div>
+            <p className="dashboard-day-summary">A base reúne {loading ? '--' : stats.total} veículos cadastrados.</p>
+          </section>
+          <section className="dashboard-profile-note" aria-label={`Atalhos do perfil ${user?.role || '-'}`}>
+            <AppIcon name="spark" className="app-icon" />
+            <div><strong>Perfil {user?.role || '-'}</strong><p>{canWrite ? 'Acesso a cadastro e atualização de dados operacionais.' : 'Acesso para consulta, filtros e exportações.'}</p></div>
+          </section>
+        </aside>
       </div>
+
+      <section className="dashboard-section dashboard-shortcuts" aria-labelledby="dashboard-shortcuts-title">
+        <div className="dashboard-section__heading"><div><h2 id="dashboard-shortcuts-title">{adminActions.length > 0 ? 'Atalhos administrativos' : 'Consulta e relatórios'}</h2><p>{adminActions.length > 0 ? 'Ferramentas disponíveis para o perfil administrador.' : 'Recursos disponíveis nas telas operacionais.'}</p></div></div>
+        {adminActions.length > 0 ? (
+          <div className="dashboard-admin-grid">
+            {adminActions.map((item) => (
+              <Link key={item.title} to={item.to} className="dashboard-admin-action">
+                <span className="dashboard-admin-action__icon" aria-hidden="true"><AppIcon name={item.icon} className="app-icon" /></span>
+                <span><strong>{item.title}</strong><small>{item.description}</small></span>
+                <span className="dashboard-admin-action__cta">{item.cta}<AppIcon name="chevron-right" className="app-icon" /></span>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="dashboard-report-note"><AppIcon name="catalog" className="app-icon" /><span>As telas operacionais mantêm exportações em PDF e XLSX para compartilhamento.</span></div>
+        )}
+      </section>
     </div>
   )
 }

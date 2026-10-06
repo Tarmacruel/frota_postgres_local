@@ -1,3 +1,4 @@
+import JustificationField from './JustificationField'
 import { useState } from 'react'
 import { claimsAPI } from '../api/claims'
 import ClaimAttachmentsField from './ClaimAttachmentsField'
@@ -125,7 +126,7 @@ export default function ClaimForm({
         <SearchableSelect
           value={form.vehicle_id}
           onChange={(value) => setForm({ ...form, vehicle_id: value })}
-          options={vehicles.map(vehicleOption)}
+          options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(vehicleOption)}
           placeholder="Selecione o veículo envolvido"
           searchPlaceholder="Buscar por placa, modelo ou chassi"
         />
@@ -181,7 +182,7 @@ export default function ClaimForm({
 
       <div className="form-field modal-field-span">
         <label htmlFor="claim-justification">Justificativa de encerramento</label>
-        <textarea id="claim-justification" className="app-textarea" rows="3" value={form.justificativa_encerramento} onChange={(event) => setForm({ ...form, justificativa_encerramento: event.target.value })} />
+        <JustificationField context="claim_close" id="claim-justification" className="app-textarea" rows="3" value={form.justificativa_encerramento} onChange={(event) => setForm({ ...form, justificativa_encerramento: event.target.value })} disabled={submitting || !canSubmit} />
       </div>
 
       <div className="form-field modal-field-span">

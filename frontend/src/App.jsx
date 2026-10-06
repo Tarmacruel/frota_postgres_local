@@ -1,5 +1,6 @@
 import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
+import EnvironmentBanner from './components/EnvironmentBanner'
 import ProtectedRoute from './components/ProtectedRoute'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import AuditPage from './pages/AuditPage'
@@ -21,6 +22,7 @@ import PublicFuelSupplyOrderPage from './pages/PublicFuelSupplyOrderPage'
 import PublicPossessionTermPage from './pages/PublicPossessionTermPage'
 import UsersPage from './pages/UsersPage'
 import VehiclesPage from './pages/VehiclesPage'
+import VehicleLoansPage from './pages/VehicleLoansPage'
 import UnauthorizedPage from './pages/UnauthorizedPage'
 
 function HomeRoute() {
@@ -33,6 +35,7 @@ export default function App() {
   return (
     <AuthProvider>
       <BrowserRouter>
+        <EnvironmentBanner />
         <Routes>
           <Route path="/login" element={<LoginPage />} />
           <Route path="/unauthorized" element={<UnauthorizedPage />} />
@@ -48,6 +51,11 @@ export default function App() {
             }
           >
             <Route index element={<HomeRoute />} />
+            <Route path="emprestimos" element={(
+              <ProtectedRoute permission={{ module: 'vehicle_loans', action: 'view' }}>
+                <VehicleLoansPage />
+              </ProtectedRoute>
+            )} />
             <Route
               path="cadastros"
               element={(

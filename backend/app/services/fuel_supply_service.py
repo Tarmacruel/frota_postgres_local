@@ -3,13 +3,15 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from decimal import Decimal
 from pathlib import Path
-from uuid import UUID
+from uuid import UUID, uuid4
 from fastapi import HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
+from app.services.operational_scope import attribute_operation, ensure_record_visible
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.organization_scope import ensure_organization_access, production_scope_is_empty, scoped_organization_id
 from app.core.config import settings
+from app.core.driver_registration import ensure_driver_registration
 from app.models.fuel_supply import FuelSupply
 from app.models.user import User, UserRole
 from app.repositories.driver_repository import DriverRepository
@@ -58,12 +60,16 @@ class FuelSupplyService:
         await self._ensure_supply_visible_to_user(supply, current_user)
         return self._serialize(supply)
 
-    async def rectify(self, supply_id: UUID, payload: FuelSupplyRectify, current_user: User) -> dict:
+    async def rectify(
+        self, supply_id: UUID, payload: FuelSupplyRectify, current_user: User,
+        *, receipt: UploadFile | None = None,
+    ) -> dict:
         self._ensure_operational_adjustment_role(current_user)
         supply = await self.supplies.get_by_id(supply_id)
         if not supply:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abastecimento nao encontrado")
         await self._ensure_supply_visible_to_user(supply, current_user)
+        await attribute_operation(self.db, supply, current_user)
         if not supply.fuel_supply_order_id:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
@@ -88,33 +94,60 @@ class FuelSupplyService:
             for field in editable_fields
             if before[field] != new_values[field]
         }
-        if not changes:
+        receipt_payload = await self._read_and_validate_receipt(receipt) if receipt is not None else None
+        if not changes and receipt_payload is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nenhuma alteracao foi informada")
 
-        for field, value in new_values.items():
-            setattr(supply, field, value)
-        supply.updated_at = datetime.now(timezone.utc)
-        consumption_inputs = {"supplied_at", "odometer_km", "liters"}
-        recalculated_supply_ids = (
-            await self._recalculate_vehicle_consumption(supply.vehicle_id)
-            if consumption_inputs.intersection(changes)
-            else []
-        )
+        stored_receipt_path: Path | None = None
+        try:
+            if receipt_payload is not None:
+                relative_path, stored_receipt_path = self._build_receipt_storage_paths(
+                    supply.id, receipt_payload["mime_type"], revision_id=uuid4(),
+                )
+                self._store_file(stored_receipt_path, receipt_payload["content"])
+                receipt_values = {
+                    "receipt_path": relative_path,
+                    "receipt_mime_type": receipt_payload["mime_type"],
+                    "receipt_size_bytes": receipt_payload["size_bytes"],
+                    "receipt_uploaded_at": datetime.now(timezone.utc),
+                }
+                changes["receipt"] = {
+                    "before": {field: getattr(supply, field) for field in receipt_values},
+                    "after": receipt_values,
+                }
+                new_values.update(receipt_values)
 
-        await self.audit.record(
-            actor=current_user,
-            action="ORDER_CONFIRM_RECTIFIED",
-            entity_type="FUEL_SUPPLY_ORDER",
-            entity_id=supply.fuel_supply_order_id,
-            entity_label=f"{supply.vehicle.plate if supply.vehicle else supply.vehicle_id} - {supply.fuel_supply_order_id}",
-            details={
-                "supply_id": str(supply.id),
-                "reason": payload.reason,
-                "changes": changes,
-                "recalculated_supply_ids": [str(item_id) for item_id in recalculated_supply_ids],
-            },
-        )
-        await self.db.commit()
+            for field, value in new_values.items():
+                setattr(supply, field, value)
+            await attribute_operation(self.db, supply, current_user)
+            supply.updated_at = datetime.now(timezone.utc)
+            consumption_inputs = {"supplied_at", "odometer_km", "liters"}
+            recalculated_supply_ids = (
+                await self._recalculate_vehicle_consumption(supply.vehicle_id)
+                if consumption_inputs.intersection(changes)
+                else []
+            )
+
+            await self.audit.record(
+                actor=current_user,
+                action="ORDER_CONFIRM_RECTIFIED",
+                entity_type="FUEL_SUPPLY_ORDER",
+                entity_id=supply.fuel_supply_order_id,
+                entity_label=f"{supply.vehicle.plate if supply.vehicle else supply.vehicle_id} - {supply.fuel_supply_order_id}",
+                details={
+                    "supply_id": str(supply.id),
+                    "reason": payload.reason,
+                    "changes": changes,
+                    "recalculated_supply_ids": [str(item_id) for item_id in recalculated_supply_ids],
+                },
+                suggestion_context="fuel_supply",
+                suggestion_text=payload.reason,
+            )
+            await self.db.commit()
+        except Exception:
+            await self.db.rollback()
+            self._cleanup_file(stored_receipt_path)
+            raise
         return await self.get(supply.id, current_user=current_user)
 
     async def get_for_station(self, *, supply_id: UUID, fuel_station: str) -> dict:
@@ -147,6 +180,7 @@ class FuelSupplyService:
             driver = await self.drivers.get_by_id(data.driver_id)
             if not driver:
                 raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Condutor não encontrado")
+            ensure_driver_registration(driver)
 
         if data.organization_id:
             organization = await self.master_data.get_organization(data.organization_id)
@@ -209,6 +243,7 @@ class FuelSupplyService:
 
         stored_receipt_path: Path | None = None
         try:
+            await attribute_operation(self.db, supply, current_user, new=True)
             await self.supplies.create(supply)
             relative_receipt_path, stored_receipt_path = self._build_receipt_storage_paths(supply.id, receipt_payload["mime_type"])
             self._store_file(stored_receipt_path, receipt_payload["content"])
@@ -308,14 +343,7 @@ class FuelSupplyService:
         ]
 
     async def _ensure_supply_visible_to_user(self, supply: FuelSupply, current_user: User | None) -> None:
-        organization_id = scoped_organization_id(current_user)
-        if organization_id is None:
-            if production_scope_is_empty(current_user):
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abastecimento não encontrado")
-            return
-        if supply.organization_id == organization_id:
-            return
-        await self._ensure_vehicle_visible_to_user(supply.vehicle_id, current_user)
+        await ensure_record_visible(self.db, supply, current_user)
 
     def _ensure_operational_adjustment_role(self, current_user: User) -> None:
         if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
@@ -392,9 +420,10 @@ class FuelSupplyService:
             "size_bytes": len(content),
         }
 
-    def _build_receipt_storage_paths(self, supply_id: UUID, mime_type: str) -> tuple[str, Path]:
+    def _build_receipt_storage_paths(self, supply_id: UUID, mime_type: str, *, revision_id: UUID | None = None) -> tuple[str, Path]:
         extension = RECEIPT_EXTENSIONS[mime_type]
-        relative_path = Path("fuel_receipts") / f"{supply_id}{extension}"
+        filename = f"{supply_id}-{revision_id}{extension}" if revision_id else f"{supply_id}{extension}"
+        relative_path = Path("fuel_receipts") / filename
         absolute_path = Path(settings.STORAGE_DIR) / relative_path
         return relative_path.as_posix(), absolute_path
 
@@ -439,8 +468,10 @@ class FuelSupplyService:
             alerts.append(item.anomaly_details)
         return {
             "id": item.id,
+            "vehicle_loan_id": getattr(item, "vehicle_loan_id", None),
             "vehicle_id": item.vehicle_id,
             "vehicle_plate": item.vehicle.plate if item.vehicle else "",
+            "vehicle_type": getattr(item.vehicle, "vehicle_type", None),
             "driver_id": item.driver_id,
             "driver_name": item.driver.nome_completo if item.driver else None,
             "organization_id": item.organization_id,

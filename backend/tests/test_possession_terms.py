@@ -206,6 +206,7 @@ async def test_delete_possession_is_denied_audited_and_preserves_record_and_file
 def test_possession_serialization_applies_role_data_exposure():
     service = PossessionService(db=None)
     record = build_record(active=False)
+    record.driver = SimpleNamespace(matricula="000123")
     record.return_confirmations = [
         SimpleNamespace(is_current=True, version=1, canonical_payload_hash="a" * 64)
     ]
@@ -223,6 +224,7 @@ def test_possession_serialization_applies_role_data_exposure():
 
     assert restricted["driver_document"] == "430.***.***-98"
     assert restricted["driver_contact"] is None
+    assert restricted["driver_matricula"] is None
     assert restricted["driver_id"] is None
     assert restricted["driver_name"] == "Identidade protegida"
     assert restricted["observation"] is None
@@ -249,6 +251,7 @@ def test_possession_serialization_applies_role_data_exposure():
 
     assert operational["driver_document"] == record.driver_document
     assert operational["driver_contact"] == record.driver_contact
+    assert operational["driver_matricula"] == "000123"
     assert operational["document_url"] == f"/api/possession/{record.id}/document"
     assert operational["loan_term_url"] == f"/api/possession/{record.id}/documents/loan-term"
     assert operational["return_term_url"] == f"/api/possession/{record.id}/documents/return-term"

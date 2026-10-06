@@ -6,6 +6,7 @@ from uuid import UUID
 
 from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError
+from app.services.operational_scope import attribute_operation, ensure_record_visible
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.organization_scope import production_scope_is_empty, scoped_organization_id
@@ -316,6 +317,8 @@ class PossessionTripService:
                     "trip_sequence": trip.sequence_number,
                     "reason": data.reason,
                 },
+                suggestion_context="trip_cancel",
+                suggestion_text=data.reason,
             )
             await self.db.flush()
             await self.db.commit()
@@ -398,20 +401,13 @@ class PossessionTripService:
         current_user: User,
         for_update: bool = False,
     ) -> VehiclePossession:
-        possession = (
-            await self.possessions.get_by_id_for_update(possession_id)
-            if for_update
-            else await self.possessions.get_by_id(possession_id)
-        )
+        possession = await self.possessions.get_by_id(possession_id)
         if possession is None:
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posse não encontrada")
-        organization_id = scoped_organization_id(current_user)
-        if organization_id is None:
-            if production_scope_is_empty(current_user):
-                raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posse não encontrada")
-            return possession
-        if not await self.vehicles.is_vehicle_in_organization(possession.vehicle_id, organization_id):
-            raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Posse não encontrada")
+            raise HTTPException(404, "Posse não encontrada")
+        await ensure_record_visible(self.db, possession, current_user)
+        if for_update:
+            await attribute_operation(self.db, possession, current_user)
+            possession = await self.possessions.get_by_id_for_update(possession_id)
         return possession
 
     def _serialize(self, trip: VehiclePossessionTrip, *, current_user: User) -> dict:

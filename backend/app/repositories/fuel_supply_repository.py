@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 from sqlalchemy import and_, func, or_, select
+from app.repositories.vehicle_scope import record_visible, responsible_to
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.models.fuel_supply import FuelSupply
@@ -127,7 +128,7 @@ class FuelSupplyRepository:
         if end_date:
             stmt = stmt.where(FuelSupply.supplied_at <= end_date)
         if organization_id:
-            stmt = stmt.where(self._organization_scope_clause(organization_id))
+            stmt = stmt.where(responsible_to(FuelSupply, FuelSupply.supplied_at, organization_id))
 
         rows = (await self.db.execute(stmt)).all()
         return [
@@ -165,15 +166,4 @@ class FuelSupplyRepository:
         return list((await self.db.execute(stmt)).scalars().unique().all())
 
     def _organization_scope_clause(self, organization_id: UUID):
-        vehicle_in_organization = (
-            select(LocationHistory.vehicle_id)
-            .join(Allocation, Allocation.id == LocationHistory.allocation_id)
-            .join(Department, Department.id == Allocation.department_id)
-            .where(
-                LocationHistory.vehicle_id == FuelSupply.vehicle_id,
-                LocationHistory.end_date.is_(None),
-                Department.organization_id == organization_id,
-            )
-            .exists()
-        )
-        return or_(FuelSupply.organization_id == organization_id, vehicle_in_organization)
+        return record_visible(FuelSupply.vehicle_id, FuelSupply.supplied_at, organization_id)
