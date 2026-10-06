@@ -99,3 +99,5 @@ Corrigida a ausência de `vehicle_type` nas respostas de leitura que fazia vári
 Publicada em **https://testefrota.sirel.com.br**: backend 143 testes aprovados; frontend 227 aprovados; lint 0 erros/46 avisos preexistentes; build aprovado. QA com os 11 tipos, temas claro/escuro e celular. API/banco saudáveis e 25 arquivos JS/CSS/SVG verificados no domínio público. Sem migration ou alteração de produção.
 
 [ExecPlan, arquivos, evidências e limites](EXECPLAN_VEHICLE_THUMBNAILS.md).
+
+**Ajuste posterior solicitado em 06/10/2026:** Perua/SW voltou a usar a miniatura anterior (`suv.svg`); o novo `wagon.svg` foi removido do código-fonte. Publicado em homologação, com 227 testes aprovados, lint sem erros (46 avisos anteriores), build aprovado e arquivos publicados conferidos. A correspondência pelo tipo cadastrado continua ativa em todas as listagens. Produção inalterada.

@@ -2,7 +2,7 @@ const TYPE_ASSET = {
   HATCH: 'hatch',
   SEDAN: 'sedan',
   SUV: 'suv',
-  PERUA_SW: 'wagon',
+  PERUA_SW: 'suv',
   PICAPE: 'pickup',
   VAN: 'van',
   MICRO_ONIBUS: 'microbus',

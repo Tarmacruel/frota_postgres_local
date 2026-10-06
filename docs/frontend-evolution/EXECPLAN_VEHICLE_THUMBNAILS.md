@@ -8,7 +8,7 @@ Exibir o SVG correspondente ao tipo cadastrado do veículo em todas as listagens
 
 - Branch `feature/frontend-evolution-hml`, HEAD `049c665`, working tree limpo.
 - Várias telas passam `record.vehicle_type`, ausente no contrato da API; empréstimos também tenta ler um tipo ausente no catálogo.
-- Perua/SW utiliza indevidamente o SVG de SUV.
+- Perua/SW utilizava o SVG de SUV; a decisão inicial de separá-lo foi posteriormente revertida por solicitação do usuário (registro abaixo).
 - Baseline novo em `storage/loan-tests/vehicle-thumbnails/baseline-*.log`.
 
 ## Arquivos previstos
@@ -64,3 +64,9 @@ Campo de leitura autorizado expressamente. Para registros cujo veículo realment
 ## Rollback
 
 Reverter somente os arquivos desta correção. Sem migração ou alteração de dados.
+
+## Ajuste solicitado — preservar a miniatura anterior de Perua/SW — 06/10/2026
+
+O usuário solicitou manter a miniatura anteriormente usada para Perua/SW. Restaurado o mapeamento `PERUA_SW → suv.svg` e removido o novo `wagon.svg` do código-fonte. O rótulo acessível continua sendo Perua/SW. A correção que leva o tipo cadastrado às listagens permanece. Os screenshots acima registram a primeira entrega, anterior a este ajuste.
+
+Publicado em homologação: 227 testes frontend aprovados, lint 0 erros/46 avisos preexistentes, build aprovado e 24 arquivos JS/CSS/SVG conferidos por hash na origem e domínio público. Logs `perua-*.log`, backup `before-perua-dist/` e evidência `perua-publication.json` em `storage/loan-tests/vehicle-thumbnails/`. Somente frontend atualizado; sem reinício da API, migration ou alteração de produção.
