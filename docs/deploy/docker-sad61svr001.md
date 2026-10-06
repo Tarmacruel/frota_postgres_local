@@ -30,7 +30,7 @@ Não monte `Z:` como diretório de dados do PostgreSQL. O volume `frota_postgres
 4. Crie `/etc/frota/smb-credentials` a partir do exemplo com uma conta SMB dedicada de menor privilégio, então habilite o mount e o timer:
 
    ```bash
-   systemctl enable --now mnt-frota-share.mount frota-backup.timer
+   systemctl enable --now "$(systemd-escape --path --suffix=mount /mnt/frota-share)" frota-backup.timer
    ```
 
 5. Execute `./deploy/ubuntu/configure-frota-firewall.sh <IP_DO_HOST_WINDOWS>` e habilite o UFW somente após conferir o acesso administrativo.

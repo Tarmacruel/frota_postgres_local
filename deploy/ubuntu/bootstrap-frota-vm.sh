@@ -40,7 +40,8 @@ install -m 0755 "$repo_root/deploy/scripts/import-legacy-backup.sh" /usr/local/s
 install -m 0755 "$repo_root/deploy/scripts/frota-ssh-command" /usr/local/sbin/frota-ssh-command
 install -m 0644 "$repo_root/deploy/scripts/common.sh" /usr/local/lib/frota/common.sh
 
-install -m 0644 "$repo_root/deploy/systemd/mnt-frota-share.mount" /etc/systemd/system/mnt-frota-share.mount
+mount_unit="$(systemd-escape --path --suffix=mount /mnt/frota-share)"
+install -m 0644 "$repo_root/deploy/systemd/mnt-frota-share.mount" "/etc/systemd/system/$mount_unit"
 install -m 0644 "$repo_root/deploy/systemd/frota-backup.service" /etc/systemd/system/frota-backup.service
 install -m 0644 "$repo_root/deploy/systemd/frota-backup.timer" /etc/systemd/system/frota-backup.timer
 
@@ -85,6 +86,6 @@ Antes de iniciar o Frota:
   2. Copie /etc/frota/smb-credentials.example para /etc/frota/smb-credentials e informe a conta SMB dedicada.
   3. Adicione a chave publica do GitHub Actions em /home/frota-deploy/.ssh/authorized_keys com:
        command="/usr/local/sbin/frota-ssh-command",no-port-forwarding,no-agent-forwarding,no-pty <CHAVE>
-  4. Execute systemctl enable --now mnt-frota-share.mount frota-backup.timer.
+  4. Execute systemctl enable --now "$(systemd-escape --path --suffix=mount /mnt/frota-share)" frota-backup.timer.
   5. Valide docker info, o mount SMB e o firewall antes do primeiro deploy.
 EOF

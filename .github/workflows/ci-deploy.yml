@@ -69,6 +69,13 @@ jobs:
         run: |
           mkdir -p deploy/.ci-uploads
           sudo chown 10001:10001 deploy/.ci-uploads
+      - name: Validar scripts e unidade de montagem
+        run: |
+          bash -n deploy/scripts/*.sh deploy/ubuntu/bootstrap-frota-vm.sh
+          python3 -m unittest discover -s deploy/tests -v
+          unit="$(systemd-escape --path --suffix=mount /mnt/frota-share)"
+          cp deploy/systemd/mnt-frota-share.mount "$RUNNER_TEMP/$unit"
+          systemd-analyze verify "$RUNNER_TEMP/$unit"
       - name: Gerar configuracao descartavel do smoke test
         run: |
           python3 - <<'PY'
@@ -129,6 +136,8 @@ jobs:
           curl --fail --silent --show-error http://127.0.0.1:8000/ | grep '<div id="root"></div>'
       - name: Validar persistencia de upload montado
         run: |
+          docker compose --env-file deploy/ci.env -f deploy/compose.production.yml exec -T app \
+            python -c "from app.core.official_identity import crest_path; assert crest_path().is_file(), 'Brasao oficial ausente na imagem'"
           docker compose --env-file deploy/ci.env -f deploy/compose.production.yml exec -T app \
             python -c "from pathlib import Path; path = Path('/data/uploads/container-smoke.txt'); path.write_text('persisted', encoding='utf-8'); assert path.read_text(encoding='utf-8') == 'persisted'"
           docker compose --env-file deploy/ci.env -f deploy/compose.production.yml up -d --no-deps --force-recreate app

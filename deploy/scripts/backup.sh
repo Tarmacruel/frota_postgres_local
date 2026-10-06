@@ -19,6 +19,9 @@ frota_require_command tar
 
 frota_load_runtime
 frota_require_share_mount
+mkdir -p "$FROTA_STATE_ROOT"
+exec 8>"$FROTA_STATE_ROOT/release.lock"
+flock -n 8 || frota_die "Publicacao ou backup do Frota em andamento"
 current_release="$(frota_state_value FROTA_CURRENT_RELEASE || true)"
 current_image="$(frota_state_value FROTA_CURRENT_IMAGE || true)"
 [[ -n "$current_release" && -d "$current_release" ]] || frota_die "Nenhuma release ativa para executar o backup"
@@ -37,10 +40,25 @@ work_dir="$(mktemp -d "$FROTA_BACKUP_ROOT/.backup-$timestamp.XXXXXX")"
 archive_path="$FROTA_BACKUP_ROOT/frota-backup-$timestamp.tar.gz"
 archive_sha_path="$archive_path.sha256"
 
+restart_app=false
 cleanup() {
+  local result=$?
+  if [[ "$restart_app" == true ]]; then
+    frota_compose "$current_release" start app || result=1
+  fi
   [[ -d "$work_dir" ]] && rm -rf -- "$work_dir"
+  exit "$result"
 }
 trap cleanup EXIT
+trap 'exit 130' INT
+trap 'exit 143' TERM
+
+# Keep the database and uploaded files at the same application write boundary.
+running_app="$(frota_compose "$current_release" ps --status running -q app)"
+if [[ -n "$running_app" ]]; then
+  restart_app=true
+  frota_compose "$current_release" stop app
+fi
 
 printf 'Exportando PostgreSQL...\n'
 frota_compose "$current_release" exec -T postgres \
@@ -52,6 +70,11 @@ frota_compose "$current_release" exec -T postgres \
 
 printf 'Arquivando anexos...\n'
 tar --create --gzip --file="$work_dir/uploads.tar.gz" --directory="$FROTA_UPLOADS_DIR" .
+
+if [[ "$restart_app" == true ]]; then
+  frota_compose "$current_release" start app
+  restart_app=false
+fi
 
 cat >"$work_dir/metadata.json" <<EOF
 {

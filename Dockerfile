@@ -28,6 +28,7 @@ RUN python -m pip install --no-cache-dir --upgrade pip \
     && python -m pip install --no-cache-dir -r /tmp/requirements.txt
 
 COPY backend/ /app/backend/
+COPY brasao-pmtf.png /app/brasao-pmtf.png
 COPY --from=frontend-build /build/frontend/dist /app/frontend/dist
 
 RUN mkdir -p /data/uploads /tmp \

@@ -126,7 +126,7 @@ class CertificateSigningSessionService:
             self._raise(
                 status.HTTP_409_CONFLICT,
                 "CANONICAL_ARTIFACT_NOT_SUPPORTED",
-                "Este tipo de documento ainda nÃ£o possui artefato canÃ´nico assinÃ¡vel.",
+                "Este tipo de documento ainda não possui artefato canônico assinável.",
             )
 
         canonical = await self.artifact_service.ensure_canonical_artifact(
@@ -139,7 +139,7 @@ class CertificateSigningSessionService:
             self._raise(
                 status.HTTP_409_CONFLICT,
                 "HOMOLOGATION_WATERMARK_REQUIRED",
-                "O PDF sintÃ©tico precisa ser regenerado com a marca de homologaÃ§Ã£o.",
+                "O PDF sintético precisa ser regenerado com a marca de homologação.",
             )
         input_artifact = await self._select_current_signing_input(
             document=document,
@@ -160,7 +160,7 @@ class CertificateSigningSessionService:
             self._raise(
                 status.HTTP_409_CONFLICT,
                 "CERTIFICATE_SESSION_ALREADY_ACTIVE",
-                "JÃ¡ existe uma assinatura por certificado em andamento para este documento.",
+                "Já existe uma assinatura por certificado em andamento para este documento.",
             )
 
         device = await self._select_device(current_user, data.device_id)
@@ -238,7 +238,7 @@ class CertificateSigningSessionService:
             self._raise(
                 status.HTTP_409_CONFLICT,
                 "CERTIFICATE_SESSION_COMPLETED",
-                "Uma sessÃ£o concluÃ­da nÃ£o pode ser cancelada.",
+                "Uma sessão concluída não pode ser cancelada.",
             )
         if signing_session.status not in _TERMINAL_SESSION_STATUSES:
             now = datetime.now(UTC)
@@ -285,7 +285,7 @@ class CertificateSigningSessionService:
 
         signer = preliminary.signer
         if signer is None:
-            self._raise(status.HTTP_409_CONFLICT, "SIGNER_UNAVAILABLE", "UsuÃ¡rio da sessÃ£o nÃ£o estÃ¡ disponÃ­vel.")
+            self._raise(status.HTTP_409_CONFLICT, "SIGNER_UNAVAILABLE", "Usuário da sessão não está disponível.")
         document = await self.document_service.get_document_for_certificate_signing(
             preliminary.document_id, signer
         )
@@ -303,7 +303,7 @@ class CertificateSigningSessionService:
             for item in data.certificate_chain
         )
         if sum(map(len, chain_der)) > 256 * 1024:
-            self._raise(status.HTTP_422_UNPROCESSABLE_ENTITY, "CERTIFICATE_CHAIN_TOO_LARGE", "Cadeia de certificados invÃ¡lida.")
+            self._raise(status.HTTP_422_UNPROCESSABLE_ENTITY, "CERTIFICATE_CHAIN_TOO_LARGE", "Cadeia de certificados inválida.")
         try:
             CertificatePadesService.assert_cpf_matches(certificate_der, signer.cpf)
             pades = self._build_pades_service(chain_der)
@@ -319,13 +319,13 @@ class CertificateSigningSessionService:
             await self._fail_locked_session(
                 signing_session,
                 code="CERTIFICATE_PREPARATION_FAILED",
-                safe_detail="O certificado, a cadeia, a revogaÃ§Ã£o ou o carimbo de tempo nÃ£o pÃ´de ser validado.",
+                safe_detail="O certificado, a cadeia, a revogação ou o carimbo de tempo não pôde ser validado.",
             )
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail={
                     "code": "CERTIFICATE_PREPARATION_FAILED",
-                    "message": "NÃ£o foi possÃ­vel validar o certificado e preparar a assinatura.",
+                    "message": "Não foi possível validar o certificado e preparar a assinatura.",
                 },
             ) from exc
 
@@ -368,21 +368,21 @@ class CertificateSigningSessionService:
             await self._mark_failed(
                 session_id,
                 code="PREPARED_STATE_PERSISTENCE_FAILED",
-                safe_detail="O estado preparado nÃ£o pÃ´de ser persistido integralmente.",
+                safe_detail="O estado preparado não pôde ser persistido integralmente.",
             )
             if cleanup_error is not None:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail={
                         "code": "PREPARED_STATE_CLEANUP_FAILED",
-                        "message": "Falha ao limpar estado preparado nÃ£o confirmado.",
+                        "message": "Falha ao limpar estado preparado não confirmado.",
                     },
                 ) from cleanup_error
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                 detail={
                     "code": "PREPARED_STATE_PERSISTENCE_FAILED",
-                    "message": "A sessÃ£o falhou sem expor um token de conclusÃ£o.",
+                    "message": "A sessão falhou sem expor um token de conclusão.",
                 },
             ) from exc
         return {
@@ -422,7 +422,7 @@ class CertificateSigningSessionService:
         )
         signer = preliminary.signer
         if signer is None:
-            self._raise(status.HTTP_409_CONFLICT, "SIGNER_UNAVAILABLE", "UsuÃ¡rio da sessÃ£o nÃ£o estÃ¡ disponÃ­vel.")
+            self._raise(status.HTTP_409_CONFLICT, "SIGNER_UNAVAILABLE", "Usuário da sessão não está disponível.")
 
         document = await self.document_service.get_document_for_certificate_signing(
             preliminary.document_id, signer
@@ -460,13 +460,13 @@ class CertificateSigningSessionService:
             await self._mark_failed(
                 session_id,
                 code="CERTIFICATE_COMPLETION_FAILED",
-                safe_detail="A assinatura retornada, a cadeia, a revogaÃ§Ã£o ou o carimbo de tempo falhou.",
+                safe_detail="A assinatura retornada, a cadeia, a revogação ou o carimbo de tempo falhou.",
             )
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
                 detail={
                     "code": "CERTIFICATE_COMPLETION_FAILED",
-                    "message": "A assinatura por certificado nÃ£o pÃ´de ser concluÃ­da.",
+                    "message": "A assinatura por certificado não pôde ser concluída.",
                 },
             ) from exc
 
@@ -483,7 +483,7 @@ class CertificateSigningSessionService:
             await self._assert_session_base_is_current(signing_session, document)
             now = datetime.now(UTC)
             if self._is_expired(signing_session, now):
-                self._raise(status.HTTP_410_GONE, "CERTIFICATE_SESSION_EXPIRED", "A sessÃ£o de assinatura expirou.")
+                self._raise(status.HTTP_410_GONE, "CERTIFICATE_SESSION_EXPIRED", "A sessão de assinatura expirou.")
 
             certificate = x509.load_der_x509_certificate(prepared.signing_certificate)
             certificate_cpf = CertificatePadesService.extract_cpf(
@@ -595,14 +595,14 @@ class CertificateSigningSessionService:
             await self._mark_failed(
                 session_id,
                 code="DOCUMENT_CHANGED_DURING_FINALIZATION",
-                safe_detail="O documento ou o artefato base mudou durante a finalizaÃ§Ã£o.",
+                safe_detail="O documento ou o artefato base mudou durante a finalização.",
             )
             if cleanup_error is not None:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail={
                         "code": "CERTIFIED_ARTIFACT_CLEANUP_FAILED",
-                        "message": "Falha ao limpar artefato nÃ£o confirmado; intervenÃ§Ã£o operacional necessÃ¡ria.",
+                        "message": "Falha ao limpar artefato não confirmado; intervenção operacional necessária.",
                     },
                 ) from cleanup_error
             raise
@@ -614,21 +614,21 @@ class CertificateSigningSessionService:
             await self._mark_failed(
                 session_id,
                 code="CERTIFICATE_PERSISTENCE_FAILED",
-                safe_detail="A evidÃªncia certificada nÃ£o pÃ´de ser persistida integralmente.",
+                safe_detail="A evidência certificada não pôde ser persistida integralmente.",
             )
             if cleanup_error is not None:
                 raise HTTPException(
                     status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
                     detail={
                         "code": "CERTIFIED_ARTIFACT_CLEANUP_FAILED",
-                        "message": "Falha ao limpar artefato nÃ£o confirmado; intervenÃ§Ã£o operacional necessÃ¡ria.",
+                        "message": "Falha ao limpar artefato não confirmado; intervenção operacional necessária.",
                     },
                 ) from cleanup_error
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
                 detail={
                     "code": "CERTIFICATE_PERSISTENCE_FAILED",
-                    "message": "A assinatura foi recusada sem registrar evidÃªncia parcial.",
+                    "message": "A assinatura foi recusada sem registrar evidência parcial.",
                 },
             ) from exc
 
@@ -688,7 +688,7 @@ class CertificateSigningSessionService:
     async def get_pairing(self, pairing_id: UUID, current_user: User) -> dict:
         pairing = await self._require_pairing(pairing_id, for_update=True)
         if pairing.user_id != current_user.id and current_user.role != UserRole.ADMIN:
-            self._raise(status.HTTP_404_NOT_FOUND, "PAIRING_NOT_FOUND", "Pareamento nÃ£o encontrado.")
+            self._raise(status.HTTP_404_NOT_FOUND, "PAIRING_NOT_FOUND", "Pareamento não encontrado.")
         now = datetime.now(UTC)
         if pairing.status == SignatureAgentPairingStatus.CREATED and self._deadline(pairing.expires_at) <= now:
             pairing.status = SignatureAgentPairingStatus.EXPIRED
@@ -714,7 +714,7 @@ class CertificateSigningSessionService:
         pairing = await self._require_pairing(pairing_id, for_update=True)
         now = datetime.now(UTC)
         if pairing.status != SignatureAgentPairingStatus.CREATED:
-            self._raise(status.HTTP_409_CONFLICT, "PAIRING_ALREADY_CONSUMED", "Pareamento jÃ¡ utilizado ou cancelado.")
+            self._raise(status.HTTP_409_CONFLICT, "PAIRING_ALREADY_CONSUMED", "Pareamento já utilizado ou cancelado.")
         if self._deadline(pairing.expires_at) <= now:
             pairing.status = SignatureAgentPairingStatus.EXPIRED
             pairing.updated_at = now
@@ -761,18 +761,18 @@ class CertificateSigningSessionService:
                 pairing.status = SignatureAgentPairingStatus.CANCELLED
                 pairing.cancelled_at = now
             await self.db.commit()
-            self._raise(status.HTTP_403_FORBIDDEN, "PAIRING_INVALID", "Pareamento invÃ¡lido.")
+            self._raise(status.HTTP_403_FORBIDDEN, "PAIRING_INVALID", "Pareamento inválido.")
 
         try:
             public_key = serialization.load_der_public_key(submitted_key)
         except (TypeError, ValueError) as exc:
-            self._raise(status.HTTP_422_UNPROCESSABLE_ENTITY, "DEVICE_PUBLIC_KEY_INVALID", "Chave pÃºblica do dispositivo invÃ¡lida.")
+            self._raise(status.HTTP_422_UNPROCESSABLE_ENTITY, "DEVICE_PUBLIC_KEY_INVALID", "Chave pública do dispositivo inválida.")
         if not isinstance(public_key, rsa.RSAPublicKey) or public_key.key_size < 3072:
-            self._raise(status.HTTP_422_UNPROCESSABLE_ENTITY, "DEVICE_PUBLIC_KEY_INVALID", "Chave pÃºblica do dispositivo invÃ¡lida.")
+            self._raise(status.HTTP_422_UNPROCESSABLE_ENTITY, "DEVICE_PUBLIC_KEY_INVALID", "Chave pública do dispositivo inválida.")
 
         existing = await self.devices.get_by_fingerprint(fingerprint)
         if existing is not None and existing.user_id not in {None, pairing.user_id}:
-            self._raise(status.HTTP_409_CONFLICT, "DEVICE_ALREADY_PAIRED", "Dispositivo jÃ¡ vinculado a outra conta.")
+            self._raise(status.HTTP_409_CONFLICT, "DEVICE_ALREADY_PAIRED", "Dispositivo já vinculado a outra conta.")
         if existing is None:
             device = SignatureAgentDevice(
                 id=uuid4(),
@@ -832,7 +832,7 @@ class CertificateSigningSessionService:
         if device is None or (
             device.user_id != current_user.id and current_user.role != UserRole.ADMIN
         ):
-            self._raise(status.HTTP_404_NOT_FOUND, "DEVICE_NOT_FOUND", "Dispositivo nÃ£o encontrado.")
+            self._raise(status.HTTP_404_NOT_FOUND, "DEVICE_NOT_FOUND", "Dispositivo não encontrado.")
         now = datetime.now(UTC)
         device.status = SignatureAgentDeviceStatus.REVOKED
         device.revoked_at = now
@@ -861,7 +861,7 @@ class CertificateSigningSessionService:
             self._raise(
                 status.HTTP_404_NOT_FOUND,
                 "CERTIFICATE_SIGNING_DISABLED",
-                "Assinatura por certificado nÃ£o estÃ¡ habilitada.",
+                "Assinatura por certificado não está habilitada.",
             )
 
     async def _select_device(self, current_user: User, external_device_id: str | None) -> SignatureAgentDevice:
@@ -892,7 +892,7 @@ class CertificateSigningSessionService:
             session_id, for_update=for_update
         )
         if signing_session is None:
-            self._raise(status.HTTP_404_NOT_FOUND, "CERTIFICATE_SESSION_NOT_FOUND", "SessÃ£o nÃ£o encontrada.")
+            self._raise(status.HTTP_404_NOT_FOUND, "CERTIFICATE_SESSION_NOT_FOUND", "Sessão não encontrada.")
         return signing_session
 
     async def _require_pairing(
@@ -900,32 +900,32 @@ class CertificateSigningSessionService:
     ) -> SignatureAgentPairing:
         pairing = await self.pairings.get_by_id(pairing_id, for_update=for_update)
         if pairing is None:
-            self._raise(status.HTTP_404_NOT_FOUND, "PAIRING_NOT_FOUND", "Pareamento nÃ£o encontrado.")
+            self._raise(status.HTTP_404_NOT_FOUND, "PAIRING_NOT_FOUND", "Pareamento não encontrado.")
         return pairing
 
     def _authorize_session_user(
         self, signing_session: CertificateSigningSession, current_user: User
     ) -> None:
         if signing_session.signer_user_id != current_user.id and current_user.role != UserRole.ADMIN:
-            self._raise(status.HTTP_404_NOT_FOUND, "CERTIFICATE_SESSION_NOT_FOUND", "SessÃ£o nÃ£o encontrada.")
+            self._raise(status.HTTP_404_NOT_FOUND, "CERTIFICATE_SESSION_NOT_FOUND", "Sessão não encontrada.")
 
     def _assert_session_state(self, signing_session: CertificateSigningSession, expected: str) -> None:
         now = datetime.now(UTC)
         if self._is_expired(signing_session, now):
-            self._raise(status.HTTP_410_GONE, "CERTIFICATE_SESSION_EXPIRED", "A sessÃ£o de assinatura expirou.")
+            self._raise(status.HTTP_410_GONE, "CERTIFICATE_SESSION_EXPIRED", "A sessão de assinatura expirou.")
         if signing_session.status != expected:
             self._raise(
                 status.HTTP_409_CONFLICT,
                 "CERTIFICATE_SESSION_STATE_MISMATCH",
-                "A sessÃ£o nÃ£o estÃ¡ no estado esperado.",
+                "A sessão não está no estado esperado.",
             )
 
     def _assert_token(self, signing_session: CertificateSigningSession, raw_token: str | None) -> None:
         if not raw_token or len(raw_token) < 32:
-            self._raise(status.HTTP_401_UNAUTHORIZED, "SIGNING_TOKEN_INVALID", "Token de assinatura invÃ¡lido.")
+            self._raise(status.HTTP_401_UNAUTHORIZED, "SIGNING_TOKEN_INVALID", "Token de assinatura inválido.")
         actual = self._token_hash(signing_session.id, raw_token)
         if not hmac.compare_digest(signing_session.one_time_token_hash, actual):
-            self._raise(status.HTTP_401_UNAUTHORIZED, "SIGNING_TOKEN_INVALID", "Token de assinatura invÃ¡lido.")
+            self._raise(status.HTTP_401_UNAUTHORIZED, "SIGNING_TOKEN_INVALID", "Token de assinatura inválido.")
 
     def _assert_bound_device(
         self, signing_session: CertificateSigningSession, external_device_id: str
@@ -939,7 +939,7 @@ class CertificateSigningSessionService:
             or not hmac.compare_digest(device.public_key_fingerprint, normalized)
             or device.user_id != signing_session.signer_user_id
         ):
-            self._raise(status.HTTP_403_FORBIDDEN, "SIGNATURE_AGENT_DEVICE_INVALID", "Dispositivo nÃ£o autorizado.")
+            self._raise(status.HTTP_403_FORBIDDEN, "SIGNATURE_AGENT_DEVICE_INVALID", "Dispositivo não autorizado.")
         return device
 
     async def _consume_device_nonce(self, device: SignatureAgentDevice, proof: dict) -> None:
@@ -947,7 +947,7 @@ class CertificateSigningSessionService:
         await self.request_nonces.purge_expired(now=now)
         nonce_hash = self._secret_hash("device-request-nonce", device.id, proof["nonce"])
         if await self.request_nonces.exists(device_id=device.id, nonce_hash=nonce_hash):
-            self._raise(status.HTTP_409_CONFLICT, "DEVICE_REQUEST_REPLAY", "RequisiÃ§Ã£o do agente jÃ¡ utilizada.")
+            self._raise(status.HTTP_409_CONFLICT, "DEVICE_REQUEST_REPLAY", "Requisição do agente já utilizada.")
         self.request_nonces.add(
             SignatureAgentRequestNonce(
                 id=uuid4(),
@@ -965,7 +965,7 @@ class CertificateSigningSessionService:
             await self.db.rollback()
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail={"code": "DEVICE_REQUEST_REPLAY", "message": "RequisiÃ§Ã£o do agente jÃ¡ utilizada."},
+                detail={"code": "DEVICE_REQUEST_REPLAY", "message": "Requisição do agente já utilizada."},
             ) from exc
 
     @classmethod
@@ -984,14 +984,14 @@ class CertificateSigningSessionService:
         nonce = str(headers.get("X-Frota-Device-Nonce") or "").lower()
         proof_text = str(headers.get("X-Frota-Device-Proof") or "")
         if not hmac.compare_digest(device_id, expected_device_id.lower()):
-            cls._raise(status.HTTP_403_FORBIDDEN, "DEVICE_PROOF_INVALID", "Prova do dispositivo invÃ¡lida.")
+            cls._raise(status.HTTP_403_FORBIDDEN, "DEVICE_PROOF_INVALID", "Prova do dispositivo inválida.")
         if _DEVICE_NONCE_RE.fullmatch(nonce) is None:
-            cls._raise(status.HTTP_403_FORBIDDEN, "DEVICE_PROOF_INVALID", "Prova do dispositivo invÃ¡lida.")
+            cls._raise(status.HTTP_403_FORBIDDEN, "DEVICE_PROOF_INVALID", "Prova do dispositivo inválida.")
         try:
             unix_timestamp = int(timestamp_text)
             request_time = datetime.fromtimestamp(unix_timestamp, UTC)
         except (ValueError, OverflowError, OSError):
-            cls._raise(status.HTTP_403_FORBIDDEN, "DEVICE_PROOF_INVALID", "Prova do dispositivo invÃ¡lida.")
+            cls._raise(status.HTTP_403_FORBIDDEN, "DEVICE_PROOF_INVALID", "Prova do dispositivo inválida.")
         if abs((datetime.now(UTC) - request_time).total_seconds()) > settings.SIGNATURE_AGENT_PROOF_MAX_SKEW_SECONDS:
             cls._raise(status.HTTP_403_FORBIDDEN, "DEVICE_PROOF_EXPIRED", "Prova do dispositivo expirada.")
         try:
@@ -999,9 +999,9 @@ class CertificateSigningSessionService:
             proof = base64.b64decode(proof_text, validate=True)
             public_key = serialization.load_der_public_key(key_der)
         except (binascii.Error, TypeError, ValueError):
-            cls._raise(status.HTTP_403_FORBIDDEN, "DEVICE_PROOF_INVALID", "Prova do dispositivo invÃ¡lida.")
+            cls._raise(status.HTTP_403_FORBIDDEN, "DEVICE_PROOF_INVALID", "Prova do dispositivo inválida.")
         if not isinstance(public_key, rsa.RSAPublicKey) or public_key.key_size < 3072:
-            cls._raise(status.HTTP_403_FORBIDDEN, "DEVICE_PROOF_INVALID", "Prova do dispositivo invÃ¡lida.")
+            cls._raise(status.HTTP_403_FORBIDDEN, "DEVICE_PROOF_INVALID", "Prova do dispositivo inválida.")
         canonical = (
             f"{timestamp_text}\n{nonce}\n{method.upper()}\n{path}\n"
             f"{hashlib.sha256(raw_body).hexdigest()}"
@@ -1014,7 +1014,7 @@ class CertificateSigningSessionService:
                 hashes.SHA256(),
             )
         except (InvalidSignature, ValueError):
-            cls._raise(status.HTTP_403_FORBIDDEN, "DEVICE_PROOF_INVALID", "Prova do dispositivo invÃ¡lida.")
+            cls._raise(status.HTTP_403_FORBIDDEN, "DEVICE_PROOF_INVALID", "Prova do dispositivo inválida.")
         return {"timestamp": request_time, "nonce": nonce}
 
     async def _assert_session_base_is_current(
@@ -1031,7 +1031,7 @@ class CertificateSigningSessionService:
                 self._raise(
                     status.HTTP_409_CONFLICT,
                     "HOMOLOGATION_WATERMARK_REQUIRED",
-                    "O artefato canÃ´nico atual nÃ£o pertence Ã  allowlist ativa.",
+                    "O artefato canônico atual não pertence à allowlist ativa.",
                 )
         current_input = (
             await self._select_current_signing_input(
@@ -1052,7 +1052,7 @@ class CertificateSigningSessionService:
             self._raise(
                 status.HTTP_409_CONFLICT,
                 "SIGNING_ARTIFACT_CHANGED",
-                "O artefato de assinatura foi substituÃ­do; crie outra sessÃ£o.",
+                "O artefato de assinatura foi substituído; crie outra sessão.",
             )
         self._assert_artifact_matches_document(document, canonical, current_input)
         self.artifact_service.read_verified_bytes(current_input)
@@ -1069,7 +1069,7 @@ class CertificateSigningSessionService:
             self._raise(
                 status.HTTP_403_FORBIDDEN,
                 "HOMOLOGATION_SIGNING_TARGET_REQUIRED",
-                "Somente registros sintÃ©ticos autorizados podem ser assinados.",
+                "Somente registros sintéticos autorizados podem ser assinados.",
             )
         return str(target.id)
 
@@ -1168,7 +1168,7 @@ class CertificateSigningSessionService:
         if self._pades_factory is not None:
             return self._pades_factory(chain_der)
         if settings.ICP_BRASIL_TRUST_STORE_DIR is None or not settings.SIGNATURE_TSA_URL:
-            raise CertificateSigningError("ServiÃ§os de confianÃ§a nÃ£o configurados.")
+            raise CertificateSigningError("Serviços de confiança não configurados.")
         validation_context = IcpBrasilTrustStore(
             settings.ICP_BRASIL_TRUST_STORE_DIR
         ).validation_context(
@@ -1229,15 +1229,15 @@ class CertificateSigningSessionService:
                 signing_session.prepared_state_sha256, self._state_hmac(state)
             )
         ):
-            self._raise(status.HTTP_409_CONFLICT, "PREPARED_STATE_INVALID", "Estado preparado ausente ou invÃ¡lido.")
+            self._raise(status.HTTP_409_CONFLICT, "PREPARED_STATE_INVALID", "Estado preparado ausente ou inválido.")
         path = self._resolve_prepared_path(signing_session.prepared_pdf_path)
         if not path.is_file():
-            self._raise(status.HTTP_409_CONFLICT, "PREPARED_STATE_INVALID", "Estado preparado ausente ou invÃ¡lido.")
+            self._raise(status.HTTP_409_CONFLICT, "PREPARED_STATE_INVALID", "Estado preparado ausente ou inválido.")
         prepared_pdf = path.read_bytes()
         if not hmac.compare_digest(
             hashlib.sha256(prepared_pdf).hexdigest(), str(state.get("prepared_pdf_sha256") or "")
         ):
-            self._raise(status.HTTP_409_CONFLICT, "PREPARED_STATE_INVALID", "Estado preparado ausente ou invÃ¡lido.")
+            self._raise(status.HTTP_409_CONFLICT, "PREPARED_STATE_INVALID", "Estado preparado ausente ou inválido.")
         try:
             return PreparedPadesSignature(
                 prepared_pdf=prepared_pdf,
@@ -1257,7 +1257,7 @@ class CertificateSigningSessionService:
         except (KeyError, TypeError, ValueError, binascii.Error) as exc:
             raise HTTPException(
                 status_code=status.HTTP_409_CONFLICT,
-                detail={"code": "PREPARED_STATE_INVALID", "message": "Estado preparado ausente ou invÃ¡lido."},
+                detail={"code": "PREPARED_STATE_INVALID", "message": "Estado preparado ausente ou inválido."},
             ) from exc
 
     async def _mark_failed(self, session_id: UUID, *, code: str, safe_detail: str) -> None:
@@ -1289,7 +1289,7 @@ class CertificateSigningSessionService:
     def _expire_session(self, signing_session: CertificateSigningSession, now: datetime) -> None:
         signing_session.status = CertificateSigningSessionStatus.EXPIRED
         signing_session.failure_code = "CERTIFICATE_SESSION_EXPIRED"
-        signing_session.failure_detail = "A sessÃ£o expirou antes da conclusÃ£o."
+        signing_session.failure_detail = "A sessão expirou antes da conclusão."
         signing_session.one_time_token_hash = self._terminal_token_hash(signing_session.id)
         signing_session.token_consumed_at = now
         signing_session.updated_at = now
@@ -1322,7 +1322,7 @@ class CertificateSigningSessionService:
             if not path.exists():
                 return None
             if not path.is_file() or path.is_symlink():
-                raise RuntimeError("Caminho preparado nÃ£o Ã© arquivo regular")
+                raise RuntimeError("Caminho preparado não é arquivo regular")
             actual_hash = hashlib.sha256(path.read_bytes()).hexdigest()
             if not expected_sha256 or not hmac.compare_digest(
                 actual_hash, str(expected_sha256)
@@ -1442,10 +1442,10 @@ class CertificateSigningSessionService:
         except (binascii.Error, ValueError) as exc:
             raise HTTPException(
                 status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
-                detail={"code": "INVALID_BASE64", "message": f"Campo {field} invÃ¡lido."},
+                detail={"code": "INVALID_BASE64", "message": f"Campo {field} inválido."},
             ) from exc
         if not decoded or len(decoded) > max_bytes:
-            cls._raise(status.HTTP_422_UNPROCESSABLE_ENTITY, "INVALID_PAYLOAD_SIZE", f"Campo {field} invÃ¡lido.")
+            cls._raise(status.HTTP_422_UNPROCESSABLE_ENTITY, "INVALID_PAYLOAD_SIZE", f"Campo {field} inválido.")
         return decoded
 
     @staticmethod
@@ -1463,7 +1463,7 @@ class CertificateSigningSessionService:
         except ValueError as exc:
             raise HTTPException(
                 status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-                detail="Caminho de estado preparado invÃ¡lido",
+                detail="Caminho de estado preparado inválido",
             ) from exc
         return candidate
 
@@ -1472,7 +1472,7 @@ class CertificateSigningSessionService:
         path.parent.mkdir(parents=True, exist_ok=True)
         if path.exists():
             if not hmac.compare_digest(hashlib.sha256(path.read_bytes()).hexdigest(), expected_sha256):
-                raise CertificateSigningError("ColisÃ£o no estado preparado.")
+                raise CertificateSigningError("Colisão no estado preparado.")
             return
         temporary = path.with_name(f".{path.name}.{uuid4().hex}.tmp")
         descriptor = os.open(temporary, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)

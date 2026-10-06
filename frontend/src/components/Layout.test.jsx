@@ -260,7 +260,7 @@ describe('Layout feature guide for batch fuel supply orders', () => {
     expect(mocks.getFuelSupplyOrdersBatchGuide).not.toHaveBeenCalled()
   })
 
-  it('mostra a novidade não reconhecida e registra Agora não antes de fechar', async () => {
+  it('mostra a novidade não reconhecida e registra Agora não ao fechar', async () => {
     const user = userEvent.setup()
     mocks.getFuelSupplyOrdersBatchGuide.mockResolvedValue({ data: { acknowledged: false } })
     renderLayout('/', { strict: true })
@@ -282,5 +282,28 @@ describe('Layout feature guide for batch fuel supply orders', () => {
 
     await waitFor(() => expect(mocks.acknowledgeFuelSupplyOrdersBatchGuide).toHaveBeenCalledTimes(1))
     expect(screen.getByTestId('current-location')).toHaveTextContent('/abastecimentos?acao=nova-ordem-lote&guia=1')
+  })
+
+  it('permite dispensar a novidade quando o reconhecimento falha', async () => {
+    const user = userEvent.setup()
+    mocks.getFuelSupplyOrdersBatchGuide.mockResolvedValue({ data: { acknowledged: false } })
+    mocks.acknowledgeFuelSupplyOrdersBatchGuide.mockRejectedValue(new Error('offline'))
+    renderLayout()
+    await screen.findByRole('dialog', { name: 'Novo: pedidos de abastecimento em lote' })
+    await user.click(screen.getByRole('button', { name: 'Ver guia rápido' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Não foi possível registrar')
+    await user.click(screen.getByRole('button', { name: 'Agora não' }))
+    expect(screen.queryByRole('dialog', { name: 'Novo: pedidos de abastecimento em lote' })).not.toBeInTheDocument()
+  })
+
+  it('permite dispensar enquanto o reconhecimento está pendente', async () => {
+    const user = userEvent.setup()
+    mocks.getFuelSupplyOrdersBatchGuide.mockResolvedValue({ data: { acknowledged: false } })
+    mocks.acknowledgeFuelSupplyOrdersBatchGuide.mockReturnValue(new Promise(() => {}))
+    renderLayout()
+    await screen.findByRole('dialog', { name: 'Novo: pedidos de abastecimento em lote' })
+    await user.click(screen.getByRole('button', { name: 'Ver guia rápido' }))
+    await user.click(screen.getByRole('button', { name: 'Agora não' }))
+    expect(screen.queryByRole('dialog', { name: 'Novo: pedidos de abastecimento em lote' })).not.toBeInTheDocument()
   })
 })

@@ -413,6 +413,7 @@ export default function Layout() {
   }
 
   async function acknowledgeFuelSupplyOrdersBatchGuide({ openGuide = false } = {}) {
+    if (!openGuide) setFuelSupplyOrdersBatchGuideOpen(false)
     if (fuelSupplyOrdersBatchGuideAcknowledging) return
 
     setFuelSupplyOrdersBatchGuideAcknowledging(true)
@@ -701,8 +702,7 @@ export default function Layout() {
         open={fuelSupplyOrdersBatchGuideOpen}
         title="Novo: pedidos de abastecimento em lote"
         description="Emita ordens independentes para vários veículos em uma única operação."
-        onClose={() => {}}
-        canClose={false}
+        onClose={() => setFuelSupplyOrdersBatchGuideOpen(false)}
       >
         <div className="stack">
           <p>Selecione os veículos, informe os dados compartilhados e revise cada ordem antes de emitir.</p>
@@ -712,7 +712,6 @@ export default function Layout() {
             <button
               className="ghost-button"
               type="button"
-              disabled={fuelSupplyOrdersBatchGuideAcknowledging}
               onClick={() => acknowledgeFuelSupplyOrdersBatchGuide()}
             >
               Agora não
