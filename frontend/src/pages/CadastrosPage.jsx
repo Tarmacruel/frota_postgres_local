@@ -25,9 +25,10 @@ const IMPORT_TEMPLATE_ROWS = [
 ]
 
 export default function CadastrosPage() {
-  const { canCreate, canEdit, canDeleteModule, isAdmin } = useAuth()
+  const { user, canCreate, canEdit, canDeleteModule, isAdmin } = useAuth()
   const canWrite = canCreate('master_data') || canEdit('master_data')
   const canDelete = canDeleteModule('master_data')
+  const canDeleteStructure = canEdit('master_data') && ['ADMIN', 'PRODUCAO'].includes(user?.role)
   const {
     organizations,
     departments,
@@ -786,7 +787,7 @@ export default function CadastrosPage() {
             <div className="actions-inline" style={{ marginBottom: 12 }}>
               <span className="section-copy">{selectedDepartmentIds.length} departamento(s) selecionado(s)</span>
               <button type="button" className="ghost-button" onClick={exportSelectedDepartments}>Exportar selecionados</button>
-              <button type="button" className="mini-button danger" onClick={handleBulkDeleteDepartments} disabled={bulkDeleting || !canDelete}>
+                <button type="button" className="mini-button danger" onClick={handleBulkDeleteDepartments} disabled={bulkDeleting || !canDeleteStructure}>
                 {bulkDeleting ? 'Excluindo...' : 'Excluir selecionados'}
               </button>
             </div>
@@ -825,7 +826,7 @@ export default function CadastrosPage() {
                       <td data-label="Ações">
                         <div className="actions-inline">
                           <button type="button" className="mini-button" onClick={() => setDepartmentForm({ id: department.id, organization_id: department.organization_id, name: department.name })}>Editar</button>
-                          {canDelete ? (
+                          {canDeleteStructure ? (
                             <button type="button" className="mini-button danger" onClick={() => handleDelete('Departamento', department)}>Excluir</button>
                           ) : null}
                         </div>
@@ -954,7 +955,7 @@ export default function CadastrosPage() {
             <div className="actions-inline" style={{ marginBottom: 12 }}>
               <span className="section-copy">{selectedAllocationIds.length} lotação(oes) selecionada(s)</span>
               <button type="button" className="ghost-button" onClick={exportSelectedAllocations}>Exportar selecionados</button>
-              <button type="button" className="mini-button danger" onClick={handleBulkDeleteAllocations} disabled={bulkDeleting || !canDelete}>
+                <button type="button" className="mini-button danger" onClick={handleBulkDeleteAllocations} disabled={bulkDeleting || !canDeleteStructure}>
                 {bulkDeleting ? 'Excluindo...' : 'Excluir selecionados'}
               </button>
             </div>
@@ -1006,7 +1007,7 @@ export default function CadastrosPage() {
                           >
                             Editar
                           </button>
-                          {canDelete ? (
+                          {canDeleteStructure ? (
                             <button type="button" className="mini-button danger" onClick={() => handleDelete('Lotação', allocation)}>Excluir</button>
                           ) : null}
                         </div>

@@ -34,7 +34,7 @@ async def test_pending_summary_persists_until_resolution_and_scopes_receiving_si
     assert (await count('recipient')) == {'total': 1, 'receipts': 1, 'returns': 0}
     assert (await count('origin'))['total'] == 0
     assert (await count('outsider'))['total'] == 0
-    assert (await count('admin'))['total'] >= 1
+    assert (await count('admin'))['total'] == 0
     await api.request('recipient', 'GET', '/' + pending['id'])
     await api.request('recipient', 'GET', '/' + pending['id'] + '/events')
     assert (await count('recipient'))['total'] == 1
