@@ -275,6 +275,7 @@ class MasterDataService:
         allocation = await self.repo.get_allocation(allocation_id)
         if not allocation:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lotação não encontrada")
+        ensure_organization_access(current_user, allocation.organization_id)
         try:
             await self.audit.record(
                 actor=current_user,
