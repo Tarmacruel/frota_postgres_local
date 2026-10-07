@@ -6,6 +6,7 @@ Demanda funcional autorizada diretamente para produção, independente da evolu�
 - Cadastro e edição: máscara `0000 0000 0000 0000`, teclado numérico e limite de 16 dígitos. Quando informado, o backend exige exatamente 16 dígitos ASCII; aceita espaços da máscara e preserva zeros iniciais.
 - Omissão em uma atualização preserva o número; `null` ou texto vazio remove. Alterações seguem a justificativa e a auditoria existentes.
 - Sem mudança de permissões, fluxos de abastecimento, assinatura ou exportação.
+- Revisão do PR #62: respostas de consulta retornam cartão nulo e histórico omite números atuais/anteriores para usuários sem permissão de edição ou sem escopo para gerenciar o veículo. Os dados originais permanecem na auditoria. Cobertura de regressão: 506 testes backend aprovados, 86 ignorados.
 
 ## Arquivos
 
