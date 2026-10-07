@@ -17,7 +17,21 @@ class VehicleLocationOut(BaseModel):
     display_name: str
 
 
-class VehicleCreate(BaseModel):
+class PrimeCardFields(BaseModel):
+    prime_card_number: str | None = None
+
+    @field_validator("prime_card_number")
+    @classmethod
+    def validate_prime_card_number(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        normalized = value.replace(" ", "")
+        if len(normalized) != 16 or not normalized.isascii() or not normalized.isdigit():
+            raise ValueError("Número do cartão Prime deve conter exatamente 16 dígitos")
+        return normalized
+
+
+class VehicleCreate(PrimeCardFields):
     plate: str = Field(min_length=5, max_length=20)
     chassis_number: str | None = Field(default=None, min_length=5, max_length=50)
     renavam: str | None = Field(default=None, max_length=30)
@@ -42,7 +56,7 @@ class VehicleCreate(BaseModel):
     allocation_id: UUID
 
 
-class VehicleUpdate(BaseModel):
+class VehicleUpdate(PrimeCardFields):
     plate: str | None = Field(default=None, min_length=5, max_length=20)
     chassis_number: str | None = Field(default=None, min_length=5, max_length=50)
     renavam: str | None = Field(default=None, max_length=30)
@@ -82,6 +96,7 @@ class VehicleOut(BaseModel):
     id: UUID
     plate: str
     chassis_number: str | None = None
+    prime_card_number: str | None = None
     renavam: str | None = None
     brand: str
     model: str

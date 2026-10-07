@@ -124,11 +124,10 @@ class VehicleLoanService:
         """Unresolved incoming handoffs; viewing them never acknowledges them."""
         receipts = VehicleLoan.status == 'AWAITING_RECEIPT'
         returns = VehicleLoan.status == 'AWAITING_RETURN_RECEIPT'
-        if not self.is_admin(user):
-            if user.role != UserRole.PRODUCAO or not user.organization_id:
-                return {'total': 0, 'receipts': 0, 'returns': 0}
-            receipts = and_(receipts, VehicleLoan.recipient_organization_id == user.organization_id)
-            returns = and_(returns, VehicleLoan.origin_organization_id == user.organization_id)
+        if not user.organization_id or user.role not in (UserRole.ADMIN, UserRole.PRODUCAO):
+            return {'total': 0, 'receipts': 0, 'returns': 0}
+        receipts = and_(receipts, VehicleLoan.recipient_organization_id == user.organization_id)
+        returns = and_(returns, VehicleLoan.origin_organization_id == user.organization_id)
         row = (await self.db.execute(select(func.count().filter(receipts), func.count().filter(returns))
             .select_from(VehicleLoan))).one()
         return {'total': row[0] + row[1], 'receipts': row[0], 'returns': row[1]}

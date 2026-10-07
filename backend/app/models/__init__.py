@@ -58,7 +58,7 @@ from app.models.user_permission import UserPermission
 from app.models.user_feature_acknowledgement import UserFeatureAcknowledgement
 from app.models.user_report_preference import UserReportPreference
 from app.models.vehicle import Vehicle, VehicleOwnershipType, VehicleStatus, VehicleType
-from app.models.vehicle_loan import VehicleLoan, VehicleLoanEvent
+from app.models.vehicle_loan import VehicleLoan, VehicleLoanEvent, VehicleLoanPrintedTerm
 from app.models.location_history import LocationHistory
 from app.models.maintenance import MaintenanceRecord
 from app.models.possession import VehiclePossession

@@ -2,12 +2,61 @@
 import os
 import psycopg
 import pytest
+from uuid import uuid4
 from test_vehicle_loan_api import api, workflow_database
 from httpx import ASGITransport, AsyncClient
 from app.main import app
 from app.core.security import create_access_token
+from app.core.config import settings
 
 pytestmark = [pytest.mark.asyncio, pytest.mark.skipif(os.environ.get('LOAN_MIGRATION_TESTS') != '1', reason='Isolated cluster required')]
+
+
+async def test_printed_loan_term_upload_and_scope(api, tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, 'STORAGE_DIR', tmp_path)
+    loan = await api.draft()
+    path = f"/api/vehicle-loans/{loan['id']}/printed-terms"
+    content = b'%PDF-1.7\nscanned paper term'
+    def client_for(actor):
+        return AsyncClient(transport=ASGITransport(app=app), base_url='http://localhost:8000',
+            cookies={'access_token': create_access_token(api.actors[actor], 'ADMIN' if actor == 'admin' else 'PRODUCAO'), 'csrf_token': 'loan-csrf'},
+            headers={'Origin': 'http://localhost:8000', 'X-CSRF-Token': 'loan-csrf'})
+
+    async with client_for('origin') as client:
+        uploaded = await client.post(path, files={'file': ('signed.pdf', content, 'application/pdf')})
+        assert uploaded.status_code == 201, uploaded.text
+        term_id = uploaded.json()['id']
+        listing = await client.get(path)
+        assert [term['id'] for term in listing.json()] == [term_id]
+        downloaded = await client.get(path + f'/{term_id}/file')
+        assert downloaded.status_code == 200 and downloaded.content == content
+        assert (await client.post(path, files={'file': ('bad.pdf', b'bad', 'application/pdf')})).status_code == 400
+    async with client_for('recipient') as client:
+        assert (await client.get(path)).status_code == 200
+    async with client_for('outsider') as client:
+        assert (await client.get(path)).status_code == 404
+        assert (await client.get(path + f'/{term_id}/file')).status_code == 404
+
+
+async def test_production_and_admin_delete_only_unreferenced_structures(api):
+    name = 'Descartavel' + uuid4().hex[:8]
+    with psycopg.connect(**api.db) as connection:
+        department = connection.execute('INSERT INTO master_departments(organization_id,name) VALUES (%s,%s) RETURNING id',
+            (api.ids['origin'], name)).fetchone()[0]
+        allocation = connection.execute('INSERT INTO master_allocations(department_id,name) VALUES (%s,%s) RETURNING id',
+            (department, name)).fetchone()[0]
+        admin_department = connection.execute('INSERT INTO master_departments(organization_id,name) VALUES (%s,%s) RETURNING id',
+            (api.ids['outsider'], name)).fetchone()[0]
+    async def remove(actor, kind, item_id):
+        async with AsyncClient(transport=ASGITransport(app=app), base_url='http://localhost:8000',
+            cookies={'access_token': create_access_token(api.actors[actor], 'ADMIN' if actor == 'admin' else 'PRODUCAO'), 'csrf_token': 'loan-csrf'},
+            headers={'Origin': 'http://localhost:8000', 'X-CSRF-Token': 'loan-csrf'}) as client:
+            return await client.delete(f'/api/master-data/{kind}/{item_id}')
+    assert (await remove('recipient', 'allocations', allocation)).status_code == 404
+    assert (await remove('origin', 'departments', department)).status_code == 409
+    assert (await remove('origin', 'allocations', allocation)).status_code == 200
+    assert (await remove('origin', 'departments', department)).status_code == 200
+    assert (await remove('admin', 'departments', admin_department)).status_code == 200
 
 
 async def test_session_exposes_organization_for_production_receipt(api):
@@ -34,7 +83,7 @@ async def test_pending_summary_persists_until_resolution_and_scopes_receiving_si
     assert (await count('recipient')) == {'total': 1, 'receipts': 1, 'returns': 0}
     assert (await count('origin'))['total'] == 0
     assert (await count('outsider'))['total'] == 0
-    assert (await count('admin'))['total'] >= 1
+    assert (await count('admin'))['total'] == 0
     await api.request('recipient', 'GET', '/' + pending['id'])
     await api.request('recipient', 'GET', '/' + pending['id'] + '/events')
     assert (await count('recipient'))['total'] == 1

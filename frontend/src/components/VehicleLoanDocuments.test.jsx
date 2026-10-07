@@ -7,7 +7,7 @@ import { documentSignaturesAPI } from '../api/documentSignatures'
 
 const auth = vi.hoisted(() => ({ user: { id: 'sender', role: 'PRODUCAO', organization_id: 'origin' }, edit: true }))
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: auth.user, canEdit: () => auth.edit }) }))
-vi.mock('../api/vehicleLoans', () => ({ vehicleLoansAPI: { documents: vi.fn(), downloadTerm: vi.fn() } }))
+vi.mock('../api/vehicleLoans', () => ({ vehicleLoansAPI: { documents: vi.fn(), downloadTerm: vi.fn(), printedTerms: vi.fn(), uploadPrintedTerm: vi.fn(), downloadPrintedTerm: vi.fn() } }))
 vi.mock('../api/documentSignatures', () => ({ documentSignaturesAPI: { sign: vi.fn(), downloadArtifact: vi.fn() } }))
 const term = { document_id: 'term', title: 'Termo de empréstimo entre secretarias', status: 'PENDING', signed_count: 0,
   signatures: [], canonical_artifact_available: true, snapshot: { representatives: [
@@ -19,10 +19,27 @@ beforeEach(() => {
   vi.resetAllMocks()
   auth.user = { id: 'sender', role: 'PRODUCAO', organization_id: 'origin' }; auth.edit = true
   vehicleLoansAPI.documents.mockResolvedValue({ data: [term] })
+  vehicleLoansAPI.printedTerms.mockResolvedValue({ data: [] })
   vehicleLoansAPI.downloadTerm.mockResolvedValue({ data: new Blob(['pdf']) })
   documentSignaturesAPI.downloadArtifact.mockResolvedValue({ data: new Blob(['pdf']) })
   URL.createObjectURL = vi.fn(() => 'blob:test'); URL.revokeObjectURL = vi.fn()
   vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+})
+
+it('permite anexar e baixar o termo impresso sem alterar as assinaturas digitais', async () => {
+  const actor = userEvent.setup()
+  const attachment = { id: 'scan', original_filename: 'termo.pdf', created_at: '2026-10-07T12:00:00Z' }
+  vehicleLoansAPI.uploadPrintedTerm.mockResolvedValue({ data: attachment })
+  vehicleLoansAPI.downloadPrintedTerm.mockResolvedValue({ data: new Blob(['%PDF-1.7']) })
+  render(<VehicleLoanDocuments loanId="loan" />)
+  const file = new File(['%PDF-1.7'], 'termo.pdf', { type: 'application/pdf' })
+  await actor.upload(await screen.findByLabelText('Arquivo do termo impresso'), file)
+  await actor.click(screen.getByRole('button', { name: 'Anexar termo impresso' }))
+  await waitFor(() => expect(vehicleLoansAPI.uploadPrintedTerm).toHaveBeenCalledWith('loan', file))
+  expect(await screen.findByText(/termo.pdf/)).toBeInTheDocument()
+  await actor.click(screen.getByRole('button', { name: 'Baixar anexo' }))
+  expect(vehicleLoansAPI.downloadPrintedTerm).toHaveBeenCalledWith('loan', 'scan')
+  expect(documentSignaturesAPI.sign).not.toHaveBeenCalled()
 })
 
 it('requires reviewing download, preserves original and signs with entered password only once', async () => {
