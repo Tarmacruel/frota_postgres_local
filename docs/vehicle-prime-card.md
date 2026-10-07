@@ -23,3 +23,10 @@ Model, schemas e serviço de veículos; migration `0050_vehicle_prime_card`; `Ve
 ## Publicação
 
 Runtime identificado pelas tarefas e logs ativos: `D:\FROTAS\frota_certificado_homologacao`, porta 8000, monitorado por `FROTA Watchdog Local`. O deploy Docker automático está desativado. Publicar somente o commit isolado desta demanda, executar migration aditiva e reiniciar o backend pelo watchdog. Confirmar readiness público, OpenAPI e bundle servido após a publicação. Não reverter a migration em rollback de aplicação.
+
+
+## Resultado da publicacao
+
+Publicado em 07/10/2026, commit `5754f4d`. Migration `0050_vehicle_prime_card` confirmada em producao; 295 veiculos preservados. Backend reiniciado pelo watchdog e readiness publico HTTP 200. O bundle publico `index-DlU76G7S.js` corresponde ao build testado e contem o campo Prime. OpenAPI publico permanece desativado (404); schemas verificados localmente no runtime. Evidencias operacionais no checkout HML: `output/prime-deployment/result.json` e `public-verification.json`.
+
+Lint comparado ao runtime anterior: os mesmos 46 avisos, nenhum erro novo. A branch principal remota exige PR com tres checks; registro remoto segue esse fluxo, sem contornar a protecao.
