@@ -1,11 +1,11 @@
 from __future__ import annotations
 
 from uuid import UUID
-from fastapi import APIRouter, Depends, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_permission
 from app.db.session import get_db_session
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.schemas.auth import MessageOut
 from app.schemas.master_data import (
     AllocationCreate,
@@ -22,6 +22,12 @@ from app.schemas.master_data import (
 from app.services.master_data_service import MasterDataService
 
 router = APIRouter(prefix="/api/master-data", tags=["MasterData"])
+
+
+def require_structure_delete(user: User = Depends(require_permission("master_data", "edit"))) -> User:
+    if user.role not in (UserRole.ADMIN, UserRole.PRODUCAO):
+        raise HTTPException(status_code=403, detail="Exclusão restrita aos perfis Admin e Produção")
+    return user
 
 
 @router.get("/catalog", response_model=MasterDataCatalogOut)
@@ -102,7 +108,7 @@ async def update_department(
 async def delete_department(
     department_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_permission("master_data", "delete")),
+    current_user: User = Depends(require_structure_delete),
 ):
     await MasterDataService(db).delete_department(department_id, current_user)
     return {"message": "Removido"}
@@ -141,7 +147,7 @@ async def update_allocation(
 async def delete_allocation(
     allocation_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_permission("master_data", "delete")),
+    current_user: User = Depends(require_structure_delete),
 ):
     await MasterDataService(db).delete_allocation(allocation_id, current_user)
     return {"message": "Removido"}

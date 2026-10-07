@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from uuid import UUID
 from fastapi import HTTPException, status
+from sqlalchemy import func, select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.organization_scope import ensure_organization_access, production_scope_is_empty, scoped_organization_id
@@ -183,6 +184,8 @@ class MasterDataService:
         if not department:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Departamento não encontrado")
         ensure_organization_access(current_user, department.organization_id)
+        if await self.db.scalar(select(func.count()).select_from(Allocation).where(Allocation.department_id == department_id)):
+            raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Exclua as lotações do departamento antes de removê-lo")
         try:
             await self.audit.record(
                 actor=current_user,
@@ -272,6 +275,7 @@ class MasterDataService:
         allocation = await self.repo.get_allocation(allocation_id)
         if not allocation:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Lotação não encontrada")
+        ensure_organization_access(current_user, allocation.organization_id)
         try:
             await self.audit.record(
                 actor=current_user,

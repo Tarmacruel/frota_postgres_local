@@ -63,7 +63,12 @@ function Term({ document, loanId, onChanged }) {
 }
 
 export default function VehicleLoanDocuments({ loanId, regularized = false }) {
+  const { canEdit } = useAuth()
   const [documents, setDocuments] = useState([])
+  const [printedTerms, setPrintedTerms] = useState([])
+  const [printedFile, setPrintedFile] = useState(null)
+  const [printedBusy, setPrintedBusy] = useState(false)
+  const [printedError, setPrintedError] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(true)
   const [revision, setRevision] = useState(0)
@@ -75,6 +80,44 @@ export default function VehicleLoanDocuments({ loanId, regularized = false }) {
       .finally(() => { if (current) setLoading(false) })
     return () => { current = false }
   }, [loanId, revision])
+  useEffect(() => {
+    let current = true
+    setPrintedTerms([])
+    setPrintedFile(null)
+    setPrintedError('')
+    vehicleLoansAPI.printedTerms(loanId).then(({ data }) => { if (current) setPrintedTerms(data) })
+      .catch((err) => { if (current) setPrintedError(getApiErrorMessage(err, 'Não foi possível consultar os termos impressos.')) })
+    return () => { current = false }
+  }, [loanId, revision])
+
+  async function uploadPrinted(event) {
+    event.preventDefault()
+    if (!printedFile || printedBusy) return
+    const form = event.currentTarget
+    setPrintedBusy(true)
+    setPrintedError('')
+    try {
+      const { data } = await vehicleLoansAPI.uploadPrintedTerm(loanId, printedFile)
+      setPrintedTerms((items) => [...items, data])
+      setPrintedFile(null)
+      form.reset()
+    } catch (err) {
+      setPrintedError(getApiErrorMessage(err, 'Não foi possível anexar o termo impresso.'))
+    } finally { setPrintedBusy(false) }
+  }
+
+  async function downloadPrinted(term) {
+    setPrintedError('')
+    try {
+      const { data } = await vehicleLoansAPI.downloadPrintedTerm(loanId, term.id)
+      const url = URL.createObjectURL(data)
+      const link = window.document.createElement('a')
+      link.href = url
+      link.download = term.original_filename
+      link.click()
+      setTimeout(() => URL.revokeObjectURL(url), 1000)
+    } catch (err) { setPrintedError(getApiErrorMessage(err, 'Não foi possível baixar o termo impresso.')) }
+  }
   return <section aria-label="Termos e assinaturas">
     <h3>Termos e assinaturas</h3>
     <p>A confirmação operacional não substitui as duas assinaturas. Assinatura por senha é uma evidência interna do sistema.</p>
@@ -85,5 +128,21 @@ export default function VehicleLoanDocuments({ loanId, regularized = false }) {
     {!regularized && !loading && !error && !documents.length && <p>O termo de empréstimo será emitido no aceite da entrega; o de devolução, no aceite do retorno.</p>}
     {documents.map((document) => <Term key={document.document_id} document={document} loanId={loanId}
       onChanged={(updated) => setDocuments((items) => items.map((item) => item.document_id === updated.document_id ? updated : item))} />)}
+    <div className="loan-notice">
+      <h4>Termo de empréstimo impresso</h4>
+      <p>Anexe uma digitalização em PDF, JPG ou PNG de até 10 MB. Ela fica separada dos termos e assinaturas digitais.</p>
+      {canEdit('vehicle_loans') && <form className="loan-form" onSubmit={uploadPrinted}>
+        <label className="loan-field">Arquivo do termo impresso
+          <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(event) => setPrintedFile(event.target.files?.[0] || null)} disabled={printedBusy} />
+        </label>
+        <button type="submit" className="app-button" disabled={!printedFile || printedBusy}>{printedBusy ? 'Enviando…' : 'Anexar termo impresso'}</button>
+      </form>}
+      {printedTerms.length === 0 && <p>Nenhum termo impresso anexado.</p>}
+      {printedTerms.map((term) => <div className="actions-inline" key={term.id}>
+        <span>{term.original_filename} · {formatLoanDate(term.created_at)}</span>
+        <button type="button" className="ghost-button" onClick={() => downloadPrinted(term)}>Baixar anexo</button>
+      </div>)}
+      {printedError && <p role="alert" className="loan-error">{printedError}</p>}
+    </div>
   </section>
 }

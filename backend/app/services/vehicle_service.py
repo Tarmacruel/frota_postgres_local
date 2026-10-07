@@ -29,6 +29,7 @@ from app.schemas.common import PaginatedResponse, build_pagination
 from app.schemas.vehicle import VehicleCreate, VehicleUpdate
 
 VEHICLE_OPTIONAL_FIELDS = (
+    "prime_card_number",
     "renavam",
     "year",
     "prefix",
@@ -126,12 +127,15 @@ class VehicleService:
                 end_date = min(end_date, cutoff) if end_date else cutoff
         history = await self.vehicles.list_history(vehicle_id, start_date=start_date, end_date=end_date)
         audit_logs = await self._list_vehicle_audit_logs(vehicle_id, start_date=start_date, end_date=end_date)
+        active_history = await self.vehicles.get_active_history(vehicle_id) if org is not None and not vehicle.owner_organization_id else None
+        operator = active_history.allocation.organization_id if active_history and active_history.allocation else None
+        can_view_card = self._can_view_prime_card(current_user, vehicle.owner_organization_id or operator)
         events = [self._serialize_history(item) for item in history]
         if cutoff:
             for event in events:
                 if event.get("end_date") and event["end_date"] > cutoff:
                     event["end_date"] = None
-        events.extend(self._serialize_audit_event(item) for item in audit_logs)
+        events.extend(self._serialize_audit_event(item, can_view_card=can_view_card) for item in audit_logs)
         return sorted(events, key=lambda item: item["occurred_at"], reverse=True)
 
     async def create(self, data: VehicleCreate, current_user: User) -> dict:
@@ -235,7 +239,7 @@ class VehicleService:
             if data.model is not None:
                 vehicle.model = data.model.strip()
             for field in VEHICLE_OPTIONAL_FIELDS:
-                if getattr(data, field) is not None:
+                if getattr(data, field) is not None or (field == "prime_card_number" and field in data.model_fields_set):
                     setattr(vehicle, field, self._normalize_optional_vehicle_value(field, getattr(data, field)))
             if data.vehicle_type is not None:
                 vehicle.vehicle_type = data.vehicle_type
@@ -452,6 +456,16 @@ class VehicleService:
                 can_manage_registration=org is None or org == (owner or operator))
         return items
 
+    @staticmethod
+    def _can_view_prime_card(current_user, owner_organization_id) -> bool:
+        if current_user is None or production_scope_is_empty(current_user):
+            return False
+        permissions = getattr(current_user, "permissions", {})
+        if not permissions.get("vehicles", {}).get("can_edit", False):
+            return False
+        org = scoped_organization_id(current_user)
+        return org is None or org == owner_organization_id
+
     def _serialize_vehicle(self, vehicle: Vehicle, active_history: LocationHistory | None, possession, *, current_user=None) -> dict:
         current_location = self._serialize_location(active_history)
         org = scoped_organization_id(current_user)
@@ -461,6 +475,7 @@ class VehicleService:
             "id": vehicle.id,
             "plate": vehicle.plate,
             "chassis_number": vehicle.chassis_number,
+            "prime_card_number": vehicle.prime_card_number if self._can_view_prime_card(current_user, owner or operator) else None,
             "renavam": vehicle.renavam,
             "brand": vehicle.brand,
             "model": vehicle.model,
@@ -526,7 +541,7 @@ class VehicleService:
             "after": None,
         }
 
-    def _serialize_audit_event(self, log: AuditLog) -> dict:
+    def _serialize_audit_event(self, log: AuditLog, *, can_view_card: bool = False) -> dict:
         details = log.details or {}
         before = details.get("before") if isinstance(details.get("before"), dict) else None
         if isinstance(details.get("after"), dict):
@@ -535,6 +550,10 @@ class VehicleService:
             after = details
         else:
             after = None
+
+        if not can_view_card:
+            before = {key: value for key, value in before.items() if key != "prime_card_number"} if before is not None else None
+            after = {key: value for key, value in after.items() if key != "prime_card_number"} if after is not None else None
 
         return {
             "id": log.id,

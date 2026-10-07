@@ -40,3 +40,31 @@ it('mantém o texto para revisão quando o salvamento é rejeitado', async () =>
   await screen.findByText('Edição rejeitada')
   expect(screen.getByLabelText('Justificativa da edição').value).toContain('Correção de dados de identificação')
 })
+
+it('aplica máscara, limita a 16 dígitos e salva somente os números', async () => {
+  await openCorrection()
+  const input = screen.getByLabelText('Número do cartão Prime')
+  fireEvent.change(input, { target: { value: '000012345678901299' } })
+  expect(input).toHaveValue('0000 1234 5678 9012')
+  expect(input).toHaveAttribute('maxlength', '19')
+  fireEvent.click(screen.getByRole('button', { name: 'Atualizar veículo' }))
+  await waitFor(() => expect(api.put).toHaveBeenCalledWith('/vehicles/vehicle-1', expect.objectContaining({ prime_card_number: '0000123456789012' })))
+})
+
+it('carrega o cartão com máscara e permite limpar o número', async () => {
+  api.get.mockResolvedValue({ data: [{ ...vehicle, prime_card_number: '0000123456789012' }] })
+  await openCorrection()
+  const input = screen.getByLabelText('Número do cartão Prime')
+  expect(input).toHaveValue('0000 1234 5678 9012')
+  fireEvent.change(input, { target: { value: '' } })
+  fireEvent.click(screen.getByRole('button', { name: 'Atualizar veículo' }))
+  await waitFor(() => expect(api.put).toHaveBeenCalledWith('/vehicles/vehicle-1', expect.objectContaining({ prime_card_number: null })))
+})
+
+it('impede salvar cartão incompleto', async () => {
+  await openCorrection()
+  fireEvent.change(screen.getByLabelText('Número do cartão Prime'), { target: { value: '1234' } })
+  fireEvent.submit(screen.getByRole('button', { name: 'Atualizar veículo' }).closest('form'))
+  expect(await screen.findByText('Número do cartão Prime deve conter exatamente 16 dígitos.')).toBeInTheDocument()
+  expect(api.put).not.toHaveBeenCalled()
+})

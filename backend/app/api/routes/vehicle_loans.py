@@ -1,14 +1,14 @@
 from uuid import UUID
 from typing import Literal
 
-from fastapi import APIRouter, Depends, Query
+from fastapi import APIRouter, Depends, File, Query, UploadFile
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import require_permission
 from app.db.session import get_db_session
 from app.models.user import User
 from app.services.vehicle_loan_presentation import describe_loans, loan_catalog, describe_events
-from app.schemas.vehicle_loan import LoanView, LoanEventView
+from app.schemas.vehicle_loan import LoanView, LoanEventView, LoanPrintedTermOut
 from app.schemas.common import PaginatedResponse
 from app.schemas.vehicle_loan import LoanAction, LoanCreate, LoanEventOut, LoanOut, LoanReturnRequest, LoanStatus, LoanUpdate
 from app.services.vehicle_loan_service import VehicleLoanService
@@ -89,6 +89,31 @@ async def get_loan_documents(loan_id: UUID, db: AsyncSession = Depends(get_db_se
                              user: User = Depends(require_permission('vehicle_loans', 'view'))):
     from app.services.vehicle_loan_document_service import list_documents
     return await list_documents(db, loan_id, user)
+
+
+@router.get('/{loan_id}/printed-terms', response_model=list[LoanPrintedTermOut])
+async def list_printed_terms(loan_id: UUID, db: AsyncSession = Depends(get_db_session),
+                             user: User = Depends(require_permission('vehicle_loans', 'view'))):
+    from app.services.vehicle_loan_printed_term_service import VehicleLoanPrintedTermService
+    return await VehicleLoanPrintedTermService(db).list(loan_id, user)
+
+
+@router.post('/{loan_id}/printed-terms', response_model=LoanPrintedTermOut, status_code=201)
+async def upload_printed_term(loan_id: UUID, file: UploadFile = File(...),
+                              db: AsyncSession = Depends(get_db_session),
+                              user: User = Depends(require_permission('vehicle_loans', 'edit'))):
+    from app.services.vehicle_loan_printed_term_service import VehicleLoanPrintedTermService
+    return await VehicleLoanPrintedTermService(db).upload(loan_id, file, user)
+
+
+@router.get('/{loan_id}/printed-terms/{term_id}/file')
+async def download_printed_term(loan_id: UUID, term_id: UUID, db: AsyncSession = Depends(get_db_session),
+                                user: User = Depends(require_permission('vehicle_loans', 'view'))):
+    from fastapi.responses import FileResponse
+    from app.services.vehicle_loan_printed_term_service import VehicleLoanPrintedTermService
+    term, path = await VehicleLoanPrintedTermService(db).get(loan_id, term_id, user)
+    return FileResponse(path, media_type=term.mime_type, filename=f'termo-impresso-{term.id}{path.suffix}',
+        headers={'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff'})
 
 
 @router.get('/{loan_id}/documents/{document_id}/pdf')

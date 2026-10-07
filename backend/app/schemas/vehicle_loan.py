@@ -97,6 +97,17 @@ class LoanEventView(LoanEventOut):
     actor_name: str | None = None
 
 
+class LoanPrintedTermOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+    id: UUID
+    loan_id: UUID
+    original_filename: str
+    mime_type: str
+    size_bytes: int
+    uploaded_by_user_id: UUID
+    created_at: datetime
+
+
 class LoanRegularization(BaseModel):
     model_config = ConfigDict(extra='forbid', str_strip_whitespace=True)
     vehicle_id: UUID
