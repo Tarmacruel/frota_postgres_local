@@ -29,6 +29,7 @@ from app.schemas.common import PaginatedResponse, build_pagination
 from app.schemas.vehicle import VehicleCreate, VehicleUpdate
 
 VEHICLE_OPTIONAL_FIELDS = (
+    "prime_card_number",
     "renavam",
     "year",
     "prefix",
@@ -235,7 +236,7 @@ class VehicleService:
             if data.model is not None:
                 vehicle.model = data.model.strip()
             for field in VEHICLE_OPTIONAL_FIELDS:
-                if getattr(data, field) is not None:
+                if getattr(data, field) is not None or (field == "prime_card_number" and field in data.model_fields_set):
                     setattr(vehicle, field, self._normalize_optional_vehicle_value(field, getattr(data, field)))
             if data.vehicle_type is not None:
                 vehicle.vehicle_type = data.vehicle_type
@@ -461,6 +462,7 @@ class VehicleService:
             "id": vehicle.id,
             "plate": vehicle.plate,
             "chassis_number": vehicle.chassis_number,
+            "prime_card_number": vehicle.prime_card_number,
             "renavam": vehicle.renavam,
             "brand": vehicle.brand,
             "model": vehicle.model,

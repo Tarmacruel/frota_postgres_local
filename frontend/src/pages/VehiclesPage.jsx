@@ -1,3 +1,4 @@
+import { formatPrimeCardNumber } from '../utils/primeCard'
 import JustificationField from '../components/JustificationField'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -18,6 +19,7 @@ import { ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../compone
 const initialForm = {
   plate: '',
   chassis_number: '',
+  prime_card_number: '',
   brand: '',
   model: '',
   vehicle_type: 'SEDAN',
@@ -237,6 +239,7 @@ function buildFilterSummary(statusFilter, ownershipFilter, organizationFilter, l
 const vehicleHistoryFieldLabels = {
   plate: 'Placa',
   chassis_number: 'Chassi',
+  prime_card_number: 'Número do cartão Prime',
   brand: 'Marca',
   model: 'Modelo',
   vehicle_type: 'Tipo de veículo',
@@ -587,6 +590,7 @@ export default function VehiclesPage() {
     setForm({
       plate: vehicle.plate,
       chassis_number: vehicle.chassis_number || '',
+      prime_card_number: formatPrimeCardNumber(vehicle.prime_card_number),
       brand: vehicle.brand,
       model: vehicle.model,
       vehicle_type: vehicle.vehicle_type || 'SEDAN',
@@ -625,6 +629,11 @@ export default function VehiclesPage() {
       return
     }
 
+    if (form.prime_card_number && form.prime_card_number.replace(/ /g, '').length !== 16) {
+      setError('Número do cartão Prime deve conter exatamente 16 dígitos.')
+      return
+    }
+
     const isEditingLegacyWithoutLocation = Boolean(editingId) && !form.allocation_id && !vehicles.find((vehicle) => vehicle.id === editingId)?.current_location
     const touchedLocationSelection = Boolean(form.organization_id || form.department_id || form.allocation_id)
 
@@ -651,6 +660,7 @@ export default function VehiclesPage() {
       const payload = {
         plate: form.plate,
         chassis_number: form.chassis_number || null,
+        prime_card_number: form.prime_card_number.replace(/ /g, '') || null,
         brand: form.brand,
         model: form.model,
         vehicle_type: form.vehicle_type,
@@ -1112,6 +1122,11 @@ export default function VehiclesPage() {
               <div className="form-field">
                 <label htmlFor="chassis_number">Número do chassi</label>
                 <input id="chassis_number" className="app-input" placeholder="17 caracteres ou identificador interno" value={form.chassis_number} onChange={(event) => setForm({ ...form, chassis_number: event.target.value.toUpperCase() })} />
+              </div>
+              <div className="form-field">
+                <label htmlFor="prime_card_number">Número do cartão Prime</label>
+                <input id="prime_card_number" className="app-input" type="text" inputMode="numeric" autoComplete="off" maxLength={19} pattern="[0-9]{4} [0-9]{4} [0-9]{4} [0-9]{4}" placeholder="0000 0000 0000 0000" value={form.prime_card_number} onChange={(event) => setForm({ ...form, prime_card_number: formatPrimeCardNumber(event.target.value) })} aria-describedby="prime-card-help" />
+                <small id="prime-card-help">Opcional. Informe os 16 dígitos do cartão de abastecimento.</small>
               </div>
               <div className="form-field">
                 <label htmlFor="brand">Marca</label>

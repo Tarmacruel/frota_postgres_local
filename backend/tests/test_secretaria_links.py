@@ -449,6 +449,7 @@ async def test_vehicle_update_for_producao_allows_transfer_to_other_secretaria_w
         id=uuid4(),
         plate="TNY8H83",
         chassis_number=None,
+        prime_card_number=None,
         renavam=None,
         brand="VW",
         model="Saveiro",
