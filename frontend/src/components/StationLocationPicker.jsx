@@ -51,9 +51,10 @@ export default function StationLocationPicker({ latitude, longitude, onChange })
       scrollWheelZoom: true,
     }).setView(initialCenter, selectedPosition ? SELECTED_ZOOM : DEFAULT_ZOOM)
 
-    L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
       maxZoom: 19,
-      attribution: '&copy; OpenStreetMap',
+      attribution: '&copy; OpenStreetMap contributors',
+      referrerPolicy: 'strict-origin-when-cross-origin',
     }).addTo(map)
 
     map.on('click', (event) => {
