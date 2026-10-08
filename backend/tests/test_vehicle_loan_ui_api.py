@@ -30,7 +30,17 @@ async def test_printed_loan_term_upload_and_scope(api, tmp_path, monkeypatch):
         assert [term['id'] for term in listing.json()] == [term_id]
         downloaded = await client.get(path + f'/{term_id}/file')
         assert downloaded.status_code == 200 and downloaded.content == content
+        with psycopg.connect(**api.db) as connection:
+            audit = connection.execute('SELECT actor_user_id, details FROM audit_logs WHERE action = %s AND entity_id = %s ORDER BY created_at DESC LIMIT 1',
+                ('DOWNLOAD_LOAN_PRINTED_TERM', loan['id'])).fetchone()
+        assert audit and str(audit[0]) == api.actors['origin'] and audit[1]['attachment_id'] == term_id
         assert (await client.post(path, files={'file': ('bad.pdf', b'bad', 'application/pdf')})).status_code == 400
+        jpeg = b'\xff\xd8\xff\xe0scan\xff\xd9trailer'
+        assert (await client.post(path, files={'file': ('scan.jpg', jpeg, 'image/jpeg')})).status_code == 201
+        for index in range(8):
+            assert (await client.post(path, files={'file': (f'scan-{index}.pdf', content, 'application/pdf')})).status_code == 201
+        assert (await client.post(path, files={'file': ('extra.pdf', content, 'application/pdf')})).status_code == 409
+        assert len((await client.get(path)).json()) == 10
     async with client_for('recipient') as client:
         assert (await client.get(path)).status_code == 200
     async with client_for('outsider') as client:
