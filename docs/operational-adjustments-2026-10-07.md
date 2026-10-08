@@ -15,6 +15,7 @@ Solicitação expressa para publicar primeiro em produção e depois manter a ho
 - Frontend: 234 testes aprovados na release isolada e 256 na homologação.
 - Lint sem erros, com os mesmos 46 avisos do baseline de produção; build aprovado.
 - Revisão do PR #63: aceite de JPEG com dados finais de scanner, limite serializado por empréstimo e auditoria de download. Na release isolada, 520 testes de backend aprovados e 88 ignorados; 234 testes de frontend aprovados; lint sem erros e build aprovado. O teste HTTP em PostgreSQL descartável confirmou os três ajustes.
+- Revisão do PR #64: JPEG exige marcador de fim de imagem mesmo quando há dados posteriores; arquivos truncados continuam rejeitados.
 
 ## Publicação
 
