@@ -1,3 +1,4 @@
+import AnalyticsSection from './AnalyticsSection'
 import {
   ResponsiveContainer,
   BarChart,
@@ -9,7 +10,7 @@ import {
   Legend,
 } from 'recharts'
 
-export default function EfficiencyChart({ rows = [] }) {
+export default function EfficiencyChart({ rows = [], ...sectionProps }) {
   const data = rows.slice(0, 12).map((item) => ({
     vehicle: item.vehicle_type,
     consumo: Number(item.consumption_l_100km || 0),
@@ -17,12 +18,11 @@ export default function EfficiencyChart({ rows = [] }) {
   }))
 
   return (
-    <section className="surface-panel">
-      <h3 className="section-title">Eficiência por tipo de veículo</h3>
+    <AnalyticsSection title="Eficiência por tipo de veículo" empty={rows.length === 0} {...sectionProps}>
       {data.length === 0 ? (
         <div className="empty-state">Sem dados para o período selecionado.</div>
       ) : (
-        <div style={{ width: '100%', height: 300 }}>
+        <div className="analytics-chart">
           <ResponsiveContainer>
             <BarChart data={data} margin={{ top: 20, right: 24, left: 0, bottom: 5 }}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -36,6 +36,6 @@ export default function EfficiencyChart({ rows = [] }) {
           </ResponsiveContainer>
         </div>
       )}
-    </section>
+    </AnalyticsSection>
   )
 }

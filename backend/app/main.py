@@ -13,6 +13,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 from app.api.routes.admin_notifications import router as admin_notifications_router
 from app.api.routes.analytics import router as analytics_router
+from app.api.routes.analytics_v2 import router as analytics_v2_router
 from app.api.routes.audit import router as audit_router
 from app.api.routes.justification_suggestions import router as justification_suggestions_router
 from app.api.routes.auth import router as auth_router
@@ -219,6 +220,7 @@ app.include_router(payment_suppliers_router)
 app.include_router(payment_contracts_router)
 app.include_router(search_router)
 app.include_router(analytics_router)
+app.include_router(analytics_v2_router)
 
 
 @app.get("/api/health")

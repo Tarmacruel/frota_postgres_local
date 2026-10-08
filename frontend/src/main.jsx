@@ -4,6 +4,7 @@ import App from './App'
 import './styles.css'
 import './styles-light.css'
 import './styles/frontend-evolution.css'
+import './styles/analytics-evolution.css'
 
 const savedTheme = window.localStorage.getItem('frota-theme') === 'dark' ? 'dark' : 'light'
 document.documentElement.dataset.theme = savedTheme

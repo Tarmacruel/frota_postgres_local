@@ -12,15 +12,17 @@ const focusableSelectors = [
 const focusableSelector = focusableSelectors.join(',')
 const modalBodyFocusableSelector = focusableSelectors.map((selector) => `.modal-body ${selector}`).join(',')
 
-export default function Modal({ open, title, description, onClose, children, canClose = true, initialFocusRef }) {
+export default function Modal({ open, title, description, onClose, children, canClose = true, initialFocusRef, onEscape, className = '', backdropClassName = '' }) {
   const titleId = useId()
   const descriptionId = useId()
   const dialogRef = useRef(null)
   const onCloseRef = useRef(onClose)
+  const onEscapeRef = useRef(onEscape)
 
   useEffect(() => {
     onCloseRef.current = onClose
-  }, [onClose])
+    onEscapeRef.current = onEscape
+  }, [onClose, onEscape])
 
   useEffect(() => {
     if (!open) return undefined
@@ -43,7 +45,8 @@ export default function Modal({ open, title, description, onClose, children, can
       if (dialogs[dialogs.length - 1] !== dialog) return
       if (event.key === 'Escape' && canClose) {
         event.preventDefault()
-        onCloseRef.current?.()
+        if (onEscapeRef.current) onEscapeRef.current()
+        else onCloseRef.current?.()
         return
       }
 
@@ -84,12 +87,12 @@ export default function Modal({ open, title, description, onClose, children, can
   if (!open) return null
 
   return createPortal(
-    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+    <div className={`modal-backdrop ${backdropClassName}`.trim()} role="presentation" onMouseDown={(event) => {
       if (canClose && event.target === event.currentTarget) onCloseRef.current?.()
     }}>
       <section
         ref={dialogRef}
-        className="modal-shell"
+        className={`modal-shell ${className}`.trim()}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

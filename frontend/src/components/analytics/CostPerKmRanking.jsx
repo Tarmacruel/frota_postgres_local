@@ -1,3 +1,4 @@
+import AnalyticsSection from './AnalyticsSection'
 import {
   ResponsiveContainer,
   ScatterChart,
@@ -9,7 +10,7 @@ import {
   Cell,
 } from 'recharts'
 
-export default function CostPerKmRanking({ rows = [] }) {
+export default function CostPerKmRanking({ rows = [], ...sectionProps }) {
   const data = rows.slice(0, 20).map((item) => {
     const variance = Number(item.variance_percentage || 0)
     return {
@@ -22,18 +23,17 @@ export default function CostPerKmRanking({ rows = [] }) {
   })
 
   return (
-    <section className="surface-panel">
-      <h3 className="section-title">Custo Total por KM (TCO)</h3>
+    <AnalyticsSection title="Custo operacional por km" description="Comparação com referência configurada por categoria; não representa pesquisa de mercado." empty={rows.length === 0} {...sectionProps}>
       {data.length === 0 ? (
         <div className="empty-state">Sem dados para o período selecionado.</div>
       ) : (
         <>
-          <div style={{ width: '100%', height: 300 }}>
+          <div className="analytics-chart">
             <ResponsiveContainer>
               <ScatterChart>
                 <CartesianGrid strokeDasharray="3 3" />
                 <XAxis type="number" dataKey="benchmark" name="Referência" unit=" R$/km" />
-                <YAxis type="number" dataKey="tco" name="TCO" unit=" R$/km" />
+                <YAxis type="number" dataKey="tco" name="Custo por km" unit=" R$/km" />
                 <Tooltip
                   cursor={{ strokeDasharray: '3 3' }}
                   formatter={(value) => Number(value).toFixed(2)}
@@ -48,12 +48,12 @@ export default function CostPerKmRanking({ rows = [] }) {
             </ResponsiveContainer>
           </div>
           <div className="analytics-scatter-legend">
-            <span><i style={{ backgroundColor: 'var(--analytics-critical)' }} /> +30% acima da referência</span>
-            <span><i style={{ backgroundColor: 'var(--analytics-low)' }} /> -20% abaixo (eficiente)</span>
-            <span><i style={{ backgroundColor: 'var(--analytics-medium)' }} /> Faixa intermediária</span>
+            <span><i className="analytics-legend-critical" /> +30% acima da referência</span>
+            <span><i className="analytics-legend-low" /> -20% abaixo (eficiente)</span>
+            <span><i className="analytics-legend-medium" /> Faixa intermediária</span>
           </div>
         </>
       )}
-    </section>
+    </AnalyticsSection>
   )
 }

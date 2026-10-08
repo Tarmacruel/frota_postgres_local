@@ -1,6 +1,8 @@
+import AnalyticsEntityLink from './AnalyticsEntityLink'
+import AnalyticsSection from './AnalyticsSection'
 import { Fragment, useMemo, useState } from 'react'
 
-export default function VehicleDetailsTable({ efficiencyRows = [], tcoRows = [] }) {
+export default function VehicleDetailsTable({ efficiencyRows = [], tcoRows = [], onOpenEntity, ...sectionProps }) {
   const [expandedRowKey, setExpandedRowKey] = useState(null)
 
   const rows = useMemo(() => {
@@ -27,16 +29,15 @@ export default function VehicleDetailsTable({ efficiencyRows = [], tcoRows = [] 
   }, [efficiencyRows, tcoRows])
 
   return (
-    <section className="surface-panel">
-      <h3 className="section-title">Detalhamento por veículo</h3>
-      <div className="table-wrap">
+    <AnalyticsSection title="Detalhamento por veículo" empty={efficiencyRows.length === 0} {...sectionProps}>
+      <div className="table-wrap" tabIndex={0} aria-label="Tabela de veículos; role horizontalmente para ver todas as colunas">
         <table className="data-table">
           <thead>
             <tr>
               <th>Veículo</th>
               <th>KM</th>
               <th>Consumo</th>
-              <th>TCO/km</th>
+              <th>Custo/km</th>
               <th>Ações</th>
             </tr>
           </thead>
@@ -46,7 +47,7 @@ export default function VehicleDetailsTable({ efficiencyRows = [], tcoRows = [] 
               return (
                 <Fragment key={rowKey}>
                   <tr>
-                    <td>{row.vehicle_type}</td>
+                    <td><AnalyticsEntityLink entityType="vehicle" entityId={row.vehicle_id} entityName={`Veículo · ${row.vehicle_type}`} onOpen={onOpenEntity}>{row.vehicle_type}</AnalyticsEntityLink></td>
                     <td>{Number(row.total_km || 0).toLocaleString('pt-BR')}</td>
                     <td>{Number(row.consumption_l_100km || 0).toFixed(2)} L/100km</td>
                     <td>R$ {Number(row.tco?.tco_cost_per_km || 0).toFixed(2)}</td>
@@ -65,7 +66,7 @@ export default function VehicleDetailsTable({ efficiencyRows = [], tcoRows = [] 
                       <td colSpan={5}>
                         Média categoria consumo: {Number(row.category_average || 0).toFixed(2)} L/100km •
                         Desvio consumo: {Number(row.variance_percentage || 0).toFixed(2)}% •
-                        Referência TCO: R$ {Number(row.tco?.market_benchmark || 0).toFixed(2)}
+                        Referência configurada: R$ {Number(row.tco?.market_benchmark || 0).toFixed(2)}
                       </td>
                     </tr>
                   ) : null}
@@ -75,6 +76,6 @@ export default function VehicleDetailsTable({ efficiencyRows = [], tcoRows = [] 
           </tbody>
         </table>
       </div>
-    </section>
+    </AnalyticsSection>
   )
 }

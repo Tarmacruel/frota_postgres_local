@@ -66,6 +66,7 @@ export default function AdvancedFilters({ filters, organizations = [], loading =
           <label className="analytics-filter-field">
             <span>Período</span>
             <SearchableSelect
+              ariaLabel="Período"
               value={filters.period_days}
               options={periodOptions}
               onChange={(value) => onChange('period_days', Number(value))}
@@ -79,6 +80,7 @@ export default function AdvancedFilters({ filters, organizations = [], loading =
             <span>Tipo de veículo</span>
             <SearchableSelect
               value={filters.vehicle_type}
+              ariaLabel="Tipo de veículo"
               options={vehicleTypeOptions}
               onChange={(value) => onChange('vehicle_type', value)}
               searchPlaceholder="Buscar tipo de veículo"
@@ -92,6 +94,7 @@ export default function AdvancedFilters({ filters, organizations = [], loading =
             <span>Secretaria</span>
             <SearchableSelect
               value={filters.organization}
+              ariaLabel="Secretaria"
               options={organizationOptions}
               onChange={(value) => onChange('organization', value)}
               searchPlaceholder="Buscar secretaria"

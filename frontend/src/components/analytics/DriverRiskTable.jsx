@@ -1,6 +1,8 @@
+import AnalyticsEntityLink from './AnalyticsEntityLink'
+import AnalyticsSection from './AnalyticsSection'
 import { useMemo } from 'react'
 
-export default function DriverRiskTable({ rows = [] }) {
+export default function DriverRiskTable({ rows = [], onOpenEntity, ...sectionProps }) {
   const displayRows = useMemo(() => {
     const uniqueByDriver = new Map()
 
@@ -20,9 +22,8 @@ export default function DriverRiskTable({ rows = [] }) {
   }, [rows])
 
   return (
-    <section className="surface-panel">
-      <h3 className="section-title">Pontuação de risco de condutores</h3>
-      <div className="table-wrap">
+    <AnalyticsSection title="Pontuação de risco de condutores" empty={rows.length === 0} {...sectionProps}>
+      <div className="table-wrap" tabIndex={0} aria-label="Tabela de condutores; role horizontalmente para ver todas as colunas">
         <table className="data-table">
           <thead>
             <tr>
@@ -36,7 +37,7 @@ export default function DriverRiskTable({ rows = [] }) {
           <tbody>
             {displayRows.map((item) => (
               <tr key={item.rowKey}>
-                <td>{item.driver_name}</td>
+                <td><AnalyticsEntityLink entityType="driver" entityId={item.driver_id} entityName={item.driver_name} onOpen={onOpenEntity}>{item.driver_name}</AnalyticsEntityLink></td>
                 <td>{item.fines_count}</td>
                 <td>{item.claims_count}</td>
                 <td>{item.anomalies_count}</td>
@@ -46,6 +47,6 @@ export default function DriverRiskTable({ rows = [] }) {
           </tbody>
         </table>
       </div>
-    </section>
+    </AnalyticsSection>
   )
 }

@@ -1,3 +1,4 @@
+import AnalyticsKpiCard from './AnalyticsKpiCard'
 const KPI_CARD_CONFIG = [
   {
     key: 'average_consumption_l_100km',
@@ -29,7 +30,7 @@ const KPI_CARD_CONFIG = [
     icon: '🚗',
     formatter: (value) => `${Math.round(Number(value || 0))}`,
     resolveTone: () => 'status-info',
-    resolveHint: () => 'Veículos disponíveis',
+    resolveHint: () => 'Veículos não inativos',
   },
 ]
 
@@ -40,14 +41,8 @@ export default function KPICards({ overview, loading = false }) {
         const value = overview?.[card.key]
         const toneClass = card.resolveTone(value)
         return (
-          <article key={card.key} className={`analytics-kpi-card ${toneClass}`}>
-            <div>
-              <p className="analytics-kpi-label">{card.label}</p>
-              <strong className="analytics-kpi-value">{loading ? '--' : card.formatter(value)}</strong>
-              <span className="analytics-kpi-hint">{loading ? 'Carregando...' : card.resolveHint(value)}</span>
-            </div>
-            <span className="analytics-kpi-icon" aria-hidden="true">{card.icon}</span>
-          </article>
+          <AnalyticsKpiCard key={card.key} label={card.label} value={card.formatter(value)}
+            note={card.resolveHint(value)} tone={toneClass} loading={loading} />
         )
       })}
     </div>
