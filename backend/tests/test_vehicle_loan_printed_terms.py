@@ -7,7 +7,7 @@ import pytest
 from fastapi import HTTPException, UploadFile
 
 from app.core.config import settings
-from app.services.vehicle_loan_printed_term_service import VehicleLoanPrintedTermService
+from app.services.vehicle_loan_printed_term_service import MAX_TERMS_PER_LOAN, VehicleLoanPrintedTermService
 
 
 def make_upload(name, content):
@@ -20,6 +20,7 @@ def make_upload(name, content):
     ('term.pdf', b'', 400),
     ('term.pdf', b'not a pdf', 400),
     ('term.png', b'%PDF-test', 400),
+    ('term.jpg', b'\xff\xd8\xff\xe0truncated scan', 400),
     ('term.pdf', b'%PDF-xxxx', 413),
 ])
 async def test_rejects_invalid_printed_terms(tmp_path, monkeypatch, name, content, status):
@@ -43,6 +44,7 @@ async def test_upload_stores_file_and_metadata_then_downloads_with_loan_scope(tm
     monkeypatch.setattr('app.services.vehicle_loan_printed_term_service.AuditService', lambda db: SimpleNamespace(record=audit))
     db = AsyncMock()
     db.add = Mock()
+    db.scalar.return_value = 0
     loan_id, user_id = uuid4(), uuid4()
     service = VehicleLoanPrintedTermService(db)
     service.loans.get = AsyncMock(return_value=SimpleNamespace())
@@ -68,6 +70,7 @@ async def test_upload_removes_file_when_database_commit_fails(tmp_path, monkeypa
     monkeypatch.setattr('app.services.vehicle_loan_printed_term_service.AuditService', lambda db: SimpleNamespace(record=AsyncMock()))
     db = AsyncMock()
     db.add = Mock()
+    db.scalar.return_value = 0
     db.commit.side_effect = RuntimeError('database down')
     service = VehicleLoanPrintedTermService(db)
     service.loans.get = AsyncMock(return_value=SimpleNamespace())
@@ -75,6 +78,34 @@ async def test_upload_removes_file_when_database_commit_fails(tmp_path, monkeypa
         await service.upload(uuid4(), make_upload('term.pdf', b'%PDF-1.7'), SimpleNamespace(id=uuid4()))
     assert not list(tmp_path.rglob('*.pdf'))
     db.rollback.assert_awaited_once()
+
+
+@pytest.mark.asyncio
+async def test_upload_accepts_jpeg_with_scanner_trailer(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, 'STORAGE_DIR', tmp_path)
+    monkeypatch.setattr('app.services.vehicle_loan_printed_term_service.AuditService', lambda db: SimpleNamespace(record=AsyncMock()))
+    db = AsyncMock()
+    db.add = Mock()
+    db.scalar.return_value = 0
+    service = VehicleLoanPrintedTermService(db)
+    service.loans.get = AsyncMock(return_value=SimpleNamespace())
+    content = b'\xff\xd8\xff\xe0scan\xff\xd9trailer'
+    term = await service.upload(uuid4(), make_upload('scan.jpeg', content), SimpleNamespace(id=uuid4()))
+    assert (tmp_path / term.storage_path).read_bytes() == content
+
+
+@pytest.mark.asyncio
+async def test_upload_enforces_per_loan_limit_before_storing(tmp_path, monkeypatch):
+    monkeypatch.setattr(settings, 'STORAGE_DIR', tmp_path)
+    db = AsyncMock()
+    db.scalar.return_value = MAX_TERMS_PER_LOAN
+    service = VehicleLoanPrintedTermService(db)
+    service.loans.get = AsyncMock(return_value=SimpleNamespace())
+    with pytest.raises(HTTPException) as error:
+        await service.upload(uuid4(), make_upload('term.pdf', b'%PDF-1.7'), SimpleNamespace(id=uuid4()))
+    assert error.value.status_code == 409
+    db.commit.assert_not_awaited()
+    assert not list(tmp_path.rglob('*'))
 
 
 @pytest.mark.asyncio
