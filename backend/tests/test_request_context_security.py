@@ -36,6 +36,7 @@ async def test_request_id_is_generated_and_security_headers_are_returned(client)
     assert response.headers["Referrer-Policy"] == "no-referrer"
     assert response.headers["X-Frame-Options"] == "DENY"
     assert "frame-ancestors 'none'" in response.headers["Content-Security-Policy"]
+    assert "https://tile.openstreetmap.org" in response.headers["Content-Security-Policy"]
     assert response.headers["Cache-Control"] == "no-store"
 
 
