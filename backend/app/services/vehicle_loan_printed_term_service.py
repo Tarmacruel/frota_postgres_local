@@ -16,8 +16,8 @@ MAX_TERM_BYTES = 10 * 1024 * 1024
 MAX_TERMS_PER_LOAN = 10
 TERM_FORMATS = {
     '.pdf': ('application/pdf', lambda data: data.startswith(b'%PDF-')),
-    '.jpg': ('image/jpeg', lambda data: data.startswith(b'\xff\xd8\xff')),
-    '.jpeg': ('image/jpeg', lambda data: data.startswith(b'\xff\xd8\xff')),
+    '.jpg': ('image/jpeg', lambda data: data.startswith(b'\xff\xd8\xff') and b'\xff\xd9' in data[3:]),
+    '.jpeg': ('image/jpeg', lambda data: data.startswith(b'\xff\xd8\xff') and b'\xff\xd9' in data[3:]),
     '.png': ('image/png', lambda data: data.startswith(b'\x89PNG\r\n\x1a\n')),
 }
 

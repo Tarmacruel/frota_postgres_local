@@ -20,6 +20,7 @@ def make_upload(name, content):
     ('term.pdf', b'', 400),
     ('term.pdf', b'not a pdf', 400),
     ('term.png', b'%PDF-test', 400),
+    ('term.jpg', b'\xff\xd8\xff\xe0truncated scan', 400),
     ('term.pdf', b'%PDF-xxxx', 413),
 ])
 async def test_rejects_invalid_printed_terms(tmp_path, monkeypatch, name, content, status):
