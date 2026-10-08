@@ -5,6 +5,8 @@ import { documentSignaturesAPI } from '../api/documentSignatures'
 import { getApiErrorMessage } from '../utils/apiError'
 import { formatLoanDate } from '../utils/vehicleLoans'
 
+const MAX_PRINTED_TERMS = 10
+
 function Term({ document, loanId, onChanged }) {
   const { user, canEdit } = useAuth()
   const [password, setPassword] = useState('')
@@ -130,13 +132,14 @@ export default function VehicleLoanDocuments({ loanId, regularized = false }) {
       onChanged={(updated) => setDocuments((items) => items.map((item) => item.document_id === updated.document_id ? updated : item))} />)}
     <div className="loan-notice">
       <h4>Termo de empréstimo impresso</h4>
-      <p>Anexe uma digitalização em PDF, JPG ou PNG de até 10 MB. Ela fica separada dos termos e assinaturas digitais.</p>
-      {canEdit('vehicle_loans') && <form className="loan-form" onSubmit={uploadPrinted}>
+      <p>Anexe uma digitalização em PDF, JPG ou PNG de até 10 MB (máximo de 10 anexos por empréstimo). Ela fica separada dos termos e assinaturas digitais.</p>
+      {canEdit('vehicle_loans') && printedTerms.length < MAX_PRINTED_TERMS && <form className="loan-form" onSubmit={uploadPrinted}>
         <label className="loan-field">Arquivo do termo impresso
           <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(event) => setPrintedFile(event.target.files?.[0] || null)} disabled={printedBusy} />
         </label>
         <button type="submit" className="app-button" disabled={!printedFile || printedBusy}>{printedBusy ? 'Enviando…' : 'Anexar termo impresso'}</button>
       </form>}
+      {canEdit('vehicle_loans') && printedTerms.length >= MAX_PRINTED_TERMS && <p>Limite de 10 termos impressos atingido.</p>}
       {printedTerms.length === 0 && <p>Nenhum termo impresso anexado.</p>}
       {printedTerms.map((term) => <div className="actions-inline" key={term.id}>
         <span>{term.original_filename} · {formatLoanDate(term.created_at)}</span>

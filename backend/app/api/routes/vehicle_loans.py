@@ -110,8 +110,13 @@ async def upload_printed_term(loan_id: UUID, file: UploadFile = File(...),
 async def download_printed_term(loan_id: UUID, term_id: UUID, db: AsyncSession = Depends(get_db_session),
                                 user: User = Depends(require_permission('vehicle_loans', 'view'))):
     from fastapi.responses import FileResponse
+    from app.services.audit_service import AuditService
     from app.services.vehicle_loan_printed_term_service import VehicleLoanPrintedTermService
     term, path = await VehicleLoanPrintedTermService(db).get(loan_id, term_id, user)
+    await AuditService(db).record(actor=user, action='DOWNLOAD_LOAN_PRINTED_TERM',
+        entity_type='VEHICLE_LOAN', entity_id=loan_id, entity_label=term.original_filename,
+        details={'attachment_id': str(term.id), 'sha256': term.sha256})
+    await db.commit()
     return FileResponse(path, media_type=term.mime_type, filename=f'termo-impresso-{term.id}{path.suffix}',
         headers={'Cache-Control': 'private, no-store', 'X-Content-Type-Options': 'nosniff'})
 
