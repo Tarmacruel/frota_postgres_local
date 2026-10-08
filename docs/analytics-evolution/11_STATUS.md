@@ -1,13 +1,13 @@
 # Status — Evolução Analytics
 
-Atualizado em 07/10/2026. Histórico inicial preservado no pacote de origem `FROTA_SIREL_ANALYTICS_EVOLUTION_PACKAGE/docs/analytics-evolution/11_STATUS.md`, que tinha Fase 0 PENDENTE e demais fases BLOQUEADAS. Este é o status de execução no diretório definitivo; o pacote original não foi alterado.
+Atualizado em 08/10/2026. Histórico inicial preservado no pacote de origem `FROTA_SIREL_ANALYTICS_EVOLUTION_PACKAGE/docs/analytics-evolution/11_STATUS.md`, que tinha Fase 0 PENDENTE e demais fases BLOQUEADAS. Este é o status de execução no diretório definitivo; o pacote original não foi alterado.
 
 | Fase | Estado | Data | HEAD inicial | HEAD final | Observações |
 |---|---|---|---|---|---|
 | 0 | AUDITORIA CONCLUÍDA — AGUARDA VALIDAÇÃO | 2026-10-06 | 738ebb7 | 738ebb7 | [Baseline e decisões](BASELINE_PHASE_0.md); sem alteração funcional |
-| 1 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-06 | 082af32 | working tree sobre 082af32 | [Entrega, arquivos e capturas](DELIVERY_PHASE_1.md); somente fundação V1 |
-| 2 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-07 | 082af32 | working tree sobre 082af32 | [Contrato, decisões e evidências](API_V2_PHASE_2.md); V1 intacta, sem migration |
-| 3 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-07 | 082af32 | working tree sobre 082af32 | [Cockpit, arquivos, testes e capturas](DELIVERY_PHASE_3.md); drawer somente shell |
+| 1 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-06 | 082af32 | 6e910a9 | [Entrega, arquivos e capturas](DELIVERY_PHASE_1.md); somente fundação V1 |
+| 2 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-07 | 082af32 | 6e910a9 | [Contrato, decisões e evidências](API_V2_PHASE_2.md); V1 intacta, sem migration |
+| 3 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-07 | 082af32 | 6e910a9 | [Cockpit, arquivos, testes e capturas](DELIVERY_PHASE_3.md); drawer somente shell |
 | 4 | BLOQUEADA | | | | Drawer/drill-down |
 | 5 | BLOQUEADA | | | | Custos |
 | 6 | BLOQUEADA | | | | Combustível |
@@ -19,6 +19,12 @@ Atualizado em 07/10/2026. Histórico inicial preservado no pacote de origem `FRO
 | 12 | BLOQUEADA | | | | QA/performance |
 
 ## Log
+
+### 2026-10-08 — Preparação para a próxima fase
+
+- Código, testes, planos e evidências das Fases 1 a 3 registrados no commit `6e910a9` da branch `feature/analytics-evolution-hml`, sem iniciar a Fase 4 nem publicar Análises em produção. Capturas e logs operacionais de `output/` permanecem no diretório local.
+- Verificação do working tree antes do checkpoint: backend completo **562 aprovados / 93 ignorados**; frontend **256 aprovados / 52 arquivos**; lint **0 erros / 45 avisos existentes**; build aprovado; `git diff --cached --check` aprovado. Produção e homologação responderam HTTP 200 após a publicação operacional separada.
+- Próxima ação: validar a Fase 3 e obter autorização para a Fase 4. O histórico anterior registra o estado em que cada fase foi executada; o checkpoint posterior não altera seus resultados.
 
 ### 2026-10-07 — Fase 3
 
