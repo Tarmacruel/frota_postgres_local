@@ -6,7 +6,7 @@ Solicitação expressa para publicar primeiro em produção e depois manter a ho
 
 - Admin e Produção com permissão de edição de Cadastros podem excluir departamentos e lotações do seu escopo. Exclusão de órgãos mantém a permissão anterior. Departamentos com lotações exigem remoção destas primeiro; vínculos históricos continuam protegidos por integridade referencial. Exclusões permanecem auditadas.
 - O contador de empréstimos pendentes considera somente entregas destinadas à secretaria do usuário e devoluções destinadas à secretaria de origem. Administradores sem secretaria vinculada não recebem notificações globais. A consulta de empréstimos mantém seu escopo anterior.
-- Aba de empréstimos aceita digitalização do termo impresso em PDF, JPG ou PNG (até 10 MB), guarda o arquivo em storage privado e registra hash, autor e auditoria. Usuários com permissão de edição podem anexar; participantes com permissão de consulta podem baixar. O anexo não altera os termos ou assinaturas digitais.
+- Aba de empréstimos aceita digitalização do termo impresso em PDF, JPG ou PNG (até 10 MB por arquivo e 10 anexos por empréstimo), guarda o arquivo em storage privado e registra hash, autor e auditoria de upload/download. Usuários com permissão de edição podem anexar; participantes com permissão de consulta podem baixar. O anexo não altera os termos ou assinaturas digitais.
 
 ## Verificações
 
@@ -14,6 +14,7 @@ Solicitação expressa para publicar primeiro em produção e depois manter a ho
 - Backend: 514 testes aprovados e 86 ignorados na release isolada. Na homologação, 559 aprovados e 91 ignorados. Testes HTTP reais em PostgreSQL descartável confirmaram upload/download, isolamento por secretaria nas notificações e exclusão de lotações/departamentos. A checagem encontrou uma ausência preexistente de validação da secretaria ao excluir lotação; a correção foi publicada nos dois ambientes e os três testes direcionados passaram.
 - Frontend: 234 testes aprovados na release isolada e 256 na homologação.
 - Lint sem erros, com os mesmos 46 avisos do baseline de produção; build aprovado.
+- Revisão do PR #63: aceite de JPEG com dados finais de scanner, limite serializado por empréstimo e auditoria de download. Na release isolada, 520 testes de backend aprovados e 88 ignorados; 234 testes de frontend aprovados; lint sem erros e build aprovado. O teste HTTP em PostgreSQL descartável confirmou os três ajustes.
 
 ## Publicação
 

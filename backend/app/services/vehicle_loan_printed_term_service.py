@@ -4,19 +4,20 @@ from pathlib import Path
 from uuid import UUID, uuid4
 
 from fastapi import HTTPException, UploadFile
-from sqlalchemy import select
+from sqlalchemy import func, select
 
 from app.core.config import settings
-from app.models.vehicle_loan import VehicleLoanPrintedTerm
+from app.models.vehicle_loan import VehicleLoan, VehicleLoanPrintedTerm
 from app.services.audit_service import AuditService
 from app.services.vehicle_loan_service import VehicleLoanService
 
 
 MAX_TERM_BYTES = 10 * 1024 * 1024
+MAX_TERMS_PER_LOAN = 10
 TERM_FORMATS = {
     '.pdf': ('application/pdf', lambda data: data.startswith(b'%PDF-')),
-    '.jpg': ('image/jpeg', lambda data: data.startswith(b'\xff\xd8\xff') and data.endswith(b'\xff\xd9')),
-    '.jpeg': ('image/jpeg', lambda data: data.startswith(b'\xff\xd8\xff') and data.endswith(b'\xff\xd9')),
+    '.jpg': ('image/jpeg', lambda data: data.startswith(b'\xff\xd8\xff')),
+    '.jpeg': ('image/jpeg', lambda data: data.startswith(b'\xff\xd8\xff')),
     '.png': ('image/png', lambda data: data.startswith(b'\x89PNG\r\n\x1a\n')),
 }
 
@@ -61,6 +62,13 @@ class VehicleLoanPrintedTermService:
             raise HTTPException(413, 'O termo impresso deve ter até 10 MB')
         if not valid(content):
             raise HTTPException(400, 'O conteúdo não corresponde ao formato do arquivo')
+
+        # Serialize uploads for this loan so concurrent requests cannot exceed the cap.
+        await self.db.execute(select(VehicleLoan.id).where(VehicleLoan.id == loan_id).with_for_update())
+        count = await self.db.scalar(select(func.count(VehicleLoanPrintedTerm.id))
+            .where(VehicleLoanPrintedTerm.loan_id == loan_id))
+        if count >= MAX_TERMS_PER_LOAN:
+            raise HTTPException(409, f'Limite de {MAX_TERMS_PER_LOAN} termos impressos por empréstimo atingido')
 
         term_id = uuid4()
         relative = Path('vehicle_loan_terms') / str(loan_id) / f'{term_id}{extension}'
