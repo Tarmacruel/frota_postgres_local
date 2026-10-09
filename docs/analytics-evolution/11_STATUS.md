@@ -12,13 +12,22 @@ Atualizado em 09/10/2026. Histórico inicial preservado no pacote de origem `FRO
 | 5 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-08 | 74c53a7 | 288656a | Custos V2 e drill-down; denominador auditável commitado em 09/10 |
 | 6 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-08 | 74c53a7 | 288656a | Combustível V2 e anomalias explicáveis; commitada no checkpoint de 09/10 |
 | 7 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-09 | 288656a | fe33d09 | Manutenção V2, sem migration ou classificação por texto |
-| 8 | BLOQUEADA | | | | Utilização |
+| 8 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-09 | e81185e | 0ce9df0 | Utilização descritiva V2; sem taxa de utilização, modelo ou migration |
 | 9 | BLOQUEADA | | | | Condutores |
 | 10 | BLOQUEADA | | | | Alertas/workflow |
 | 11 | BLOQUEADA | | | | Relatórios |
 | 12 | BLOQUEADA | | | | QA/performance |
 
 ## Log
+
+### 2026-10-09 — Fase 8
+
+- Execução somente em `feature/analytics-evolution-hml`; preflight anterior à edição: HEAD `e81185e24ca561c4de15a7e4199c8d6947efffc0`, working tree limpo e sincronizado com o remoto. Commit funcional `0ce9df0`. [ExecPlan](EXECPLAN_PHASE_8.md). Nenhuma alteração em produção, modelo, migration ou fluxo de edição.
+- `/analytics?view=utilization` usa dias civis encerrados, cadastro atual de veículos, aberturas/encerramentos de posse e hodômetros. Exibe km de posses encerradas válidas, km por posse válida, quantidade/duração cadastrada, último evento observável, veículos sem evento no recorte, status atual e manutenções sem fim, ranking com medição válida e agrupamento pela secretaria operadora atual. Posse não comprova deslocamento contínuo; status/manutenção atuais não reconstituem disponibilidade histórica. Não há denominador robusto para “taxa de utilização”, portanto essa métrica não foi criada.
+- Endpoints somente leitura `/api/analytics/v2/utilization` e `/utilization/events` preservam `analytics:view`, escopo organizacional V2 e filtros de data/tipo/veículo. A lista de posses exige `possession:view`, é paginada e aplica responsabilidade histórica ao selecionar secretaria. Drawer abre a posse registrada e explica regra/amostra, mantendo filtros e pilha de navegação; nenhuma edição foi duplicada.
+- Arquivos funcionais: `backend/app/api/routes/analytics_v2.py`, `backend/app/services/analytics_v2_utilization.py`, `backend/tests/test_analytics_v2_utilization.py`, `backend/tests/test_analytics_v2_postgres.py`, `frontend/src/api/analyticsV2.js`, `frontend/src/components/analytics/AnalyticsUtilization.jsx`, `AnalyticsUtilization.test.jsx`, `AnalyticsEntityDrawer.jsx`, `AnalyticsEntityDrawer.test.jsx`, `frontend/src/pages/AdminAnalyticsDashboard.jsx`, `AdminAnalyticsDashboard.test.jsx`. Documentação: este status e `EXECPLAN_PHASE_8.md`.
+- Backend completo: **582 aprovados/96 pulados**; PostgreSQL HML somente leitura: **11 aprovados**. Frontend completo: **273 aprovados/56 arquivos**; lint **0 erros/45 avisos preexistentes**; build e `git diff --check` aprovados. API HML local e pública com HTTP 200, mesmos 9 hashes de assets e mesmos totais no recorte 09/09–08/10/2026: 286 veículos no cadastro atual, 478 posses com km válido, 418.507,3 km. Consulta restrita a uma secretaria: 91 veículos, 36 eventos; todos os eventos da amostra pertencem ao cadastro autorizado.
+- Chromium autenticado em HML: métrica → lista paginada → registro de posse, Voltar/Fechar; temas claro/escuro desktop e escuro celular 390 px, sem overflow horizontal; console final 0 erros/0 avisos. Capturas em `output/playwright/analytics-phase-8/01-utilization-light-desktop.png` a `05-utilization-dark-mobile-full.png` (artefatos locais ignorados). Runtime/API e PostgreSQL reiniciados somente pelo script isolado de HML. Pendente validação funcional/visual pelo responsável. Fase 9 não iniciada.
 
 ### 2026-10-09 — Fase 7
 
