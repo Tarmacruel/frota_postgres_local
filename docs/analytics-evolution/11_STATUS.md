@@ -8,10 +8,10 @@ Atualizado em 09/10/2026. Histórico inicial preservado no pacote de origem `FRO
 | 1 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-06 | 082af32 | 6e910a9 | [Entrega, arquivos e capturas](DELIVERY_PHASE_1.md); somente fundação V1 |
 | 2 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-07 | 082af32 | 6e910a9 | [Contrato, decisões e evidências](API_V2_PHASE_2.md); V1 intacta, sem migration |
 | 3 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-07 | 082af32 | 6e910a9 | [Cockpit, arquivos, testes e capturas](DELIVERY_PHASE_3.md); drawer somente shell |
-| 4 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-08 | 74c53a7 | 7506847 | Drawer e drill-down; incluída no checkpoint de 09/10 |
-| 5 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-08 | 74c53a7 | 7506847 | Custos V2 e drill-down; denominador auditável no checkpoint de 09/10 |
-| 6 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-08 | 74c53a7 | 7506847 | Combustível V2 e anomalias explicáveis; incluída no checkpoint de 09/10 |
-| 7 | BLOQUEADA | | | | Manutenção |
+| 4 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-08 | 74c53a7 | 288656a | Drawer e drill-down; commitada no checkpoint de 09/10 |
+| 5 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-08 | 74c53a7 | 288656a | Custos V2 e drill-down; denominador auditável commitado em 09/10 |
+| 6 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-08 | 74c53a7 | 288656a | Combustível V2 e anomalias explicáveis; commitada no checkpoint de 09/10 |
+| 7 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-09 | 288656a | fe33d09 | Manutenção V2, sem migration ou classificação por texto |
 | 8 | BLOQUEADA | | | | Utilização |
 | 9 | BLOQUEADA | | | | Condutores |
 | 10 | BLOQUEADA | | | | Alertas/workflow |
@@ -19,6 +19,15 @@ Atualizado em 09/10/2026. Histórico inicial preservado no pacote de origem `FRO
 | 12 | BLOQUEADA | | | | QA/performance |
 
 ## Log
+
+### 2026-10-09 — Fase 7
+
+- Execução somente em `feature/analytics-evolution-hml`; preflight antes da edição: HEAD `288656a647046ce987d67f5777175b3607026c3d`, working tree limpo, branch um commit à frente do remoto. Commit funcional `fe33d09996e44abd22becabf61f2ce25574b4d58`. [ExecPlan](EXECPLAN_PHASE_7.md). Nenhuma alteração na produção, modelo, migration ou fluxo de edição.
+- `/analytics?view=maintenance` usa intervenções iniciadas no recorte de dias civis encerrados, com tipo, secretaria e escopo histórico existentes. Mostra custo registrado, custo/km, quantidade, duração média de intervalos encerrados válidos, abertas no estado atual, ranking por veículo e quantidade de veículos com duas ou mais intervenções. A repetição é apenas quantitativa; não classifica preventiva/corretiva nem atribui causa. Duração cadastrada não comprova indisponibilidade operacional.
+- Custo/km divide o custo de manutenção dos veículos com km válido pelos quilômetros das posses encerradas válidas no mesmo conjunto medido; veículos medidos sem manutenção têm custo zero. Numerador e denominador abrem registros de origem; o drawer de manutenção pagina histórico, abre veículo e GET de domínio do registro, preserva filtros e “Como foi calculado?”. O histórico individual exige `maintenance:view`, enquanto a visão agregada mantém `analytics:view` e escopo organizacional.
+- Arquivos funcionais: `backend/app/api/routes/analytics_v2.py`, `backend/app/services/analytics_v2_maintenance.py`, `backend/tests/test_analytics_v2_maintenance.py`, `backend/tests/test_analytics_v2_postgres.py`, `frontend/src/api/analyticsV2.js`, `frontend/src/components/analytics/AnalyticsMaintenance.jsx`, `AnalyticsMaintenance.test.jsx`, `AnalyticsEntityDrawer.jsx`, `AnalyticsEntityDrawer.test.jsx`, `frontend/src/pages/AdminAnalyticsDashboard.jsx`, `AdminAnalyticsDashboard.test.jsx`. Documentação: este status e `EXECPLAN_PHASE_7.md`.
+- Backend completo: **579 aprovados/95 pulados**; focados PostgreSQL HML somente leitura: **10 aprovados**. Frontend completo: **270 aprovados/55 arquivos**; lint **0 erros/45 avisos preexistentes**; build e `git diff --check` aprovados. API local HML retornou 200 para resumo e todos os cinco subconjuntos de histórico; a API pública HML retornou 200 com os mesmos totais e o mesmo hash de bundle frontend.
+- Chromium autenticado em HML: métrica → histórico → registro original e Voltar, tema claro/escuro no desktop, escuro em 390 px, sem overflow horizontal; console final 0 erros/0 avisos. Capturas em `output/playwright/analytics-phase-7/01-maintenance-light-desktop.png` a `05-maintenance-dark-mobile-full.png` (artefatos locais ignorados). API e PostgreSQL foram reiniciados somente pelo script isolado de testes; HML pública passou a servir a nova visão. Pendente validação funcional/visual pelo responsável. Fase 8 não iniciada.
 
 ### 2026-10-09 — Checkpoint funcional das Fases 4–6
 
