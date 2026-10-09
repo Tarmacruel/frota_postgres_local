@@ -8,6 +8,7 @@ import AdminAnalyticsDashboard from './AdminAnalyticsDashboard'
 
 vi.mock('../components/analytics/AnalyticsOverview', () => ({ default: () => <div>Cockpit atual</div> }))
 vi.mock('../components/analytics/AnalyticsFuel', () => ({ default: () => <div>Combustível V2</div> }))
+vi.mock('../components/analytics/AnalyticsMaintenance', () => ({ default: () => <div>Manutenção V2</div> }))
 vi.mock('../api/analytics', () => ({ analyticsAPI: Object.fromEntries(
   ['overview', 'efficiency', 'tco', 'driverRisk', 'insights', 'costTrend', 'exportReport'].map((name) => [name, vi.fn()]),
 ) }))
@@ -132,7 +133,14 @@ describe('Analytics — fundação V1', () => {
     expect(screen.queryByText('999.00 L/100km')).not.toBeInTheDocument()
   })
 
-  it.each(['maintenance', 'utilization'])('seção %s informa limite sem inventar dados', async (view) => {
+  it('seção maintenance usa somente a visão V2 específica', () => {
+    mount('/analytics?view=maintenance')
+    expect(screen.getByText('Manutenção V2')).toBeInTheDocument()
+    expect(analyticsAPI.overview).not.toHaveBeenCalled()
+  })
+
+  it('seção utilization informa limite sem inventar dados', async () => {
+    const view = 'utilization'
     mount(`/analytics?view=${view}`)
     expect(screen.getByText('Análise específica ainda não disponível')).toBeInTheDocument()
     await waitFor(() => expect(analyticsAPI.overview).toHaveBeenCalledTimes(1))

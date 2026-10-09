@@ -7,7 +7,7 @@ import useAnalyticsDetailStack from './useAnalyticsDetailStack'
 import { analyticsV2API } from '../../api/analyticsV2'
 import api from '../../api/client'
 
-vi.mock('../../api/analyticsV2', () => ({ analyticsV2API: { entity: vi.fn(), costEvents: vi.fn(), fuelEvents: vi.fn(), mileageEvents: vi.fn() } }))
+vi.mock('../../api/analyticsV2', () => ({ analyticsV2API: { entity: vi.fn(), costEvents: vi.fn(), fuelEvents: vi.fn(), mileageEvents: vi.fn(), maintenanceEvents: vi.fn() } }))
 vi.mock('../../api/client', () => ({ default: { get: vi.fn() } }))
 
 const filters = { date_from: '2026-09-01', date_to: '2026-09-30', organization: 'org-1' }
@@ -39,6 +39,9 @@ beforeEach(() => {
     events: [{ id: 'possession-1', public_number: 42, vehicle_id: 'vehicle-1', plate: 'ABC1D23',
       start_date: '2026-09-10T10:00:00Z', end_date: '2026-09-11T10:00:00Z',
       start_odometer_km: '1000', end_odometer_km: '1100', distance_km: '100' }] } })
+  analyticsV2API.maintenanceEvents.mockResolvedValue({ data: { total_events: 1, offset: 0,
+    events: [{ id: 'maintenance-1', vehicle_id: 'vehicle-1', plate: 'ABC1D23',
+      start_date: '2026-09-10T10:00:00Z', end_date: null, cost: '100', duration_hours: null }] } })
 })
 
 function Harness() {
@@ -50,6 +53,26 @@ function Harness() {
 }
 
 describe('AnalyticsEntityDrawer', () => {
+  it('abre histórico de manutenção, registro de domínio e volta com fórmula', async () => {
+    const user = userEvent.setup()
+    api.get.mockResolvedValueOnce({ data: { start_date: '2026-09-10T10:00:00Z', end_date: null,
+      total_cost: '100', service_description: 'Serviço registrado' } })
+    function MaintenanceHarness() {
+      const detail = useAnalyticsDetailStack()
+      return <><button onClick={() => detail.open({ entityType: 'maintenance-events', title: 'Manutenções abertas',
+        maintenanceSubset: 'open', filters, origin: { label: 'Abertas', formula: 'Fim ausente.' } })}>Abrir manutenção</button>
+        <AnalyticsEntityDrawer detail={detail.current} canGoBack={detail.canGoBack} onOpen={detail.open} onBack={detail.back} onClose={detail.close} /></>
+    }
+    render(<MaintenanceHarness />)
+    await user.click(screen.getByRole('button', { name: 'Abrir manutenção' }))
+    expect(await screen.findByText(/1 intervenção\(ões\) no recorte/)).toBeInTheDocument()
+    expect(analyticsV2API.maintenanceEvents).toHaveBeenCalledWith({ ...filters, subset: 'open' }, expect.any(AbortSignal))
+    await user.click(screen.getByRole('button', { name: /Manutenção · 10\/09\/2026/ }))
+    expect(await screen.findByText('Serviço registrado')).toBeInTheDocument()
+    expect(api.get).toHaveBeenCalledWith('/maintenance/maintenance-1', expect.objectContaining({ signal: expect.any(AbortSignal) }))
+    await user.click(screen.getByRole('button', { name: /Voltar/ }))
+    expect(screen.getByRole('region', { name: 'Como foi calculado?' })).toHaveTextContent('Fim ausente.')
+  })
   it('lista as posses válidas que compõem o denominador e preserva o contexto', async () => {
     const user = userEvent.setup()
     function MileageHarness() {

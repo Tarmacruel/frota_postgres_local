@@ -21,13 +21,14 @@ from app.schemas.analytics_v2 import AnalyticsV2Filter
 from app.services.analytics_v2_service import AnalyticsV2Service
 from app.repositories.analytics_v2_repository import AnalyticsV2Repository
 from app.services.analytics_v2_periods import equivalent_periods
+from app.services.analytics_v2_maintenance import maintenance_statement
 
 pytestmark = pytest.mark.skipif(os.environ.get("ANALYTICS_V2_READONLY_TESTS") != "1", reason="opt-in read-only HML PostgreSQL probes")
 
 SCHEMA = {
-    "vehicles": {"id": "uuid", "vehicle_type": "text", "status": "text"},
+    "vehicles": {"id": "uuid", "vehicle_type": "text", "status": "text", "plate": "text"},
     "fuel_supplies": {"id": "uuid", "vehicle_id": "uuid", "driver_id": "uuid", "organization_id": "uuid", "supplied_at": "timestamptz", "total_amount": "numeric", "liters": "double precision", "is_consumption_anomaly": "boolean"},
-    "maintenance_records": {"id": "uuid", "vehicle_id": "uuid", "responsible_organization_id": "uuid", "start_date": "timestamptz", "total_cost": "numeric"},
+    "maintenance_records": {"id": "uuid", "vehicle_id": "uuid", "responsible_organization_id": "uuid", "start_date": "timestamptz", "end_date": "timestamptz", "total_cost": "numeric"},
     "fines": {"id": "uuid", "vehicle_id": "uuid", "driver_id": "uuid", "responsible_organization_id": "uuid", "infraction_date": "date", "infraction_time": "time", "amount": "numeric", "status": "text"},
     "claims": {"id": "uuid", "vehicle_id": "uuid", "driver_id": "uuid", "responsible_organization_id": "uuid", "data_ocorrencia": "timestamptz", "valor_estimado": "numeric"},
     "location_history": {"id": "uuid", "vehicle_id": "uuid", "allocation_id": "uuid", "start_date": "timestamptz", "end_date": "timestamptz"},
@@ -45,8 +46,8 @@ class ReadOnlyFacts:
         self.connection = connection
         self.rows = {table: [] for table in SCHEMA}
         self.calls = 0
-        self.add("vehicles", id=VEHICLE, vehicle_type="SEDAN", status="INATIVO")
-        self.add("vehicles", id=OTHER, vehicle_type="HATCH", status="ATIVO")
+        self.add("vehicles", id=VEHICLE, vehicle_type="SEDAN", status="INATIVO", plate="ABC1D23")
+        self.add("vehicles", id=OTHER, vehicle_type="HATCH", status="ATIVO", plate="XYZ9A87")
 
     def add(self, table, **values):
         values.setdefault("id", UUID(int=100 + sum(len(rows) for rows in self.rows.values())))
@@ -109,6 +110,26 @@ def facts():
         assert connection.execute("SHOW transaction_read_only").fetchone()["transaction_read_only"] == "on"
         yield ReadOnlyFacts(connection)
         connection.rollback()
+
+
+@pytest.mark.asyncio
+async def test_maintenance_real_sql_cohort_scope_and_duration(facts):
+    facts.add('maintenance_records', vehicle_id=VEHICLE, responsible_organization_id=A,
+        start_date='2026-09-01 03:00:00+00', end_date='2026-09-01 05:00:00+00', total_cost=Decimal('40'))
+    facts.add('maintenance_records', vehicle_id=VEHICLE, responsible_organization_id=A,
+        start_date='2026-09-02 03:00:00+00', end_date=None, total_cost=Decimal('20'))
+    facts.add('maintenance_records', vehicle_id=VEHICLE, responsible_organization_id=B,
+        start_date='2026-09-03 03:00:00+00', end_date=None, total_cost=Decimal('100'))
+    facts.add('maintenance_records', vehicle_id=OTHER, responsible_organization_id=A,
+        start_date='2026-09-04 03:00:00+00', end_date=None, total_cost=Decimal('200'))
+    filters = AnalyticsV2Filter(date_from=date(2026, 9, 1), date_to=date(2026, 9, 30),
+        organization=A, vehicle_type='SEDAN')
+    period, _ = equivalent_periods(filters.date_from, filters.date_to, now=NOW)
+    rows = (await facts.execute(maintenance_statement(filters, period))).mappings().all()
+    assert len(rows) == 2
+    assert sum(row['cost'] for row in rows) == 60
+    assert sorted(row['duration_seconds'] for row in rows if row['duration_seconds'] is not None) == [7200]
+    assert sum(row['end_date'] is None for row in rows) == 1
 
 
 @pytest.mark.asyncio

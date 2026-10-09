@@ -17,6 +17,7 @@ from app.services.analytics_v2_cockpit import AnalyticsV2Cockpit, FleetStatus, C
 from app.services.analytics_v2_detail import AnalyticsV2DetailService, EntityDetail
 from app.services.analytics_v2_costs import AnalyticsV2Costs, CostAnalysis, CostEvents, MileageEvents
 from app.services.analytics_v2_fuel import AnalyticsV2Fuel, FuelAnalysis, FuelEvents
+from app.services.analytics_v2_maintenance import AnalyticsV2Maintenance, MaintenanceAnalysis, MaintenanceEvents
 
 router = APIRouter(prefix="/api/analytics/v2", tags=["Análises V2"])
 
@@ -33,6 +34,8 @@ def common_filter(request: Request, date_from: date = Query(), date_to: date = Q
         allowed.add('offset')
     if request.url.path == '/api/analytics/v2/fuel/events':
         allowed.update({'offset', 'station'})
+    if request.url.path == '/api/analytics/v2/maintenance/events':
+        allowed.update({'offset', 'subset'})
     unsupported = set(request.query_params) - allowed
     if unsupported:
         raise HTTPException(422, "Filtro não suportado: " + ", ".join(sorted(unsupported)))
@@ -69,6 +72,26 @@ async def fuel(response: Response, filters: AnalyticsV2Filter = Depends(common_f
     scoped = filters.model_copy(update={"organization": analytics_organization_scope(current_user, filters.organization)})
     return await AnalyticsV2Fuel(db).get(scoped,
         can_view_records=bool(current_user.permissions.get("fuel_supplies", {}).get("can_view")))
+
+
+@router.get("/maintenance", response_model=MaintenanceAnalysis)
+async def maintenance(response: Response, filters: AnalyticsV2Filter = Depends(common_filter),
+    db: AsyncSession = Depends(get_db_session), current_user: User = Depends(require_permission("analytics", "view"))):
+    response.headers["Cache-Control"] = "private, no-store"
+    scoped = filters.model_copy(update={"organization": analytics_organization_scope(current_user, filters.organization)})
+    return await AnalyticsV2Maintenance(db).get(scoped)
+
+
+@router.get("/maintenance/events", response_model=MaintenanceEvents,
+    dependencies=[Depends(require_permission("maintenance", "view"))])
+async def maintenance_events(response: Response, subset: str = Query(default='all'), offset: int = Query(default=0, ge=0),
+    filters: AnalyticsV2Filter = Depends(common_filter), db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("analytics", "view"))):
+    if subset not in {'all', 'open', 'duration', 'repeated', 'measured'}:
+        raise HTTPException(422, "Recorte de manutenção não suportado")
+    response.headers["Cache-Control"] = "private, no-store"
+    scoped = filters.model_copy(update={"organization": analytics_organization_scope(current_user, filters.organization)})
+    return await AnalyticsV2Maintenance(db).events(scoped, subset=subset, offset=offset)
 
 
 @router.get("/fuel/events", response_model=FuelEvents, dependencies=[Depends(require_permission("fuel_supplies", "view"))])

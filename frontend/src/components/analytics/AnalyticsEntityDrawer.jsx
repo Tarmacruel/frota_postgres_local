@@ -118,13 +118,35 @@ function MileageEventsContent({ detail, result, onOpen, onLoadMore, moreLoading,
   </>
 }
 
+function MaintenanceEventsContent({ detail, result, onOpen, onLoadMore, moreLoading, moreError }) {
+  return <>
+    <p className="analytics-scope-note">{formatDate(detail.filters.date_from)} a {formatDate(detail.filters.date_to)} · {result.total_events} intervenção(ões) no recorte. Início no período; situação aberta conforme cadastro atual.</p>
+    <ol className="analytics-detail-timeline">{result.events.map((event) => <li key={event.id}>
+      <button type="button" className="analytics-entity-link" onClick={() => onOpen({ entityType: 'record', entityId: event.id,
+        source: 'maintenance', title: `Manutenção · ${recordDate(event.start_date)}`,
+        filters: detail.filters, origin: detail.origin })}>
+        <strong>Manutenção</strong> · {recordDate(event.start_date)} · {event.cost === null ? 'Custo indisponível' : formatValue(event.cost, 'BRL')}
+      </button>
+      <div className="analytics-detail-related">
+        <AnalyticsEntityLink entityType="vehicle" entityId={event.vehicle_id} entityName={event.plate}
+          onOpen={(item) => onOpen({ ...item, filters: detail.filters, origin: detail.origin })}>{event.plate}</AnalyticsEntityLink>
+        <span>{event.end_date ? `Encerrada em ${recordDate(event.end_date)}` : 'Aberta'}</span>
+        {event.duration_hours !== null ? <span>Duração: {formatValue(event.duration_hours, 'h')}</span> : null}
+      </div>
+    </li>)}</ol>
+    {result.events.length < result.total_events ? <button type="button" className="ghost-button" disabled={moreLoading} onClick={onLoadMore}>
+      {moreLoading ? 'Carregando…' : 'Carregar mais registros'}</button> : null}
+    {moreError ? <p role="alert">{moreError}</p> : null}
+  </>
+}
+
 export default function AnalyticsEntityDrawer({ detail, canGoBack, onOpen, onBack, onClose, children }) {
   const contentRef = useRef(null)
   const [resource, setResource] = useState({ data: null, loading: false, error: '' })
   const [retry, setRetry] = useState(0)
   const [moreLoading, setMoreLoading] = useState(false)
   const [moreError, setMoreError] = useState('')
-  const key = detail ? `${detail.entityType}/${detail.source || ''}/${detail.costSource || ''}/${detail.organizationBucket || ''}/${detail.stationKey || ''}/${detail.measuredOnly || false}/${detail.entityId}/${JSON.stringify(detail.filters)}` : ''
+  const key = detail ? `${detail.entityType}/${detail.source || ''}/${detail.costSource || ''}/${detail.organizationBucket || ''}/${detail.stationKey || ''}/${detail.maintenanceSubset || ''}/${detail.measuredOnly || false}/${detail.entityId}/${JSON.stringify(detail.filters)}` : ''
   useEffect(() => { if (detail) contentRef.current?.focus() }, [detail])
   useEffect(() => {
     if (!detail?.filters || children) return undefined
@@ -132,7 +154,9 @@ export default function AnalyticsEntityDrawer({ detail, canGoBack, onOpen, onBac
     let active = true
     setResource({ data: null, loading: true, error: '', key })
     setMoreError('')
-    const request = detail.entityType === 'mileage-events'
+    const request = detail.entityType === 'maintenance-events'
+      ? analyticsV2API.maintenanceEvents({ ...detail.filters, subset: detail.maintenanceSubset }, controller.signal)
+      : detail.entityType === 'mileage-events'
       ? analyticsV2API.mileageEvents(detail.filters, controller.signal)
       : detail.entityType === 'fuel-events'
       ? analyticsV2API.fuelEvents({ ...detail.filters, station: detail.stationKey }, controller.signal)
@@ -151,7 +175,10 @@ export default function AnalyticsEntityDrawer({ detail, canGoBack, onOpen, onBac
     if (moreLoading || !current.data || !detail) return
     setMoreLoading(true); setMoreError('')
     try {
-      const { data } = detail.entityType === 'mileage-events'
+      const { data } = detail.entityType === 'maintenance-events'
+        ? await analyticsV2API.maintenanceEvents({ ...detail.filters, subset: detail.maintenanceSubset,
+          offset: current.data.events.length })
+        : detail.entityType === 'mileage-events'
         ? await analyticsV2API.mileageEvents({ ...detail.filters, offset: current.data.events.length })
         : detail.entityType === 'fuel-events'
         ? await analyticsV2API.fuelEvents({ ...detail.filters, station: detail.stationKey,
@@ -182,6 +209,8 @@ export default function AnalyticsEntityDrawer({ detail, canGoBack, onOpen, onBac
         {children || (current.loading ? <p role="status">Carregando detalhamento…</p>
           : current.error ? <div role="alert"><p>{current.error}</p><button type="button" className="ghost-button" onClick={() => setRetry((value) => value + 1)}>Tentar novamente</button></div>
             : current.data ? (detail.entityType === 'record' ? <RecordDetail detail={detail} record={current.data} />
+              : detail.entityType === 'maintenance-events' ? <MaintenanceEventsContent detail={detail} result={current.data} onOpen={onOpen} onLoadMore={loadMore}
+                moreLoading={moreLoading} moreError={moreError} />
               : detail.entityType === 'mileage-events' ? <MileageEventsContent detail={detail} result={current.data} onOpen={onOpen} onLoadMore={loadMore}
                 moreLoading={moreLoading} moreError={moreError} />
               : detail.entityType === 'costs' || detail.entityType === 'fuel-events' ? <CostEventsContent detail={detail} result={current.data} onOpen={onOpen} onLoadMore={loadMore}
