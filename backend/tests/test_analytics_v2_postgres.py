@@ -22,6 +22,7 @@ from app.services.analytics_v2_service import AnalyticsV2Service
 from app.repositories.analytics_v2_repository import AnalyticsV2Repository
 from app.services.analytics_v2_periods import equivalent_periods
 from app.services.analytics_v2_maintenance import maintenance_statement
+from app.services.analytics_v2_utilization import possession_statement
 
 pytestmark = pytest.mark.skipif(os.environ.get("ANALYTICS_V2_READONLY_TESTS") != "1", reason="opt-in read-only HML PostgreSQL probes")
 
@@ -34,7 +35,7 @@ SCHEMA = {
     "location_history": {"id": "uuid", "vehicle_id": "uuid", "allocation_id": "uuid", "start_date": "timestamptz", "end_date": "timestamptz"},
     "master_allocations": {"id": "uuid", "department_id": "uuid"},
     "master_departments": {"id": "uuid", "organization_id": "uuid"},
-    "vehicle_possession": {"id": "uuid", "vehicle_id": "uuid", "responsible_organization_id": "uuid",
+    "vehicle_possession": {"id": "uuid", "public_number": "bigint", "vehicle_id": "uuid", "responsible_organization_id": "uuid",
         "start_date": "timestamptz", "end_date": "timestamptz", "start_odometer_km": "double precision", "end_odometer_km": "double precision"},
 }
 A, B, VEHICLE, OTHER, DRIVER = [UUID(int=i) for i in range(1, 6)]
@@ -130,6 +131,32 @@ async def test_maintenance_real_sql_cohort_scope_and_duration(facts):
     assert sum(row['cost'] for row in rows) == 60
     assert sorted(row['duration_seconds'] for row in rows if row['duration_seconds'] is not None) == [7200]
     assert sum(row['end_date'] is None for row in rows) == 1
+
+
+@pytest.mark.asyncio
+async def test_utilization_real_sql_distinguishes_recorded_duration_from_valid_km(facts):
+    facts.add('vehicle_possession', public_number=1, vehicle_id=VEHICLE, responsible_organization_id=A,
+        start_date='2026-09-10 12:00+00', end_date='2026-09-11 12:00+00',
+        start_odometer_km=100, end_odometer_km=150)
+    facts.add('vehicle_possession', public_number=2, vehicle_id=VEHICLE, responsible_organization_id=A,
+        start_date='2026-09-20 12:00+00', end_date='2026-09-21 12:00+00',
+        start_odometer_km=200, end_odometer_km=190)
+    facts.add('vehicle_possession', public_number=3, vehicle_id=VEHICLE, responsible_organization_id=A,
+        start_date='2026-08-31 12:00+00', end_date='2026-09-02 12:00+00',
+        start_odometer_km=10, end_odometer_km=20)
+    facts.add('vehicle_possession', public_number=4, vehicle_id=VEHICLE, responsible_organization_id=A,
+        start_date='2026-09-25 12:00+00', end_date=None,
+        start_odometer_km=150, end_odometer_km=None)
+    filters = AnalyticsV2Filter(date_from=date(2026, 9, 1), date_to=date(2026, 9, 30), vehicle_type='SEDAN')
+    period, _ = equivalent_periods(filters.date_from, filters.date_to, now=NOW)
+    rows = (await facts.execute(possession_statement(filters, period))).mappings().all()
+    assert len(rows) == 4
+    assert sum(row['start_in_period'] for row in rows) == 3
+    assert sum(row['end_in_period'] for row in rows) == 3
+    assert all(isinstance(row['end_in_period'], bool) for row in rows)
+    assert sum(row['valid_duration'] for row in rows) == 2
+    assert sum(row['valid_km'] for row in rows) == 1
+    assert sum(row['distance_km'] for row in rows if row['distance_km'] is not None) == 50
 
 
 @pytest.mark.asyncio

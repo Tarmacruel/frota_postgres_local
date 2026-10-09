@@ -7,7 +7,7 @@ import useAnalyticsDetailStack from './useAnalyticsDetailStack'
 import { analyticsV2API } from '../../api/analyticsV2'
 import api from '../../api/client'
 
-vi.mock('../../api/analyticsV2', () => ({ analyticsV2API: { entity: vi.fn(), costEvents: vi.fn(), fuelEvents: vi.fn(), mileageEvents: vi.fn(), maintenanceEvents: vi.fn() } }))
+vi.mock('../../api/analyticsV2', () => ({ analyticsV2API: { entity: vi.fn(), costEvents: vi.fn(), fuelEvents: vi.fn(), mileageEvents: vi.fn(), maintenanceEvents: vi.fn(), utilizationEvents: vi.fn() } }))
 vi.mock('../../api/client', () => ({ default: { get: vi.fn() } }))
 
 const filters = { date_from: '2026-09-01', date_to: '2026-09-30', organization: 'org-1' }
@@ -42,6 +42,11 @@ beforeEach(() => {
   analyticsV2API.maintenanceEvents.mockResolvedValue({ data: { total_events: 1, offset: 0,
     events: [{ id: 'maintenance-1', vehicle_id: 'vehicle-1', plate: 'ABC1D23',
       start_date: '2026-09-10T10:00:00Z', end_date: null, cost: '100', duration_hours: null }] } })
+  analyticsV2API.utilizationEvents.mockResolvedValue({ data: { total_events: 1, offset: 0,
+    events: [{ id: 'possession-1', public_number: 42, vehicle_id: 'vehicle-1', plate: 'ABC1D23',
+      start_date: '2026-09-10T10:00:00Z', end_date: '2026-09-11T10:00:00Z',
+      start_odometer_km: 1000, end_odometer_km: 1100, start_in_period: true, end_in_period: true,
+      distance_km: '100', duration_hours: '24' }] } })
 })
 
 function Harness() {
@@ -53,6 +58,24 @@ function Harness() {
 }
 
 describe('AnalyticsEntityDrawer', () => {
+  it('abre posse de origem e volta ao histórico preservando a explicação', async () => {
+    const user = userEvent.setup()
+    function UtilizationHarness() {
+      const detail = useAnalyticsDetailStack()
+      return <><button onClick={() => detail.open({ entityType: 'utilization-events', title: 'Km válido',
+        utilizationMode: 'km', filters, origin: { label: 'Km válido', formula: 'Posse encerrada válida.' } })}>Abrir utilização</button>
+        <AnalyticsEntityDrawer detail={detail.current} canGoBack={detail.canGoBack} onOpen={detail.open} onBack={detail.back} onClose={detail.close} /></>
+    }
+    render(<UtilizationHarness />)
+    await user.click(screen.getByRole('button', { name: 'Abrir utilização' }))
+    expect(await screen.findByRole('button', { name: /Posse nº 42/ })).toBeInTheDocument()
+    expect(analyticsV2API.utilizationEvents).toHaveBeenCalledWith({ ...filters, mode: 'km' }, expect.any(AbortSignal))
+    await user.click(screen.getByRole('button', { name: /Posse nº 42/ }))
+    expect(await screen.findByText('Hodômetro inicial')).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Como foi calculado?' })).toHaveTextContent('Posse encerrada válida.')
+    await user.click(screen.getByRole('button', { name: /Voltar/ }))
+    expect(screen.getByRole('dialog', { name: 'Km válido' })).toBeInTheDocument()
+  })
   it('abre histórico de manutenção, registro de domínio e volta com fórmula', async () => {
     const user = userEvent.setup()
     api.get.mockResolvedValueOnce({ data: { start_date: '2026-09-10T10:00:00Z', end_date: null,

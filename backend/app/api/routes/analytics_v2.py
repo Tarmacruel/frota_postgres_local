@@ -18,6 +18,7 @@ from app.services.analytics_v2_detail import AnalyticsV2DetailService, EntityDet
 from app.services.analytics_v2_costs import AnalyticsV2Costs, CostAnalysis, CostEvents, MileageEvents
 from app.services.analytics_v2_fuel import AnalyticsV2Fuel, FuelAnalysis, FuelEvents
 from app.services.analytics_v2_maintenance import AnalyticsV2Maintenance, MaintenanceAnalysis, MaintenanceEvents
+from app.services.analytics_v2_utilization import AnalyticsV2Utilization, UtilizationAnalysis, UtilizationEvents
 
 router = APIRouter(prefix="/api/analytics/v2", tags=["Análises V2"])
 
@@ -36,6 +37,8 @@ def common_filter(request: Request, date_from: date = Query(), date_to: date = Q
         allowed.update({'offset', 'station'})
     if request.url.path == '/api/analytics/v2/maintenance/events':
         allowed.update({'offset', 'subset'})
+    if request.url.path == '/api/analytics/v2/utilization/events':
+        allowed.update({'offset', 'mode'})
     unsupported = set(request.query_params) - allowed
     if unsupported:
         raise HTTPException(422, "Filtro não suportado: " + ", ".join(sorted(unsupported)))
@@ -80,6 +83,26 @@ async def maintenance(response: Response, filters: AnalyticsV2Filter = Depends(c
     response.headers["Cache-Control"] = "private, no-store"
     scoped = filters.model_copy(update={"organization": analytics_organization_scope(current_user, filters.organization)})
     return await AnalyticsV2Maintenance(db).get(scoped)
+
+
+@router.get("/utilization", response_model=UtilizationAnalysis)
+async def utilization(response: Response, filters: AnalyticsV2Filter = Depends(common_filter),
+    db: AsyncSession = Depends(get_db_session), current_user: User = Depends(require_permission("analytics", "view"))):
+    response.headers["Cache-Control"] = "private, no-store"
+    scoped = filters.model_copy(update={"organization": analytics_organization_scope(current_user, filters.organization)})
+    return await AnalyticsV2Utilization(db).get(scoped)
+
+
+@router.get("/utilization/events", response_model=UtilizationEvents,
+    dependencies=[Depends(require_permission("possession", "view"))])
+async def utilization_events(response: Response, mode: str = Query(default='period'), offset: int = Query(default=0, ge=0),
+    filters: AnalyticsV2Filter = Depends(common_filter), db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("analytics", "view"))):
+    if mode not in {'period', 'history', 'km', 'duration'} or (mode == 'history' and filters.vehicle_id is None):
+        raise HTTPException(422, "Recorte de posses não suportado")
+    response.headers["Cache-Control"] = "private, no-store"
+    scoped = filters.model_copy(update={"organization": analytics_organization_scope(current_user, filters.organization)})
+    return await AnalyticsV2Utilization(db).events(scoped, mode=mode, offset=offset)
 
 
 @router.get("/maintenance/events", response_model=MaintenanceEvents,

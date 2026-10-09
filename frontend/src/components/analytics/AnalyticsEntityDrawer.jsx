@@ -140,13 +140,51 @@ function MaintenanceEventsContent({ detail, result, onOpen, onLoadMore, moreLoad
   </>
 }
 
+function UtilizationEventsContent({ detail, result, onOpen, onLoadMore, moreLoading, moreError }) {
+  return <>
+    <p className="analytics-scope-note">{detail.utilizationMode === 'history' ? `Posses observáveis até ${formatDate(detail.filters.date_to)}`
+      : `${formatDate(detail.filters.date_from)} a ${formatDate(detail.filters.date_to)}`} · {result.total_events} registro(s) de posse acessível(is). Início/fim de posse não mede deslocamento contínuo.</p>
+    <ol className="analytics-detail-timeline">{result.events.map((event) => <li key={event.id}>
+      <button type="button" className="analytics-entity-link" onClick={() => onOpen({ entityType: 'possession-record', entityId: event.id,
+        title: `Posse nº ${event.public_number}`, record: event, filters: detail.filters, origin: detail.origin })}>
+        <strong>Posse nº {event.public_number}</strong> · {recordDate(event.start_date)} {event.end_date ? `a ${recordDate(event.end_date)}` : '· sem fim registrado'}
+        {event.distance_km !== null ? ` · ${formatValue(event.distance_km, 'km')} medidos` : ''}
+      </button>
+      <div className="analytics-detail-related">
+        <AnalyticsEntityLink entityType="vehicle" entityId={event.vehicle_id} entityName={event.plate}
+          onOpen={(item) => onOpen({ ...item, filters: detail.filters, origin: detail.origin })}>{event.plate}</AnalyticsEntityLink>
+        {event.duration_hours !== null ? <span>Duração válida: {formatValue(event.duration_hours, 'h')}</span> : null}
+        <span>{event.start_in_period ? 'Iniciada no recorte' : 'Início anterior ao recorte'}</span>
+        {event.end_in_period ? <span>Encerrada no recorte</span> : null}
+      </div>
+    </li>)}</ol>
+    {result.events.length < result.total_events ? <button type="button" className="ghost-button" disabled={moreLoading} onClick={onLoadMore}>
+      {moreLoading ? 'Carregando…' : 'Carregar mais registros'}</button> : null}
+    {moreError ? <p role="alert">{moreError}</p> : null}
+  </>
+}
+
+function PossessionRecordContent({ record }) {
+  const facts = [['Início', recordDate(record.start_date)], ['Fim', record.end_date ? recordDate(record.end_date) : 'Sem fim registrado'],
+    ['Hodômetro inicial', formatValue(record.start_odometer_km, 'km')],
+    ['Hodômetro final', formatValue(record.end_odometer_km, 'km')],
+    ['Km válido neste recorte', formatValue(record.distance_km, 'km')],
+    ['Duração válida neste recorte', formatValue(record.duration_hours, 'h')]]
+  return <>
+    <p className="analytics-context-label">Posse nº {record.public_number} · registro de origem consultado na análise</p>
+    <dl className="analytics-detail-facts">{facts.map(([label, value]) =>
+      <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}</dl>
+    <p className="analytics-scope-note">Leitura somente de dados já registrados. Km e duração só entram nas métricas quando atendem às regras do período.</p>
+  </>
+}
+
 export default function AnalyticsEntityDrawer({ detail, canGoBack, onOpen, onBack, onClose, children }) {
   const contentRef = useRef(null)
   const [resource, setResource] = useState({ data: null, loading: false, error: '' })
   const [retry, setRetry] = useState(0)
   const [moreLoading, setMoreLoading] = useState(false)
   const [moreError, setMoreError] = useState('')
-  const key = detail ? `${detail.entityType}/${detail.source || ''}/${detail.costSource || ''}/${detail.organizationBucket || ''}/${detail.stationKey || ''}/${detail.maintenanceSubset || ''}/${detail.measuredOnly || false}/${detail.entityId}/${JSON.stringify(detail.filters)}` : ''
+  const key = detail ? `${detail.entityType}/${detail.source || ''}/${detail.costSource || ''}/${detail.organizationBucket || ''}/${detail.stationKey || ''}/${detail.maintenanceSubset || ''}/${detail.utilizationMode || ''}/${detail.measuredOnly || false}/${detail.entityId}/${JSON.stringify(detail.filters)}` : ''
   useEffect(() => { if (detail) contentRef.current?.focus() }, [detail])
   useEffect(() => {
     if (!detail?.filters || children) return undefined
@@ -154,7 +192,11 @@ export default function AnalyticsEntityDrawer({ detail, canGoBack, onOpen, onBac
     let active = true
     setResource({ data: null, loading: true, error: '', key })
     setMoreError('')
-    const request = detail.entityType === 'maintenance-events'
+    const request = detail.entityType === 'possession-record'
+      ? Promise.resolve({ data: detail.record })
+      : detail.entityType === 'utilization-events'
+      ? analyticsV2API.utilizationEvents({ ...detail.filters, mode: detail.utilizationMode }, controller.signal)
+      : detail.entityType === 'maintenance-events'
       ? analyticsV2API.maintenanceEvents({ ...detail.filters, subset: detail.maintenanceSubset }, controller.signal)
       : detail.entityType === 'mileage-events'
       ? analyticsV2API.mileageEvents(detail.filters, controller.signal)
@@ -175,7 +217,10 @@ export default function AnalyticsEntityDrawer({ detail, canGoBack, onOpen, onBac
     if (moreLoading || !current.data || !detail) return
     setMoreLoading(true); setMoreError('')
     try {
-      const { data } = detail.entityType === 'maintenance-events'
+      const { data } = detail.entityType === 'utilization-events'
+        ? await analyticsV2API.utilizationEvents({ ...detail.filters, mode: detail.utilizationMode,
+          offset: current.data.events.length })
+        : detail.entityType === 'maintenance-events'
         ? await analyticsV2API.maintenanceEvents({ ...detail.filters, subset: detail.maintenanceSubset,
           offset: current.data.events.length })
         : detail.entityType === 'mileage-events'
@@ -209,6 +254,9 @@ export default function AnalyticsEntityDrawer({ detail, canGoBack, onOpen, onBac
         {children || (current.loading ? <p role="status">Carregando detalhamento…</p>
           : current.error ? <div role="alert"><p>{current.error}</p><button type="button" className="ghost-button" onClick={() => setRetry((value) => value + 1)}>Tentar novamente</button></div>
             : current.data ? (detail.entityType === 'record' ? <RecordDetail detail={detail} record={current.data} />
+              : detail.entityType === 'possession-record' ? <PossessionRecordContent record={current.data} />
+              : detail.entityType === 'utilization-events' ? <UtilizationEventsContent detail={detail} result={current.data} onOpen={onOpen} onLoadMore={loadMore}
+                moreLoading={moreLoading} moreError={moreError} />
               : detail.entityType === 'maintenance-events' ? <MaintenanceEventsContent detail={detail} result={current.data} onOpen={onOpen} onLoadMore={loadMore}
                 moreLoading={moreLoading} moreError={moreError} />
               : detail.entityType === 'mileage-events' ? <MileageEventsContent detail={detail} result={current.data} onOpen={onOpen} onLoadMore={loadMore}
