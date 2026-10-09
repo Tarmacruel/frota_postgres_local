@@ -1,4 +1,5 @@
 import AnalyticsSection from './AnalyticsSection'
+import AnalyticsEntityLink from './AnalyticsEntityLink'
 import {
   ResponsiveContainer,
   ScatterChart,
@@ -10,11 +11,12 @@ import {
   Cell,
 } from 'recharts'
 
-export default function CostPerKmRanking({ rows = [], ...sectionProps }) {
+export default function CostPerKmRanking({ rows = [], onOpenEntity, ...sectionProps }) {
   const data = rows.slice(0, 20).map((item) => {
     const variance = Number(item.variance_percentage || 0)
     return {
       vehicle: item.vehicle_type,
+      vehicle_id: item.vehicle_id,
       tco: Number(item.tco_cost_per_km || 0),
       benchmark: Number(item.market_benchmark || 0),
       variance,
@@ -39,7 +41,13 @@ export default function CostPerKmRanking({ rows = [], ...sectionProps }) {
                   formatter={(value) => Number(value).toFixed(2)}
                   labelFormatter={(_, payload) => payload?.[0]?.payload?.vehicle || ''}
                 />
-                <Scatter data={data}>
+                <Scatter data={data} onClick={(point) => {
+                  const selected = point?.payload || point
+                  if (selected?.vehicle_id) onOpenEntity?.({ entityType: 'vehicle', entityId: selected.vehicle_id,
+                    title: `Veículo · ${selected.vehicle}`, origin: { label: 'Custo operacional por km',
+                      formula: 'Custo operacional registrado dividido pelos km registrados no painel anterior.',
+                      limitations: ['A referência por categoria é configurada; não representa pesquisa de mercado.'] } })
+                }}>
                   {data.map((point, index) => (
                     <Cell key={`${point.vehicle}-${index}`} fill={point.color} />
                   ))}
@@ -47,6 +55,13 @@ export default function CostPerKmRanking({ rows = [], ...sectionProps }) {
               </ScatterChart>
             </ResponsiveContainer>
           </div>
+          <ol className="analytics-chart-entities">{data.map((point, index) => <li key={`${point.vehicle_id || point.vehicle}-${index}`}>
+            <AnalyticsEntityLink entityType="vehicle" entityId={point.vehicle_id} entityName={`Veículo · ${point.vehicle}`}
+              origin={{ label: 'Custo operacional por km', formula: 'Custo operacional registrado dividido pelos km registrados no painel anterior.',
+                limitations: ['A referência por categoria é configurada; não representa pesquisa de mercado.'] }} onOpen={onOpenEntity}>
+              {point.vehicle} · R$ {point.tco.toFixed(2)}/km
+            </AnalyticsEntityLink>
+          </li>)}</ol>
           <div className="analytics-scatter-legend">
             <span><i className="analytics-legend-critical" /> +30% acima da referência</span>
             <span><i className="analytics-legend-low" /> -20% abaixo (eficiente)</span>

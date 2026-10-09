@@ -47,7 +47,9 @@ export default function VehicleDetailsTable({ efficiencyRows = [], tcoRows = [],
               return (
                 <Fragment key={rowKey}>
                   <tr>
-                    <td><AnalyticsEntityLink entityType="vehicle" entityId={row.vehicle_id} entityName={`Veículo · ${row.vehicle_type}`} onOpen={onOpenEntity}>{row.vehicle_type}</AnalyticsEntityLink></td>
+                    <td><AnalyticsEntityLink entityType="vehicle" entityId={row.vehicle_id} entityName={`Veículo · ${row.vehicle_type}`}
+                      origin={{ label: 'Indicadores do veículo', formula: 'Consumo e custo por km registrados no painel anterior.',
+                        limitations: ['O detalhe usa os dias civis encerrados do recorte selecionado.'] }} onOpen={onOpenEntity}>{row.vehicle_type}</AnalyticsEntityLink></td>
                     <td>{Number(row.total_km || 0).toLocaleString('pt-BR')}</td>
                     <td>{Number(row.consumption_l_100km || 0).toFixed(2)} L/100km</td>
                     <td>R$ {Number(row.tco?.tco_cost_per_km || 0).toFixed(2)}</td>

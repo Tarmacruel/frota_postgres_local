@@ -44,7 +44,11 @@ export default function AnalyticsOverview({ enabled = true, organizations = [], 
     const next = { ...applied, [key]: '' }
     setApplied(next); setDraft(next)
   }
-  function entity(item) { return { entityType: 'vehicle', entityId: item.vehicle_id, title: item.plate } }
+  function open(item) { onOpenEntity?.({ ...item, filters: query }) }
+  function entity(item, alert = false) { return { entityType: 'vehicle', entityId: item.vehicle_id, title: item.plate,
+    origin: { label: alert ? 'Alerta de consumo' : 'Veículo que exige atenção',
+      formula: alert ? attention.data?.alert_basis : attention.data?.basis,
+      limitations: [alert ? 'A flag registrada não determina a causa da anomalia.' : 'A variação de custo não comprova sua causa.'] } } }
 
   return (
     <div className="analytics-cockpit">
@@ -95,7 +99,7 @@ export default function AnalyticsOverview({ enabled = true, organizations = [], 
           empty={attention.data?.items.length === 0} emptyMessage="Sem aumento de custo ou anomalias registradas neste recorte.">
           <ol className="analytics-attention-list">{attention.data?.items.map((item) => <li key={item.vehicle_id}>
             <VehicleThumbnail vehicleType={item.vehicle_type} plate={item.plate} />
-            <div><AnalyticsEntityLink entityType="vehicle" entityId={item.vehicle_id} entityName={item.plate} onOpen={onOpenEntity}>{item.plate}</AnalyticsEntityLink>
+            <div><AnalyticsEntityLink entityType="vehicle" entityId={item.vehicle_id} entityName={item.plate} origin={entity(item).origin} onOpen={open}>{item.plate}</AnalyticsEntityLink>
               <p>{item.anomalies ? `${item.anomalies} anomalia(s) registrada(s) · ` : ''}{deltaText(item.comparison, 'BRL')}</p></div>
           </li>)}</ol>
           {attention.data ? <p className="analytics-scope-note">Exibindo {attention.data.items.length} de {attention.data.total_attention_vehicles} veículos no critério.</p> : null}
@@ -125,7 +129,7 @@ export default function AnalyticsOverview({ enabled = true, organizations = [], 
         <AnalyticsSection title="Resumo de alertas" {...sectionState(attention)}>
           <p><strong>{formatValue(attention.data?.anomaly_records)}</strong> anomalias registradas em <strong>{formatValue(attention.data?.anomaly_vehicles)}</strong> veículos.</p>
           <p className="analytics-scope-note">{attention.data?.alert_basis}</p>
-          <div className="analytics-alert-links">{attention.data?.items.filter((item) => item.anomalies > 0).map((item) => <button key={item.vehicle_id} className="analytics-entity-link" onClick={() => onOpenEntity(entity(item))}>{item.plate} · {item.anomalies} registro(s)</button>)}</div>
+          <div className="analytics-alert-links">{attention.data?.items.filter((item) => item.anomalies > 0).map((item) => <button key={item.vehicle_id} className="analytics-entity-link" onClick={() => open(entity(item, true))}>{item.plate} · {item.anomalies} registro(s)</button>)}</div>
           {attention.data?.anomaly_records === 0 ? <p>Não há flags de consumo registradas no recorte. Isso não comprova ausência de problemas.</p> : null}
         </AnalyticsSection>
       </div>

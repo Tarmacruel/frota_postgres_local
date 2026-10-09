@@ -19,6 +19,8 @@ from sqlalchemy.engine import make_url
 
 from app.schemas.analytics_v2 import AnalyticsV2Filter
 from app.services.analytics_v2_service import AnalyticsV2Service
+from app.repositories.analytics_v2_repository import AnalyticsV2Repository
+from app.services.analytics_v2_periods import equivalent_periods
 
 pytestmark = pytest.mark.skipif(os.environ.get("ANALYTICS_V2_READONLY_TESTS") != "1", reason="opt-in read-only HML PostgreSQL probes")
 
@@ -78,6 +80,22 @@ class ReadOnlyFacts:
 
     async def summary(self, **filters):
         return await AnalyticsV2Service(self).summary(AnalyticsV2Filter(date_from=date(2026, 9, 1), date_to=date(2026, 9, 30), **filters), now=NOW)
+
+
+@pytest.mark.asyncio
+async def test_cost_breakdown_real_sql_preserves_event_organization_and_estimates(facts):
+    facts.fuel("2026-09-10 12:00+00", 10, organization_id=A)
+    facts.add("maintenance_records", vehicle_id=VEHICLE, responsible_organization_id=B,
+        start_date="2026-09-11 12:00+00", total_cost=20)
+    facts.add("claims", vehicle_id=VEHICLE, driver_id=DRIVER, responsible_organization_id=A,
+        data_ocorrencia="2026-09-12 12:00+00", valor_estimado=90)
+    filters = AnalyticsV2Filter(date_from=date(2026, 9, 1), date_to=date(2026, 9, 30))
+    current, previous = equivalent_periods(filters.date_from, filters.date_to, now=NOW)
+    rows = await AnalyticsV2Repository(facts).cost_rows(filters, current, previous)
+    amounts = {(row['organization_id'], row['source']): row['amount'] for row in rows if row['period'] == 'current'}
+    assert amounts[(A, 'fuel')] == 10
+    assert amounts[(B, 'maintenance')] == 20
+    assert amounts[(A, 'claim_estimate')] == 90
 
 
 @pytest.fixture

@@ -3,12 +3,15 @@ import userEvent from '@testing-library/user-event'
 import { MemoryRouter, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { analyticsAPI } from '../api/analytics'
+import { analyticsV2API } from '../api/analyticsV2'
 import AdminAnalyticsDashboard from './AdminAnalyticsDashboard'
 
 vi.mock('../components/analytics/AnalyticsOverview', () => ({ default: () => <div>Cockpit atual</div> }))
+vi.mock('../components/analytics/AnalyticsFuel', () => ({ default: () => <div>Combustível V2</div> }))
 vi.mock('../api/analytics', () => ({ analyticsAPI: Object.fromEntries(
   ['overview', 'efficiency', 'tco', 'driverRisk', 'insights', 'costTrend', 'exportReport'].map((name) => [name, vi.fn()]),
 ) }))
+vi.mock('../api/analyticsV2', () => ({ analyticsV2API: { entity: vi.fn(), costs: vi.fn() } }))
 vi.mock('../hooks/useMasterDataCatalog', () => ({ useMasterDataCatalog: () => ({ organizations: [] }) }))
 // Chart layout requires a browser. Keep the real analytics wrappers/tables and isolate Recharts.
 vi.mock('recharts', () => {
@@ -31,12 +34,31 @@ beforeEach(() => {
   analyticsAPI.driverRisk.mockResolvedValue({ data: [{ driver_id: 2, driver_name: 'Condutor de teste', fines_count: 1, claims_count: 0, anomalies_count: 1, normalized_risk_score: 20 }] })
   analyticsAPI.insights.mockResolvedValue({ data: [] })
   analyticsAPI.costTrend.mockResolvedValue({ data: [] })
+  const amount = { value: '0', known_value: '0', records: 0, missing_or_invalid: 0 }
+  analyticsV2API.entity.mockResolvedValue({ data: { subtitle: 'Sedan de teste', period: { date_from: '2026-09-01', date_to: '2026-09-30' },
+    methodology: 'Valores registrados no período.', totals: { operational_cost: amount, fuel: amount, maintenance: amount, fines: amount, claim_estimate: amount },
+    risk_score: null, total_events: 0, timeline_limit: 100, events: [] } })
+  analyticsV2API.costs.mockResolvedValue({ data: { totals: { operational_cost: amount, fuel: amount, maintenance: amount,
+    fines: amount, claim_estimate: amount }, measured_cost: amount, measured_distance_km: null, cost_per_km: null,
+    measured_vehicles: 0, monthly: [], vehicles: [], organizations: [], methodology: { cost: 'Valores registrados.',
+      claims: 'Estimativas separadas.', missing: 'Sem imputação.', organization: 'Responsabilidade histórica.', mileage: 'Posses válidas.' } } })
 })
 
 describe('Analytics — fundação V1', () => {
+  it('mantém a comparação anterior de custos acessível sob demanda', async () => {
+    const user = userEvent.setup()
+    mount('/analytics?view=costs')
+    expect(await screen.findByRole('region', { name: 'Custo operacional registrado' })).toBeInTheDocument()
+    expect(analyticsV2API.costs).toHaveBeenCalledOnce()
+    expect(analyticsAPI.tco).not.toHaveBeenCalled()
+    await user.click(screen.getByText('Consultar análises anteriores de custos'))
+    await waitFor(() => expect(analyticsAPI.tco).toHaveBeenCalledOnce())
+    expect(screen.getByText(/não representam TCO completo/)).toBeInTheDocument()
+  })
   it('preserva /analytics, oito seções, indicadores e contratos atuais', async () => {
     mount()
     await ready()
+    expect(screen.getByText('Combustível V2')).toBeInTheDocument()
     expect(within(screen.getByRole('navigation', { name: 'Seções de análises' })).getAllByRole('button')).toHaveLength(8)
     expect(screen.getByText('R$ 2.30')).toBeInTheDocument()
     for (const key of ['overview', 'efficiency', 'tco', 'driverRisk', 'insights']) {
@@ -62,7 +84,8 @@ describe('Analytics — fundação V1', () => {
     const trigger = screen.getByRole('button', { name: /Condutor de teste/ })
     await user.click(trigger)
     expect(screen.getByRole('dialog', { name: 'Condutor de teste' })).toBeInTheDocument()
-    expect(screen.getByText('Detalhamento ainda não disponível')).toBeInTheDocument()
+    expect(await screen.findByText('Registros do período')).toBeInTheDocument()
+    expect(analyticsV2API.entity).toHaveBeenCalledWith('driver', 2, expect.objectContaining({ organization: undefined }), expect.any(AbortSignal))
     await user.keyboard('{Escape}')
     expect(trigger).toHaveFocus()
     expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
@@ -75,7 +98,7 @@ describe('Analytics — fundação V1', () => {
     mount('/analytics?view=fuel')
     await user.click(await screen.findByRole('button', { name: 'Detalhes' }))
     expect(screen.getByText(/Média categoria consumo:/)).toBeInTheDocument()
-    await user.click(screen.getByRole('button', { name: /SEDAN/ }))
+    await user.click(within(screen.getByRole('region', { name: 'Detalhamento por veículo' })).getByRole('button', { name: /SEDAN/ }))
     await user.click(screen.getByRole('button', { name: 'Fechar', exact: true }))
     expect(screen.getByRole('button', { name: 'Ocultar' })).toBeInTheDocument()
   })

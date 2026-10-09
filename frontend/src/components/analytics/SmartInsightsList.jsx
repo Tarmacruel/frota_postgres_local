@@ -2,6 +2,12 @@ import AnalyticsSection from './AnalyticsSection'
 import AnalyticsSeverityBadge from './AnalyticsSeverityBadge'
 import AnalyticsEntityLink from './AnalyticsEntityLink'
 
+const CALCULATIONS = {
+  consumption_l_100km: 'Litros abastecidos / km do painel anterior × 100; desvio percentual frente à média da categoria.',
+  tco_cost_per_km: '(Combustível + manutenção + multas) / km do painel anterior; desvio percentual frente à referência configurada por tipo.',
+  driver_risk_score: 'min(3 × multas + 5 × sinistros + 2 × anomalias, 100), conforme pesos do painel anterior.',
+}
+
 export default function SmartInsightsList({ insights = [], onOpenEntity, ...sectionProps }) {
   return (
     <AnalyticsSection title="Alertas inteligentes" empty={insights.length === 0}
@@ -22,7 +28,9 @@ export default function SmartInsightsList({ insights = [], onOpenEntity, ...sect
                 </strong>
               </footer>
               {entityId ? <AnalyticsEntityLink entityType={entityType} entityId={entityId}
-                entityName={entityType === 'vehicle' ? 'Veículo do alerta' : 'Condutor do alerta'} onOpen={onOpenEntity}>
+                entityName={entityType === 'vehicle' ? 'Veículo do alerta' : 'Condutor do alerta'}
+                origin={{ label: item.metric, formula: CALCULATIONS[item.metric] || item.message,
+                  limitations: item.metric === 'tco_cost_per_km' ? ['A referência é configurada e não representa pesquisa de mercado.'] : [] }} onOpen={onOpenEntity}>
                 {entityType === 'vehicle' ? 'Ver veículo' : 'Ver condutor'}
               </AnalyticsEntityLink> : null}
             </article>

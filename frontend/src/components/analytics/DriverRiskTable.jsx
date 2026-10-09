@@ -37,7 +37,9 @@ export default function DriverRiskTable({ rows = [], onOpenEntity, ...sectionPro
           <tbody>
             {displayRows.map((item) => (
               <tr key={item.rowKey}>
-                <td><AnalyticsEntityLink entityType="driver" entityId={item.driver_id} entityName={item.driver_name} onOpen={onOpenEntity}>{item.driver_name}</AnalyticsEntityLink></td>
+                <td><AnalyticsEntityLink entityType="driver" entityId={item.driver_id} entityName={item.driver_name}
+                  origin={{ label: 'Pontuação de risco', formula: 'Pontuação exibida no ranking anterior, baseada em multas, sinistros e anomalias registrados.',
+                    limitations: ['A pontuação não representa probabilidade de acidente.'] }} onOpen={onOpenEntity}>{item.driver_name}</AnalyticsEntityLink></td>
                 <td>{item.fines_count}</td>
                 <td>{item.claims_count}</td>
                 <td>{item.anomalies_count}</td>
