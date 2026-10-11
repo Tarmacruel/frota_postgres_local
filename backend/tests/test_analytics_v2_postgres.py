@@ -23,6 +23,7 @@ from app.repositories.analytics_v2_repository import AnalyticsV2Repository
 from app.services.analytics_v2_periods import equivalent_periods
 from app.services.analytics_v2_maintenance import maintenance_statement
 from app.services.analytics_v2_utilization import possession_statement
+from app.services.analytics_v2_drivers import driver_possession_statement, driver_record_statement
 
 pytestmark = pytest.mark.skipif(os.environ.get("ANALYTICS_V2_READONLY_TESTS") != "1", reason="opt-in read-only HML PostgreSQL probes")
 
@@ -31,11 +32,11 @@ SCHEMA = {
     "fuel_supplies": {"id": "uuid", "vehicle_id": "uuid", "driver_id": "uuid", "organization_id": "uuid", "supplied_at": "timestamptz", "total_amount": "numeric", "liters": "double precision", "is_consumption_anomaly": "boolean"},
     "maintenance_records": {"id": "uuid", "vehicle_id": "uuid", "responsible_organization_id": "uuid", "start_date": "timestamptz", "end_date": "timestamptz", "total_cost": "numeric"},
     "fines": {"id": "uuid", "vehicle_id": "uuid", "driver_id": "uuid", "responsible_organization_id": "uuid", "infraction_date": "date", "infraction_time": "time", "amount": "numeric", "status": "text"},
-    "claims": {"id": "uuid", "vehicle_id": "uuid", "driver_id": "uuid", "responsible_organization_id": "uuid", "data_ocorrencia": "timestamptz", "valor_estimado": "numeric"},
+    "claims": {"id": "uuid", "vehicle_id": "uuid", "driver_id": "uuid", "responsible_organization_id": "uuid", "data_ocorrencia": "timestamptz", "valor_estimado": "numeric", "status": "text"},
     "location_history": {"id": "uuid", "vehicle_id": "uuid", "allocation_id": "uuid", "start_date": "timestamptz", "end_date": "timestamptz"},
     "master_allocations": {"id": "uuid", "department_id": "uuid"},
     "master_departments": {"id": "uuid", "organization_id": "uuid"},
-    "vehicle_possession": {"id": "uuid", "public_number": "bigint", "vehicle_id": "uuid", "responsible_organization_id": "uuid",
+    "vehicle_possession": {"id": "uuid", "public_number": "bigint", "vehicle_id": "uuid", "driver_id": "uuid", "responsible_organization_id": "uuid",
         "start_date": "timestamptz", "end_date": "timestamptz", "start_odometer_km": "double precision", "end_odometer_km": "double precision"},
 }
 A, B, VEHICLE, OTHER, DRIVER = [UUID(int=i) for i in range(1, 6)]
@@ -157,6 +158,31 @@ async def test_utilization_real_sql_distinguishes_recorded_duration_from_valid_k
     assert sum(row['valid_duration'] for row in rows) == 2
     assert sum(row['valid_km'] for row in rows) == 1
     assert sum(row['distance_km'] for row in rows if row['distance_km'] is not None) == 50
+
+
+@pytest.mark.asyncio
+async def test_driver_real_sql_keeps_link_and_organization_on_each_source(facts):
+    facts.add('vehicle_possession', public_number=11, vehicle_id=VEHICLE, driver_id=DRIVER,
+        responsible_organization_id=A, start_date='2026-09-10 12:00+00', end_date='2026-09-11 12:00+00',
+        start_odometer_km=100, end_odometer_km=150)
+    facts.add('vehicle_possession', public_number=12, vehicle_id=VEHICLE, driver_id=None,
+        responsible_organization_id=A, start_date='2026-09-12 12:00+00', end_date='2026-09-13 12:00+00',
+        start_odometer_km=150, end_odometer_km=170)
+    facts.add('vehicle_possession', public_number=13, vehicle_id=OTHER, driver_id=DRIVER,
+        responsible_organization_id=B, start_date='2026-09-14 12:00+00', end_date='2026-09-15 12:00+00',
+        start_odometer_km=0, end_odometer_km=90)
+    facts.add('fines', vehicle_id=VEHICLE, driver_id=DRIVER, responsible_organization_id=A,
+        infraction_date='2026-09-20', amount=Decimal('50'), status='PENDENTE')
+    facts.add('fines', vehicle_id=OTHER, driver_id=DRIVER, responsible_organization_id=B,
+        infraction_date='2026-09-21', amount=Decimal('70'), status='PENDENTE')
+    filters = AnalyticsV2Filter(date_from=date(2026, 9, 1), date_to=date(2026, 9, 30),
+        organization=A, vehicle_type='SEDAN')
+    period, _ = equivalent_periods(filters.date_from, filters.date_to, now=NOW)
+    possessions = (await facts.execute(driver_possession_statement(filters, period))).mappings().all()
+    fines = (await facts.execute(driver_record_statement(filters, period, 'fine'))).mappings().all()
+    assert len(possessions) == 2 and sum(row['driver_id'] == DRIVER for row in possessions) == 1
+    assert sum(row['distance_km'] for row in possessions if row['driver_id'] == DRIVER) == 50
+    assert len(fines) == 1 and fines[0]['driver_id'] == DRIVER and fines[0]['amount'] == 50
 
 
 @pytest.mark.asyncio

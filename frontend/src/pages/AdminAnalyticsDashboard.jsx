@@ -8,13 +8,13 @@ import Modal from '../components/Modal'
 import AdvancedFilters from '../components/analytics/AdvancedFilters'
 import EfficiencyChart from '../components/analytics/EfficiencyChart'
 import CostPerKmRanking from '../components/analytics/CostPerKmRanking'
-import DriverRiskTable from '../components/analytics/DriverRiskTable'
 import SmartInsightsList from '../components/analytics/SmartInsightsList'
 import AnalyticsOverview from '../components/analytics/AnalyticsOverview'
 import AnalyticsCosts from '../components/analytics/AnalyticsCosts'
 import AnalyticsFuel from '../components/analytics/AnalyticsFuel'
 import AnalyticsMaintenance from '../components/analytics/AnalyticsMaintenance'
 import AnalyticsUtilization from '../components/analytics/AnalyticsUtilization'
+import AnalyticsDrivers from '../components/analytics/AnalyticsDrivers'
 import TrendChart from '../components/analytics/TrendChart'
 import VehicleDetailsTable from '../components/analytics/VehicleDetailsTable'
 import AnalyticsSubnav from '../components/analytics/AnalyticsSubnav'
@@ -40,7 +40,7 @@ export default function AdminAnalyticsDashboard() {
   const detail = useAnalyticsDetailStack()
   const query = useMemo(() => ({ period_days: filters.period_days,
     vehicle_type: filters.vehicle_type || undefined, organization: filters.organization || undefined }), [filters])
-  const { resources, loading, retry } = useAnalyticsV1(query, refreshTick, !['overview', 'maintenance', 'utilization'].includes(view) && (view !== 'costs' || legacyCostsOpen))
+  const { resources, loading, retry } = useAnalyticsV1(query, refreshTick, !['overview', 'maintenance', 'utilization', 'drivers'].includes(view) && (view !== 'costs' || legacyCostsOpen))
   const data = (key) => resources[key]?.data || []
   const state = (key) => ({ loading: !resources[key] || resources[key].loading,
     error: resources[key]?.error, onRetry: () => retry(key) })
@@ -89,6 +89,7 @@ export default function AdminAnalyticsDashboard() {
       {view === 'fuel' ? <AnalyticsFuel organizations={organizations} catalogError={catalogError} onOpenEntity={detail.open} /> : null}
       {view === 'maintenance' ? <AnalyticsMaintenance organizations={organizations} catalogError={catalogError} onOpenEntity={detail.open} /> : null}
       {view === 'utilization' ? <AnalyticsUtilization organizations={organizations} catalogError={catalogError} onOpenEntity={detail.open} /> : null}
+      {view === 'drivers' ? <AnalyticsDrivers organizations={organizations} catalogError={catalogError} onOpenEntity={detail.open} /> : null}
       {view === 'costs' ? <details className="analytics-costs-legacy" open={legacyCostsOpen} onToggle={(event) => setLegacyCostsOpen(event.currentTarget.open)}>
         <summary>Consultar análises anteriores de custos</summary>
         <p className="analytics-scope-note">Comparação com referência configurada por categoria e tendência anterior de 12 meses. Estes indicadores usam filtros e cálculos próprios da V1; não representam TCO completo nem pesquisa de mercado.</p>
@@ -104,14 +105,13 @@ export default function AdminAnalyticsDashboard() {
             onRetry={() => { if (resources.efficiency?.error) retry('efficiency'); if (resources.tco?.error) retry('tco') }} />
         </div>
       </details> : null}
-      {view !== 'overview' && view !== 'costs' && view !== 'maintenance' && view !== 'utilization' ? <AdvancedFilters filters={filters} organizations={organizations} loading={loading}
+      {view !== 'overview' && view !== 'costs' && view !== 'maintenance' && view !== 'utilization' && view !== 'drivers' ? <AdvancedFilters filters={filters} organizations={organizations} loading={loading}
         onChange={(name, value) => setFilters((current) => ({ ...current, [name]: value }))}
         onRefresh={() => setRefreshTick((value) => value + 1)} onExport={openExport} /> : null}
-      {view !== 'overview' && view !== 'costs' && view !== 'maintenance' && view !== 'utilization' ? <p className="analytics-scope-note">Análises anteriores: mantêm filtros e cálculos próprios. {view === 'fuel' ? 'A comparação por tipo abaixo usa sua janela e fórmula V1 próprias; abastecimentos registrados não comprovam consumo efetivo.' : 'A tendência considera 12 meses.'} O relatório existente não exporta as novas visões V2.</p> : null}
+      {view !== 'overview' && view !== 'costs' && view !== 'maintenance' && view !== 'utilization' && view !== 'drivers' ? <p className="analytics-scope-note">Análises anteriores: mantêm filtros e cálculos próprios. {view === 'fuel' ? 'A comparação por tipo abaixo usa sua janela e fórmula V1 próprias; abastecimentos registrados não comprovam consumo efetivo.' : 'A tendência considera 12 meses.'} O relatório existente não exporta as novas visões V2.</p> : null}
       <div className="analytics-foundation-grid">
         {visible('fuel') ? <EfficiencyChart rows={data('efficiency')} onOpenEntity={openLegacy} {...state('efficiency')} /> : null}
         {visible('alerts') ? <SmartInsightsList insights={data('insights')} onOpenEntity={openLegacy} {...state('insights')} /> : null}
-        {visible('drivers') ? <DriverRiskTable rows={data('driverRisk')} onOpenEntity={openLegacy} {...state('driverRisk')} /> : null}
         {visible('fuel') ? <VehicleDetailsTable efficiencyRows={data('efficiency').slice(0, 25)} tcoRows={data('tco')}
           onOpenEntity={openLegacy} loading={state('efficiency').loading || state('tco').loading}
           error={resources.efficiency?.error || resources.tco?.error}

@@ -19,6 +19,7 @@ from app.services.analytics_v2_costs import AnalyticsV2Costs, CostAnalysis, Cost
 from app.services.analytics_v2_fuel import AnalyticsV2Fuel, FuelAnalysis, FuelEvents
 from app.services.analytics_v2_maintenance import AnalyticsV2Maintenance, MaintenanceAnalysis, MaintenanceEvents
 from app.services.analytics_v2_utilization import AnalyticsV2Utilization, UtilizationAnalysis, UtilizationEvents
+from app.services.analytics_v2_drivers import AnalyticsV2Drivers, DriverAnalysis, DriverEvents
 
 router = APIRouter(prefix="/api/analytics/v2", tags=["Análises V2"])
 
@@ -39,6 +40,8 @@ def common_filter(request: Request, date_from: date = Query(), date_to: date = Q
         allowed.update({'offset', 'subset'})
     if request.url.path == '/api/analytics/v2/utilization/events':
         allowed.update({'offset', 'mode'})
+    if request.url.path.startswith('/api/analytics/v2/drivers/') and request.url.path.endswith('/events'):
+        allowed.update({'offset', 'source'})
     unsupported = set(request.query_params) - allowed
     if unsupported:
         raise HTTPException(422, "Filtro não suportado: " + ", ".join(sorted(unsupported)))
@@ -91,6 +94,35 @@ async def utilization(response: Response, filters: AnalyticsV2Filter = Depends(c
     response.headers["Cache-Control"] = "private, no-store"
     scoped = filters.model_copy(update={"organization": analytics_organization_scope(current_user, filters.organization)})
     return await AnalyticsV2Utilization(db).get(scoped)
+
+
+@router.get("/drivers", response_model=DriverAnalysis)
+async def drivers(response: Response, filters: AnalyticsV2Filter = Depends(common_filter),
+    db: AsyncSession = Depends(get_db_session), current_user: User = Depends(require_permission("analytics", "view"))):
+    response.headers["Cache-Control"] = "private, no-store"
+    scoped = filters.model_copy(update={"organization": analytics_organization_scope(current_user, filters.organization)})
+    can_view_drivers = bool(current_user.permissions.get('drivers', {}).get('can_view'))
+    readable_sources = [source for source, module in (
+        ('possession', 'possession'), ('fine', 'fines'), ('claim', 'claims'),
+        ('fuel_supply', 'fuel_supplies'), ('anomaly', 'fuel_supplies'))
+        if current_user.permissions.get(module, {}).get('can_view')]
+    return await AnalyticsV2Drivers(db).get(scoped, can_view_drivers=can_view_drivers,
+        readable_sources=readable_sources)
+
+
+@router.get("/drivers/{driver_id}/events", response_model=DriverEvents)
+async def driver_events(driver_id: UUID, response: Response, source: str = Query(default='possession'),
+    offset: int = Query(default=0, ge=0), filters: AnalyticsV2Filter = Depends(common_filter),
+    db: AsyncSession = Depends(get_db_session), current_user: User = Depends(require_permission("analytics", "view"))):
+    module = {'possession': 'possession', 'fine': 'fines', 'claim': 'claims',
+        'fuel_supply': 'fuel_supplies', 'anomaly': 'fuel_supplies'}.get(source)
+    if module is None:
+        raise HTTPException(422, "Fonte de condutor não suportada")
+    if not current_user.permissions.get(module, {}).get('can_view'):
+        raise HTTPException(403, "Permissão insuficiente")
+    response.headers["Cache-Control"] = "private, no-store"
+    scoped = filters.model_copy(update={"organization": analytics_organization_scope(current_user, filters.organization)})
+    return await AnalyticsV2Drivers(db).events(scoped, driver_id, source=source, offset=offset)
 
 
 @router.get("/utilization/events", response_model=UtilizationEvents,

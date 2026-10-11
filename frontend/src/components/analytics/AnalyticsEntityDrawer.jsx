@@ -12,6 +12,7 @@ const SOURCES = {
   fine: { label: 'Multa', path: 'fines' },
   claim: { label: 'Sinistro (estimativa)', path: 'claims' },
 }
+const DRIVER_SOURCES = { possession: 'Posses', fine: 'Multas', claim: 'Sinistros', fuel_supply: 'Abastecimentos', anomaly: 'Anomalias' }
 
 function recordDate(value) {
   if (!value) return value
@@ -54,7 +55,6 @@ function EntityContent({ detail, result, onOpen, onLoadMore, moreLoading, moreEr
       <div><dt>Manutenção</dt><dd>{formatValue(t.maintenance.value, 'BRL')}</dd></div>
       <div><dt>Multas</dt><dd>{formatValue(t.fines.value, 'BRL')}</dd></div>
       <div><dt>Sinistros estimados, fora do total</dt><dd>{formatValue(t.claim_estimate.value, 'BRL')}</dd></div>
-      {result.risk_score !== null ? <div><dt>Pontuação de risco</dt><dd>{result.risk_score}</dd></div> : null}
     </dl>
     <h4>Registros do período</h4>
     <p className="analytics-scope-note">{result.total_events
@@ -79,6 +79,66 @@ function EntityContent({ detail, result, onOpen, onLoadMore, moreLoading, moreEr
       {moreLoading ? 'Carregando…' : 'Carregar mais registros'}
     </button> : null}
     {moreError ? <p role="alert">{moreError}</p> : null}
+  </>
+}
+
+function DriverAnalysisContent({ detail, result, onOpen, onLoadMore, moreLoading, moreError }) {
+  const row = detail.driverRow
+  const source = detail.driverSource
+  const methodology = detail.driverMethodology || {}
+  function switchSource(next) {
+    const formula = next === 'possession' ? `${methodology.possession || ''} ${methodology.distance || ''}`
+      : next === 'fine' || next === 'claim' ? methodology.incidents : methodology.fuel
+    onOpen({ ...detail, driverSource: next, origin: { label: `${DRIVER_SOURCES[next]} de ${row.name}`,
+      formula, limitations: [methodology.scope, methodology.coverage].filter(Boolean) } })
+  }
+  function openEvent(event) {
+    const origin = event.anomaly ? { label: event.anomaly.label, formula: event.anomaly.rule,
+      limitations: [`Observado: ${event.anomaly.observed}. Referência: ${event.anomaly.reference}. Amostra: ${event.anomaly.sample_size}.`,
+        event.anomaly.limitation] } : detail.origin
+    if (event.source === 'possession') {
+      onOpen({ entityType: 'possession-record', entityId: event.id, title: `Posse nº ${event.public_number}`,
+        record: { ...event, start_date: event.date }, filters: detail.filters, origin })
+    } else {
+      onOpen({ entityType: 'record', entityId: event.id, source: event.source,
+        title: `${SOURCES[event.source]?.label} · ${recordDate(event.date)}`, filters: detail.filters, origin })
+    }
+  }
+  return <>
+    <p className="analytics-scope-note">{formatDate(detail.filters.date_from)} a {formatDate(detail.filters.date_to)} · somente vínculos explícitos com este condutor.</p>
+    <dl className="analytics-detail-facts">
+      <div><dt>Posses iniciadas</dt><dd>{row.possessions}</dd></div>
+      <div><dt>Km de posses válidas</dt><dd>{formatValue(row.distance_km, 'km')} · {row.valid_km_possessions} posse(s)</dd></div>
+      <div><dt>Veículos com posse</dt><dd>{row.vehicles_with_possession}</dd></div>
+      <div><dt>Multas / sinistros</dt><dd>{row.fines} / {row.claims}</dd></div>
+      <div><dt>Abastecimentos / regras de anomalia</dt><dd>{row.fuel_supplies} / {row.anomaly_rules}</dd></div>
+      {row.license_status ? <div><dt>CNH — situação administrativa atual</dt><dd>{row.license_expires_at ? formatDate(row.license_expires_at) : 'Sem data cadastrada'} · {row.license_status === 'expired' ? 'Vencida' : row.license_status === 'expiring' ? 'A vencer em 30 dias' : row.license_status === 'missing' ? 'Sem data' : 'Válida'}</dd></div> : null}
+    </dl>
+    <p className="analytics-scope-note">Anomalia é triagem de abastecimento, sem atribuição de culpa ou score individual. A CNH não integra as contagens de ocorrências.</p>
+    {detail.readableSources?.length ? <div className="analytics-detail-related" role="group" aria-label="Fontes do condutor">
+      {detail.readableSources.map((item) => <button key={item} type="button" className={source === item ? 'app-button' : 'ghost-button'}
+        aria-pressed={source === item} onClick={() => { if (source !== item) switchSource(item) }}>{DRIVER_SOURCES[item]}</button>)}
+    </div> : <p className="analytics-scope-note">A leitura dos registros individuais depende das permissões dos módulos de origem.</p>}
+    {source ? <>
+      <h4>{DRIVER_SOURCES[source]} vinculados</h4>
+      <p className="analytics-scope-note">{result.total_events} registro(s) acessível(is). {source === 'anomaly' ? 'Cada linha é uma regra acionada; um abastecimento pode aparecer mais de uma vez.' : ''}</p>
+      <ol className="analytics-detail-timeline">{result.events.map((event) => <li key={`${event.id}-${event.anomaly?.kind || event.source}`}>
+        <button type="button" className="analytics-entity-link" onClick={() => openEvent(event)}>
+          <strong>{event.anomaly?.label || (event.source === 'possession' ? `Posse nº ${event.public_number}` : SOURCES[event.source]?.label)}</strong>
+          {' · '}{recordDate(event.date)}
+          {event.source === 'possession' ? ` · ${formatValue(event.distance_km, 'km')} válidos` : event.amount !== null ? ` · ${formatValue(event.amount, 'BRL')}` : ''}
+        </button>
+        <div className="analytics-detail-related">
+          <AnalyticsEntityLink entityType="vehicle" entityId={event.vehicle_id} entityName={event.plate}
+            onOpen={(item) => onOpen({ ...item, filters: detail.filters, origin: detail.origin })}>{event.plate}</AnalyticsEntityLink>
+          {event.anomaly ? <span>Observado: {event.anomaly.observed} · Referência: {event.anomaly.reference} · Amostra: {event.anomaly.sample_size}</span> : null}
+          {event.status ? <span>{event.status}</span> : null}
+        </div>
+      </li>)}</ol>
+      {result.events.length < result.total_events ? <button type="button" className="ghost-button" disabled={moreLoading} onClick={onLoadMore}>
+        {moreLoading ? 'Carregando…' : 'Carregar mais registros'}</button> : null}
+      {moreError ? <p role="alert">{moreError}</p> : null}
+    </> : null}
   </>
 }
 
@@ -184,7 +244,7 @@ export default function AnalyticsEntityDrawer({ detail, canGoBack, onOpen, onBac
   const [retry, setRetry] = useState(0)
   const [moreLoading, setMoreLoading] = useState(false)
   const [moreError, setMoreError] = useState('')
-  const key = detail ? `${detail.entityType}/${detail.source || ''}/${detail.costSource || ''}/${detail.organizationBucket || ''}/${detail.stationKey || ''}/${detail.maintenanceSubset || ''}/${detail.utilizationMode || ''}/${detail.measuredOnly || false}/${detail.entityId}/${JSON.stringify(detail.filters)}` : ''
+  const key = detail ? `${detail.entityType}/${detail.source || ''}/${detail.costSource || ''}/${detail.organizationBucket || ''}/${detail.stationKey || ''}/${detail.maintenanceSubset || ''}/${detail.utilizationMode || ''}/${detail.driverSource || ''}/${detail.measuredOnly || false}/${detail.entityId}/${JSON.stringify(detail.filters)}` : ''
   useEffect(() => { if (detail) contentRef.current?.focus() }, [detail])
   useEffect(() => {
     if (!detail?.filters || children) return undefined
@@ -194,6 +254,10 @@ export default function AnalyticsEntityDrawer({ detail, canGoBack, onOpen, onBac
     setMoreError('')
     const request = detail.entityType === 'possession-record'
       ? Promise.resolve({ data: detail.record })
+      : detail.entityType === 'driver-analysis'
+      ? detail.driverSource ? analyticsV2API.driverEvents(detail.entityId,
+        { ...detail.filters, source: detail.driverSource }, controller.signal)
+        : Promise.resolve({ data: { total_events: 0, events: [] } })
       : detail.entityType === 'utilization-events'
       ? analyticsV2API.utilizationEvents({ ...detail.filters, mode: detail.utilizationMode }, controller.signal)
       : detail.entityType === 'maintenance-events'
@@ -219,6 +283,9 @@ export default function AnalyticsEntityDrawer({ detail, canGoBack, onOpen, onBac
     try {
       const { data } = detail.entityType === 'utilization-events'
         ? await analyticsV2API.utilizationEvents({ ...detail.filters, mode: detail.utilizationMode,
+          offset: current.data.events.length })
+        : detail.entityType === 'driver-analysis'
+        ? await analyticsV2API.driverEvents(detail.entityId, { ...detail.filters, source: detail.driverSource,
           offset: current.data.events.length })
         : detail.entityType === 'maintenance-events'
         ? await analyticsV2API.maintenanceEvents({ ...detail.filters, subset: detail.maintenanceSubset,
@@ -254,6 +321,8 @@ export default function AnalyticsEntityDrawer({ detail, canGoBack, onOpen, onBac
         {children || (current.loading ? <p role="status">Carregando detalhamento…</p>
           : current.error ? <div role="alert"><p>{current.error}</p><button type="button" className="ghost-button" onClick={() => setRetry((value) => value + 1)}>Tentar novamente</button></div>
             : current.data ? (detail.entityType === 'record' ? <RecordDetail detail={detail} record={current.data} />
+              : detail.entityType === 'driver-analysis' ? <DriverAnalysisContent detail={detail} result={current.data} onOpen={onOpen} onLoadMore={loadMore}
+                moreLoading={moreLoading} moreError={moreError} />
               : detail.entityType === 'possession-record' ? <PossessionRecordContent record={current.data} />
               : detail.entityType === 'utilization-events' ? <UtilizationEventsContent detail={detail} result={current.data} onOpen={onOpen} onLoadMore={loadMore}
                 moreLoading={moreLoading} moreError={moreError} />

@@ -111,6 +111,7 @@ body.internal-app-active .modal-shell.analytics-drawer { width: min(640px, 100vw
 @media (prefers-reduced-motion: reduce) { body.internal-app-active .modal-shell.analytics-drawer { animation: none; } }
 .analytics-costs { display: grid; gap: var(--ui-space-4); }
 .analytics-costs-summary { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: var(--ui-space-4); }
+.analytics-costs-summary.analytics-drivers-summary { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 .analytics-costs-summary > div { display: grid; align-content: start; gap: .45rem; border-inline-start: 3px solid var(--ui-info); padding: .2rem 1rem; }
 .analytics-costs-summary span { color: var(--ui-text-muted); }
 .analytics-costs-summary strong { font-size: clamp(1.25rem, 2vw, 1.8rem); overflow-wrap: anywhere; }
@@ -146,5 +147,6 @@ body.internal-app-active .modal-shell.analytics-drawer { width: min(640px, 100vw
 }
 @media (max-width: 760px) {
   .analytics-costs-summary { grid-template-columns: 1fr; }
+  .analytics-costs-summary.analytics-drivers-summary { grid-template-columns: 1fr; }
   .analytics-costs-pareto li { grid-template-columns: 1fr; }
 }

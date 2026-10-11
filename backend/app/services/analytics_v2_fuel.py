@@ -125,7 +125,7 @@ def station_key(row):
 
 
 def fuel_statement(filters, start_at, end_exclusive, *, station=None):
-    query = select(FuelSupply.id, FuelSupply.vehicle_id, Vehicle.plate, Vehicle.vehicle_type,
+    query = select(FuelSupply.id, FuelSupply.vehicle_id, FuelSupply.driver_id, Vehicle.plate, Vehicle.vehicle_type,
         Vehicle.tank_capacity_liters, FuelSupply.supplied_at, FuelSupply.odometer_km,
         FuelSupply.liters, FuelSupply.total_amount, FuelSupply.fuel_type,
         FuelSupply.fuel_station_id.label('station_id'), FuelSupply.fuel_station.label('station_text'),

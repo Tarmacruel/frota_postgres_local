@@ -10,6 +10,7 @@ vi.mock('../components/analytics/AnalyticsOverview', () => ({ default: () => <di
 vi.mock('../components/analytics/AnalyticsFuel', () => ({ default: () => <div>Combustível V2</div> }))
 vi.mock('../components/analytics/AnalyticsMaintenance', () => ({ default: () => <div>Manutenção V2</div> }))
 vi.mock('../components/analytics/AnalyticsUtilization', () => ({ default: () => <div>Utilização V2</div> }))
+vi.mock('../components/analytics/AnalyticsDrivers', () => ({ default: () => <div>Condutores V2</div> }))
 vi.mock('../api/analytics', () => ({ analyticsAPI: Object.fromEntries(
   ['overview', 'efficiency', 'tco', 'driverRisk', 'insights', 'costTrend', 'exportReport'].map((name) => [name, vi.fn()]),
 ) }))
@@ -78,21 +79,15 @@ describe('Analytics — fundação V1', () => {
     await user.click(screen.getByRole('button', { name: 'Últimos 90 dias' }))
     await waitFor(() => expect(analyticsAPI.overview).toHaveBeenLastCalledWith(expect.objectContaining({ period_days: 90 })))
     const before = analyticsAPI.overview.mock.calls.length
+    const driverCallsBefore = analyticsAPI.driverRisk.mock.calls.length
     const tab = screen.getByRole('button', { name: 'Condutores', exact: true })
     tab.focus()
     await user.keyboard('{Enter}')
     expect(tab).toHaveAttribute('aria-current', 'page')
     expect(screen.getByTestId('location')).toHaveTextContent('/analytics?keep=1&view=drivers')
-    const trigger = screen.getByRole('button', { name: /Condutor de teste/ })
-    await user.click(trigger)
-    expect(screen.getByRole('dialog', { name: 'Condutor de teste' })).toBeInTheDocument()
-    expect(await screen.findByText('Registros do período')).toBeInTheDocument()
-    expect(analyticsV2API.entity).toHaveBeenCalledWith('driver', 2, expect.objectContaining({ organization: undefined }), expect.any(AbortSignal))
-    await user.keyboard('{Escape}')
-    expect(trigger).toHaveFocus()
-    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
-    expect(screen.getByText('Período: 90 dias')).toBeInTheDocument()
+    expect(screen.getByText('Condutores V2')).toBeInTheDocument()
     expect(analyticsAPI.overview).toHaveBeenCalledTimes(before)
+    expect(analyticsAPI.driverRisk).toHaveBeenCalledTimes(driverCallsBefore)
   })
 
   it('mantém detalhes inline do veículo e permite abrir o shell lateral', async () => {

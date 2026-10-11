@@ -7,7 +7,7 @@ import useAnalyticsDetailStack from './useAnalyticsDetailStack'
 import { analyticsV2API } from '../../api/analyticsV2'
 import api from '../../api/client'
 
-vi.mock('../../api/analyticsV2', () => ({ analyticsV2API: { entity: vi.fn(), costEvents: vi.fn(), fuelEvents: vi.fn(), mileageEvents: vi.fn(), maintenanceEvents: vi.fn(), utilizationEvents: vi.fn() } }))
+vi.mock('../../api/analyticsV2', () => ({ analyticsV2API: { entity: vi.fn(), costEvents: vi.fn(), fuelEvents: vi.fn(), mileageEvents: vi.fn(), maintenanceEvents: vi.fn(), utilizationEvents: vi.fn(), driverEvents: vi.fn() } }))
 vi.mock('../../api/client', () => ({ default: { get: vi.fn() } }))
 
 const filters = { date_from: '2026-09-01', date_to: '2026-09-30', organization: 'org-1' }
@@ -47,6 +47,15 @@ beforeEach(() => {
       start_date: '2026-09-10T10:00:00Z', end_date: '2026-09-11T10:00:00Z',
       start_odometer_km: 1000, end_odometer_km: 1100, start_in_period: true, end_in_period: true,
       distance_km: '100', duration_hours: '24' }] } })
+  analyticsV2API.driverEvents.mockImplementation((_id, params) => Promise.resolve({ data: { total_events: 1, offset: 0,
+    events: params.source === 'anomaly' ? [{ id: 'supply-1', source: 'fuel_supply', date: '2026-09-10T12:00:00Z',
+      vehicle_id: 'vehicle-1', plate: 'ABC1D23', amount: '40', status: null,
+      anomaly: { kind: 'capacity', label: 'Volume acima da capacidade', observed: '60 L', reference: '50 L',
+        sample_size: 1, rule: 'litros > capacidade × 1,02', limitation: 'Triagem; não comprova irregularidade.' } }]
+      : [{ id: 'possession-1', source: 'possession', date: '2026-09-10T10:00:00Z',
+        vehicle_id: 'vehicle-1', plate: 'ABC1D23', public_number: 42,
+        end_date: '2026-09-11T10:00:00Z', start_odometer_km: 1000, end_odometer_km: 1100,
+        distance_km: '100', duration_hours: '24', amount: null, anomaly: null }] } }))
 })
 
 function Harness() {
@@ -58,6 +67,34 @@ function Harness() {
 }
 
 describe('AnalyticsEntityDrawer', () => {
+  it('mostra fontes absolutas do condutor, posse e regra da anomalia sem score', async () => {
+    const user = userEvent.setup()
+    const driverRow = { name: 'Condutora', possessions: 1, valid_km_possessions: 1, distance_km: '100',
+      vehicles_with_possession: 1, fines: 0, claims: 0, fuel_supplies: 1, anomaly_rules: 1,
+      license_status: 'expiring', license_expires_at: '2026-10-20' }
+    function DriverHarness() {
+      const detail = useAnalyticsDetailStack()
+      return <><button onClick={() => detail.open({ entityType: 'driver-analysis', entityId: 'driver-1', title: 'Condutora',
+        driverRow, driverSource: 'possession', readableSources: ['possession', 'anomaly'],
+        driverMethodology: { possession: 'Posse iniciada.', distance: 'Km válido.', fuel: 'fuel-v2.1.' }, filters,
+        origin: { label: 'Posses de Condutora', formula: 'Posse iniciada; km válido.' } })}>Abrir condutora</button>
+        <AnalyticsEntityDrawer detail={detail.current} canGoBack={detail.canGoBack} onOpen={detail.open} onBack={detail.back} onClose={detail.close} /></>
+    }
+    render(<DriverHarness />)
+    await user.click(screen.getByRole('button', { name: 'Abrir condutora' }))
+    expect(await screen.findByRole('button', { name: /Posse nº 42/ })).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Como foi calculado?' })).toHaveTextContent('Posse iniciada')
+    expect(screen.queryByText('Pontuação de risco')).not.toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Posse nº 42/ }))
+    expect(await screen.findByText('Hodômetro inicial')).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: '← Voltar' }))
+    await user.click(screen.getByRole('button', { name: 'Anomalias', exact: true }))
+    expect(await screen.findByText(/Volume acima da capacidade/)).toBeInTheDocument()
+    await user.click(screen.getByRole('button', { name: /Volume acima da capacidade/ }))
+    expect(await screen.findByText(/litros > capacidade/)).toBeInTheDocument()
+    expect(analyticsV2API.driverEvents).toHaveBeenCalledWith('driver-1',
+      expect.objectContaining({ source: 'anomaly', organization: 'org-1' }), expect.any(AbortSignal))
+  })
   it('abre posse de origem e volta ao histórico preservando a explicação', async () => {
     const user = userEvent.setup()
     function UtilizationHarness() {
