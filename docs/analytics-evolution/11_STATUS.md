@@ -1,6 +1,6 @@
 # Status — Evolução Analytics
 
-Atualizado em 09/10/2026. Histórico inicial preservado no pacote de origem `FROTA_SIREL_ANALYTICS_EVOLUTION_PACKAGE/docs/analytics-evolution/11_STATUS.md`, que tinha Fase 0 PENDENTE e demais fases BLOQUEADAS. Este é o status de execução no diretório definitivo; o pacote original não foi alterado.
+Atualizado em 11/10/2026. Histórico inicial preservado no pacote de origem `FROTA_SIREL_ANALYTICS_EVOLUTION_PACKAGE/docs/analytics-evolution/11_STATUS.md`, que tinha Fase 0 PENDENTE e demais fases BLOQUEADAS. Este é o status de execução no diretório definitivo; o pacote original não foi alterado.
 
 | Fase | Estado | Data | HEAD inicial | HEAD final | Observações |
 |---|---|---|---|---|---|
@@ -13,12 +13,22 @@ Atualizado em 09/10/2026. Histórico inicial preservado no pacote de origem `FRO
 | 6 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-08 | 74c53a7 | 288656a | Combustível V2 e anomalias explicáveis; commitada no checkpoint de 09/10 |
 | 7 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-09 | 288656a | fe33d09 | Manutenção V2, sem migration ou classificação por texto |
 | 8 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-09 | e81185e | 0ce9df0 | Utilização descritiva V2; sem taxa de utilização, modelo ou migration |
-| 9 | BLOQUEADA | | | | Condutores |
+| 9 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-11 | 0688877 | 30a8a58 | Condutores V2 com eventos absolutos, cobertura e CNH administrativa separada; sem score opaco |
 | 10 | BLOQUEADA | | | | Alertas/workflow |
 | 11 | BLOQUEADA | | | | Relatórios |
 | 12 | BLOQUEADA | | | | QA/performance |
 
 ## Log
+
+### 2026-10-11 — Fase 9
+
+- Execução somente em `feature/analytics-evolution-hml`; preflight anterior à edição: HEAD `06888772fb45fac0df6762af270451d807043025`, working tree limpo e sincronizado com o remoto. Commit funcional `30a8a58`. [ExecPlan](EXECPLAN_PHASE_9.md). Nenhuma alteração em produção, modelo, migration ou edição de registros. Fase 10 não iniciada.
+- `/analytics?view=drivers` apresenta posses iniciadas, km de posses encerradas válidas, veículos com posse, multas, sinistros, abastecimentos e acionamentos de regras de anomalia por `driver_id` explícito. A ordenação por posses, km, multas, sinistros, abastecimentos ou anomalias usa valores absolutos; a nova visão e o drawer não exibem score composto. A V1 e seus contratos permanecem intactos. Associação registrada não atribui culpa ou condução contínua.
+- CNH vencida/a vencer em 30 dias e ausência de data são acompanhadas em bloco administrativo do cadastro atual de condutores ativos, sob `drivers:view`; não integram ocorrências, ranking ou filtro histórico de veículo. Registros sem `driver_id` ficam na cobertura separada. Na HML, no recorte 11/09–10/10/2026, não há multas, sinistros ou abastecimentos vinculados; 43 abastecimentos e 5 acionamentos de regra ficaram sem condutor vinculado. Nenhum vínculo por nome foi inferido.
+- Endpoints somente leitura `/api/analytics/v2/drivers` e `/drivers/{id}/events` reutilizam `analytics:view`, recorte civil V2 e responsabilidade histórica por secretaria. Listas paginadas exigem leitura do módulo de origem (`possession`, `fines`, `claims`, `fuel_supplies`); anomalias reutilizam `fuel-v2.1` e exibem observado, referência, amostra, regra e limitação. Drawer conserva filtros/pilha, abre posse registrada e GET de domínio de multa/sinistro/abastecimento quando aplicável, sem duplicar edição.
+- Arquivos funcionais: `backend/app/api/routes/analytics_v2.py`, `backend/app/services/analytics_v2_drivers.py`, `backend/app/services/analytics_v2_fuel.py`, `backend/tests/test_analytics_v2_drivers.py`, `backend/tests/test_analytics_v2_postgres.py`, `frontend/src/api/analyticsV2.js`, `frontend/src/components/analytics/AnalyticsDrivers.jsx`, `AnalyticsDrivers.test.jsx`, `AnalyticsEntityDrawer.jsx`, `AnalyticsEntityDrawer.test.jsx`, `frontend/src/pages/AdminAnalyticsDashboard.jsx`, `AdminAnalyticsDashboard.test.jsx`, `frontend/src/styles/analytics-evolution.css`. Documentação: este status e `EXECPLAN_PHASE_9.md`.
+- Backend completo: **587 aprovados/97 pulados**; PostgreSQL HML somente leitura: **14 aprovados**. Frontend completo: **277 aprovados/57 arquivos**; lint **0 erros/45 avisos preexistentes**; build e `git diff --check` aprovados. API HML local e pública com HTTP 200, mesmos 9 hashes de assets e totais: 305 condutores no universo do administrador, 588 posses, 445 posses com km válido e 412.246,3 km. Consulta de uma secretaria retornou 41 condutores, 75 posses e 62 posses válidas. Todos os cinco subconjuntos do drawer responderam 200; fontes sem registros vinculados retornaram vazio.
+- Chromium autenticado em HML: condutor → posse → registro → Voltar/Fechar, temas claro/escuro no desktop e escuro no celular 390 px, sem overflow horizontal; console final 0 erros/0 avisos. Capturas em `output/playwright/analytics-phase-9/01-drivers-light-desktop.png` a `08-driver-drawer-dark-mobile.png` (artefatos locais ignorados). Runtime/API e PostgreSQL reiniciados somente pelo script isolado de HML. Pendente validação funcional/visual pelo responsável.
 
 ### 2026-10-09 — Fase 8
 
