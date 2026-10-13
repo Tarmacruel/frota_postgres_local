@@ -20,6 +20,13 @@ Atualizado em 13/10/2026. Histórico inicial preservado no pacote de origem `FRO
 
 ## Log
 
+### 2026-10-13 — Promoção integral autorizada e publicada em produção
+
+- Autorização expressa: “aplique agora todas as mudanças do ambiente de homologação no de produção.” [ExecPlan, entrega, backup/rollback e limites](../ANALYTICS_PRODUCTION_RELEASE_20261013.md). Fonte HML `169cde9`, produção anterior `05fbf51`; ambos limpos. Release `df84161`, merge mantendo a main e árvore idêntica à HML; correções emergenciais preservadas.
+- Publicado às **15:43:43**: API saudável, watchdog reabilitado, configuração própria preservada e bundle público `index-CfE8XNxs.js`. Migration **0052** aplicada após backup/ensaio descartável; **54 tabelas antigas idênticas**, três tabelas de workflow vazias; sem copiar operações, usuários/anexos ou cinco casos de QA da HML.
+- Release: frontend **304 aprovados/59 arquivos**, backend **623 aprovados/109 pulados**, lint **0 erros/45 avisos preexistentes**, build aprovado. Nove endpoints protegidos retornaram 401 sem sessão; docs/OpenAPI 404. Oito serviços e 12 exports conferidos na produção read-only, sete igualdades entre visões e zero escrita. HTML/10 assets públicos idênticos ao build por SHA-256; HML saudável.
+- Inspeção pública visual restrita ao login sem banner HML porque não havia sessão autenticada em produção; oito abas/temas já validados na HML com mesma árvore. Nenhum caso real criado/tratado para QA, sem ensaio de carga. Versionamento pelo PR/main segue esta publicação; Docker automático continua desabilitado e é uma etapa futura. A tabela acima preserva os marcos históricos de execução em HML.
+
 ### 2026-10-13 — Correção de tooltips acumulados em Abastecimentos
 
 - Branch `feature/analytics-evolution-hml`, HEAD inicial `ceac415`, working tree limpo antes de editar. Corrigido defeito relatado pelo usuário: rolagem mantinha caixas anteriores porque cancelava fechamento/reposicionava cada badge. Scroll agora fecha o resumo e o histórico controla um único alerta ativo.

@@ -1,5 +1,11 @@
 # Status — evolução do frontend Frota PMTF
 
+## 13/10/2026 — Publicação do Analytics e resumos de Abastecimentos
+
+- Promoção integral de HML `169cde9` para produção autorizada pelo usuário e ativada às 15:43:43; release `df84161`, bundle público `index-CfE8XNxs.js`. [Entrega e evidências](../ANALYTICS_PRODUCTION_RELEASE_20261013.md).
+- Frontend 304 aprovados/59 arquivos, lint sem erros/45 avisos preexistentes, build de produção aprovado. HTML/10 assets públicos correspondentes; login sem banner HML. Backend/migration/backup e validação read-only registrados na entrega. Sem importar configuração/dados da HML.
+- Resumo único dos alertas e fechamento no scroll incluídos. HML preservada; Docker automático permanece futuro. A inspeção visual autenticada de produção não foi repetida por falta de sessão; QA das telas feito em HML com árvore funcional idêntica.
+
 ## 13/10/2026 — Correção de acúmulo de resumos dos alertas
 
 - Scroll fecha a caixa; histórico mantém somente um resumo ativo, inclusive sem mouseleave entre registros. [Entrega e evidências](DELIVERY_FUEL_ALERTS.md#correção-posterior--acúmulo-de-caixas-ao-rolar).

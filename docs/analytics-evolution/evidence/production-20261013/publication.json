@@ -1,0 +1,264 @@
+{
+  "activation": {
+    "status": "ready",
+    "startedAt": "2026-10-13T15:43:27.0381705-03:00",
+    "target": "df8416167c1686c455e3e30062a7f2676eb1905b",
+    "previous": "05fbf512571d4ba80c482b7d19367c43275bfb03",
+    "configurationPreserved": true,
+    "currentPid": 23988,
+    "finishedAt": "2026-10-13T15:43:43.4762820-03:00"
+  },
+  "publication": {
+    "target": "df8416167c1686c455e3e30062a7f2676eb1905b",
+    "configuration_preserved": true,
+    "checks": {
+      "backend": {
+        "ready": {
+          "status": "ok",
+          "app": "frota-pmtf",
+          "database": "ok"
+        },
+        "unauthenticated": {
+          "/api/auth/me": 401,
+          "/api/analytics/v2/summary": 401,
+          "/api/analytics/v2/costs": 401,
+          "/api/analytics/v2/fuel": 401,
+          "/api/analytics/v2/maintenance": 401,
+          "/api/analytics/v2/utilization": 401,
+          "/api/analytics/v2/drivers": 401,
+          "/api/analytics/v2/alerts": 401,
+          "/api/analytics/v2/export": 401
+        },
+        "docs_disabled": true
+      },
+      "public": {
+        "ready": {
+          "status": "ok",
+          "app": "frota-pmtf",
+          "database": "ok"
+        },
+        "unauthenticated": {
+          "/api/auth/me": 401,
+          "/api/analytics/v2/summary": 401,
+          "/api/analytics/v2/costs": 401,
+          "/api/analytics/v2/fuel": 401,
+          "/api/analytics/v2/maintenance": 401,
+          "/api/analytics/v2/utilization": 401,
+          "/api/analytics/v2/drivers": 401,
+          "/api/analytics/v2/alerts": 401,
+          "/api/analytics/v2/export": 401
+        },
+        "docs_disabled": true,
+        "index_matches": true,
+        "assets_sha256_matched": 10,
+        "bundle": "index-CfE8XNxs.js"
+      },
+      "frontend": {
+        "index_matches": true,
+        "assets_sha256_matched": 10,
+        "bundle": "index-CfE8XNxs.js"
+      },
+      "homologation": {
+        "ready": {
+          "status": "ok",
+          "app": "frota-pmtf",
+          "database": "ok"
+        },
+        "unchanged": true
+      }
+    }
+  },
+  "gates": {
+    "passed": true,
+    "targetHead": "df8416167c1686c455e3e30062a7f2676eb1905b",
+    "sourceHead": "169cde957796c2b0af68df94620da58374d93f6b",
+    "source_tree_equal": true,
+    "frontend": {
+      "passed": 304,
+      "files": 59
+    },
+    "backend_release": {
+      "passed": 623,
+      "skipped": 109,
+      "warnings": 7
+    },
+    "backend_hml_previous_with_postgres_gates": {
+      "passed": 644,
+      "skipped": 88
+    },
+    "lint": {
+      "errors": 0,
+      "preexisting_warnings": 45
+    },
+    "build": {
+      "passed": true,
+      "production_flags_checked": true,
+      "bundle": "index-CfE8XNxs.js"
+    },
+    "migration_rehearsal": {
+      "passed": true,
+      "existing_tables_unchanged": 54,
+      "new_tables_empty": 3
+    }
+  },
+  "analytics": {
+    "environment": "production",
+    "period": "2026-09-13..2026-10-12",
+    "services": [
+      {
+        "name": "summary",
+        "milliseconds": 241.0,
+        "sql_statements": 2,
+        "payload_bytes": 12110
+      },
+      {
+        "name": "fleet-status",
+        "milliseconds": 14.2,
+        "sql_statements": 1,
+        "payload_bytes": 229
+      },
+      {
+        "name": "attention",
+        "milliseconds": 16.5,
+        "sql_statements": 2,
+        "payload_bytes": 2429
+      },
+      {
+        "name": "costs",
+        "milliseconds": 139.3,
+        "sql_statements": 4,
+        "payload_bytes": 21282
+      },
+      {
+        "name": "fuel",
+        "milliseconds": 73.6,
+        "sql_statements": 2,
+        "payload_bytes": 16754
+      },
+      {
+        "name": "maintenance",
+        "milliseconds": 63.2,
+        "sql_statements": 2,
+        "payload_bytes": 2179
+      },
+      {
+        "name": "utilization",
+        "milliseconds": 68.3,
+        "sql_statements": 4,
+        "payload_bytes": 114068
+      },
+      {
+        "name": "drivers",
+        "milliseconds": 63.3,
+        "sql_statements": 5,
+        "payload_bytes": 129618
+      }
+    ],
+    "exports": [
+      {
+        "profile": "executive",
+        "format": "pdf",
+        "status": 200,
+        "signature_valid": true,
+        "bytes": 73495
+      },
+      {
+        "profile": "executive",
+        "format": "xlsx",
+        "status": 200,
+        "signature_valid": true,
+        "bytes": 7530
+      },
+      {
+        "profile": "costs",
+        "format": "pdf",
+        "status": 200,
+        "signature_valid": true,
+        "bytes": 73201
+      },
+      {
+        "profile": "costs",
+        "format": "xlsx",
+        "status": 200,
+        "signature_valid": true,
+        "bytes": 7193
+      },
+      {
+        "profile": "fuel",
+        "format": "pdf",
+        "status": 200,
+        "signature_valid": true,
+        "bytes": 76457
+      },
+      {
+        "profile": "fuel",
+        "format": "xlsx",
+        "status": 200,
+        "signature_valid": true,
+        "bytes": 8377
+      },
+      {
+        "profile": "maintenance",
+        "format": "pdf",
+        "status": 200,
+        "signature_valid": true,
+        "bytes": 71500
+      },
+      {
+        "profile": "maintenance",
+        "format": "xlsx",
+        "status": 200,
+        "signature_valid": true,
+        "bytes": 6676
+      },
+      {
+        "profile": "utilization",
+        "format": "pdf",
+        "status": 200,
+        "signature_valid": true,
+        "bytes": 104637
+      },
+      {
+        "profile": "utilization",
+        "format": "xlsx",
+        "status": 200,
+        "signature_valid": true,
+        "bytes": 16817
+      },
+      {
+        "profile": "drivers",
+        "format": "pdf",
+        "status": 200,
+        "signature_valid": true,
+        "bytes": 100602
+      },
+      {
+        "profile": "drivers",
+        "format": "xlsx",
+        "status": 200,
+        "signature_valid": true,
+        "bytes": 16905
+      }
+    ],
+    "read_only": true,
+    "migration": "0052_analytics_alert_workflow",
+    "workflow_rows": {
+      "analytics_alert_cases": 0,
+      "analytics_alert_events": 0,
+      "analytics_alert_requests": 0
+    },
+    "cross_view_checks": {
+      "operational_cost": true,
+      "fuel_cost": true,
+      "fuel_liters": true,
+      "maintenance_cost": true,
+      "cost_mileage": true,
+      "utilization_mileage": true,
+      "driver_fuel_anomalies": true
+    },
+    "write_statements": 0
+  },
+  "protected_backups_retained": true,
+  "authenticated_production_ui_checked": false,
+  "automatic_docker_deploy_enabled": false
+}
