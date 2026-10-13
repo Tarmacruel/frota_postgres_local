@@ -1,0 +1,15 @@
+{
+  "branch": "feature/analytics-evolution-hml",
+  "head": "82f3415fc358e3f5152a9ee4d0fad53594d264e5",
+  "date": "2026-10-13",
+  "backend": {"passed":644,"skipped":88,"preexisting_warnings":7,"readonly_postgres_enabled":true,"workflow_qa_postgres_enabled":true},
+  "frontend": {"passed":295,"files":58},
+  "focused_frontend_after_qa": {"passed":41,"files":4},
+  "final_modal_after_lint_ref_adjustment": {"passed":3,"files":1},
+  "lint": {"errors":0,"preexisting_warnings":45},
+  "build": {"passed":true,"bundle":"index-D0qAPC_i.js","kilobytes":754.42,"gzip_kilobytes":178.02,"preexisting_chunk_warning":true},
+  "diff_check": {"passed":true,"exit_code":0},
+  "migration": "0052_analytics_alert_workflow",
+  "production_changed": false,
+  "commit_or_push": false
+}

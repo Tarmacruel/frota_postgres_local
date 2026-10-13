@@ -1,0 +1,14 @@
+{
+    "unauthenticated_http":  {
+                                 "/api/analytics/insights":  401,
+                                 "/api/analytics/v2/summary":  401,
+                                 "/api/analytics/v2/export?profile=executive\u0026export_format=pdf":  401
+                             },
+    "html_status":  200,
+    "health":  {
+                   "status":  "ok",
+                   "app":  "frota-pmtf",
+                   "database":  "ok"
+               },
+    "current_bundle_present":  true
+}

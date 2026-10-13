@@ -2,6 +2,7 @@ import FuelSupplyOrderCancelForm from '../components/FuelSupplyOrderCancelForm'
 import { useEffect, useMemo, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
+import FuelSupplyAlertBadge from '../components/FuelSupplyAlertBadge'
 import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
 import FuelSupplyOrderCreateForm from '../components/FuelSupplyOrderCreateForm'
@@ -26,7 +27,7 @@ import {
   getOrderStatusLabel,
   resolvePublicValidationUrl,
 } from '../utils/fuelSupplyOrders'
-import { formatAdditiveDetails } from '../utils/fuelSupplyDetails'
+import { formatAdditiveDetails, fuelSupplyAlertReason } from '../utils/fuelSupplyDetails'
 
 const ORDER_STATUS_OPTIONS = [
   { value: 'TODOS', label: 'Todas as situações' },
@@ -148,6 +149,8 @@ export default function FuelSuppliesPage() {
   const [isBatchOrderModalOpen, setIsBatchOrderModalOpen] = useState(false)
   const [batchTourReplayToken, setBatchTourReplayToken] = useState(0)
   const [supplyToRectify, setSupplyToRectify] = useState(null)
+  const [alertSupply, setAlertSupply] = useState(null)
+  const [activeAlertSummary, setActiveAlertSummary] = useState(null)
   const [orderToAdjust, setOrderToAdjust] = useState(null)
   const [orderToCancel, setOrderToCancel] = useState(null)
   const [cancellingOrder, setCancellingOrder] = useState(false)
@@ -718,7 +721,8 @@ export default function FuelSuppliesPage() {
                   <td data-label="Combustível">{record.fuel_type || '-'}</td>
                   <td data-label="Aditivo">{formatAdditiveDetails(record, formatNumber)}</td>
                   <td data-label="Km/l">{formatNumber(record.consumption_km_l)}</td>
-                  <td data-label="Alerta">{record.is_consumption_anomaly ? <StatusChip tone="warning">Alerta</StatusChip> : <StatusChip tone="success">Regular</StatusChip>}</td>
+                  <td data-label="Alerta">{record.is_consumption_anomaly ? <FuelSupplyAlertBadge record={record} onOpen={setAlertSupply}
+                    summaryOpen={activeAlertSummary === record.id} onSummaryOpen={() => setActiveAlertSummary(record.id)} /> : <StatusChip tone="success">Regular</StatusChip>}</td>
                   <td data-label="Ações">
                     <div className="actions-inline">
                       <a className="mini-button" href={record.receipt_url} target="_blank" rel="noreferrer">Comprovante</a>
@@ -734,6 +738,29 @@ export default function FuelSuppliesPage() {
         </div>
         <Pagination currentPage={currentHistoryPage} totalPages={totalHistoryPages} onPageChange={setCurrentHistoryPage} />
       </div>
+
+      <Modal open={Boolean(alertSupply)} onClose={() => setAlertSupply(null)}
+        title={`Alerta de abastecimento${alertSupply?.vehicle_plate ? ` — ${alertSupply.vehicle_plate}` : ''}`}
+        className="fuel-alert-drawer" backdropClassName="fuel-alert-backdrop">
+        {alertSupply && <>
+          <h4 className="section-title">Motivo do alerta</h4>
+          <p className="fuel-alert-reason">{fuelSupplyAlertReason(alertSupply)}</p>
+          <dl className="fuel-alert-facts">
+            {[
+              ['Veículo', alertSupply.vehicle_plate || 'Não informado'],
+              ['Data do abastecimento', formatDate(alertSupply.supplied_at)],
+              ['Secretaria', alertSupply.organization_name || 'Não informada'],
+              ['Posto', alertSupply.fuel_station_name || alertSupply.fuel_station || 'Não informado'],
+              ['Combustível', alertSupply.fuel_type || 'Não informado'],
+              ['Litros abastecidos', formatNumber(alertSupply.liters)],
+              ['Valor registrado', formatCurrency(alertSupply.total_amount)],
+              ['Hodômetro (km)', formatNumber(alertSupply.odometer_km)],
+              ['Rendimento registrado (km/l)', formatNumber(alertSupply.consumption_km_l)],
+            ].map(([label, value]) => <div key={label}><dt>{label}</dt><dd>{value}</dd></div>)}
+          </dl>
+          <p className="section-copy">Fonte: motivo registrado no abastecimento. Este alerta de consumo é um sinal para conferência e não comprova irregularidade.</p>
+        </>}
+      </Modal>
 
       <Modal open={isOrderModalOpen && canCreateOrder} onClose={() => setIsOrderModalOpen(false)} title="Nova ordem de abastecimento" description="Emita a ordem para um posto credenciado executar o abastecimento.">
         <FuelSupplyOrderCreateForm

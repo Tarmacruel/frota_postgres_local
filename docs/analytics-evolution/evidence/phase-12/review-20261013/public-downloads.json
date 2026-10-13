@@ -1,0 +1,12 @@
+{
+  "public_hml": true,
+  "profile": "executive",
+  "period": "2026-09-13..2026-10-12",
+  "xlsx_zip_integrity": true,
+  "xlsx_bytes": 7500,
+  "pdf_valid": true,
+  "pdf_period_verified": true,
+  "pdf_bytes": 73492,
+  "pdf_pages": 2,
+  "download_event_adapter_timed_out_but_files_verified": true
+}

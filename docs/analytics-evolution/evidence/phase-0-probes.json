@@ -1,0 +1,183 @@
+{
+  "source": "synthetic characterization; actual service, mocked database",
+  "period_30": {
+    "start": "2026-09-06T00:00:00+00:00",
+    "end": "2026-10-06T00:00:00+00:00",
+    "today_noon_included": false
+  },
+  "months": {
+    "2023-03": [
+      "12/2022",
+      "01/2023",
+      "03/2023"
+    ],
+    "2024-03": [
+      "12/2023",
+      "01/2024",
+      "03/2024"
+    ],
+    "2026-05": [
+      "02/2026",
+      "03/2026",
+      "05/2026"
+    ],
+    "2026-10": [
+      "07/2026",
+      "08/2026",
+      "10/2026"
+    ]
+  },
+  "query_counts": {
+    "0": {
+      "selects": 5,
+      "replace_called": 0,
+      "commit_called": 0
+    },
+    "1": {
+      "selects": 8,
+      "replace_called": 1,
+      "commit_called": 1
+    },
+    "10": {
+      "selects": 35,
+      "replace_called": 1,
+      "commit_called": 1
+    },
+    "100": {
+      "selects": 305,
+      "replace_called": 1,
+      "commit_called": 1
+    }
+  },
+  "scoped_aggregate_sql": [
+    "SELECT vehicles.id, vehicles.vehicle_type \nFROM vehicles \nWHERE vehicles.status != 'INATIVO'",
+    "SELECT fuel_supplies.vehicle_id, max(fuel_supplies.odometer_km) AS max_odometer, min(fuel_supplies.odometer_km) AS min_odometer, sum(fuel_supplies.liters) AS sum_liters, sum(coalesce(fuel_supplies.total_amount, 0)) AS sum_fuel_cost, sum(CASE WHEN (fuel_supplies.is_consumption_anomaly IS true) THEN 1 ELSE 0 END) AS anomalies_count \nFROM fuel_supplies \nWHERE (fuel_supplies.organization_id = '00000000-0000-0000-0000-00000000002a' OR fuel_supplies.organization_id IS NULL AND (SELECT min(CAST(master_departments.organization_id AS VARCHAR)) AS min_1 \nFROM location_history AS location_history_1 JOIN master_allocations ON master_allocations.id = location_history_1.allocation_id JOIN master_departments ON master_departments.id = master_allocations.department_id \nWHERE location_history_1.vehicle_id = fuel_supplies.vehicle_id AND location_history_1.start_date <= fuel_supplies.supplied_at AND (location_history_1.end_date IS NULL OR location_history_1.end_date > fuel_supplies.supplied_at) \nHAVING count(distinct(master_departments.organization_id)) = 1) = '00000000-0000-0000-0000-00000000002a') AND fuel_supplies.supplied_at >= '2026-09-06 00:00:00+00:00' AND fuel_supplies.supplied_at <= '2026-10-06 00:00:00+00:00' GROUP BY fuel_supplies.vehicle_id",
+    "SELECT maintenance_records.vehicle_id, sum(maintenance_records.total_cost) AS sum_cost \nFROM maintenance_records \nWHERE (maintenance_records.responsible_organization_id = '00000000-0000-0000-0000-00000000002a' OR maintenance_records.responsible_organization_id IS NULL AND (SELECT min(CAST(master_departments.organization_id AS VARCHAR)) AS min_1 \nFROM location_history AS location_history_1 JOIN master_allocations ON master_allocations.id = location_history_1.allocation_id JOIN master_departments ON master_departments.id = master_allocations.department_id \nWHERE location_history_1.vehicle_id = maintenance_records.vehicle_id AND location_history_1.start_date <= maintenance_records.start_date AND (location_history_1.end_date IS NULL OR location_history_1.end_date > maintenance_records.start_date) \nHAVING count(distinct(master_departments.organization_id)) = 1) = '00000000-0000-0000-0000-00000000002a') AND maintenance_records.start_date >= '2026-09-06 00:00:00+00:00' AND maintenance_records.start_date <= '2026-10-06 00:00:00+00:00' GROUP BY maintenance_records.vehicle_id",
+    "SELECT fines.vehicle_id, sum(fines.amount) AS sum_cost \nFROM fines \nWHERE (fines.responsible_organization_id = '00000000-0000-0000-0000-00000000002a' OR fines.responsible_organization_id IS NULL AND (SELECT min(CAST(master_departments.organization_id AS VARCHAR)) AS min_1 \nFROM location_history AS location_history_1 JOIN master_allocations ON master_allocations.id = location_history_1.allocation_id JOIN master_departments ON master_departments.id = master_allocations.department_id \nWHERE location_history_1.vehicle_id = fines.vehicle_id AND location_history_1.start_date <= timezone('America/Bahia', fines.infraction_date + coalesce(fines.infraction_time, '00:00:00')) AND (location_history_1.end_date IS NULL OR location_history_1.end_date > CASE WHEN (fines.infraction_time IS NULL) THEN timezone('America/Bahia', fines.infraction_date + coalesce(fines.infraction_time, '00:00:00')) + INTERVAL '1 day' - INTERVAL '1 microsecond' ELSE timezone('America/Bahia', fines.infraction_date + coalesce(fines.infraction_time, '00:00:00')) END) \nHAVING count(distinct(master_departments.organization_id)) = 1) = '00000000-0000-0000-0000-00000000002a') AND fines.infraction_date >= '2026-09-06' AND fines.infraction_date <= '2026-10-06' GROUP BY fines.vehicle_id",
+    "SELECT drivers.id, drivers.nome_completo \nFROM drivers \nWHERE drivers.ativo IS true"
+  ],
+  "odometer_examples": [
+    {
+      "readings": [
+        1000
+      ],
+      "liters": 50,
+      "km": 0,
+      "l_100km": null
+    },
+    {
+      "readings": [
+        1000,
+        1500
+      ],
+      "liters": 100,
+      "km": 500,
+      "l_100km": 20.0
+    },
+    {
+      "readings": [
+        1500,
+        1000
+      ],
+      "liters": 100,
+      "km": 500,
+      "l_100km": 20.0
+    }
+  ],
+  "endpoint_parameters": {
+    "/api/analytics/overview": [
+      "period_days",
+      "organization",
+      "db",
+      "current_user"
+    ],
+    "/api/analytics/efficiency": [
+      "period_days",
+      "vehicle_type",
+      "organization",
+      "db",
+      "current_user"
+    ],
+    "/api/analytics/costs/trend": [
+      "months",
+      "vehicle_type",
+      "organization",
+      "db",
+      "current_user"
+    ],
+    "/api/analytics/costs/tco": [
+      "period_days",
+      "vehicle_type",
+      "organization",
+      "db",
+      "current_user"
+    ],
+    "/api/analytics/risk/drivers": [
+      "period_days",
+      "organization",
+      "db",
+      "current_user"
+    ],
+    "/api/analytics/insights": [
+      "period_days",
+      "vehicle_type",
+      "organization",
+      "db",
+      "current_user"
+    ],
+    "/api/analytics/export": [
+      "export_format",
+      "period_days",
+      "vehicle_type",
+      "organization",
+      "db",
+      "current_user"
+    ]
+  },
+  "scope": {
+    "production_requested_other": "00000000-0000-0000-0000-000000000001",
+    "production_without_org": "00000000-0000-0000-0000-000000000000",
+    "admin_no_filter": null
+  },
+  "below_reference_alerts": [
+    {
+      "metric": "consumption_l_100km",
+      "severity": "HIGH",
+      "variance_percentage": -50.0
+    },
+    {
+      "metric": "tco_cost_per_km",
+      "severity": "HIGH",
+      "variance_percentage": -50.0
+    }
+  ],
+  "hatch_filter_with_only_sedan_and_driver": {
+    "efficiency": [],
+    "tco": [],
+    "insight_metrics": [
+      "driver_risk_score"
+    ]
+  },
+  "empty_overview": {
+    "period_days": 30,
+    "fleet_active": 0,
+    "average_consumption_l_100km": 0,
+    "average_tco_per_km": 0,
+    "active_alerts": 0,
+    "generated_at": "2026-10-06 19:14:43.492846+00:00"
+  },
+  "weighted_vs_unweighted_example": {
+    "vehicles": [
+      {
+        "liters": 10,
+        "km": 100
+      },
+      {
+        "liters": 10,
+        "km": 1000
+      }
+    ],
+    "current_average_l_100km": 5.5,
+    "ratio_of_totals_l_100km": 1.8181818181818181
+  }
+}

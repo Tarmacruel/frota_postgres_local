@@ -1,0 +1,26 @@
+import api from './client'
+
+export const analyticsV2API = {
+  alerts: (params, signal) => api.get('/analytics/v2/alerts', { params, signal }),
+  alert: (id, signal) => api.get(`/analytics/v2/alerts/${id}`, { signal }),
+  alertEvents: (id, params, signal) => api.get(`/analytics/v2/alerts/${id}/events`, { params, signal }),
+  reconcileAlerts: (params, key) => api.post('/analytics/v2/alerts/reconcile', params, { headers: { 'Idempotency-Key': key } }),
+  changeAlertStatus: (id, params, version, key) => api.patch(`/analytics/v2/alerts/${id}/status`, params,
+    { headers: { 'If-Match': `"${version}"`, 'Idempotency-Key': key } }),
+  exportReport: (params) => api.get('/analytics/v2/export', { params, responseType: 'blob' }),
+  summary: (params, signal) => api.get('/analytics/v2/summary', { params, signal }),
+  costs: (params, signal) => api.get('/analytics/v2/costs', { params, signal }),
+  fuel: (params, signal) => api.get('/analytics/v2/fuel', { params, signal }),
+  maintenance: (params, signal) => api.get('/analytics/v2/maintenance', { params, signal }),
+  maintenanceEvents: (params, signal) => api.get('/analytics/v2/maintenance/events', { params, signal }),
+  utilization: (params, signal) => api.get('/analytics/v2/utilization', { params, signal }),
+  utilizationEvents: (params, signal) => api.get('/analytics/v2/utilization/events', { params, signal }),
+  drivers: (params, signal) => api.get('/analytics/v2/drivers', { params, signal }),
+  driverEvents: (id, params, signal) => api.get(`/analytics/v2/drivers/${id}/events`, { params, signal }),
+  fuelEvents: (params, signal) => api.get('/analytics/v2/fuel/events', { params, signal }),
+  costEvents: (params, signal) => api.get('/analytics/v2/costs/events', { params, signal }),
+  mileageEvents: (params, signal) => api.get('/analytics/v2/costs/mileage-events', { params, signal }),
+  attention: (params, signal) => api.get('/analytics/v2/attention', { params, signal }),
+  fleet: (params, signal) => api.get('/analytics/v2/fleet-status', { params, signal }),
+  entity: (type, id, params, signal) => api.get(`/analytics/v2/entities/${type}/${id}`, { params, signal }),
+}

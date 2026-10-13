@@ -1,0 +1,20 @@
+async (page) => {
+  await page.setViewportSize({ width: 390, height: 844 })
+  const navigation = page.getByRole('navigation', { name: 'Seções de análises' })
+  await navigation.getByRole('button', { name: 'Relatórios', exact: true }).click()
+  await page.getByRole('button', { name: 'Exportar relatório' }).click()
+  await page.getByRole('alert').getByText('Permissão insuficiente para exportar (cenário de teste)', { exact: true }).waitFor()
+  await page.screenshot({ path: 'output/playwright/analytics-review-20261013/report-error-mobile.png', fullPage: true, animations: 'disabled' })
+  await navigation.getByRole('button', { name: 'Custos', exact: true }).click()
+  const filters = page.getByRole('form', { name: 'Filtros de Custos' })
+  await filters.getByLabel('De', { exact: true }).fill('2026-09-11')
+  await filters.getByLabel('Até', { exact: true }).fill('2026-10-10')
+  await filters.getByRole('button', { name: 'Aplicar filtros' }).click()
+  await page.waitForFunction(() => [...document.querySelectorAll('[aria-busy="true"]')].every((element) => !element.checkVisibility()))
+  await navigation.getByRole('button', { name: 'Relatórios', exact: true }).click()
+  await navigation.getByRole('button', { name: 'Custos', exact: true }).click()
+  if (await filters.getByLabel('De', { exact: true }).inputValue() !== '2026-09-11') throw new Error('Cost date filter lost')
+  await page.getByRole('button', { name: 'Ver posses do denominador', exact: true }).click()
+  await page.getByRole('dialog').getByRole('button', { name: /Posse nº/ }).first().waitFor()
+  return { reportErrorExplained: true, filtersPreserved: true, mileageDrawerOpen: true }
+}

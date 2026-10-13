@@ -1,4 +1,5 @@
 from app.models.admin_notification import AdminNotification
+from app.models.analytics_alert import AnalyticsAlertCase, AnalyticsAlertEvent, AnalyticsAlertRequest
 from app.models.audit_log import AuditLog
 from app.models.justification_suggestion import JustificationSuggestion
 from app.models.claim import Claim, ClaimStatus, ClaimType
@@ -71,6 +72,7 @@ from app.models.possession_trip import (
 )
 
 __all__ = [
+    "AnalyticsAlertCase", "AnalyticsAlertEvent", "AnalyticsAlertRequest",
     "JustificationSuggestion",
     "VehicleLoan",
     "VehicleLoanEvent",

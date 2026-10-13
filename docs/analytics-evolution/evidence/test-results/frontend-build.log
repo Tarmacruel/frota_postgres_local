@@ -1,0 +1,25 @@
+
+> frota-pmtf-frontend@1.0.0 build
+> vite build
+
+vite v8.1.4 building client environment for production...
+[2K
+transforming...✓ 1015 modules transformed.
+rendering chunks...
+computing gzip size...
+dist/index.html                             1.14 kB │ gzip:   0.49 kB
+dist/assets/maps-vh-t_kPv.css              15.09 kB │ gzip:   6.36 kB
+dist/assets/index-CJ69TfWC.css            172.93 kB │ gzip:  28.46 kB
+dist/assets/rolldown-runtime-aKtaBQYM.js    1.08 kB │ gzip:   0.62 kB
+dist/assets/purify.es-Bwt4ulIK.js          27.13 kB │ gzip:  10.54 kB
+dist/assets/api-client-BQPRRFHk.js         44.71 kB │ gzip:  17.01 kB
+dist/assets/export-utils-D0LWJ4vJ.js      126.74 kB │ gzip:  39.63 kB
+dist/assets/maps-B28ca5KY.js              148.81 kB │ gzip:  43.38 kB
+dist/assets/index.es-Cz0vZab-.js          151.36 kB │ gzip:  48.90 kB
+dist/assets/react-vendor-BG9MmpDm.js      157.57 kB │ gzip:  51.92 kB
+dist/assets/html2canvas-P2PH8bad.js       199.56 kB │ gzip:  46.78 kB
+dist/assets/analytics-charts-1R1obXM5.js  408.17 kB │ gzip: 106.28 kB
+dist/assets/export-pdf-D11XU4Vk.js        431.17 kB │ gzip: 139.84 kB
+dist/assets/index-p1yMcCkt.js             634.12 kB │ gzip: 154.04 kB
+
+✓ built in 608ms

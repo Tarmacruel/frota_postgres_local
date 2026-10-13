@@ -1,0 +1,38 @@
+{
+  "observed_at": "2026-10-07T02:05:18.575173+00:00",
+  "environment": "isolated HML",
+  "runs": [
+    {
+      "scope": "global",
+      "selects": 2,
+      "elapsed_seconds": 0.2117,
+      "records": 64,
+      "driver_groups": 0,
+      "month_count": 1,
+      "schema_valid": true
+    },
+    {
+      "scope": "organization_1",
+      "selects": 2,
+      "elapsed_seconds": 0.0892,
+      "records": 59,
+      "driver_groups": 0,
+      "month_count": 1,
+      "schema_valid": true
+    },
+    {
+      "scope": "organization_2",
+      "selects": 2,
+      "elapsed_seconds": 0.0291,
+      "records": 0,
+      "driver_groups": 0,
+      "month_count": 1,
+      "schema_valid": true
+    }
+  ],
+  "read_only": "on",
+  "migration_before": "0049_justification_suggestions",
+  "snapshot_count_unchanged": true,
+  "migration_after": "0049_justification_suggestions",
+  "writes": 0
+}
