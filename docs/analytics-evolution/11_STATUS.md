@@ -14,15 +14,15 @@ Atualizado em 13/10/2026. Histórico inicial preservado no pacote de origem `FRO
 | 7 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-09 | 288656a | fe33d09 | Manutenção V2, sem migration ou classificação por texto |
 | 8 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-09 | e81185e | 0ce9df0 | Utilização descritiva V2; sem taxa de utilização, modelo ou migration |
 | 9 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO | 2026-10-11 | 0688877 | 30a8a58 | Condutores V2 com eventos absolutos, cobertura e CNH administrativa separada; sem score opaco |
-| 10 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO DO RESPONSÁVEL | 2026-10-13 | 82f3415 | 82f3415 | [Persistência, workflow, migration e QA](DELIVERY_PHASE_10.md); 0052 aplicada somente HML, sem backfill/produção |
-| 11 | IMPLEMENTADA E REVISADA EM HML — AGUARDA VALIDAÇÃO DO RESPONSÁVEL | 2026-10-13 | 82f3415 | 82f3415 | [Revisão, exports e validação pública](REVIEW_2026_10_13.md); seis perfis V2 PDF/XLSX, sem migration |
-| 12 | QA CONCLUÍDA EM HML — AGUARDA CHECKPOINT E VALIDAÇÃO DO RESPONSÁVEL | 2026-10-13 | 82f3415 | 82f3415 | [Revisão geral anterior](REVIEW_2026_10_13.md); Fase 10 posteriormente autorizada/implementada com QA própria; sem ensaio de carga |
+| 10 | IMPLEMENTADA EM HML — AGUARDA VALIDAÇÃO DO RESPONSÁVEL | 2026-10-13 | 82f3415 | 9eae46a | [Persistência, workflow, migration e QA](DELIVERY_PHASE_10.md); 0052 aplicada somente HML, sem backfill/produção |
+| 11 | IMPLEMENTADA E REVISADA EM HML — AGUARDA VALIDAÇÃO DO RESPONSÁVEL | 2026-10-13 | 82f3415 | 9eae46a | [Revisão, exports e validação pública](REVIEW_2026_10_13.md); seis perfis V2 PDF/XLSX, sem migration |
+| 12 | QA CONCLUÍDA E COMMITADA EM HML — AGUARDA VALIDAÇÃO DO RESPONSÁVEL | 2026-10-13 | 82f3415 | 9eae46a | [Revisão geral anterior](REVIEW_2026_10_13.md); Fase 10 posteriormente autorizada/implementada com QA própria; sem ensaio de carga |
 
 ## Log
 
 ### 2026-10-13 — Checkpoint autorizado e motivo de alerta em Abastecimentos
 
-- Usuário autorizou commit das modificações atuais e de todas as pendências da homologação. Branch `feature/analytics-evolution-hml`, HEAD inicial `82f3415`; nenhuma produção. [Entrega, inventário e evidências](../frontend-evolution/DELIVERY_FUEL_ALERTS.md). O checkpoint local consolida Fase 10 autorizada, Relatórios, QA/revisão e esta demanda; registros anteriores “sem commit” são históricos.
+- Usuário autorizou commit das modificações atuais e de todas as pendências da homologação. Branch `feature/analytics-evolution-hml`, HEAD inicial `82f3415`; nenhuma produção. [Entrega, inventário e evidências](../frontend-evolution/DELIVERY_FUEL_ALERTS.md). Commit funcional `9eae46a62dce221940d17eea3d588e096d09e6ea` (112 arquivos), working tree limpo após o commit. O checkpoint local consolida Fase 10 autorizada, Relatórios, QA/revisão e esta demanda; registros anteriores “sem commit” são históricos.
 - Histórico de Abastecimentos exibe `anomaly_details` por hover/foco e drawer ao clicar. Flag operacional permanece separada dos casos V2; motivo ausente explicitado, sem fabricar regra ou alterar dados. Comprovantes/retificação/filtros preservados.
 - Gates do conjunto: frontend **301 aprovados/59 arquivos**, backend **644 aprovados/88 pulados**, lint **0 erros/45 avisos preexistentes**, build e diff check aprovados. HML pública `index-HAep1CnS.js`, claro/escuro desktop/mobile, foco/Escape/filtro e zero erros JS. Sem reaplicar migration, push ou deploy de produção; limites de carga/perfis reais anteriores permanecem.
 
