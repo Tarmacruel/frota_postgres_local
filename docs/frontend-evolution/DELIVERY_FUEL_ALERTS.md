@@ -6,7 +6,7 @@ Data: 13/10/2026. Ambiente exclusivo: `D:\FROTAS\frota_emprestimos_testes`, bran
 
 - O badge **Alerta** é um botão. Hover ou foco mostra caixa com o motivo; clique abre drawer lateral com motivo, placa, data, secretaria, posto, combustível, litros, valor, hodômetro e rendimento registrado.
 - Texto vem de `anomaly_details` do registro já autorizado/carregado. Não há nova API, cálculo, requisição, persistência ou edição. Motivo ausente: “Motivo não informado no registro deste abastecimento.”
-- Tooltip em portal evita corte pela tabela, permite mover o ponteiro para ler, é dispensável por Escape e acompanha rolagem enquanto o botão estiver visível. Drawer reutiliza Modal e seus controles de foco/Escape. Filtros, paginação, comprovantes, retificação e indicadores Regular preservados.
+- Tooltip em portal evita corte pela tabela, permite mover o ponteiro para ler e é dispensável por Escape. Após a correção posterior, a rolagem da página/tabela fecha a caixa, e somente um resumo pode estar aberto. Drawer reutiliza Modal e seus controles de foco/Escape. Filtros, paginação, comprovantes, retificação e indicadores Regular preservados.
 - Flag operacional continua distinta da Central de casos de Analytics V2. O alerta sinaliza conferência e não comprova irregularidade.
 
 ## Arquivos desta demanda
@@ -31,3 +31,11 @@ Data: 13/10/2026. Ambiente exclusivo: `D:\FROTAS\frota_emprestimos_testes`, bran
 Hover e passagem do ponteiro cobertos em regressão automatizada; navegador real validou foco e drawer. Não realizado ensaio de carga ou login real de cada perfil nesta demanda. Sem mudança de banco/produção. A migration 0052 já aplicada à HML na etapa anterior não foi reaplicada.
 
 O usuário autorizou commit de todas as modificações pendentes. Commit funcional `9eae46a62dce221940d17eea3d588e096d09e6ea`, 112 arquivos, working tree limpo após o checkpoint. Checkpoint local identificado pela mensagem `feat(hml): consolidar analytics e detalhar alertas de abastecimento`. O inventário registra os arquivos incluídos; não houve push nem deploy de produção. Registros anteriores com “sem commit” descrevem o momento de cada execução, superado por este checkpoint.
+
+## Correção posterior — Acúmulo de caixas ao rolar
+
+- Screenshot do usuário revelou que o reposicionamento no scroll cancelava o timer de saída e mantinha cada caixa aberta. O histórico agora controla um único badge ativo; scroll da página ou tabela dispensa o resumo mesmo com o botão visível. A rolagem dentro da própria explicação longa permanece possível.
+- Branch `feature/analytics-evolution-hml`, HEAD inicial `ceac415`, working tree inicialmente limpo. Arquivos: `FuelSupplyAlertBadge.jsx`, `FuelSupplyAlertBadge.test.jsx`, `FuelSuppliesPage.jsx`, `FuelSuppliesPage.test.jsx`, este relatório, ExecPlan, status frontend/Analytics e duas evidências.
+- Regressão cobre dois alertas sucessivos sem mouseleave, timer pendente durante scroll, botão ainda visível, contêiner ancestral, foco e drawer. **15 testes focados**, frontend completo **304 aprovados/59 arquivos**, lint **0 erros/45 avisos preexistentes**, build aprovado com aviso de chunk preexistente, diff check aprovado.
+- HML pública autenticada em desktop claro/escuro: caixa fechou ao rolar para baixo/cima; troca de foco entre dois alertas manteve exatamente uma caixa; motivo e drawer preservados, zero erros JS. Bundle `index-D7olhyya.js`. Tema claro restaurado e aba de QA fechada. [Resultado](evidence/fuel-alerts/scroll-fix-qa.json), [captura após rolagem](evidence/fuel-alerts/scroll-dismiss-dark.png).
+- Mudança somente frontend, sem backend/migration/banco/produção/push. Commit corretivo continua a demanda autorizada.

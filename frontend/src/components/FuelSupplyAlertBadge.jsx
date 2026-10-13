@@ -11,11 +11,12 @@ function summaryPosition(rect) {
   }
 }
 
-export default function FuelSupplyAlertBadge({ record, onOpen }) {
+export default function FuelSupplyAlertBadge({ record, onOpen, summaryOpen = true, onSummaryOpen }) {
   const tooltipId = useId()
   const buttonRef = useRef(null)
   const closeTimer = useRef(null)
   const [position, setPosition] = useState(null)
+  const visible = summaryOpen && Boolean(position)
 
   function cancelClose() { window.clearTimeout(closeTimer.current) }
 
@@ -23,6 +24,7 @@ export default function FuelSupplyAlertBadge({ record, onOpen }) {
     cancelClose()
     const rect = buttonRef.current.getBoundingClientRect()
     setPosition(summaryPosition(rect))
+    onSummaryOpen?.()
   }
 
   function scheduleClose() {
@@ -33,19 +35,12 @@ export default function FuelSupplyAlertBadge({ record, onOpen }) {
   useEffect(() => () => window.clearTimeout(closeTimer.current), [])
 
   useEffect(() => {
-    if (!position) return undefined
+    if (!visible) return undefined
     function dismiss(event) {
       if (event.type === 'keydown' && event.key !== 'Escape') return
       // Scrolling inside a long explanation should not dismiss it.
       if (event.type === 'scroll' && event.target?.id === tooltipId) return
       window.clearTimeout(closeTimer.current)
-      if (event.type !== 'keydown') {
-        const rect = buttonRef.current.getBoundingClientRect()
-        if (rect.bottom > 0 && rect.top < window.innerHeight && rect.right > 0 && rect.left < window.innerWidth) {
-          setPosition(summaryPosition(rect))
-          return
-        }
-      }
       setPosition(null)
     }
     window.addEventListener('keydown', dismiss)
@@ -56,17 +51,17 @@ export default function FuelSupplyAlertBadge({ record, onOpen }) {
       window.removeEventListener('resize', dismiss)
       window.removeEventListener('scroll', dismiss, true)
     }
-  }, [position, tooltipId])
+  }, [visible, tooltipId])
 
   return <>
     <button type="button" ref={buttonRef} className="ui-status-chip fuel-alert-trigger" data-tone="warning"
       aria-label={`Ver motivo do alerta de ${record.vehicle_plate || 'veículo não informado'}`}
-      aria-haspopup="dialog" aria-describedby={position ? tooltipId : undefined}
+      aria-haspopup="dialog" aria-describedby={visible ? tooltipId : undefined}
       onMouseEnter={showSummary} onMouseLeave={scheduleClose} onFocus={showSummary} onBlur={scheduleClose}
       onClick={() => { cancelClose(); setPosition(null); onOpen(record) }}>
       Alerta
     </button>
-    {position && createPortal(<div id={tooltipId} role="tooltip" className="fuel-alert-tooltip" style={position}
+    {visible && createPortal(<div id={tooltipId} role="tooltip" className="fuel-alert-tooltip" style={position}
       onMouseEnter={cancelClose} onMouseLeave={scheduleClose}>
       <strong>Motivo do alerta</strong>
       <p>{fuelSupplyAlertReason(record)}</p>

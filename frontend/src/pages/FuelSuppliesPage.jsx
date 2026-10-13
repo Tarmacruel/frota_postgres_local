@@ -150,6 +150,7 @@ export default function FuelSuppliesPage() {
   const [batchTourReplayToken, setBatchTourReplayToken] = useState(0)
   const [supplyToRectify, setSupplyToRectify] = useState(null)
   const [alertSupply, setAlertSupply] = useState(null)
+  const [activeAlertSummary, setActiveAlertSummary] = useState(null)
   const [orderToAdjust, setOrderToAdjust] = useState(null)
   const [orderToCancel, setOrderToCancel] = useState(null)
   const [cancellingOrder, setCancellingOrder] = useState(false)
@@ -720,7 +721,8 @@ export default function FuelSuppliesPage() {
                   <td data-label="Combustível">{record.fuel_type || '-'}</td>
                   <td data-label="Aditivo">{formatAdditiveDetails(record, formatNumber)}</td>
                   <td data-label="Km/l">{formatNumber(record.consumption_km_l)}</td>
-                  <td data-label="Alerta">{record.is_consumption_anomaly ? <FuelSupplyAlertBadge record={record} onOpen={setAlertSupply} /> : <StatusChip tone="success">Regular</StatusChip>}</td>
+                  <td data-label="Alerta">{record.is_consumption_anomaly ? <FuelSupplyAlertBadge record={record} onOpen={setAlertSupply}
+                    summaryOpen={activeAlertSummary === record.id} onSummaryOpen={() => setActiveAlertSummary(record.id)} /> : <StatusChip tone="success">Regular</StatusChip>}</td>
                   <td data-label="Ações">
                     <div className="actions-inline">
                       <a className="mini-button" href={record.receipt_url} target="_blank" rel="noreferrer">Comprovante</a>

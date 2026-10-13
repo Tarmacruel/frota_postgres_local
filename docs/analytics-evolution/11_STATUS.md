@@ -20,6 +20,11 @@ Atualizado em 13/10/2026. Histórico inicial preservado no pacote de origem `FRO
 
 ## Log
 
+### 2026-10-13 — Correção de tooltips acumulados em Abastecimentos
+
+- Branch `feature/analytics-evolution-hml`, HEAD inicial `ceac415`, working tree limpo antes de editar. Corrigido defeito relatado pelo usuário: rolagem mantinha caixas anteriores porque cancelava fechamento/reposicionava cada badge. Scroll agora fecha o resumo e o histórico controla um único alerta ativo.
+- [Arquivos, testes e evidências](../frontend-evolution/DELIVERY_FUEL_ALERTS.md#correção-posterior--acúmulo-de-caixas-ao-rolar). Frontend **304 aprovados/59 arquivos**, focados **15 aprovados**, lint **0 erros/45 avisos preexistentes**, build/diff check aprovados. HML pública `index-D7olhyya.js`, claro/escuro: scroll dispensa caixa mesmo com botão visível; foco entre alertas mantém uma; drawer preservado e zero erros JS. Somente frontend; sem backend, migration, banco, produção ou push.
+
 ### 2026-10-13 — Checkpoint autorizado e motivo de alerta em Abastecimentos
 
 - Usuário autorizou commit das modificações atuais e de todas as pendências da homologação. Branch `feature/analytics-evolution-hml`, HEAD inicial `82f3415`; nenhuma produção. [Entrega, inventário e evidências](../frontend-evolution/DELIVERY_FUEL_ALERTS.md). Commit funcional `9eae46a62dce221940d17eea3d588e096d09e6ea` (112 arquivos), working tree limpo após o commit. O checkpoint local consolida Fase 10 autorizada, Relatórios, QA/revisão e esta demanda; registros anteriores “sem commit” são históricos.

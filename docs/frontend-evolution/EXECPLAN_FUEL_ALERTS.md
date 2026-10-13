@@ -34,3 +34,10 @@ Motivo ausente terá mensagem explícita. Flag operacional não equivale aos cas
 
 ## Rollback
 Reverter apenas o diff desta demanda; não reverter migration 0052 com histórico nem os trabalhos anteriores.
+
+## Correção posterior — 13/10/2026 — Acúmulo de tooltips ao rolar
+- Preflight: branch `feature/analytics-evolution-hml`, HEAD `ceac415a706d0ada9d8fe7e0f54f3fb884a315ee`, working tree limpo; dois commits locais à frente do remoto.
+- Screenshot do usuário e código confirmam: cada badge mantém seu tooltip; scroll cancela o timer de fechamento e reposiciona a caixa, mantendo caixas anteriores abertas.
+- Corrigir scroll para dispensar o resumo e controlar um único badge ativo no histórico. Preservar foco, Escape e drawer. Substitui a decisão anterior de acompanhar scroll.
+- Arquivos: badge/testes, FuelSuppliesPage/testes, status/relatório e evidências. Baseline: 301 testes frontend, lint 0 erros/45 avisos, build aprovado.
+- Concluído: 15 testes focados, 304 testes frontend/59 arquivos, lint 0 erros/45 avisos preexistentes, build e diff check aprovados. Bundle público `index-D7olhyya.js`; sessão real em claro/escuro confirmou scroll fechando caixa com botão visível, foco entre alertas com no máximo um resumo e drawer preservado. [Evidência](evidence/fuel-alerts/scroll-fix-qa.json), [captura](evidence/fuel-alerts/scroll-dismiss-dark.png). Sem backend/banco/produção; commit corretivo autorizado pela continuidade da demanda.

@@ -1,0 +1,33 @@
+{
+  "date": "2026-10-13",
+  "branch": "feature/analytics-evolution-hml",
+  "initial_head": "ceac415a706d0ada9d8fe7e0f54f3fb884a315ee",
+  "initial_working_tree_clean": true,
+  "bundle": "index-D7olhyya.js",
+  "frontend": {"passed": 304, "files": 59, "focused_passed": 15},
+  "lint": {"errors": 0, "preexisting_warnings": 45},
+  "build": {"passed": true, "preexisting_chunk_warning": true},
+  "diff_check": {"passed": true},
+  "public_browser": {
+    "authenticated": true,
+    "themes": ["light", "dark"],
+    "viewport": [1912, 922],
+    "scroll_down_closes_tooltip_with_button_visible": true,
+    "scroll_up_closes_tooltip": true,
+    "two_visible_alerts_focused_successively_tooltip_counts": [1, 1],
+    "after_dark_scroll_tooltip_count": 0,
+    "drawer_preserved": true,
+    "javascript_errors": 0,
+    "original_theme_restored": true,
+    "qa_tab_closed": true
+  },
+  "new_regressions": [
+    "visible button plus pending leave timer then scroll",
+    "ancestor container scroll",
+    "scroll inside long tooltip remains readable",
+    "new alert replaces old summary without mouseleave"
+  ],
+  "backend_or_database_changed": false,
+  "production_changed": false,
+  "push": false
+}

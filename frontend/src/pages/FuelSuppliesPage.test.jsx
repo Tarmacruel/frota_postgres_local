@@ -215,4 +215,29 @@ describe('FuelSuppliesPage administrative adjustments', () => {
     expect(screen.getByText('Regular')).toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Ver motivo do alerta de DEF4G56' })).not.toBeInTheDocument()
   })
+
+  it('mantém apenas um resumo ao percorrer alertas e remove todos ao rolar', async () => {
+    mocks.listSupplies.mockResolvedValue({ data: { data: [
+      { id: 'first', vehicle_plate: 'ABC1D23', is_consumption_anomaly: true, anomaly_details: 'Motivo do primeiro registro.' },
+      { id: 'second', vehicle_plate: 'DEF4G56', is_consumption_anomaly: true, anomaly_details: 'Motivo do segundo registro.' },
+    ] } })
+    renderPage('/abastecimentos')
+    const first = await screen.findByRole('button', { name: 'Ver motivo do alerta de ABC1D23' })
+    const second = screen.getByRole('button', { name: 'Ver motivo do alerta de DEF4G56' })
+    fireEvent.mouseEnter(first)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Motivo do primeiro registro.')
+    // A previous mouseleave is not guaranteed when rows move under a stationary pointer.
+    fireEvent.mouseEnter(second)
+    expect(screen.getAllByRole('tooltip')).toHaveLength(1)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Motivo do segundo registro.')
+    expect(first).not.toHaveAttribute('aria-describedby')
+    fireEvent.scroll(window)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    fireEvent.focus(first)
+    expect(screen.getAllByRole('tooltip')).toHaveLength(1)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Motivo do primeiro registro.')
+    fireEvent.click(first)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toHaveTextContent('Motivo do primeiro registro.')
+  })
 })

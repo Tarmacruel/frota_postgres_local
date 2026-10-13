@@ -39,16 +39,34 @@ describe('FuelSupplyAlertBadge', () => {
     expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
   })
 
-  it('acompanha o botão quando o navegador rola para dar foco a ele', () => {
+  it('fecha ao rolar mesmo quando o botão ainda está visível e havia timer de saída', () => {
+    vi.useFakeTimers()
     render(<FuelSupplyAlertBadge record={record} onOpen={vi.fn()} />)
     const button = screen.getByRole('button')
     vi.spyOn(button, 'getBoundingClientRect')
       .mockReturnValueOnce({ top: 100, bottom: 120, left: 100, right: 150 })
       .mockReturnValue({ top: 50, bottom: 70, left: 100, right: 150 })
-    fireEvent.focus(button)
+    fireEvent.mouseEnter(button)
     expect(screen.getByRole('tooltip')).toHaveStyle({ top: '128px' })
+    fireEvent.mouseLeave(button)
     fireEvent.scroll(window)
-    expect(screen.getByRole('tooltip')).toHaveStyle({ top: '78px' })
-    expect(button).toHaveAttribute('aria-describedby', screen.getByRole('tooltip').id)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    expect(button).not.toHaveAttribute('aria-describedby')
+    act(() => vi.advanceTimersByTime(200))
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
+  it('fecha ao rolar um contêiner ancestral da tabela', () => {
+    render(<div data-testid="table-scroll"><FuelSupplyAlertBadge record={record} onOpen={vi.fn()} /></div>)
+    fireEvent.mouseEnter(screen.getByRole('button'))
+    fireEvent.scroll(screen.getByTestId('table-scroll'))
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+  })
+
+  it('mantém a explicação durante sua própria rolagem', () => {
+    render(<FuelSupplyAlertBadge record={record} onOpen={vi.fn()} />)
+    fireEvent.mouseEnter(screen.getByRole('button'))
+    fireEvent.scroll(screen.getByRole('tooltip'))
+    expect(screen.getByRole('tooltip')).toBeInTheDocument()
   })
 })
