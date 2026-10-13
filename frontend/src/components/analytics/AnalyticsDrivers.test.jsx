@@ -70,3 +70,14 @@ it('mantém a CNH administrativa fora do filtro de tipo de veículo', async () =
   expect(license).toHaveTextContent('A lista individual de CNH é exibida sem filtro de tipo/veículo')
   expect(within(license).queryByRole('table')).not.toBeInTheDocument()
 })
+
+it('permite trocar a medida quando o ranking inicial está vazio', async () => {
+  const user = userEvent.setup()
+  analyticsV2API.drivers.mockResolvedValue({ data: { ...data,
+    drivers: [{ ...driver, possessions: 0, distance_km: null, valid_km_possessions: 0 }] } })
+  render(<AnalyticsDrivers onOpenEntity={vi.fn()} />)
+  const ranking = await screen.findByRole('region', { name: 'Ranking por medida registrada' })
+  await waitFor(() => expect(ranking).toHaveTextContent('Sem dados para os filtros selecionados.'))
+  await user.click(within(ranking).getByRole('button', { name: 'Mais multas' }))
+  expect(within(ranking).getByRole('button', { name: 'Ana Condutora' })).toBeInTheDocument()
+})

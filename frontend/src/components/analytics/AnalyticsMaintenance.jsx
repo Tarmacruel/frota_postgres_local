@@ -13,7 +13,7 @@ function amountLabel(amount) {
     ? `Subtotal conhecido: ${formatValue(amount.known_value, 'BRL')}` : formatValue(amount?.value, 'BRL')
 }
 
-export default function AnalyticsMaintenance({ organizations = [], catalogError, onOpenEntity }) {
+export default function AnalyticsMaintenance({ enabled = true, organizations = [], catalogError, onOpenEntity }) {
   const [applied, setApplied] = useState(() => ({ ...closedPeriod(), organization: '', vehicle_type: '' }))
   const [draft, setDraft] = useState(applied)
   const [validation, setValidation] = useState('')
@@ -21,7 +21,7 @@ export default function AnalyticsMaintenance({ organizations = [], catalogError,
   const [shown, setShown] = useState(20)
   const query = useMemo(() => ({ ...applied, organization: applied.organization || undefined,
     vehicle_type: applied.vehicle_type || undefined }), [applied])
-  const resource = useCockpitResource(analyticsV2API.maintenance, query, revision, true)
+  const resource = useCockpitResource(analyticsV2API.maintenance, query, revision, enabled)
   const data = resource.data
   const state = { loading: resource.loading, error: resource.error, onRetry: resource.onRetry }
   const maxDate = closedPeriod(1).date_to
@@ -54,6 +54,7 @@ export default function AnalyticsMaintenance({ organizations = [], catalogError,
           'A leitura das posses individuais exige permissão de Posses.'] } })
   }
 
+  if (!enabled) return null
   return <div className="analytics-costs">
     <form className="analytics-cockpit-filters" onSubmit={apply} aria-label="Filtros de Manutenção">
       <label>De<input type="date" value={draft.date_from} min="1901-01-01" max={maxDate} required onChange={(e) => setDraft((v) => ({ ...v, date_from: e.target.value }))} /></label>

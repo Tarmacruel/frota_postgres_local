@@ -24,3 +24,7 @@ export function formatAdditiveDetails(record, formatNumber) {
   if (!record.additive_quantity_liters) return record.additive_type
   return `${record.additive_type} (${formatNumber(record.additive_quantity_liters)} L)`
 }
+
+export function fuelSupplyAlertReason(record) {
+  return record.anomaly_details?.trim() || 'Motivo não informado no registro deste abastecimento.'
+}

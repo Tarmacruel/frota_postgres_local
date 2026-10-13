@@ -44,6 +44,9 @@ it('mostra medidas registradas e abre anomalia, veículo, posto e mês com conte
   expect(onOpenEntity).toHaveBeenLastCalledWith(expect.objectContaining({ entityType: 'record',
     entityId: supplyId, source: 'fuel_supply', origin: expect.objectContaining({ formula: anomaly.rule,
       limitations: expect.arrayContaining([expect.stringContaining('Amostra: 1')]) }) }))
+  await user.click(within(screen.getByRole('region', { name: 'Anomalias para conferência' })).getByRole('button', { name: 'ABC1D23' }))
+  expect(onOpenEntity).toHaveBeenLastCalledWith(expect.objectContaining({ entityType: 'vehicle', entityId: vehicleId,
+    origin: expect.objectContaining({ formula: anomaly.rule }) }))
   await user.click(within(screen.getByRole('region', { name: 'Ranking de veículos' })).getByRole('button', { name: 'ABC1D23' }))
   expect(onOpenEntity).toHaveBeenLastCalledWith(expect.objectContaining({ entityType: 'vehicle', entityId: vehicleId }))
   await user.click(screen.getByRole('button', { name: 'Posto teste' }))

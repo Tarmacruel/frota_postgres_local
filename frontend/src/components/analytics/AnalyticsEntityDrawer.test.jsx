@@ -146,6 +146,11 @@ describe('AnalyticsEntityDrawer', () => {
     expect(await screen.findByText(/Posse nº 42/)).toBeInTheDocument()
     expect(screen.getAllByText(/100 km/).length).toBeGreaterThan(0)
     expect(analyticsV2API.mileageEvents).toHaveBeenCalledWith(filters, expect.any(AbortSignal))
+    await user.click(screen.getByRole('button', { name: /Posse nº 42/ }))
+    expect(await screen.findByText(/registro de origem consultado na análise/)).toBeInTheDocument()
+    expect(screen.getByRole('region', { name: 'Como foi calculado?' })).toHaveTextContent('Posses encerradas válidas.')
+    await user.click(screen.getByRole('button', { name: /Voltar/ }))
+    await screen.findByRole('button', { name: 'ABC1D23' })
     await user.click(screen.getByRole('button', { name: 'ABC1D23' }))
     expect(analyticsV2API.entity).toHaveBeenCalledWith('vehicle', 'vehicle-1', filters, expect.any(AbortSignal))
     await user.click(screen.getByRole('button', { name: /Voltar/ }))
@@ -197,6 +202,11 @@ describe('AnalyticsEntityDrawer', () => {
     expect(await screen.findByText('Registros do período')).toBeInTheDocument()
     expect(screen.getByRole('region', { name: 'Como foi calculado?' })).toHaveTextContent('Flag registrada')
     expect(analyticsV2API.entity).toHaveBeenCalledWith('vehicle', 'vehicle-1', filters, expect.any(AbortSignal))
+    await user.click(screen.getByRole('button', { name: 'Condutora', exact: true }))
+    await screen.findByText('Registros do período')
+    expect(screen.getByRole('region', { name: 'Como foi calculado?' })).toHaveTextContent('Flag registrada')
+    await user.click(screen.getByRole('button', { name: /Voltar/ }))
+    await screen.findByRole('button', { name: /Abastecimento · 10\/09\/2026/ })
     await user.click(screen.getByRole('button', { name: /Abastecimento · 10\/09\/2026/ }))
     expect(await screen.findByText('consulta ao registro de domínio', { exact: false })).toBeInTheDocument()
     expect(api.get).toHaveBeenCalledWith('/fuel-supplies/supply-1', expect.objectContaining({ signal: expect.any(AbortSignal) }))
@@ -219,7 +229,31 @@ describe('AnalyticsEntityDrawer', () => {
     await user.click(screen.getByRole('button', { name: 'Abrir alerta' }))
     await user.click(await screen.findByRole('button', { name: 'Carregar mais registros' }))
     expect(await screen.findByRole('button', { name: /Multa · 09\/09\/2026/ })).toBeInTheDocument()
-    expect(analyticsV2API.entity).toHaveBeenLastCalledWith('vehicle', 'vehicle-1', { ...filters, offset: 1 })
+    expect(analyticsV2API.entity).toHaveBeenLastCalledWith('vehicle', 'vehicle-1', { ...filters, offset: 1 }, expect.any(AbortSignal))
+  })
+  it.each(['success', 'error'])('cancela paginação e descarta resposta antiga %s ao reabrir o mesmo contexto', async (outcome) => {
+    let settlePage
+    const initial = { subtitle: 'Sedan', period: filters, methodology: 'Valores registrados.',
+      totals: Object.fromEntries(['operational_cost', 'fuel', 'maintenance', 'fines', 'claim_estimate'].map((key) => [key, { value: '0' }])),
+      total_events: 2, events: [{ id: 'one', source: 'fuel_supply', date: '2026-09-10', amount: '10',
+        vehicle_id: 'vehicle-1', plate: 'ABC1D23', driver_id: null, driver_name: null, anomaly: false, status: null }] }
+    analyticsV2API.entity.mockResolvedValueOnce({ data: initial })
+      .mockImplementationOnce(() => new Promise((resolve, reject) => { settlePage = outcome === 'success' ? resolve : reject }))
+      .mockResolvedValueOnce({ data: initial })
+    const user = userEvent.setup()
+    render(<DetailHarness />)
+    await user.click(screen.getByRole('button', { name: 'Abrir alerta' }))
+    await user.click(await screen.findByRole('button', { name: 'Carregar mais registros' }))
+    const signal = analyticsV2API.entity.mock.calls[1][3]
+    await user.click(screen.getByRole('button', { name: 'Fechar' }))
+    expect(signal.aborted).toBe(true)
+    await user.click(screen.getByRole('button', { name: 'Abrir alerta' }))
+    await screen.findByRole('button', { name: 'Carregar mais registros' })
+    await act(async () => settlePage(outcome === 'success'
+      ? { data: { events: [{ ...initial.events[0], id: 'old-page', source: 'fine' }] } } : new Error('old page failed')))
+    expect(screen.queryByRole('button', { name: /Multa ·/ })).not.toBeInTheDocument()
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Carregar mais registros' })).toBeEnabled()
   })
   it('Escape volta um nível, Voltar preserva pilha e Fechar restaura foco', async () => {
     const user = userEvent.setup()

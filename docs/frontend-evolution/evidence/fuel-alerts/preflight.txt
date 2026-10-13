@@ -1,0 +1,57 @@
+﻿Branch: feature/analytics-evolution-hml HEAD: 82f3415fc358e3f5152a9ee4d0fad53594d264e5 Git status:
+ M backend/app/api/routes/analytics_v2.py
+ M backend/app/models/__init__.py
+ M backend/app/repositories/analytics_v2_repository.py
+ M backend/app/services/analytics_service.py
+ M backend/app/services/analytics_v2_drivers.py
+ M backend/app/services/analytics_v2_fuel.py
+ M backend/tests/test_analytics_metrics.py
+ M backend/tests/test_analytics_v2_drivers.py
+ M backend/tests/test_analytics_v2_fuel.py
+ M backend/tests/test_analytics_v2_postgres.py
+ M docs/analytics-evolution/11_STATUS.md
+ M frontend/src/api/analytics.js
+ M frontend/src/api/analyticsV2.js
+ M frontend/src/components/Modal.jsx
+ M frontend/src/components/Modal.test.jsx
+ M frontend/src/components/analytics/AdvancedFilters.jsx
+ M frontend/src/components/analytics/AnalyticsCosts.jsx
+ M frontend/src/components/analytics/AnalyticsDrivers.jsx
+ M frontend/src/components/analytics/AnalyticsDrivers.test.jsx
+ M frontend/src/components/analytics/AnalyticsEntityDrawer.jsx
+ M frontend/src/components/analytics/AnalyticsEntityDrawer.test.jsx
+ M frontend/src/components/analytics/AnalyticsFuel.jsx
+ M frontend/src/components/analytics/AnalyticsFuel.test.jsx
+ M frontend/src/components/analytics/AnalyticsMaintenance.jsx
+ M frontend/src/components/analytics/AnalyticsOverview.jsx
+ M frontend/src/components/analytics/AnalyticsUtilization.jsx
+ M frontend/src/components/analytics/SmartInsightsList.jsx
+ M frontend/src/components/analytics/useAnalyticsV1.js
+ M frontend/src/pages/AdminAnalyticsDashboard.jsx
+ M frontend/src/pages/AdminAnalyticsDashboard.test.jsx
+ M frontend/src/styles/analytics-evolution.css
+ M frontend/src/utils/apiError.js
+?? backend/alembic/versions/0052_analytics_alert_workflow.py
+?? backend/app/api/routes/analytics_alerts.py
+?? backend/app/models/analytics_alert.py
+?? backend/app/schemas/analytics_alert.py
+?? backend/app/services/analytics_alerts.py
+?? backend/app/services/analytics_v2_reports.py
+?? backend/tests/test_analytics_alert_routes.py
+?? backend/tests/test_analytics_alerts.py
+?? backend/tests/test_analytics_alerts_postgres.py
+?? backend/tests/test_analytics_v2_reports.py
+?? docs/analytics-evolution/DELIVERY_PHASE_10.md
+?? docs/analytics-evolution/EXECPLAN_PHASE_10_PART_1.md
+?? docs/analytics-evolution/EXECPLAN_PHASE_10_PART_2.md
+?? docs/analytics-evolution/EXECPLAN_PHASE_11.md
+?? docs/analytics-evolution/EXECPLAN_REVIEW_2026_10_13.md
+?? docs/analytics-evolution/QA_PHASE_12.md
+?? docs/analytics-evolution/REVIEW_2026_10_13.md
+?? docs/analytics-evolution/evidence/phase-10/
+?? docs/analytics-evolution/evidence/phase-12/
+?? frontend/src/components/analytics/AnalyticsAlertDetail.jsx
+?? frontend/src/components/analytics/AnalyticsAlerts.jsx
+?? frontend/src/components/analytics/AnalyticsAlerts.test.jsx
+?? frontend/src/components/analytics/AnalyticsReports.jsx
+?? frontend/src/components/analytics/analyticsAlertFormat.js

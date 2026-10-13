@@ -67,8 +67,8 @@ ANALYTICS_EXPORT_COLUMNS = (
 )
 
 ANALYTICS_METRIC_LABELS = {
-    "consumption_l_100km": "Consumo de combustível (L/100 km)",
-    "tco_cost_per_km": "Custo total por quilômetro",
+    "consumption_l_100km": "Litros abastecidos por 100 km",
+    "tco_cost_per_km": "Custo operacional por quilômetro",
     "driver_risk_score": "Índice de risco do condutor",
 }
 
@@ -516,11 +516,14 @@ class AnalyticsService:
             )
         return sorted(payload, key=lambda item: item["normalized_risk_score"], reverse=True)
 
-    def _build_insights(self, vehicle_rows: list[FleetAnalyticsSnapshot], driver_rows: list[FleetAnalyticsSnapshot]) -> list[dict]:
+    def _build_insights(self, vehicle_rows: list[FleetAnalyticsSnapshot], driver_rows: list[FleetAnalyticsSnapshot],
+                        vehicle_names: dict[UUID, str] | None = None) -> list[dict]:
         insights: list[dict] = []
         now = datetime.now(timezone.utc)
+        vehicle_names = vehicle_names or {}
 
         for row in vehicle_rows:
+            vehicle_name = vehicle_names.get(row.vehicle_id, 'Veículo')
             variance = calculate_variance_percentage(row.consumption_l_100km, row.category_average_consumption)
             if variance is not None and abs(variance) > 20:
                 severity = "HIGH" if abs(variance) >= 40 else "MEDIUM"
@@ -534,8 +537,8 @@ class AnalyticsService:
                         "variance_percentage": round(variance, 2),
                         "severity": severity,
                         "message": (
-                            f"Veículo tipo {row.vehicle_type} apresenta consumo {abs(variance):.1f}% "
-                            f"{'superior' if variance > 0 else 'inferior'} a média da categoria "
+                            f"{vehicle_name}: litros abastecidos por 100 km {abs(variance):.1f}% "
+                            f"{'superiores' if variance > 0 else 'inferiores'} à média da categoria "
                             f"({(row.category_average_consumption or 0):.1f} L/100km)."
                         ),
                         "recommended_action": "Agendar inspeção mecânica preventiva",
@@ -555,8 +558,8 @@ class AnalyticsService:
                         "variance_percentage": round(tco_var, 2),
                         "severity": "HIGH" if abs(tco_var) >= 50 else "MEDIUM",
                         "message": (
-                            f"TCO por km de {row.vehicle_type} está {abs(tco_var):.1f}% fora da referência "
-                            f"de mercado ({(row.market_benchmark_tco or 0):.2f}/km)."
+                            f"Custo operacional por km de {vehicle_name} está {abs(tco_var):.1f}% fora da referência "
+                            f"configurada por tipo ({(row.market_benchmark_tco or 0):.2f}/km)."
                         ),
                         "recommended_action": "Revisar plano de custos e manutenção",
                         "generated_at": now,
@@ -605,9 +608,18 @@ class AnalyticsService:
             self._unique_driver_snapshots(rows),
             organization_id,
         )
+        vehicle_ids = {row.vehicle_id for row in vehicle_rows if row.vehicle_id is not None}
+        vehicle_names = {}
+        if vehicle_ids:
+            identities = (await self.db.execute(
+                select(Vehicle.id, Vehicle.plate, Vehicle.brand, Vehicle.model).where(Vehicle.id.in_(vehicle_ids))
+            )).all()
+            vehicle_names = {item.id: f"Veículo {item.plate} · {item.brand} {item.model}".strip()
+                             for item in identities}
         return self._build_insights(
             vehicle_rows,
             driver_rows,
+            vehicle_names,
         )
 
 

@@ -1,5 +1,7 @@
 from io import BytesIO
+from types import SimpleNamespace
 from unittest.mock import AsyncMock
+from uuid import uuid4
 from zipfile import ZipFile
 
 import pytest
@@ -38,6 +40,34 @@ def test_calculate_variance_percentage():
     assert calculate_variance_percentage(12, 10) == 20
     assert calculate_variance_percentage(8, 10) == -20
     assert calculate_variance_percentage(10, 0) is None
+
+
+@pytest.mark.asyncio
+async def test_insights_identify_only_scoped_vehicles_by_plate_brand_and_model():
+    allowed_id, other_id = uuid4(), uuid4()
+    def snapshot(vehicle_id):
+        return SimpleNamespace(scope='VEHICLE', vehicle_id=vehicle_id, vehicle_type='PERUA_SW',
+            consumption_l_100km=20, category_average_consumption=10,
+            tco_cost_per_km=3, market_benchmark_tco=1)
+
+    allowed, other = snapshot(allowed_id), snapshot(other_id)
+    db = SimpleNamespace(execute=AsyncMock(return_value=SimpleNamespace(all=lambda: [
+        SimpleNamespace(id=allowed_id, plate='ABC1D23', brand='Fiat', model='Uno')])))
+    service = AnalyticsService(db)
+    service._ensure_snapshots = AsyncMock(return_value=[allowed, other])
+    service._filter_vehicle_snapshots_by_organization = AsyncMock(return_value=[allowed])
+    service._filter_driver_snapshots_by_organization = AsyncMock(return_value=[])
+
+    insights = await service.insights(30, organization_id=uuid4())
+
+    db.execute.assert_awaited_once()
+    selected_ids = next(iter(db.execute.await_args.args[0].compile().params.values()))
+    assert set(selected_ids) == {allowed_id}
+    assert len(insights) == 2
+    assert all('Veículo ABC1D23 · Fiat Uno' in item['message'] for item in insights)
+    assert all('PERUA_SW' not in item['message'] for item in insights)
+    assert 'litros abastecidos por 100 km' in insights[0]['message']
+    assert 'referência configurada por tipo' in insights[1]['message']
 
 
 @pytest.mark.parametrize(
@@ -160,6 +190,6 @@ async def test_analytics_pdf_export_is_real_official_and_contains_dataset(monkey
     assert "RELATÓRIO DE ANÁLISES DA FROTA" in rendered_content
     assert "últimos 90 dias" in rendered_content
     assert "UTC-03:00" in rendered_content
-    assert "Consumo de combustível (L/100 km)" in rendered_content
+    assert "Litros abastecidos por 100 km" in rendered_content
     assert "Consumo acima da média da categoria." in rendered_content
     assert "Agendar inspeção mecânica preventiva" in rendered_content

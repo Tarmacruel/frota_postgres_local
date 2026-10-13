@@ -6,15 +6,16 @@ import { analyticsAPI } from '../api/analytics'
 import { analyticsV2API } from '../api/analyticsV2'
 import AdminAnalyticsDashboard from './AdminAnalyticsDashboard'
 
-vi.mock('../components/analytics/AnalyticsOverview', () => ({ default: () => <div>Cockpit atual</div> }))
-vi.mock('../components/analytics/AnalyticsFuel', () => ({ default: () => <div>Combustível V2</div> }))
-vi.mock('../components/analytics/AnalyticsMaintenance', () => ({ default: () => <div>Manutenção V2</div> }))
-vi.mock('../components/analytics/AnalyticsUtilization', () => ({ default: () => <div>Utilização V2</div> }))
-vi.mock('../components/analytics/AnalyticsDrivers', () => ({ default: () => <div>Condutores V2</div> }))
+vi.mock('../components/analytics/AnalyticsOverview', () => ({ default: ({ enabled }) => enabled ? <div>Cockpit atual</div> : null }))
+vi.mock('../components/analytics/AnalyticsFuel', () => ({ default: ({ enabled }) => enabled ? <div>Combustível V2</div> : null }))
+vi.mock('../components/analytics/AnalyticsMaintenance', () => ({ default: ({ enabled }) => enabled ? <div>Manutenção V2</div> : null }))
+vi.mock('../components/analytics/AnalyticsUtilization', () => ({ default: ({ enabled }) => enabled ? <div>Utilização V2</div> : null }))
+vi.mock('../components/analytics/AnalyticsDrivers', () => ({ default: ({ enabled }) => enabled ? <div>Condutores V2</div> : null }))
+vi.mock('../components/analytics/AnalyticsAlerts', () => ({ default: ({ enabled }) => enabled ? <div>Casos persistidos V2</div> : null }))
 vi.mock('../api/analytics', () => ({ analyticsAPI: Object.fromEntries(
   ['overview', 'efficiency', 'tco', 'driverRisk', 'insights', 'costTrend', 'exportReport'].map((name) => [name, vi.fn()]),
 ) }))
-vi.mock('../api/analyticsV2', () => ({ analyticsV2API: { entity: vi.fn(), costs: vi.fn() } }))
+vi.mock('../api/analyticsV2', () => ({ analyticsV2API: { entity: vi.fn(), costs: vi.fn(), exportReport: vi.fn() } }))
 vi.mock('../hooks/useMasterDataCatalog', () => ({ useMasterDataCatalog: () => ({ organizations: [] }) }))
 // Chart layout requires a browser. Keep the real analytics wrappers/tables and isolate Recharts.
 vi.mock('recharts', () => {
@@ -48,6 +49,33 @@ beforeEach(() => {
 })
 
 describe('Analytics — fundação V1', () => {
+  it('conserva o recorte de Custos ao sair e retornar à aba', async () => {
+    const user = userEvent.setup()
+    mount('/analytics?view=costs')
+    const filters = within(screen.getByRole('form', { name: 'Filtros de Custos' }))
+    await user.clear(filters.getByLabelText('De'))
+    await user.type(filters.getByLabelText('De'), '2026-09-01')
+    await user.clear(filters.getByLabelText('Até'))
+    await user.type(filters.getByLabelText('Até'), '2026-09-30')
+    await user.click(filters.getByRole('button', { name: 'Aplicar filtros' }))
+    await user.click(screen.getByRole('button', { name: 'Relatórios', exact: true }))
+    await user.click(screen.getByRole('button', { name: 'Custos', exact: true }))
+    const restored = within(screen.getByRole('form', { name: 'Filtros de Custos' }))
+    expect(restored.getByLabelText('De')).toHaveValue('2026-09-01')
+    expect(restored.getByLabelText('Até')).toHaveValue('2026-09-30')
+  })
+
+  it('mantém insights V1 sob demanda na aba de casos persistidos', async () => {
+    mount('/analytics?view=alerts')
+    expect(screen.getByText('Casos persistidos V2')).toBeInTheDocument()
+    expect(analyticsAPI.insights).not.toHaveBeenCalled()
+    await userEvent.click(screen.getByText('Consultar insights anteriores (V1)'))
+    await screen.findByText('Sem alertas no período selecionado.')
+    expect(analyticsAPI.insights).toHaveBeenCalledOnce()
+    for (const key of ['overview', 'efficiency', 'tco', 'driverRisk', 'costTrend']) {
+      expect(analyticsAPI[key]).not.toHaveBeenCalled()
+    }
+  })
   it('mantém a comparação anterior de custos acessível sob demanda', async () => {
     const user = userEvent.setup()
     mount('/analytics?view=costs')
@@ -64,10 +92,10 @@ describe('Analytics — fundação V1', () => {
     expect(screen.getByText('Combustível V2')).toBeInTheDocument()
     expect(within(screen.getByRole('navigation', { name: 'Seções de análises' })).getAllByRole('button')).toHaveLength(8)
     expect(screen.getByText('R$ 2.30')).toBeInTheDocument()
-    for (const key of ['overview', 'efficiency', 'tco', 'driverRisk', 'insights']) {
-      expect(analyticsAPI[key]).toHaveBeenCalledWith({ period_days: 30, vehicle_type: undefined, organization: undefined })
+    for (const key of ['efficiency', 'tco']) {
+      expect(analyticsAPI[key]).toHaveBeenCalledWith({ period_days: 30, vehicle_type: undefined, organization: undefined }, expect.any(AbortSignal))
     }
-    expect(analyticsAPI.costTrend).toHaveBeenCalledWith({ months: 12, vehicle_type: undefined, organization: undefined })
+    for (const key of ['overview', 'driverRisk', 'insights', 'costTrend']) expect(analyticsAPI[key]).not.toHaveBeenCalled()
     expect(screen.getByTestId('location')).toHaveTextContent('/analytics')
   })
 
@@ -77,8 +105,8 @@ describe('Analytics — fundação V1', () => {
     await ready()
     await user.click(screen.getByRole('button', { name: 'Período', exact: true }))
     await user.click(screen.getByRole('button', { name: 'Últimos 90 dias' }))
-    await waitFor(() => expect(analyticsAPI.overview).toHaveBeenLastCalledWith(expect.objectContaining({ period_days: 90 })))
-    const before = analyticsAPI.overview.mock.calls.length
+    await waitFor(() => expect(analyticsAPI.efficiency).toHaveBeenLastCalledWith(expect.objectContaining({ period_days: 90 }), expect.any(AbortSignal)))
+    const before = analyticsAPI.efficiency.mock.calls.length
     const driverCallsBefore = analyticsAPI.driverRisk.mock.calls.length
     const tab = screen.getByRole('button', { name: 'Condutores', exact: true })
     tab.focus()
@@ -86,7 +114,7 @@ describe('Analytics — fundação V1', () => {
     expect(tab).toHaveAttribute('aria-current', 'page')
     expect(screen.getByTestId('location')).toHaveTextContent('/analytics?keep=1&view=drivers')
     expect(screen.getByText('Condutores V2')).toBeInTheDocument()
-    expect(analyticsAPI.overview).toHaveBeenCalledTimes(before)
+    expect(analyticsAPI.efficiency).toHaveBeenCalledTimes(before)
     expect(analyticsAPI.driverRisk).toHaveBeenCalledTimes(driverCallsBefore)
   })
 
@@ -104,6 +132,7 @@ describe('Analytics — fundação V1', () => {
     analyticsAPI.insights.mockRejectedValueOnce(new Error('offline'))
     const user = userEvent.setup()
     mount('/analytics?view=alerts')
+    await user.click(screen.getByText('Consultar insights anteriores (V1)'))
     await screen.findByRole('alert')
     const section = screen.getByRole('region', { name: 'Alertas inteligentes' })
     expect(within(section).getByRole('alert')).toBeInTheDocument()
@@ -111,7 +140,7 @@ describe('Analytics — fundação V1', () => {
     await user.click(within(section).getByRole('button', { name: 'Tentar novamente' }))
     await within(section).findByText('Sem alertas no período selecionado.')
     expect(analyticsAPI.insights).toHaveBeenCalledTimes(2)
-    expect(analyticsAPI.overview).toHaveBeenCalledTimes(1)
+    expect(analyticsAPI.overview).not.toHaveBeenCalled()
   })
 
   it('mostra carregamento sem zeros e descarta resposta antiga após mudar filtros', async () => {
@@ -123,6 +152,7 @@ describe('Analytics — fundação V1', () => {
     expect(screen.queryByText('0.00 L/100km')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Período', exact: true }))
     await user.click(screen.getByRole('button', { name: 'Últimos 7 dias' }))
+    expect(analyticsAPI.efficiency.mock.calls[0][1].aborted).toBe(true)
     await ready()
     await act(async () => resolveOld({ data: [{ ...vehicle, consumption_l_100km: 999 }] }))
     expect(screen.getByText('8.00 L/100km')).toBeInTheDocument()
@@ -147,34 +177,78 @@ describe('Analytics — fundação V1', () => {
     expect(screen.getByRole('button', { name: 'Visão Geral' })).toHaveAttribute('aria-current', 'page')
   })
 
-  it.each(['xlsx', 'pdf'])('preserva exportação %s, opções e filtros V1', async (format) => {
+  it.each(['xlsx', 'pdf'])('exporta relatório V2 %s com filtros aceitos', async (format) => {
     const user = userEvent.setup()
     const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
     const create = vi.fn(() => 'blob:test')
     const revoke = vi.fn()
     Object.defineProperty(window.URL, 'createObjectURL', { configurable: true, value: create })
     Object.defineProperty(window.URL, 'revokeObjectURL', { configurable: true, value: revoke })
-    analyticsAPI.exportReport.mockResolvedValue({ data: new Blob(['test']) })
+    analyticsV2API.exportReport.mockResolvedValue({ data: new Blob(['test']) })
     mount('/analytics?view=reports')
-    await user.click(screen.getByRole('button', { name: 'Preparar exportação' }))
     await user.selectOptions(screen.getByRole('combobox', { name: 'Formato' }), format)
-    await user.click(screen.getByRole('checkbox', { name: 'Incluir gráficos' }))
-    await user.click(screen.getByRole('button', { name: 'Exportar', exact: true }))
-    await waitFor(() => expect(screen.queryByRole('dialog')).not.toBeInTheDocument())
-    expect(analyticsAPI.exportReport).toHaveBeenCalledWith({ period_days: 30, vehicle_type: undefined, organization: undefined,
-      export_format: format, include_charts: false, include_details: true })
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Perfil' }), 'costs')
+    await user.click(screen.getByRole('button', { name: 'Exportar relatório' }))
+    await waitFor(() => expect(analyticsV2API.exportReport).toHaveBeenCalledOnce())
+    expect(analyticsV2API.exportReport).toHaveBeenCalledWith({ date_from: expect.any(String), date_to: expect.any(String),
+      organization: undefined, vehicle_type: undefined, profile: 'costs', export_format: format })
+    expect(analyticsAPI.exportReport).not.toHaveBeenCalled()
+    expect(screen.queryByRole('checkbox', { name: /gráficos|detalhados/i })).not.toBeInTheDocument()
     expect(click).toHaveBeenCalledOnce()
     expect(revoke).toHaveBeenCalledWith('blob:test')
     click.mockRestore()
   })
 
-  it('mantém modal e opções em caso de erro de exportação', async () => {
-    analyticsAPI.exportReport.mockRejectedValue(new Error('offline'))
+  it('informa falha de exportação V2 sem perder filtros', async () => {
+    analyticsV2API.exportReport.mockRejectedValue(new Error('offline'))
     const user = userEvent.setup()
     mount('/analytics?view=reports')
-    await user.click(screen.getByRole('button', { name: 'Preparar exportação' }))
+    await user.click(screen.getByRole('button', { name: 'Exportar relatório' }))
+    expect(await screen.findByRole('alert')).toBeInTheDocument()
+    expect(screen.getByRole('button', { name: 'Exportar relatório' })).toBeEnabled()
+  })
+
+  it('explica a permissão negada pelo exportador V2 quando a resposta é blob', async () => {
+    const failure = new Error('Request failed with status code 403')
+    const body = new Blob([JSON.stringify({ detail: 'Permissão insuficiente para relatório de condutores' })],
+      { type: 'application/json' })
+    body.text = vi.fn().mockResolvedValue(JSON.stringify({ detail: 'Permissão insuficiente para relatório de condutores' }))
+    failure.response = { status: 403, data: body }
+    analyticsV2API.exportReport.mockRejectedValue(failure)
+    const user = userEvent.setup()
+    mount('/analytics?view=reports')
+    await user.selectOptions(screen.getByRole('combobox', { name: 'Perfil' }), 'drivers')
+    await user.click(screen.getByRole('button', { name: 'Exportar relatório' }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Permissão insuficiente para relatório de condutores')
+    expect(screen.getByRole('combobox', { name: 'Perfil' })).toHaveValue('drivers')
+  })
+
+  it('preserva o exportador V1 sem parâmetros ignorados', async () => {
+    const user = userEvent.setup()
+    analyticsAPI.exportReport.mockResolvedValue({ data: new Blob(['test']) })
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => {})
+    Object.defineProperty(window.URL, 'createObjectURL', { configurable: true, value: vi.fn(() => 'blob:test') })
+    Object.defineProperty(window.URL, 'revokeObjectURL', { configurable: true, value: vi.fn() })
+    mount('/analytics?view=fuel')
+    await user.click(screen.getByRole('button', { name: 'Exportar insights anteriores' }))
+    expect(screen.queryByRole('checkbox')).not.toBeInTheDocument()
     await user.click(screen.getByRole('button', { name: 'Exportar', exact: true }))
-    expect(await within(screen.getByRole('dialog')).findByRole('alert')).toBeInTheDocument()
+    await waitFor(() => expect(analyticsAPI.exportReport).toHaveBeenCalledWith({ period_days: 30,
+      vehicle_type: undefined, organization: undefined, export_format: 'xlsx' }))
+    click.mockRestore()
+  })
+
+  it('mostra a justificativa da API também na falha de exportação V1 binária', async () => {
+    const body = new Blob([], { type: 'application/json' })
+    body.text = vi.fn().mockResolvedValue(JSON.stringify({ detail: 'Permissão insuficiente para exportar' }))
+    analyticsAPI.exportReport.mockRejectedValue({ response: { data: body } })
+    const user = userEvent.setup()
+    mount('/analytics?view=alerts')
+    await user.click(screen.getByText('Consultar insights anteriores (V1)'))
+    await screen.findByText('Sem alertas no período selecionado.')
+    await user.click(screen.getByRole('button', { name: 'Exportar insights anteriores' }))
+    await user.click(screen.getByRole('button', { name: 'Exportar', exact: true }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Permissão insuficiente para exportar')
     expect(screen.getByRole('button', { name: 'Exportar', exact: true })).toBeEnabled()
   })
 })

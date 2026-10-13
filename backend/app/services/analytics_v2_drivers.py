@@ -234,13 +234,17 @@ class AnalyticsV2Drivers:
         return build_analysis(filters, period, roster, possessions, fines, claims, supplies, anomalies,
             can_view_drivers=can_view_drivers, today=today, readable_sources=readable_sources)
 
-    async def events(self, filters, driver_id: UUID, *, source: str, offset: int):
+    async def events(self, filters, driver_id: UUID, *, source: str, offset: int, can_view_drivers: bool = False):
         period, roster, possessions, fines, claims, supplies, anomalies = await self._load(
             filters, can_view_drivers=False)
         analysis = build_analysis(filters, period, roster, possessions, fines, claims, supplies, anomalies,
             can_view_drivers=False, today=datetime.now(INSTITUTIONAL_TIMEZONE).date())
         if driver_id not in {item.driver_id for item in analysis.drivers}:
-            raise HTTPException(404, 'Condutor fora do recorte autorizado')
+            roster_visible = can_view_drivers and filters.vehicle_type is None and filters.vehicle_id is None and any(
+                row['id'] == driver_id and (filters.organization is None or row['organization_id'] == filters.organization)
+                for row in roster)
+            if not roster_visible:
+                raise HTTPException(404, 'Condutor fora do recorte autorizado')
         current_supplies = [row for row in supplies if row['supplied_at'] >= period.start_at]
         supply_by_id = {row['id']: row for row in current_supplies}
         if source == 'anomaly':

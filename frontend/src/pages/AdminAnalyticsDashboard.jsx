@@ -1,7 +1,7 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import { analyticsAPI } from '../api/analytics'
-import { getApiErrorMessage } from '../utils/apiError'
+import { getApiBlobErrorMessage } from '../utils/apiError'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import PageHeader from '../components/ui/PageHeader'
 import Modal from '../components/Modal'
@@ -15,15 +15,20 @@ import AnalyticsFuel from '../components/analytics/AnalyticsFuel'
 import AnalyticsMaintenance from '../components/analytics/AnalyticsMaintenance'
 import AnalyticsUtilization from '../components/analytics/AnalyticsUtilization'
 import AnalyticsDrivers from '../components/analytics/AnalyticsDrivers'
+import AnalyticsReports from '../components/analytics/AnalyticsReports'
+import AnalyticsAlerts from '../components/analytics/AnalyticsAlerts'
+import AnalyticsAlertDetail from '../components/analytics/AnalyticsAlertDetail'
 import TrendChart from '../components/analytics/TrendChart'
 import VehicleDetailsTable from '../components/analytics/VehicleDetailsTable'
 import AnalyticsSubnav from '../components/analytics/AnalyticsSubnav'
 import { ANALYTICS_SECTIONS } from '../components/analytics/analyticsSections'
-import AnalyticsSection from '../components/analytics/AnalyticsSection'
 import AnalyticsEntityDrawer from '../components/analytics/AnalyticsEntityDrawer'
 import useAnalyticsDetailStack from '../components/analytics/useAnalyticsDetailStack'
 import useAnalyticsV1 from '../components/analytics/useAnalyticsV1'
 import { closedPeriod } from '../components/analytics/analyticsV2Format'
+
+const LEGACY_SOURCES = { fuel: ['efficiency', 'tco'], alerts: ['insights'], costs: ['efficiency', 'tco', 'trend'] }
+const NO_LEGACY_SOURCES = []
 
 export default function AdminAnalyticsDashboard() {
   const { organizations, error: catalogError } = useMasterDataCatalog()
@@ -33,14 +38,17 @@ export default function AdminAnalyticsDashboard() {
   const [filters, setFilters] = useState({ period_days: 30, vehicle_type: '', organization: '' })
   const [refreshTick, setRefreshTick] = useState(0)
   const [legacyCostsOpen, setLegacyCostsOpen] = useState(false)
+  const [legacyAlertsOpen, setLegacyAlertsOpen] = useState(false)
   const [exportModalOpen, setExportModalOpen] = useState(false)
-  const [exportConfig, setExportConfig] = useState({ format: 'xlsx', includeCharts: true, includeDetails: true })
+  const [exportConfig, setExportConfig] = useState({ format: 'xlsx' })
   const [exportError, setExportError] = useState('')
   const [exporting, setExporting] = useState(false)
   const detail = useAnalyticsDetailStack()
+  const alertQueueFocus = useRef(null)
   const query = useMemo(() => ({ period_days: filters.period_days,
     vehicle_type: filters.vehicle_type || undefined, organization: filters.organization || undefined }), [filters])
-  const { resources, loading, retry } = useAnalyticsV1(query, refreshTick, !['overview', 'maintenance', 'utilization', 'drivers'].includes(view) && (view !== 'costs' || legacyCostsOpen))
+  const { resources, loading, retry } = useAnalyticsV1(query, refreshTick,
+    Boolean(LEGACY_SOURCES[view]) && (view !== 'costs' || legacyCostsOpen) && (view !== 'alerts' || legacyAlertsOpen), LEGACY_SOURCES[view] || NO_LEGACY_SOURCES)
   const data = (key) => resources[key]?.data || []
   const state = (key) => ({ loading: !resources[key] || resources[key].loading,
     error: resources[key]?.error, onRetry: () => retry(key) })
@@ -66,9 +74,7 @@ export default function AdminAnalyticsDashboard() {
     setExporting(true)
     setExportError('')
     try {
-      const { data: report } = await analyticsAPI.exportReport({ ...query,
-        export_format: exportConfig.format, include_charts: exportConfig.includeCharts,
-        include_details: exportConfig.includeDetails })
+      const { data: report } = await analyticsAPI.exportReport({ ...query, export_format: exportConfig.format })
       const url = window.URL.createObjectURL(report)
       const a = document.createElement('a')
       a.href = url
@@ -76,7 +82,7 @@ export default function AdminAnalyticsDashboard() {
       a.click()
       window.URL.revokeObjectURL(url)
       setExportModalOpen(false)
-    } catch (error) { setExportError(getApiErrorMessage(error, 'Não foi possível exportar o relatório.')) }
+    } catch (error) { setExportError(await getApiBlobErrorMessage(error, 'Não foi possível exportar o relatório.')) }
     finally { setExporting(false) }
   }
 
@@ -84,12 +90,22 @@ export default function AdminAnalyticsDashboard() {
     <div className="surface-panel operation-page management-page management-page--analytics analytics-foundation">
       <PageHeader title="Análises administrativas" description="Consulte os indicadores da frota e explore as análises por assunto." />
       <AnalyticsSubnav activeKey={view} onChange={changeView} />
-      <div hidden={view !== 'overview'}><AnalyticsOverview enabled={view === 'overview'} organizations={organizations} catalogError={catalogError} onOpenEntity={detail.open} /></div>
-      {view === 'costs' ? <AnalyticsCosts organizations={organizations} catalogError={catalogError} onOpenEntity={detail.open} /> : null}
-      {view === 'fuel' ? <AnalyticsFuel organizations={organizations} catalogError={catalogError} onOpenEntity={detail.open} /> : null}
-      {view === 'maintenance' ? <AnalyticsMaintenance organizations={organizations} catalogError={catalogError} onOpenEntity={detail.open} /> : null}
-      {view === 'utilization' ? <AnalyticsUtilization organizations={organizations} catalogError={catalogError} onOpenEntity={detail.open} /> : null}
-      {view === 'drivers' ? <AnalyticsDrivers organizations={organizations} catalogError={catalogError} onOpenEntity={detail.open} /> : null}
+      <AnalyticsOverview enabled={view === 'overview'} organizations={organizations} catalogError={catalogError} onOpenEntity={detail.open} />
+      <AnalyticsCosts enabled={view === 'costs'} organizations={organizations} catalogError={catalogError} onOpenEntity={detail.open} />
+      <AnalyticsFuel enabled={view === 'fuel'} organizations={organizations} catalogError={catalogError} onOpenEntity={detail.open} />
+      <AnalyticsMaintenance enabled={view === 'maintenance'} organizations={organizations} catalogError={catalogError} onOpenEntity={detail.open} />
+      <AnalyticsUtilization enabled={view === 'utilization'} organizations={organizations} catalogError={catalogError} onOpenEntity={detail.open} />
+      <AnalyticsDrivers enabled={view === 'drivers'} organizations={organizations} catalogError={catalogError} onOpenEntity={detail.open} />
+      <AnalyticsReports enabled={view === 'reports'} organizations={organizations} catalogError={catalogError} />
+      <AnalyticsAlerts enabled={view === 'alerts'} organizations={organizations} onOpenEntity={detail.open} returnFocusRef={alertQueueFocus} />
+      {view === 'alerts' ? <details className="analytics-costs-legacy" open={legacyAlertsOpen} onToggle={(event) => setLegacyAlertsOpen(event.currentTarget.open)}>
+        <summary>Consultar insights anteriores (V1)</summary>
+        <p className="analytics-scope-note">Insights calculados, sem estado ou atendimento persistido. Usam janela/fórmulas anteriores e não são os casos da fila.</p>
+        <AdvancedFilters filters={filters} organizations={organizations} loading={loading}
+          onChange={(name, value) => setFilters((current) => ({ ...current, [name]: value }))}
+          onRefresh={() => setRefreshTick((value) => value + 1)} onExport={openExport} />
+        <SmartInsightsList insights={data('insights')} onOpenEntity={openLegacy} {...state('insights')} />
+      </details> : null}
       {view === 'costs' ? <details className="analytics-costs-legacy" open={legacyCostsOpen} onToggle={(event) => setLegacyCostsOpen(event.currentTarget.open)}>
         <summary>Consultar análises anteriores de custos</summary>
         <p className="analytics-scope-note">Comparação com referência configurada por categoria e tendência anterior de 12 meses. Estes indicadores usam filtros e cálculos próprios da V1; não representam TCO completo nem pesquisa de mercado.</p>
@@ -105,24 +121,21 @@ export default function AdminAnalyticsDashboard() {
             onRetry={() => { if (resources.efficiency?.error) retry('efficiency'); if (resources.tco?.error) retry('tco') }} />
         </div>
       </details> : null}
-      {view !== 'overview' && view !== 'costs' && view !== 'maintenance' && view !== 'utilization' && view !== 'drivers' ? <AdvancedFilters filters={filters} organizations={organizations} loading={loading}
+      {view === 'fuel' ? <AdvancedFilters filters={filters} organizations={organizations} loading={loading}
         onChange={(name, value) => setFilters((current) => ({ ...current, [name]: value }))}
         onRefresh={() => setRefreshTick((value) => value + 1)} onExport={openExport} /> : null}
-      {view !== 'overview' && view !== 'costs' && view !== 'maintenance' && view !== 'utilization' && view !== 'drivers' ? <p className="analytics-scope-note">Análises anteriores: mantêm filtros e cálculos próprios. {view === 'fuel' ? 'A comparação por tipo abaixo usa sua janela e fórmula V1 próprias; abastecimentos registrados não comprovam consumo efetivo.' : 'A tendência considera 12 meses.'} O relatório existente não exporta as novas visões V2.</p> : null}
+      {view === 'fuel' ? <p className="analytics-scope-note">Análises anteriores: mantêm filtros e cálculos próprios. A comparação por tipo abaixo usa sua janela e fórmula V1 próprias; abastecimentos registrados não comprovam consumo efetivo. A exportação anterior contém insights V1; use Relatórios para as visões V2.</p> : null}
       <div className="analytics-foundation-grid">
         {visible('fuel') ? <EfficiencyChart rows={data('efficiency')} onOpenEntity={openLegacy} {...state('efficiency')} /> : null}
-        {visible('alerts') ? <SmartInsightsList insights={data('insights')} onOpenEntity={openLegacy} {...state('insights')} /> : null}
         {visible('fuel') ? <VehicleDetailsTable efficiencyRows={data('efficiency').slice(0, 25)} tcoRows={data('tco')}
           onOpenEntity={openLegacy} loading={state('efficiency').loading || state('tco').loading}
           error={resources.efficiency?.error || resources.tco?.error}
           onRetry={() => { if (resources.efficiency?.error) retry('efficiency'); if (resources.tco?.error) retry('tco') }} /> : null}
       </div>
-      {view === 'reports' ? <AnalyticsSection title="Relatórios" description="Exporte a consulta nos formatos já disponíveis.">
-        <p>O relatório mantém o conteúdo da exportação atual. A seção selecionada não altera seu conteúdo.</p>
-        <button type="button" className="app-button" onClick={openExport}>Preparar exportação</button>
-      </AnalyticsSection> : null}
-      <AnalyticsEntityDrawer detail={detail.current} canGoBack={detail.canGoBack} onOpen={detail.open} onBack={detail.back} onClose={detail.close} />
-      <Modal open={exportModalOpen} title="Exportar relatório" description="Escolha o formato e os itens do relatório gerado"
+      <AnalyticsEntityDrawer detail={detail.current} canGoBack={detail.canGoBack} onOpen={detail.open} onBack={detail.back} onClose={detail.close} returnFocusRef={alertQueueFocus}>
+        {detail.current?.entityType === 'alert' ? <AnalyticsAlertDetail key={detail.current.entityId} detail={detail.current} onOpen={detail.open} /> : undefined}
+      </AnalyticsEntityDrawer>
+      <Modal open={exportModalOpen} title="Exportar insights anteriores" description="Escolha o formato do relatório V1"
         onClose={() => setExportModalOpen(false)} canClose={!exporting}>
         <div className="form-grid analytics-export-form">
           <label>Formato
@@ -130,11 +143,7 @@ export default function AdminAnalyticsDashboard() {
               <option value="xlsx">Excel (XLSX)</option><option value="pdf">PDF</option>
             </select>
           </label>
-          <label className="checkbox-field"><input type="checkbox" disabled={exporting} checked={exportConfig.includeCharts}
-            onChange={(e) => setExportConfig((v) => ({ ...v, includeCharts: e.target.checked }))} />Incluir gráficos</label>
-          <label className="checkbox-field"><input type="checkbox" disabled={exporting} checked={exportConfig.includeDetails}
-            onChange={(e) => setExportConfig((v) => ({ ...v, includeDetails: e.target.checked }))} />Incluir dados detalhados</label>
-          <p className="analytics-scope-note">A exportação atual usa um conteúdo fixo: as opções de gráficos e detalhamento ainda não alteram o arquivo gerado.</p>
+          <p className="analytics-scope-note">Este arquivo contém apenas insights V1 do período e filtros anteriores. Para métricas V2, use a seção Relatórios.</p>
           {exportError ? <p role="alert">{exportError}</p> : null}
           <div className="actions-inline">
             <button type="button" className="ghost-button" disabled={exporting} onClick={() => setExportModalOpen(false)}>Cancelar</button>

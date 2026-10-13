@@ -1,4 +1,5 @@
 from datetime import date, datetime, timezone
+from typing import Literal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, Response
@@ -20,6 +21,7 @@ from app.services.analytics_v2_fuel import AnalyticsV2Fuel, FuelAnalysis, FuelEv
 from app.services.analytics_v2_maintenance import AnalyticsV2Maintenance, MaintenanceAnalysis, MaintenanceEvents
 from app.services.analytics_v2_utilization import AnalyticsV2Utilization, UtilizationAnalysis, UtilizationEvents
 from app.services.analytics_v2_drivers import AnalyticsV2Drivers, DriverAnalysis, DriverEvents
+from app.services.analytics_v2_reports import export_report
 
 router = APIRouter(prefix="/api/analytics/v2", tags=["Análises V2"])
 
@@ -42,6 +44,10 @@ def common_filter(request: Request, date_from: date = Query(), date_to: date = Q
         allowed.update({'offset', 'mode'})
     if request.url.path.startswith('/api/analytics/v2/drivers/') and request.url.path.endswith('/events'):
         allowed.update({'offset', 'source'})
+    if request.url.path == '/api/analytics/v2/export':
+        allowed.update({'profile', 'export_format'})
+    if request.url.path == '/api/analytics/v2/alerts':
+        allowed.update({'offset', 'limit', 'status', 'severity', 'rule_key'})
     unsupported = set(request.query_params) - allowed
     if unsupported:
         raise HTTPException(422, "Filtro não suportado: " + ", ".join(sorted(unsupported)))
@@ -61,6 +67,35 @@ async def summary(response: Response, filters: AnalyticsV2Filter = Depends(commo
     response.headers["Cache-Control"] = "private, no-store"
     scoped = filters.model_copy(update={"organization": analytics_organization_scope(current_user, filters.organization)})
     return await AnalyticsV2Service(db).summary(scoped)
+
+
+@router.get('/export')
+async def export_v2(profile: Literal['executive', 'costs', 'fuel', 'maintenance', 'utilization', 'drivers'],
+    export_format: Literal['pdf', 'xlsx'], filters: AnalyticsV2Filter = Depends(common_filter),
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission('analytics', 'view'))):
+    scoped = filters.model_copy(update={'organization': analytics_organization_scope(current_user, filters.organization)})
+    permissions = current_user.permissions
+    if profile == 'executive':
+        data = await AnalyticsV2Service(db).summary(scoped)
+    elif profile == 'costs':
+        data = await AnalyticsV2Costs(db).get(scoped)
+    elif profile == 'fuel':
+        data = await AnalyticsV2Fuel(db).get(scoped,
+            can_view_records=bool(permissions.get('fuel_supplies', {}).get('can_view')))
+    elif profile == 'maintenance':
+        data = await AnalyticsV2Maintenance(db).get(scoped)
+    elif profile == 'utilization':
+        data = await AnalyticsV2Utilization(db).get(scoped)
+    else:
+        if not permissions.get('drivers', {}).get('can_view'):
+            raise HTTPException(403, 'Permissão insuficiente para relatório de condutores')
+        readable = [source for source, module in (
+            ('possession', 'possession'), ('fine', 'fines'), ('claim', 'claims'),
+            ('fuel_supply', 'fuel_supplies'), ('anomaly', 'fuel_supplies'))
+            if permissions.get(module, {}).get('can_view')]
+        data = await AnalyticsV2Drivers(db).get(scoped, can_view_drivers=True, readable_sources=readable)
+    return export_report(profile, export_format, scoped, data)
 
 
 @router.get("/costs", response_model=CostAnalysis)
@@ -122,7 +157,8 @@ async def driver_events(driver_id: UUID, response: Response, source: str = Query
         raise HTTPException(403, "Permissão insuficiente")
     response.headers["Cache-Control"] = "private, no-store"
     scoped = filters.model_copy(update={"organization": analytics_organization_scope(current_user, filters.organization)})
-    return await AnalyticsV2Drivers(db).events(scoped, driver_id, source=source, offset=offset)
+    return await AnalyticsV2Drivers(db).events(scoped, driver_id, source=source, offset=offset,
+        can_view_drivers=bool(current_user.permissions.get('drivers', {}).get('can_view')))
 
 
 @router.get("/utilization/events", response_model=UtilizationEvents,
@@ -226,3 +262,8 @@ async def entity_detail(entity_type: str, entity_id: UUID, response: Response,
     response.headers["Cache-Control"] = "private, no-store"
     scoped = filters.model_copy(update={"organization": analytics_organization_scope(current_user, filters.organization)})
     return await AnalyticsV2DetailService(db).get(scoped, entity_type, entity_id, current_user.permissions, offset=offset)
+
+
+# Imported after common_filter is defined; existing V2 routes keep their contracts.
+from app.api.routes.analytics_alerts import router as alerts_router  # noqa: E402
+router.include_router(alerts_router)

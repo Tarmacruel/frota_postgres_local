@@ -50,6 +50,7 @@ export default function AnalyticsOverview({ enabled = true, organizations = [], 
       formula: alert ? attention.data?.alert_basis : attention.data?.basis,
       limitations: [alert ? 'A flag registrada não determina a causa da anomalia.' : 'A variação de custo não comprova sua causa.'] } } }
 
+  if (!enabled) return null
   return (
     <div className="analytics-cockpit">
       <form className="analytics-cockpit-filters" onSubmit={apply} aria-label="Filtros da Visão Geral">

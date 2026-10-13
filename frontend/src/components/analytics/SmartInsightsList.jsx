@@ -7,6 +7,11 @@ const CALCULATIONS = {
   tco_cost_per_km: '(Combustível + manutenção + multas) / km do painel anterior; desvio percentual frente à referência configurada por tipo.',
   driver_risk_score: 'min(3 × multas + 5 × sinistros + 2 × anomalias, 100), conforme pesos do painel anterior.',
 }
+const METRICS = {
+  consumption_l_100km: 'Litros abastecidos por 100 km',
+  tco_cost_per_km: 'Custo operacional por km',
+  driver_risk_score: 'Indicador anterior de condutor',
+}
 
 export default function SmartInsightsList({ insights = [], onOpenEntity, ...sectionProps }) {
   return (
@@ -19,7 +24,7 @@ export default function SmartInsightsList({ insights = [], onOpenEntity, ...sect
           const entityId = item.vehicle_id || item.driver_id
           return (
             <article key={`${item.metric}-${entityId || index}`} className="analytics-insight">
-              <header><strong>{item.metric}</strong><AnalyticsSeverityBadge severity={item.severity} /></header>
+              <header><strong>{METRICS[item.metric] || item.metric}</strong><AnalyticsSeverityBadge severity={item.severity} /></header>
               <p>{item.message}</p>
               <footer>
                 <span>{item.recommended_action}</span>
@@ -29,7 +34,7 @@ export default function SmartInsightsList({ insights = [], onOpenEntity, ...sect
               </footer>
               {entityId ? <AnalyticsEntityLink entityType={entityType} entityId={entityId}
                 entityName={entityType === 'vehicle' ? 'Veículo do alerta' : 'Condutor do alerta'}
-                origin={{ label: item.metric, formula: CALCULATIONS[item.metric] || item.message,
+                origin={{ label: METRICS[item.metric] || item.metric, formula: CALCULATIONS[item.metric] || item.message,
                   limitations: item.metric === 'tco_cost_per_km' ? ['A referência é configurada e não representa pesquisa de mercado.'] : [] }} onOpen={onOpenEntity}>
                 {entityType === 'vehicle' ? 'Ver veículo' : 'Ver condutor'}
               </AnalyticsEntityLink> : null}

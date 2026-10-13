@@ -110,7 +110,7 @@ export default function AdvancedFilters({ filters, organizations = [], loading =
             {loading ? 'Atualizando...' : '🔄 Atualizar'}
           </button>
           <button type="button" className="secondary-button" onClick={onExport}>
-            Exportar relatório
+            Exportar insights anteriores
           </button>
         </div>
       </div>

@@ -250,6 +250,14 @@ async def test_real_sql_invalid_values_and_vehicle_id_filter(facts):
 
 
 @pytest.mark.asyncio
+async def test_real_sql_zero_liters_is_invalid_like_fuel_analysis(facts):
+    facts.fuel('2026-09-03 12:00+00', 0, liters=0)
+    result = await facts.summary(vehicle_id=VEHICLE)
+    assert result.current.liters.value is None
+    assert result.current.liters.missing_or_invalid == 1
+
+
+@pytest.mark.asyncio
 async def test_real_sql_valid_possessions_regression_missing_overlap_and_boundaries(facts):
     def possession(start, end, km_from=100, km_to=200, **extra):
         facts.add("vehicle_possession", **dict(dict(vehicle_id=VEHICLE, responsible_organization_id=A,

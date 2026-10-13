@@ -176,7 +176,7 @@ def detect_anomalies(rows, period):
     price_history = defaultdict(list)
     anomalies = []
     insufficient_consumption = insufficient_price = 0
-    for row in rows:
+    for row in sorted(rows, key=lambda item: (item['supplied_at'], str(item['id']))):
         current = row['supplied_at'] >= period.start_at
         liters = finite_decimal(row['liters'], positive=True)
         odometer = finite_decimal(row['odometer_km'])
@@ -239,7 +239,7 @@ def detect_anomalies(rows, period):
                     add('price', 'Preço por litro fora do histórico do posto', f'R$ {price:.2f}/L',
                         f'R$ {reference:.2f}/L', len(history),
                         'valor / litros fora de 70–130% da mediana dos registros anteriores do mesmo posto e combustível nos últimos 90 dias; mínimo 5',
-                        'Variação de preço exige conferência; não representa preço de mercado nem comprova erro.')
+                        'Variação de preço exige conferência; não representa preço de mercado nem comprova erro. Amostra disponível no período anterior equivalente e no recorte, limitada a 90 dias anteriores ao registro.')
             price_history[price_key].append((row['supplied_at'], price))
 
         if interval_ratio is not None:
@@ -321,7 +321,7 @@ def build_analysis(rows, distance_rows, filters, period, previous, can_view_reco
             'liters': 'Soma de litros abastecidos registrados; não representa combustível consumido.',
             'cost': 'Soma de valores registrados nos abastecimentos; ausência ou invalidade torna o total completo indisponível.',
             'price': 'Soma dos valores / soma dos litros somente nos abastecimentos com ambos válidos; não é média simples de preços.',
-            'mileage': 'Km apenas de posses encerradas válidas e inteiramente no período. Razões usam litros/custos dos mesmos veículos medidos; abastecimento não indica tanque cheio.',
+            'mileage': 'Km apenas de posses encerradas válidas e inteiramente no período, dos veículos com abastecimento registrado no recorte. Razões usam litros/custos dos mesmos veículos medidos; esse conjunto pode diferir da Visão Geral, que também inclui veículos medidos sem abastecimento. Abastecimento não indica tanque cheio.',
             'category': 'Referência de categoria: litros por 100 km abastecidos dos outros veículos do mesmo tipo atual, com ao menos três outros veículos medidos; não é benchmark externo.',
             'anomalies': 'Regras de triagem fuel-v2.1 somente leitura, no recorte organizacional aplicado. Histórico usa também o período anterior equivalente. Flags operacionais persistidas não são alteradas nem fundidas com estas regras.',
         })

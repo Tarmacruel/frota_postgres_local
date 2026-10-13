@@ -31,7 +31,7 @@ def summary_statement(filters: AnalyticsV2Filter, current: AnalyticsV2Period, pr
         is_current = day >= current.date_from
         valid_amount = and_(amount >= 0, amount < literal(Decimal("Infinity"), type_=Numeric))
         liters = FuelSupply.liters if model is FuelSupply else literal(0)
-        valid_liters = and_(liters >= 0, liters < float("inf"))
+        valid_liters = and_(liters > 0, liters < float("inf"))
         field = getattr(model, "responsible_organization_id", None)
         if field is None:
             field = model.organization_id

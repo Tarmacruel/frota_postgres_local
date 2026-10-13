@@ -69,9 +69,9 @@ function EntityContent({ detail, result, onOpen, onLoadMore, moreLoading, moreEr
       </button>
       <div className="analytics-detail-related">
         {detail.entityType === 'driver' ? <AnalyticsEntityLink entityType="vehicle" entityId={event.vehicle_id} entityName={event.plate}
-          onOpen={(item) => onOpen({ ...item, filters: detail.filters })}>{event.plate}</AnalyticsEntityLink> : null}
+          onOpen={(item) => onOpen({ ...item, filters: detail.filters, origin: detail.origin, periodNote: detail.periodNote })}>{event.plate}</AnalyticsEntityLink> : null}
         {detail.entityType === 'vehicle' && event.driver_id ? <AnalyticsEntityLink entityType="driver" entityId={event.driver_id} entityName={event.driver_name || 'Condutor'}
-          onOpen={(item) => onOpen({ ...item, filters: detail.filters })}>{event.driver_name || 'Condutor'}</AnalyticsEntityLink> : null}
+          onOpen={(item) => onOpen({ ...item, filters: detail.filters, origin: detail.origin, periodNote: detail.periodNote })}>{event.driver_name || 'Condutor'}</AnalyticsEntityLink> : null}
         {event.status ? <span>{event.status}</span> : null}
       </div>
     </li>)}</ol>
@@ -165,7 +165,11 @@ function MileageEventsContent({ detail, result, onOpen, onLoadMore, moreLoading,
   return <>
     <p className="analytics-scope-note">{formatDate(detail.filters.date_from)} a {formatDate(detail.filters.date_to)} · {result.total_events} posse(s) válida(s) · {formatValue(result.total_distance_km, 'km')}. Apenas posses encerradas inteiramente no período, com leituras válidas e sem sobreposição.</p>
     <ol className="analytics-detail-timeline">{result.events.map((event) => <li key={event.id}>
-      <strong>Posse nº {event.public_number}</strong> · {recordDate(event.start_date)} a {recordDate(event.end_date)} · {formatValue(event.distance_km, 'km')}
+      <button type="button" className="analytics-entity-link" onClick={() => onOpen({ entityType: 'possession-record',
+        entityId: event.id, title: `Posse nº ${event.public_number}`, record: event, filters: detail.filters,
+        origin: detail.origin })}>
+        <strong>Posse nº {event.public_number}</strong> · {recordDate(event.start_date)} a {recordDate(event.end_date)} · {formatValue(event.distance_km, 'km')}
+      </button>
       <div className="analytics-detail-related">
         <AnalyticsEntityLink entityType="vehicle" entityId={event.vehicle_id} entityName={event.plate}
           onOpen={(item) => onOpen({ ...item, filters: detail.filters, origin: detail.origin })}>{event.plate}</AnalyticsEntityLink>
@@ -238,8 +242,10 @@ function PossessionRecordContent({ record }) {
   </>
 }
 
-export default function AnalyticsEntityDrawer({ detail, canGoBack, onOpen, onBack, onClose, children }) {
+export default function AnalyticsEntityDrawer({ detail, canGoBack, onOpen, onBack, onClose, children, returnFocusRef }) {
   const contentRef = useRef(null)
+  const generation = useRef(0)
+  const moreRequest = useRef(null)
   const [resource, setResource] = useState({ data: null, loading: false, error: '' })
   const [retry, setRetry] = useState(0)
   const [moreLoading, setMoreLoading] = useState(false)
@@ -247,6 +253,11 @@ export default function AnalyticsEntityDrawer({ detail, canGoBack, onOpen, onBac
   const key = detail ? `${detail.entityType}/${detail.source || ''}/${detail.costSource || ''}/${detail.organizationBucket || ''}/${detail.stationKey || ''}/${detail.maintenanceSubset || ''}/${detail.utilizationMode || ''}/${detail.driverSource || ''}/${detail.measuredOnly || false}/${detail.entityId}/${JSON.stringify(detail.filters)}` : ''
   useEffect(() => { if (detail) contentRef.current?.focus() }, [detail])
   useEffect(() => {
+    generation.current += 1
+    moreRequest.current?.abort()
+    moreRequest.current = null
+    setMoreLoading(false)
+    setMoreError('')
     if (!detail?.filters || children) return undefined
     const controller = new AbortController()
     let active = true
@@ -274,42 +285,50 @@ export default function AnalyticsEntityDrawer({ detail, canGoBack, onOpen, onBac
       : analyticsV2API.entity(detail.entityType, detail.entityId, detail.filters, controller.signal)
     request.then(({ data }) => { if (active) setResource({ data, loading: false, error: '', key }) })
       .catch((error) => { if (active) setResource({ data: null, loading: false, error: getApiErrorMessage(error, 'Não foi possível consultar o detalhe.'), key }) })
-    return () => { active = false; controller.abort() }
+    return () => { active = false; generation.current += 1; controller.abort(); moreRequest.current?.abort() }
   }, [detail, key, retry, children])
   const current = resource.key === key ? resource : { data: null, loading: Boolean(detail), error: '' }
   async function loadMore() {
-    if (moreLoading || !current.data || !detail) return
+    if (moreLoading || moreRequest.current || !current.data || !detail) return
+    const version = generation.current
+    const controller = new AbortController()
+    moreRequest.current = controller
     setMoreLoading(true); setMoreError('')
     try {
       const { data } = detail.entityType === 'utilization-events'
         ? await analyticsV2API.utilizationEvents({ ...detail.filters, mode: detail.utilizationMode,
-          offset: current.data.events.length })
+          offset: current.data.events.length }, controller.signal)
         : detail.entityType === 'driver-analysis'
         ? await analyticsV2API.driverEvents(detail.entityId, { ...detail.filters, source: detail.driverSource,
-          offset: current.data.events.length })
+          offset: current.data.events.length }, controller.signal)
         : detail.entityType === 'maintenance-events'
         ? await analyticsV2API.maintenanceEvents({ ...detail.filters, subset: detail.maintenanceSubset,
-          offset: current.data.events.length })
+          offset: current.data.events.length }, controller.signal)
         : detail.entityType === 'mileage-events'
-        ? await analyticsV2API.mileageEvents({ ...detail.filters, offset: current.data.events.length })
+        ? await analyticsV2API.mileageEvents({ ...detail.filters, offset: current.data.events.length }, controller.signal)
         : detail.entityType === 'fuel-events'
         ? await analyticsV2API.fuelEvents({ ...detail.filters, station: detail.stationKey,
-          offset: current.data.events.length })
+          offset: current.data.events.length }, controller.signal)
         : detail.entityType === 'costs'
         ? await analyticsV2API.costEvents({ ...detail.filters, source: detail.costSource,
           organization_bucket: detail.organizationBucket, measured_only: detail.measuredOnly || undefined,
-          offset: current.data.events.length })
+          offset: current.data.events.length }, controller.signal)
         : await analyticsV2API.entity(detail.entityType, detail.entityId,
-          { ...detail.filters, offset: current.data.events.length })
-      setResource((existing) => existing.key === key ? { ...existing,
+          { ...detail.filters, offset: current.data.events.length }, controller.signal)
+      if (version !== generation.current || controller.signal.aborted) return
+      setResource((existing) => existing.key === key && version === generation.current ? { ...existing,
         data: { ...existing.data, events: [...existing.data.events, ...data.events] } } : existing)
-    } catch (error) { setMoreError(getApiErrorMessage(error, 'Não foi possível carregar mais registros.')) }
-    finally { setMoreLoading(false) }
+    } catch (error) {
+      if (version === generation.current && !controller.signal.aborted) setMoreError(getApiErrorMessage(error, 'Não foi possível carregar mais registros.'))
+    } finally {
+      if (moreRequest.current === controller) moreRequest.current = null
+      if (version === generation.current) setMoreLoading(false)
+    }
   }
   return (
     <Modal open={Boolean(detail)} title={(detail?.entityType !== 'record' && current.data?.title) || detail?.title || 'Detalhamento analítico'}
       description="Contexto da seleção" onClose={onClose} onEscape={canGoBack ? onBack : onClose}
-      className="analytics-drawer" backdropClassName="analytics-drawer-backdrop" initialFocusRef={contentRef}>
+      className="analytics-drawer" backdropClassName="analytics-drawer-backdrop" initialFocusRef={contentRef} returnFocusRef={returnFocusRef}>
       <div className="analytics-drawer__content" ref={contentRef} tabIndex={-1}>
         {canGoBack ? <button type="button" className="ghost-button" onClick={onBack}>← Voltar</button> : null}
         {detail?.periodNote ? <p className="analytics-scope-note">{detail.periodNote}</p> : null}

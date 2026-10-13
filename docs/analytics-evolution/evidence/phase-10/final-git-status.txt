@@ -1,0 +1,95 @@
+﻿ M backend/app/api/routes/analytics_v2.py
+ M backend/app/models/__init__.py
+ M backend/app/repositories/analytics_v2_repository.py
+ M backend/app/services/analytics_service.py
+ M backend/app/services/analytics_v2_drivers.py
+ M backend/app/services/analytics_v2_fuel.py
+ M backend/tests/test_analytics_metrics.py
+ M backend/tests/test_analytics_v2_drivers.py
+ M backend/tests/test_analytics_v2_fuel.py
+ M backend/tests/test_analytics_v2_postgres.py
+ M docs/analytics-evolution/11_STATUS.md
+ M frontend/src/api/analytics.js
+ M frontend/src/api/analyticsV2.js
+ M frontend/src/components/Modal.jsx
+ M frontend/src/components/Modal.test.jsx
+ M frontend/src/components/analytics/AdvancedFilters.jsx
+ M frontend/src/components/analytics/AnalyticsCosts.jsx
+ M frontend/src/components/analytics/AnalyticsDrivers.jsx
+ M frontend/src/components/analytics/AnalyticsDrivers.test.jsx
+ M frontend/src/components/analytics/AnalyticsEntityDrawer.jsx
+ M frontend/src/components/analytics/AnalyticsEntityDrawer.test.jsx
+ M frontend/src/components/analytics/AnalyticsFuel.jsx
+ M frontend/src/components/analytics/AnalyticsFuel.test.jsx
+ M frontend/src/components/analytics/AnalyticsMaintenance.jsx
+ M frontend/src/components/analytics/AnalyticsOverview.jsx
+ M frontend/src/components/analytics/AnalyticsUtilization.jsx
+ M frontend/src/components/analytics/SmartInsightsList.jsx
+ M frontend/src/components/analytics/useAnalyticsV1.js
+ M frontend/src/pages/AdminAnalyticsDashboard.jsx
+ M frontend/src/pages/AdminAnalyticsDashboard.test.jsx
+ M frontend/src/styles/analytics-evolution.css
+ M frontend/src/utils/apiError.js
+?? backend/alembic/versions/0052_analytics_alert_workflow.py
+?? backend/app/api/routes/analytics_alerts.py
+?? backend/app/models/analytics_alert.py
+?? backend/app/schemas/analytics_alert.py
+?? backend/app/services/analytics_alerts.py
+?? backend/app/services/analytics_v2_reports.py
+?? backend/tests/test_analytics_alert_routes.py
+?? backend/tests/test_analytics_alerts.py
+?? backend/tests/test_analytics_alerts_postgres.py
+?? backend/tests/test_analytics_v2_reports.py
+?? docs/analytics-evolution/DELIVERY_PHASE_10.md
+?? docs/analytics-evolution/EXECPLAN_PHASE_10_PART_1.md
+?? docs/analytics-evolution/EXECPLAN_PHASE_10_PART_2.md
+?? docs/analytics-evolution/EXECPLAN_PHASE_11.md
+?? docs/analytics-evolution/EXECPLAN_REVIEW_2026_10_13.md
+?? docs/analytics-evolution/QA_PHASE_12.md
+?? docs/analytics-evolution/REVIEW_2026_10_13.md
+?? docs/analytics-evolution/evidence/phase-10/after-migration.json
+?? docs/analytics-evolution/evidence/phase-10/after-qa.json
+?? docs/analytics-evolution/evidence/phase-10/browser-fixtures.py
+?? docs/analytics-evolution/evidence/phase-10/browser-flow.js
+?? docs/analytics-evolution/evidence/phase-10/browser-qa.json
+?? docs/analytics-evolution/evidence/phase-10/browser-setup.js
+?? docs/analytics-evolution/evidence/phase-10/drawer-mobile-dark.png
+?? docs/analytics-evolution/evidence/phase-10/gates.json
+?? docs/analytics-evolution/evidence/phase-10/original-fixture-mobile-dark.png
+?? docs/analytics-evolution/evidence/phase-10/probe-hml.py
+?? docs/analytics-evolution/evidence/phase-10/public-qa.json
+?? docs/analytics-evolution/evidence/phase-10/queue-1366-light.png
+?? docs/analytics-evolution/evidence/phase-10/queue-390-dark.png
+?? docs/analytics-evolution/evidence/phase-10/runtime.json
+?? docs/analytics-evolution/evidence/phase-10/treated-fixture-mobile-dark.png
+?? docs/analytics-evolution/evidence/phase-12/alert-preflight-2026-10-13.txt
+?? docs/analytics-evolution/evidence/phase-12/browser-review-dialog.js
+?? docs/analytics-evolution/evidence/phase-12/browser-review-flow.js
+?? docs/analytics-evolution/evidence/phase-12/browser-review-setup.js
+?? docs/analytics-evolution/evidence/phase-12/browser-review-sweep.js
+?? docs/analytics-evolution/evidence/phase-12/executive-pdf-last.png
+?? docs/analytics-evolution/evidence/phase-12/executive-pdf-page1.png
+?? docs/analytics-evolution/evidence/phase-12/preflight.txt
+?? docs/analytics-evolution/evidence/phase-12/readonly-browser-fixtures.py
+?? docs/analytics-evolution/evidence/phase-12/readonly-qa.json
+?? docs/analytics-evolution/evidence/phase-12/readonly-qa.py
+?? docs/analytics-evolution/evidence/phase-12/review-20261013/2-1366-light.png
+?? docs/analytics-evolution/evidence/phase-12/review-20261013/8-390-dark.png
+?? docs/analytics-evolution/evidence/phase-12/review-20261013/browser-dialog.json
+?? docs/analytics-evolution/evidence/phase-12/review-20261013/browser-flow.json
+?? docs/analytics-evolution/evidence/phase-12/review-20261013/browser-sweep.json
+?? docs/analytics-evolution/evidence/phase-12/review-20261013/empty-ranking-mobile.png
+?? docs/analytics-evolution/evidence/phase-12/review-20261013/executive-pdf-last.png
+?? docs/analytics-evolution/evidence/phase-12/review-20261013/executive-pdf-page1.png
+?? docs/analytics-evolution/evidence/phase-12/review-20261013/final-git-status.txt
+?? docs/analytics-evolution/evidence/phase-12/review-20261013/partial-failure-mobile.png
+?? docs/analytics-evolution/evidence/phase-12/review-20261013/possession-drawer-mobile.png
+?? docs/analytics-evolution/evidence/phase-12/review-20261013/public-browser.json
+?? docs/analytics-evolution/evidence/phase-12/review-20261013/public-downloads.json
+?? docs/analytics-evolution/evidence/phase-12/review-20261013/readonly-qa.json
+?? docs/analytics-evolution/evidence/phase-12/review-20261013/runtime.json
+?? frontend/src/components/analytics/AnalyticsAlertDetail.jsx
+?? frontend/src/components/analytics/AnalyticsAlerts.jsx
+?? frontend/src/components/analytics/AnalyticsAlerts.test.jsx
+?? frontend/src/components/analytics/AnalyticsReports.jsx
+?? frontend/src/components/analytics/analyticsAlertFormat.js

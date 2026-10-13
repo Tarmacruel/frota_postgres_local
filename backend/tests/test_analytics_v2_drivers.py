@@ -112,11 +112,29 @@ async def test_driver_events_open_source_records_and_anomaly_evidence():
 
 
 @pytest.mark.asyncio
+async def test_driver_without_events_opens_empty_only_with_authorized_roster_read():
+    driver, org, elsewhere = uuid4(), uuid4(), uuid4()
+    filters = AnalyticsV2Filter(date_from='2026-09-01', date_to='2026-09-30', organization=org)
+    period, _ = equivalent_periods(filters.date_from, filters.date_to,
+        now=datetime(2026, 10, 8, tzinfo=timezone.utc))
+    roster = [dict(id=driver, nome_completo='Ana', organization_id=org, ativo=True, cnh_validade=None)]
+    service = AnalyticsV2Drivers(None)
+    service._load = AsyncMock(return_value=(period, roster, [], [], [], [], []))
+    result = await service.events(filters, driver, source='possession', offset=0, can_view_drivers=True)
+    assert result.total_events == 0 and result.events == []
+    for recorte, allowed in [(filters, False), (filters.model_copy(update={'organization': elsewhere}), True),
+                            (filters.model_copy(update={'vehicle_type': 'SEDAN'}), True)]:
+        with pytest.raises(HTTPException) as denied:
+            await service.events(recorte, driver, source='possession', offset=0, can_view_drivers=allowed)
+        assert denied.value.status_code == 404
+
+
+@pytest.mark.asyncio
 async def test_driver_event_route_enforces_source_permission_and_organization(monkeypatch):
     org, driver = uuid4(), uuid4()
     seen = []
-    async def stub(self, filters, driver_id, *, source, offset):
-        seen.append((filters.organization, driver_id, source, offset))
+    async def stub(self, filters, driver_id, *, source, offset, can_view_drivers):
+        seen.append((filters.organization, driver_id, source, offset, can_view_drivers))
         return DriverEvents(driver_id=driver_id, source=source, total_events=0, events=[], offset=offset)
     monkeypatch.setattr(AnalyticsV2Drivers, 'events', stub)
     app = FastAPI()
@@ -134,5 +152,5 @@ async def test_driver_event_route_enforces_source_permission_and_organization(mo
         denied = await client.get(path + '&source=fine')
         invalid = await client.get(path + '&source=unknown')
     assert allowed.status_code == 200 and allowed.headers['cache-control'] == 'private, no-store'
-    assert seen == [(org, driver, 'possession', 100)]
+    assert seen == [(org, driver, 'possession', 100, False)]
     assert denied.status_code == 403 and invalid.status_code == 422

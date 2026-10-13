@@ -18,14 +18,14 @@ function amountLabel(amount) {
   return amount?.value === null && amount.records ? `Subtotal conhecido: ${formatValue(amount.known_value, 'BRL')}` : formatValue(amount?.value, 'BRL')
 }
 
-export default function AnalyticsCosts({ organizations = [], catalogError, onOpenEntity }) {
+export default function AnalyticsCosts({ enabled = true, organizations = [], catalogError, onOpenEntity }) {
   const [applied, setApplied] = useState(() => ({ ...closedPeriod(), organization: '', vehicle_type: '' }))
   const [draft, setDraft] = useState(applied)
   const [validation, setValidation] = useState('')
   const [revision, setRevision] = useState(0)
   const [shown, setShown] = useState(20)
   const query = useMemo(() => ({ ...applied, organization: applied.organization || undefined, vehicle_type: applied.vehicle_type || undefined }), [applied])
-  const resource = useCockpitResource(analyticsV2API.costs, query, revision, true)
+  const resource = useCockpitResource(analyticsV2API.costs, query, revision, enabled)
   const data = resource.data
   const maxDate = closedPeriod(1).date_to
   const knownTotal = numeric(data?.totals.operational_cost.known_value) || 0
@@ -66,6 +66,7 @@ export default function AnalyticsCosts({ organizations = [], catalogError, onOpe
     return { date_from: start < query.date_from ? query.date_from : start, date_to: end > query.date_to ? query.date_to : end }
   }
   const state = { loading: resource.loading, error: resource.error, onRetry: resource.onRetry }
+  if (!enabled) return null
   return <div className="analytics-costs">
     <form className="analytics-cockpit-filters" onSubmit={apply} aria-label="Filtros de Custos">
       <label>De<input type="date" value={draft.date_from} min="1901-01-01" max={maxDate} required onChange={(e) => setDraft((v) => ({ ...v, date_from: e.target.value }))} /></label>

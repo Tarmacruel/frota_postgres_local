@@ -14,7 +14,7 @@ const RANKINGS = [
 ]
 const LICENSE = { expired: 'Vencida', expiring: 'A vencer em 30 dias', valid: 'Válida', missing: 'Sem data cadastrada' }
 
-export default function AnalyticsDrivers({ organizations = [], catalogError, onOpenEntity }) {
+export default function AnalyticsDrivers({ enabled = true, organizations = [], catalogError, onOpenEntity }) {
   const [applied, setApplied] = useState(() => ({ ...closedPeriod(), organization: '', vehicle_type: '' }))
   const [draft, setDraft] = useState(applied)
   const [validation, setValidation] = useState('')
@@ -23,7 +23,7 @@ export default function AnalyticsDrivers({ organizations = [], catalogError, onO
   const [shown, setShown] = useState(20)
   const query = useMemo(() => ({ ...applied, organization: applied.organization || undefined,
     vehicle_type: applied.vehicle_type || undefined }), [applied])
-  const resource = useCockpitResource(analyticsV2API.drivers, query, revision, true)
+  const resource = useCockpitResource(analyticsV2API.drivers, query, revision, enabled)
   const data = resource.data
   const state = { loading: resource.loading, error: resource.error, onRetry: resource.onRetry }
   const maxDate = closedPeriod(1).date_to
@@ -67,6 +67,7 @@ export default function AnalyticsDrivers({ organizations = [], catalogError, onO
     return data?.readable_sources?.includes(source) ? driverButton(item, source, value) : value
   }
 
+  if (!enabled) return null
   return <div className="analytics-costs">
     <form className="analytics-cockpit-filters" onSubmit={apply} aria-label="Filtros de Condutores">
       <label>De<input type="date" value={draft.date_from} min="1901-01-01" max={maxDate} required onChange={(event) => setDraft((value) => ({ ...value, date_from: event.target.value }))} /></label>
@@ -94,11 +95,11 @@ export default function AnalyticsDrivers({ organizations = [], catalogError, onO
       <p className="analytics-scope-note">{data?.methodology.distance} {data?.methodology.fuel}</p>
     </AnalyticsSection>
 
-    <AnalyticsSection title="Ranking por medida registrada" description="Escolha a coluna de ordenação; nenhum score composto é calculado." {...state} empty={!ranked.length}>
-      <div className="analytics-detail-related" role="group" aria-label="Ordenação do ranking">
+    <AnalyticsSection className="analytics-drivers-ranking" title="Ranking por medida registrada" description="Escolha a coluna de ordenação; nenhum score composto é calculado." {...state} empty={!ranked.length}
+      action={<div className="analytics-detail-related" role="group" aria-label="Ordenação do ranking">
         {RANKINGS.map(([key, label]) => <button key={key} type="button" className={ranking === key ? 'app-button' : 'ghost-button'}
           aria-pressed={ranking === key} onClick={() => setRanking(key)}>{label}</button>)}
-      </div>
+      </div>}>
       <div className="table-wrap" tabIndex={0}><table className="data-table"><thead><tr><th>Condutor</th><th>{rankingDefinition?.[1]}</th><th>Veículos com posse</th><th>Multas</th><th>Sinistros</th><th>Anomalias</th></tr></thead>
         <tbody>{ranked.slice(0, 15).map((item) => <tr key={item.driver_id}><td>{driverButton(item, rankingDefinition?.[2])}</td>
           <td>{ranking === 'distance_km' ? formatValue(item.distance_km, 'km') : item[ranking]}</td><td>{item.vehicles_with_possession}</td>
@@ -135,7 +136,7 @@ export default function AnalyticsDrivers({ organizations = [], catalogError, onO
 
     <AnalyticsSection title="Cobertura dos vínculos" description="Registros sem condutor identificado não entram nas linhas individuais." {...state}>
       <dl className="analytics-definition-list">{Object.entries({ possession: 'Posses', fine: 'Multas', claim: 'Sinistros', fuel_supply: 'Abastecimentos', anomaly_rule: 'Regras de anomalia' })
-        .map(([key, label]) => <div key={key}><dt>{label} sem driver_id</dt><dd>{data?.unlinked_records[key] ?? '—'}</dd></div>)}</dl>
+        .map(([key, label]) => <div key={key}><dt>{label} sem condutor vinculado</dt><dd>{data?.unlinked_records[key] ?? '—'}</dd></div>)}</dl>
       <p className="analytics-scope-note">{data?.methodology.coverage}</p>
     </AnalyticsSection>
   </div>

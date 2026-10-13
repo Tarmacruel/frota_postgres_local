@@ -66,6 +66,18 @@ def test_consumption_and_price_need_five_prior_comparable_samples():
     assert not any(item.kind == 'price' for item in detect_anomalies(without_station, PERIOD)[0])
 
 
+def test_rules_use_chronology_even_when_rows_are_grouped_by_vehicle():
+    vehicle, other, station = uuid4(), uuid4(), uuid4()
+    history = [supply(index, vehicle=vehicle, station=station) for index in range(6)]
+    outlier = supply(7, vehicle=other, station=station, amount=100)
+    # Driver queries group/order by vehicle; future records must not become a reference for earlier ones.
+    ordered = detect_anomalies([*history, outlier], PERIOD)
+    grouped = detect_anomalies([outlier, *history], PERIOD)
+    assert grouped == ordered
+    price = [item for item in grouped[0] if item.kind == 'price']
+    assert len(price) == 1 and price[0].supply_id == outlier['id'] and price[0].sample_size == 6
+
+
 def test_fuel_analysis_uses_same_measured_vehicle_set_and_hides_records_without_domain_permission():
     vehicle, other, station = uuid4(), uuid4(), uuid4()
     rows = [supply(0, vehicle=vehicle, station=station, liters=10, amount=50),

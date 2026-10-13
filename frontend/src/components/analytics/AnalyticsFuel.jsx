@@ -27,7 +27,7 @@ function dateTime(value) {
   }).format(date)
 }
 
-export default function AnalyticsFuel({ organizations = [], catalogError, onOpenEntity }) {
+export default function AnalyticsFuel({ enabled = true, organizations = [], catalogError, onOpenEntity }) {
   const [applied, setApplied] = useState(() => ({ ...closedPeriod(), organization: '', vehicle_type: '' }))
   const [draft, setDraft] = useState(applied)
   const [validation, setValidation] = useState('')
@@ -36,7 +36,7 @@ export default function AnalyticsFuel({ organizations = [], catalogError, onOpen
   const [shownAnomalies, setShownAnomalies] = useState(20)
   const query = useMemo(() => ({ ...applied, organization: applied.organization || undefined,
     vehicle_type: applied.vehicle_type || undefined }), [applied])
-  const resource = useCockpitResource(analyticsV2API.fuel, query, revision, true)
+  const resource = useCockpitResource(analyticsV2API.fuel, query, revision, enabled)
   const data = resource.data
   const maxDate = closedPeriod(1).date_to
   const chart = (data?.monthly || []).map((item) => ({ month: item.month.split('-').reverse().join('/'),
@@ -62,12 +62,16 @@ export default function AnalyticsFuel({ organizations = [], catalogError, onOpen
       origin: { label: `Abastecimentos de ${item.plate}`, formula: data?.methodology.mileage,
         limitations: [data?.methodology.category, data?.methodology.liters].filter(Boolean) } })
   }
+  function anomalyOrigin(item) {
+    return { label: item.label, formula: item.rule,
+      limitations: [`Observado: ${item.observed}. Referência: ${item.reference}. Amostra: ${item.sample_size} registro(s)/intervalo(s).`,
+        item.limitation, `Versão da regra: ${item.rule_version}.`] }
+  }
   function openAnomaly(item, supplyId = item.supply_id) {
     onOpenEntity({ entityType: 'record', entityId: supplyId, source: 'fuel_supply',
-      title: `${item.label} · ${item.plate}`, filters: query,
-      origin: { label: item.label, formula: item.rule,
-        limitations: [`Observado: ${item.observed}. Referência: ${item.reference}. Amostra: ${item.sample_size} registro(s)/intervalo(s).`,
-          item.limitation, `Versão da regra: ${item.rule_version}.`] } })
+      title: `${supplyId === item.supply_id ? item.label : 'Registro anterior'} · ${item.plate}`, filters: query,
+      periodNote: supplyId === item.supply_id ? undefined : 'Registro anterior usado como referência da regra; pode pertencer ao período de comparação.',
+      origin: anomalyOrigin(item) })
   }
   function monthDates(month) {
     const start = `${month}-01`
@@ -75,6 +79,7 @@ export default function AnalyticsFuel({ organizations = [], catalogError, onOpen
     return { date_from: start < query.date_from ? query.date_from : start,
       date_to: end > query.date_to ? query.date_to : end }
   }
+  if (!enabled) return null
   return <div className="analytics-fuel">
     <form className="analytics-cockpit-filters" onSubmit={apply} aria-label="Filtros de Combustível">
       <label>De<input type="date" value={draft.date_from} min="1901-01-01" max={maxDate} required onChange={(e) => setDraft((v) => ({ ...v, date_from: e.target.value }))} /></label>
@@ -101,7 +106,7 @@ export default function AnalyticsFuel({ organizations = [], catalogError, onOpen
         <div><span>Preço médio ponderado</span><strong>{priceLabel(data?.totals.price_per_liter)}</strong>
           <small>{data?.totals.priced_records} registro(s) com valor e litros válidos</small></div>
         <div><span>Km de posses válidas</span><strong>{formatValue(data?.measured_distance_km, 'km')}</strong>
-          <small>{data?.measured_vehicles} veículo(s) medidos</small></div>
+          <small>{data?.measured_vehicles} veículo(s) medidos com abastecimento no recorte</small></div>
         <div><span>Km por litro abastecido</span><strong>{formatValue(data?.measured_km_per_liter_supplied, 'km/L')}</strong>
           <small>Secundário: {formatValue(data?.measured_liters_per_100km_supplied, 'L/100km')}</small></div>
       </div>
@@ -139,7 +144,9 @@ export default function AnalyticsFuel({ organizations = [], catalogError, onOpen
       <dl className="analytics-fuel-anomaly-counts">{Object.entries(ANOMALIES).map(([kind, label]) => <div key={kind}><dt>{label}</dt><dd>{data?.anomaly_counts[kind] || 0}</dd></div>)}</dl>
       {data?.can_view_records ? <>
         {data.anomalies.length ? <ol className="analytics-fuel-anomalies">{data.anomalies.slice(0, shownAnomalies).map((item) => <li key={`${item.kind}-${item.supply_id}`}>
-          <div><strong>{item.label}</strong><span>{item.plate} · {dateTime(item.supplied_at)}</span></div>
+          <div><strong>{item.label}</strong><span><AnalyticsEntityLink entityType="vehicle" entityId={item.vehicle_id}
+            entityName={item.plate} origin={anomalyOrigin(item)} onOpen={(selection) => onOpenEntity({ ...selection, filters: query })}>{item.plate}</AnalyticsEntityLink>
+            {' · '}{dateTime(item.supplied_at)}</span></div>
           <p>Observado: {item.observed} · referência: {item.reference} · amostra: {item.sample_size}</p>
           <p>{item.rule}</p><p className="analytics-scope-note">{item.limitation}</p>
           <div className="analytics-fuel-anomaly-actions"><button type="button" className="analytics-entity-link" onClick={() => openAnomaly(item)}>Abrir abastecimento e regra</button>

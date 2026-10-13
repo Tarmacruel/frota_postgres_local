@@ -1,6 +1,13 @@
 import api from './client'
 
 export const analyticsV2API = {
+  alerts: (params, signal) => api.get('/analytics/v2/alerts', { params, signal }),
+  alert: (id, signal) => api.get(`/analytics/v2/alerts/${id}`, { signal }),
+  alertEvents: (id, params, signal) => api.get(`/analytics/v2/alerts/${id}/events`, { params, signal }),
+  reconcileAlerts: (params, key) => api.post('/analytics/v2/alerts/reconcile', params, { headers: { 'Idempotency-Key': key } }),
+  changeAlertStatus: (id, params, version, key) => api.patch(`/analytics/v2/alerts/${id}/status`, params,
+    { headers: { 'If-Match': `"${version}"`, 'Idempotency-Key': key } }),
+  exportReport: (params) => api.get('/analytics/v2/export', { params, responseType: 'blob' }),
   summary: (params, signal) => api.get('/analytics/v2/summary', { params, signal }),
   costs: (params, signal) => api.get('/analytics/v2/costs', { params, signal }),
   fuel: (params, signal) => api.get('/analytics/v2/fuel', { params, signal }),

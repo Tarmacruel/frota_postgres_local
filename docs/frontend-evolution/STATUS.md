@@ -1,5 +1,12 @@
 # Status — evolução do frontend Frota PMTF
 
+## 13/10/2026 — Alertas no histórico de abastecimentos
+
+- Demanda funcional implementada somente em `feature/analytics-evolution-hml`, HEAD inicial `82f3415`. [Entrega e arquivos](DELIVERY_FUEL_ALERTS.md), [preflight](evidence/fuel-alerts/preflight.txt).
+- Motivo registrado por hover/foco e drawer ao clicar; sem novos cálculos/API/banco/edição. Regular, comprovantes, retificação, escopo e filtros preservados.
+- Frontend 301 aprovados/59 arquivos, backend 644 aprovados/88 pulados, lint 0 erros/45 avisos preexistentes, build/diff check aprovados. HML pública validada em quatro combinações claro/escuro/desktop/mobile; teclado/foco e busca preservados; zero erros JS.
+- Commit local autorizado inclui estas alterações e pendências anteriores do Analytics. Inventário na entrega; sem push/produção. O status abaixo preserva a iniciativa visual original.
+
 **Branch:** `feature/frontend-evolution-hml`
 
 **HEAD de partida das Fases 6/7:** `1ec4886`
