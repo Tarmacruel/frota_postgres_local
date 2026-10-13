@@ -21,7 +21,7 @@ Merge integral da fonte no histórico de produção; build específico com confi
 - [x] Testes/build de produção no checkout isolado; preparar ativação/rollback revisáveis.
 - [x] Suspender apenas watchdog/API na janela; backup final offline; fast-forward local da main, migration, API nova e assets/index.
 - [x] Conferir dados, saúde/autenticação/versão/assets e login público; reabilitar watchdog.
-- [ ] Registrar resultado/limites e alinhar histórico de HML/main pelo PR com checks obrigatórios.
+- [x] Registrar resultado/limites e alinhar histórico de HML/main pelo PR com checks obrigatórios.
 
 ## Reversão
 Antes da ativação preservar commit `05fbf51` e build anterior. Falha de aplicação: reiniciar código/build anterior, preservando schema aditivo 0052 e dados novos; não executar downgrade destrutivo. Migration roda em transação; se falhar, não expor frontend novo. Backups nunca versionados. Não parar PostgreSQL, Cloudflare, HML ou sistema de obras.
@@ -55,4 +55,6 @@ O navegador público confirmou login institucional sem banner HML e sem erros JS
 
 ## Versionamento
 
-Release e relatório serão publicados pelo PR `release/analytics-evolution-20261013` → `main`, respeitando os três checks obrigatórios e sem alterar proteção (zero aprovações obrigatórias já configuradas). Sincronização da main local e da branch HML somente após os checks/merge. O resultado final do PR será registrado no mesmo relatório.
+O [PR #66](https://github.com/Tarmacruel/frota_postgres_local/pull/66) foi integrado em **13/10/2026 às 15:53:05**, com `backend-tests`, `frontend-tests` e `container-smoke` aprovados. Commit funcional da main: `90905847aa46d5bada0591d45c465ca5f176e5c9`. Nenhuma proteção alterada; zero aprovações obrigatórias era a configuração já existente, e os três checks foram respeitados. Deploy automático foi corretamente pulado.
+
+Depois do merge, produção `main`, HML `feature/analytics-evolution-hml` e ambas as referências remotas foram sincronizadas por fast-forward ao mesmo commit `9090584`, com working trees limpos. Nenhuma alteração funcional ocorreu nessa sincronização, portanto não foi necessário outro restart/build/migration. Este complemento documental não altera o código publicado. A conclusão operacional também foi registrada em `storage/loan-tests/production-release-20261013/final-synchronization.json`.
