@@ -1,0 +1,13 @@
+{
+    "unauthenticated_http":  {
+                                 "/api/analytics/v2/alerts?date_from=2026-09-13\u0026date_to=2026-10-12":  401,
+                                 "/api/analytics/v2/alerts/00000000-0000-0000-0000-000000000000":  401
+                             },
+    "html_status":  200,
+    "health":  {
+                   "status":  "ok",
+                   "app":  "frota-pmtf",
+                   "database":  "ok"
+               },
+    "final_bundle_present":  true
+}

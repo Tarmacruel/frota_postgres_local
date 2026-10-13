@@ -1,5 +1,24 @@
 # Status — evolução do frontend Frota PMTF
 
+## 13/10/2026 — Publicação do Analytics e resumos de Abastecimentos
+
+- Promoção integral de HML `169cde9` para produção autorizada pelo usuário e ativada às 15:43:43; release `df84161`, bundle público `index-CfE8XNxs.js`. [Entrega e evidências](../ANALYTICS_PRODUCTION_RELEASE_20261013.md).
+- Frontend 304 aprovados/59 arquivos, lint sem erros/45 avisos preexistentes, build de produção aprovado. HTML/10 assets públicos correspondentes; login sem banner HML. Backend/migration/backup e validação read-only registrados na entrega. Sem importar configuração/dados da HML.
+- Resumo único dos alertas e fechamento no scroll incluídos. HML preservada; Docker automático permanece futuro. A inspeção visual autenticada de produção não foi repetida por falta de sessão; QA das telas feito em HML com árvore funcional idêntica.
+
+## 13/10/2026 — Correção de acúmulo de resumos dos alertas
+
+- Scroll fecha a caixa; histórico mantém somente um resumo ativo, inclusive sem mouseleave entre registros. [Entrega e evidências](DELIVERY_FUEL_ALERTS.md#correção-posterior--acúmulo-de-caixas-ao-rolar).
+- Preflight: `feature/analytics-evolution-hml`, HEAD `ceac415`, working tree limpo. Frontend **304 aprovados/59 arquivos**, focados **15 aprovados**, lint **0 erros/45 avisos preexistentes**, build/diff check aprovados.
+- HML pública `index-D7olhyya.js`, claro/escuro: scroll com botão visível remove caixa; foco entre alertas mantém somente uma; drawer preservado; zero erros JS. Somente frontend, sem produção/push.
+
+## 13/10/2026 — Alertas no histórico de abastecimentos
+
+- Demanda funcional implementada somente em `feature/analytics-evolution-hml`, HEAD inicial `82f3415`. [Entrega e arquivos](DELIVERY_FUEL_ALERTS.md), [preflight](evidence/fuel-alerts/preflight.txt).
+- Motivo registrado por hover/foco e drawer ao clicar; sem novos cálculos/API/banco/edição. Regular, comprovantes, retificação, escopo e filtros preservados.
+- Frontend 301 aprovados/59 arquivos, backend 644 aprovados/88 pulados, lint 0 erros/45 avisos preexistentes, build/diff check aprovados. HML pública validada em quatro combinações claro/escuro/desktop/mobile; teclado/foco e busca preservados; zero erros JS.
+- Commit local autorizado inclui estas alterações e pendências anteriores do Analytics. Inventário na entrega; sem push/produção. O status abaixo preserva a iniciativa visual original.
+
 **Branch:** `feature/frontend-evolution-hml`
 
 **HEAD de partida das Fases 6/7:** `1ec4886`

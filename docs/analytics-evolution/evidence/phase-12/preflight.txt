@@ -1,0 +1,17 @@
+Preflight registrado antes da primeira edição da Fase 12 — 2026-10-12
+Branch: feature/analytics-evolution-hml
+HEAD: 82f3415fc358e3f5152a9ee4d0fad53594d264e5
+git status --short --branch:
+## feature/analytics-evolution-hml...origin/feature/analytics-evolution-hml
+ M backend/app/api/routes/analytics_v2.py
+ M docs/analytics-evolution/11_STATUS.md
+ M frontend/src/api/analyticsV2.js
+ M frontend/src/components/analytics/AdvancedFilters.jsx
+ M frontend/src/pages/AdminAnalyticsDashboard.jsx
+ M frontend/src/pages/AdminAnalyticsDashboard.test.jsx
+ M frontend/src/styles/analytics-evolution.css
+?? backend/app/services/analytics_v2_reports.py
+?? backend/tests/test_analytics_v2_reports.py
+?? docs/analytics-evolution/EXECPLAN_PHASE_10_PART_1.md
+?? docs/analytics-evolution/EXECPLAN_PHASE_11.md
+?? frontend/src/components/analytics/AnalyticsReports.jsx

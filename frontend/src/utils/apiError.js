@@ -43,3 +43,14 @@ export function getApiErrorMessage(error, fallback = 'Não foi possível conclui
 
   return withReference(fallback)
 }
+
+export async function getApiBlobErrorMessage(error, fallback) {
+  const body = error?.response?.data
+  if (body instanceof Blob && body.type.includes('json')) {
+    try {
+      const data = JSON.parse(await body.text())
+      return getApiErrorMessage({ ...error, response: { ...error.response, data } }, fallback)
+    } catch { /* An invalid binary response keeps the original error message. */ }
+  }
+  return getApiErrorMessage(error, fallback)
+}

@@ -1,0 +1,32 @@
+{
+  "environment": "isolated HML",
+  "observed_at_utc": "2026-10-13T15:23:25.122432+00:00",
+  "transaction_read_only": "on",
+  "migration": "0052_analytics_alert_workflow",
+  "rows": {
+    "analytics_alert_cases": 5,
+    "analytics_alert_events": 11,
+    "analytics_alert_requests": 3,
+    "fuel_supplies": 204,
+    "vehicles": 286
+  },
+  "statuses": {
+    "NEW": 4,
+    "IN_REVIEW": 1
+  },
+  "event_types": {
+    "REEVALUATED": 5,
+    "DETECTED": 5,
+    "STATUS_CHANGED": 1
+  },
+  "history_privileges": {
+    "select": true,
+    "insert": true,
+    "update": false,
+    "delete": false
+  },
+  "qa_schemas_remaining": 0,
+  "unique_fingerprints": true,
+  "workflow_audit_rows": 11,
+  "original_events_preserved": true
+}

@@ -1,0 +1,441 @@
+{
+  "environment": "isolated HML",
+  "observed_at_utc": "2026-10-12T16:43:31.629079+00:00",
+  "period": "2026-09-11..2026-10-10",
+  "runs": [
+    {
+      "service": "summary",
+      "sample": 1,
+      "elapsed_ms": 182.1,
+      "sql_statements": 2,
+      "payload_bytes": 11987
+    },
+    {
+      "service": "summary",
+      "sample": 2,
+      "elapsed_ms": 55.2,
+      "sql_statements": 2,
+      "payload_bytes": 11987
+    },
+    {
+      "service": "fleet-status",
+      "sample": 1,
+      "elapsed_ms": 5.0,
+      "sql_statements": 1,
+      "payload_bytes": 229
+    },
+    {
+      "service": "fleet-status",
+      "sample": 2,
+      "elapsed_ms": 0.5,
+      "sql_statements": 1,
+      "payload_bytes": 229
+    },
+    {
+      "service": "attention",
+      "sample": 1,
+      "elapsed_ms": 14.4,
+      "sql_statements": 2,
+      "payload_bytes": 2429
+    },
+    {
+      "service": "attention",
+      "sample": 2,
+      "elapsed_ms": 11.2,
+      "sql_statements": 2,
+      "payload_bytes": 2429
+    },
+    {
+      "service": "costs",
+      "sample": 1,
+      "elapsed_ms": 115.2,
+      "sql_statements": 4,
+      "payload_bytes": 19330
+    },
+    {
+      "service": "costs",
+      "sample": 2,
+      "elapsed_ms": 59.7,
+      "sql_statements": 4,
+      "payload_bytes": 19330
+    },
+    {
+      "service": "fuel",
+      "sample": 1,
+      "elapsed_ms": 59.9,
+      "sql_statements": 2,
+      "payload_bytes": 13802
+    },
+    {
+      "service": "fuel",
+      "sample": 2,
+      "elapsed_ms": 53.8,
+      "sql_statements": 2,
+      "payload_bytes": 13802
+    },
+    {
+      "service": "maintenance",
+      "sample": 1,
+      "elapsed_ms": 49.2,
+      "sql_statements": 2,
+      "payload_bytes": 2179
+    },
+    {
+      "service": "maintenance",
+      "sample": 2,
+      "elapsed_ms": 46.5,
+      "sql_statements": 2,
+      "payload_bytes": 2179
+    },
+    {
+      "service": "utilization",
+      "sample": 1,
+      "elapsed_ms": 52.8,
+      "sql_statements": 4,
+      "payload_bytes": 107813
+    },
+    {
+      "service": "utilization",
+      "sample": 2,
+      "elapsed_ms": 46.7,
+      "sql_statements": 4,
+      "payload_bytes": 107813
+    },
+    {
+      "service": "drivers",
+      "sample": 1,
+      "elapsed_ms": 59.4,
+      "sql_statements": 5,
+      "payload_bytes": 120322
+    },
+    {
+      "service": "drivers",
+      "sample": 2,
+      "elapsed_ms": 49.5,
+      "sql_statements": 5,
+      "payload_bytes": 120322
+    }
+  ],
+  "exports": [
+    {
+      "profile": "executive",
+      "format": "pdf",
+      "elapsed_ms": 94.6,
+      "bytes": 73477,
+      "status": 200,
+      "signature_ok": true,
+      "pages": 2
+    },
+    {
+      "profile": "executive",
+      "format": "xlsx",
+      "elapsed_ms": 19.6,
+      "bytes": 7496,
+      "status": 200,
+      "signature_ok": true
+    },
+    {
+      "profile": "costs",
+      "format": "pdf",
+      "elapsed_ms": 68.9,
+      "bytes": 72811,
+      "status": 200,
+      "signature_ok": true,
+      "pages": 2
+    },
+    {
+      "profile": "costs",
+      "format": "xlsx",
+      "elapsed_ms": 15.6,
+      "bytes": 7018,
+      "status": 200,
+      "signature_ok": true
+    },
+    {
+      "profile": "fuel",
+      "format": "pdf",
+      "elapsed_ms": 76.9,
+      "bytes": 74327,
+      "status": 200,
+      "signature_ok": true,
+      "pages": 2
+    },
+    {
+      "profile": "fuel",
+      "format": "xlsx",
+      "elapsed_ms": 17.2,
+      "bytes": 7625,
+      "status": 200,
+      "signature_ok": true
+    },
+    {
+      "profile": "maintenance",
+      "format": "pdf",
+      "elapsed_ms": 60.0,
+      "bytes": 71247,
+      "status": 200,
+      "signature_ok": true,
+      "pages": 1
+    },
+    {
+      "profile": "maintenance",
+      "format": "xlsx",
+      "elapsed_ms": 15.2,
+      "bytes": 6524,
+      "status": 200,
+      "signature_ok": true
+    },
+    {
+      "profile": "utilization",
+      "format": "pdf",
+      "elapsed_ms": 225.0,
+      "bytes": 89123,
+      "status": 200,
+      "signature_ok": true,
+      "pages": 8
+    },
+    {
+      "profile": "utilization",
+      "format": "xlsx",
+      "elapsed_ms": 42.9,
+      "bytes": 14045,
+      "status": 200,
+      "signature_ok": true
+    },
+    {
+      "profile": "drivers",
+      "format": "pdf",
+      "elapsed_ms": 255.8,
+      "bytes": 93675,
+      "status": 200,
+      "signature_ok": true,
+      "pages": 9
+    },
+    {
+      "profile": "drivers",
+      "format": "xlsx",
+      "elapsed_ms": 47.7,
+      "bytes": 15984,
+      "status": 200,
+      "signature_ok": true
+    }
+  ],
+  "transaction_read_only": "on",
+  "migration": "0051_vehicle_loan_printed_terms",
+  "table_rows": {
+    "vehicles": 286,
+    "drivers": 305,
+    "fuel_supplies": 204,
+    "maintenance_records": 3,
+    "vehicle_possession": 1583,
+    "fines": 2,
+    "claims": 1
+  },
+  "indexes": [
+    {
+      "tablename": "claims",
+      "indexname": "claims_pkey"
+    },
+    {
+      "tablename": "claims",
+      "indexname": "idx_claims_data"
+    },
+    {
+      "tablename": "claims",
+      "indexname": "idx_claims_driver"
+    },
+    {
+      "tablename": "claims",
+      "indexname": "idx_claims_status"
+    },
+    {
+      "tablename": "claims",
+      "indexname": "idx_claims_vehicle"
+    },
+    {
+      "tablename": "claims",
+      "indexname": "ix_claims_responsible_organization_id"
+    },
+    {
+      "tablename": "claims",
+      "indexname": "ix_claims_vehicle_loan_id"
+    },
+    {
+      "tablename": "drivers",
+      "indexname": "drivers_pkey"
+    },
+    {
+      "tablename": "drivers",
+      "indexname": "idx_drivers_ativo"
+    },
+    {
+      "tablename": "drivers",
+      "indexname": "idx_drivers_documento"
+    },
+    {
+      "tablename": "drivers",
+      "indexname": "idx_drivers_nome"
+    },
+    {
+      "tablename": "drivers",
+      "indexname": "idx_drivers_organization_id"
+    },
+    {
+      "tablename": "drivers",
+      "indexname": "uq_drivers_documento_active"
+    },
+    {
+      "tablename": "fines",
+      "indexname": "fines_pkey"
+    },
+    {
+      "tablename": "fines",
+      "indexname": "idx_fines_driver"
+    },
+    {
+      "tablename": "fines",
+      "indexname": "idx_fines_due_date"
+    },
+    {
+      "tablename": "fines",
+      "indexname": "idx_fines_infraction_type_id"
+    },
+    {
+      "tablename": "fines",
+      "indexname": "idx_fines_source_import_row_id"
+    },
+    {
+      "tablename": "fines",
+      "indexname": "idx_fines_status"
+    },
+    {
+      "tablename": "fines",
+      "indexname": "idx_fines_vehicle"
+    },
+    {
+      "tablename": "fines",
+      "indexname": "ix_fines_responsible_organization_id"
+    },
+    {
+      "tablename": "fines",
+      "indexname": "ix_fines_vehicle_loan_id"
+    },
+    {
+      "tablename": "fuel_supplies",
+      "indexname": "fuel_supplies_pkey"
+    },
+    {
+      "tablename": "fuel_supplies",
+      "indexname": "idx_fuel_supplies_anomaly"
+    },
+    {
+      "tablename": "fuel_supplies",
+      "indexname": "idx_fuel_supplies_driver"
+    },
+    {
+      "tablename": "fuel_supplies",
+      "indexname": "idx_fuel_supplies_fuel_station_id"
+    },
+    {
+      "tablename": "fuel_supplies",
+      "indexname": "idx_fuel_supplies_organization"
+    },
+    {
+      "tablename": "fuel_supplies",
+      "indexname": "idx_fuel_supplies_supplied_at"
+    },
+    {
+      "tablename": "fuel_supplies",
+      "indexname": "idx_fuel_supplies_vehicle"
+    },
+    {
+      "tablename": "fuel_supplies",
+      "indexname": "ix_fuel_supplies_vehicle_loan_id"
+    },
+    {
+      "tablename": "fuel_supplies",
+      "indexname": "uq_fuel_supplies_order_id"
+    },
+    {
+      "tablename": "maintenance_records",
+      "indexname": "idx_maintenance_created_by"
+    },
+    {
+      "tablename": "maintenance_records",
+      "indexname": "idx_maintenance_dates"
+    },
+    {
+      "tablename": "maintenance_records",
+      "indexname": "idx_maintenance_vehicle"
+    },
+    {
+      "tablename": "maintenance_records",
+      "indexname": "ix_maintenance_records_responsible_organization_id"
+    },
+    {
+      "tablename": "maintenance_records",
+      "indexname": "ix_maintenance_records_vehicle_loan_id"
+    },
+    {
+      "tablename": "maintenance_records",
+      "indexname": "maintenance_records_pkey"
+    },
+    {
+      "tablename": "vehicle_possession",
+      "indexname": "idx_possession_driver"
+    },
+    {
+      "tablename": "vehicle_possession",
+      "indexname": "idx_possession_loan_term_validation_code"
+    },
+    {
+      "tablename": "vehicle_possession",
+      "indexname": "idx_possession_return_term_validation_code"
+    },
+    {
+      "tablename": "vehicle_possession",
+      "indexname": "idx_possession_vehicle"
+    },
+    {
+      "tablename": "vehicle_possession",
+      "indexname": "ix_vehicle_possession_driver_id"
+    },
+    {
+      "tablename": "vehicle_possession",
+      "indexname": "ix_vehicle_possession_responsible_organization_id"
+    },
+    {
+      "tablename": "vehicle_possession",
+      "indexname": "ix_vehicle_possession_vehicle_loan_id"
+    },
+    {
+      "tablename": "vehicle_possession",
+      "indexname": "uq_possession_active"
+    },
+    {
+      "tablename": "vehicle_possession",
+      "indexname": "uq_vehicle_possession_public_number"
+    },
+    {
+      "tablename": "vehicle_possession",
+      "indexname": "vehicle_possession_pkey"
+    },
+    {
+      "tablename": "vehicles",
+      "indexname": "ix_vehicles_chassis_number"
+    },
+    {
+      "tablename": "vehicles",
+      "indexname": "ix_vehicles_owner_organization_id"
+    },
+    {
+      "tablename": "vehicles",
+      "indexname": "ix_vehicles_plate"
+    },
+    {
+      "tablename": "vehicles",
+      "indexname": "vehicles_pkey"
+    }
+  ],
+  "write_statements": 0
+}

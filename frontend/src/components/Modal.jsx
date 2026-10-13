@@ -7,26 +7,30 @@ const focusableSelectors = [
   'input:not([disabled])',
   'select:not([disabled])',
   'textarea:not([disabled])',
+  'summary',
   '[tabindex]:not([tabindex="-1"])',
 ]
 const focusableSelector = focusableSelectors.join(',')
 const modalBodyFocusableSelector = focusableSelectors.map((selector) => `.modal-body ${selector}`).join(',')
 
-export default function Modal({ open, title, description, onClose, children, canClose = true, initialFocusRef }) {
+export default function Modal({ open, title, description, onClose, children, canClose = true, initialFocusRef, returnFocusRef, onEscape, className = '', backdropClassName = '' }) {
   const titleId = useId()
   const descriptionId = useId()
   const dialogRef = useRef(null)
   const onCloseRef = useRef(onClose)
+  const onEscapeRef = useRef(onEscape)
 
   useEffect(() => {
     onCloseRef.current = onClose
-  }, [onClose])
+    onEscapeRef.current = onEscape
+  }, [onClose, onEscape])
 
   useEffect(() => {
     if (!open) return undefined
 
     const previousOverflow = document.body.style.overflow
     const previousFocus = document.activeElement
+    const fallbackFocus = returnFocusRef?.current
     const dialog = dialogRef.current
 
     function focusInitialElement() {
@@ -43,13 +47,23 @@ export default function Modal({ open, title, description, onClose, children, can
       if (dialogs[dialogs.length - 1] !== dialog) return
       if (event.key === 'Escape' && canClose) {
         event.preventDefault()
-        onCloseRef.current?.()
+        if (onEscapeRef.current) onEscapeRef.current()
+        else onCloseRef.current?.()
         return
       }
 
       if (event.key !== 'Tab' || !dialog) return
       const focusable = Array.from(dialog.querySelectorAll(focusableSelector))
-        .filter((element) => !element.hasAttribute('disabled') && element.getAttribute('aria-hidden') !== 'true')
+        .filter((element) => {
+          if (element.hasAttribute('disabled') || element.closest('[hidden], [aria-hidden="true"]')) return false
+          if (typeof element.checkVisibility === 'function' && !element.checkVisibility()) return false
+          let closed = element.closest('details:not([open])')
+          while (closed) {
+            if (!closed.querySelector('summary')?.contains(element)) return false
+            closed = closed.parentElement?.closest('details:not([open])')
+          }
+          return true
+        })
       if (focusable.length === 0) {
         event.preventDefault()
         dialog.focus()
@@ -58,7 +72,11 @@ export default function Modal({ open, title, description, onClose, children, can
 
       const first = focusable[0]
       const last = focusable.at(-1)
-      if (event.shiftKey && document.activeElement === first) {
+      if (!focusable.includes(document.activeElement)) {
+        event.preventDefault()
+        const target = event.shiftKey ? last : first
+        target.focus()
+      } else if (event.shiftKey && document.activeElement === first) {
         event.preventDefault()
         last.focus()
       } else if (!event.shiftKey && document.activeElement === last) {
@@ -78,18 +96,19 @@ export default function Modal({ open, title, description, onClose, children, can
       cancelFocus(focusFrame)
       window.removeEventListener('keydown', handleKeyDown)
       if (previousFocus instanceof HTMLElement && document.contains(previousFocus)) previousFocus.focus()
+      else if (fallbackFocus && document.contains(fallbackFocus)) fallbackFocus.focus()
     }
-  }, [open, canClose, initialFocusRef])
+  }, [open, canClose, initialFocusRef, returnFocusRef])
 
   if (!open) return null
 
   return createPortal(
-    <div className="modal-backdrop" role="presentation" onMouseDown={(event) => {
+    <div className={`modal-backdrop ${backdropClassName}`.trim()} role="presentation" onMouseDown={(event) => {
       if (canClose && event.target === event.currentTarget) onCloseRef.current?.()
     }}>
       <section
         ref={dialogRef}
-        className="modal-shell"
+        className={`modal-shell ${className}`.trim()}
         role="dialog"
         aria-modal="true"
         aria-labelledby={titleId}

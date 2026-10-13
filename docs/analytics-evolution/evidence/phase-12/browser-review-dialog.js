@@ -1,0 +1,51 @@
+async (page) => {
+  const errors = []
+  const onError = (error) => errors.push(error.message)
+  page.on('pageerror', onError)
+  await page.getByRole('dialog').getByRole('button', { name: /Posse nº/ }).first().click()
+  await page.getByText(/registro de origem consultado na análise/).waitFor()
+  if (!await page.getByRole('region', { name: 'Como foi calculado?' }).isVisible()) throw new Error('Missing calculation context')
+  for (let index = 0; index < 6; index++) {
+    await page.keyboard.press('Tab')
+    if (!await page.evaluate(() => document.querySelector('[role="dialog"]').contains(document.activeElement))) throw new Error('Focus escaped drawer')
+  }
+  await page.screenshot({ path: 'output/playwright/analytics-review-20261013/possession-drawer-mobile.png', animations: 'disabled' })
+  await page.keyboard.press('Escape')
+  await page.getByRole('dialog').getByRole('button', { name: /Posse nº/ }).first().waitFor()
+  await page.keyboard.press('Escape')
+  await page.getByRole('dialog').waitFor({ state: 'hidden' })
+  const focusRestored = await page.evaluate(() => document.activeElement.textContent.includes('Ver posses do denominador'))
+  if (!focusRestored) throw new Error('Trigger focus was not restored')
+  const navigation = page.getByRole('navigation', { name: 'Seções de análises' })
+  await navigation.getByRole('button', { name: 'Condutores', exact: true }).click()
+  const ranking = page.getByRole('region', { name: 'Ranking por medida registrada' })
+  await ranking.getByRole('button', { name: 'Mais multas', exact: true }).click()
+  await ranking.getByText('Sem dados para os filtros selecionados.', { exact: true }).waitFor()
+  if (!await ranking.getByRole('button', { name: 'Mais posses', exact: true }).isVisible()) throw new Error('Empty ranking hides controls')
+  await ranking.screenshot({ path: 'output/playwright/analytics-review-20261013/empty-ranking-mobile.png', animations: 'disabled' })
+  await ranking.getByRole('button', { name: 'Mais posses', exact: true }).click()
+  await ranking.getByRole('table').waitFor()
+  await navigation.getByRole('button', { name: 'Alertas', exact: true }).click()
+  await page.getByRole('button', { name: 'Ver veículo', exact: true }).click()
+  await page.getByRole('region', { name: 'Como foi calculado?' }).waitFor()
+  await page.getByRole('button', { name: 'Fechar', exact: true }).click()
+  await page.getByRole('button', { name: 'Exportar insights anteriores', exact: true }).click()
+  await page.getByRole('button', { name: 'Exportar', exact: true }).click()
+  await page.getByRole('alert').getByText('Permissão insuficiente para exportar (cenário de teste)', { exact: true }).waitFor()
+  await page.getByRole('button', { name: 'Cancelar', exact: true }).click()
+  let attempts = 0
+  await page.route('**/api/analytics/v2/attention?**', async (route) => {
+    if (attempts++ === 0) await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ detail: 'Falha parcial de teste' }) })
+    else await route.fallback()
+  })
+  await navigation.getByRole('button', { name: 'Visão Geral', exact: true }).click()
+  const attention = page.getByRole('region', { name: 'Veículos que exigem atenção' })
+  await attention.getByRole('alert').waitFor()
+  if (await page.getByRole('region', { name: 'Indicadores do período' }).getByRole('alert').count()) throw new Error('Partial failure affected summary')
+  await page.screenshot({ path: 'output/playwright/analytics-review-20261013/partial-failure-mobile.png', fullPage: true, animations: 'disabled' })
+  await attention.getByRole('button', { name: 'Tentar novamente', exact: true }).click()
+  await attention.getByRole('alert').waitFor({ state: 'hidden' })
+  page.off('pageerror', onError)
+  return { possessionRecord: true, calculationContext: true, focusTrap: true, focusRestored,
+    emptyRankingControls: true, legacyExportError: true, partialFailureRetry: attempts === 2, errors }
+}

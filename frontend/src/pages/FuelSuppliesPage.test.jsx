@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FuelSuppliesPage from './FuelSuppliesPage'
@@ -39,7 +39,7 @@ vi.mock('../context/AuthContext', () => ({
   }),
 }))
 vi.mock('../components/Modal', () => ({
-  default: ({ open, title, children }) => (open ? <section role="dialog" aria-label={title}>{children}</section> : null),
+  default: ({ open, title, children, onClose }) => (open ? <section role="dialog" aria-label={title}><button onClick={onClose}>Fechar</button>{children}</section> : null),
 }))
 vi.mock('../components/Pagination', () => ({ default: () => null }))
 vi.mock('../components/SearchableSelect', () => ({ default: ({ placeholder }) => <button type="button">{placeholder}</button> }))
@@ -176,5 +176,68 @@ describe('FuelSuppliesPage administrative adjustments', () => {
     expect(screen.getByRole('dialog', { name: 'Reabrir prazo da ordem' })).toBeInTheDocument()
     expect(screen.getByLabelText('Novo prazo')).toBeRequired()
     expect(screen.getByLabelText('Justificativa')).toBeRequired()
+  })
+
+  it('exibe motivo persistido por hover e clique, preservando filtros e ações', async () => {
+    const reason = 'Alerta: consumo 6.45 km/l está mais de 30% abaixo da média histórica (10.20 km/l).'
+    mocks.listSupplies.mockResolvedValue({ data: { data: [{
+      id: 'alert-1', vehicle_plate: 'ABC1D23', supplied_at: '2026-10-06T14:01:00Z',
+      is_consumption_anomaly: true, anomaly_details: reason, liters: 40, consumption_km_l: 6.45,
+      fuel_supply_order_id: 'order-1', receipt_url: '/api/fuel-supplies/alert-1/receipt',
+    }] } })
+    renderPage('/abastecimentos?vehicle_id=vehicle-1')
+    const trigger = await screen.findByRole('button', { name: 'Ver motivo do alerta de ABC1D23' })
+    const search = screen.getByPlaceholderText('Buscar por placa, secretaria, posto, combustível ou aditivo')
+    fireEvent.change(search, { target: { value: 'ABC1D23' } })
+    fireEvent.mouseEnter(trigger)
+    expect(screen.getByRole('tooltip')).toHaveTextContent(reason)
+    fireEvent.click(trigger)
+    const drawer = screen.getByRole('dialog', { name: 'Alerta de abastecimento — ABC1D23' })
+    expect(drawer).toHaveTextContent(reason)
+    expect(drawer).toHaveTextContent('Rendimento registrado (km/l)')
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    fireEvent.click(within(drawer).getByRole('button', { name: 'Fechar' }))
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(search).toHaveValue('ABC1D23')
+    expect(screen.getByTestId('location')).toHaveTextContent('/abastecimentos?vehicle_id=vehicle-1')
+    expect(screen.getByRole('link', { name: 'Comprovante' })).toHaveAttribute('href', '/api/fuel-supplies/alert-1/receipt')
+    expect(screen.getByRole('button', { name: 'Retificar' })).toBeInTheDocument()
+  })
+
+  it('informa motivo ausente sem fabricar regra e mantém Regular sem ação de alerta', async () => {
+    mocks.listSupplies.mockResolvedValue({ data: { data: [
+      { id: 'missing', vehicle_plate: 'ABC1D23', is_consumption_anomaly: true, anomaly_details: '   ' },
+      { id: 'regular', vehicle_plate: 'DEF4G56', is_consumption_anomaly: false },
+    ] } })
+    renderPage('/abastecimentos')
+    fireEvent.click(await screen.findByRole('button', { name: 'Ver motivo do alerta de ABC1D23' }))
+    expect(screen.getByRole('dialog')).toHaveTextContent('Motivo não informado no registro deste abastecimento.')
+    expect(screen.getByText('Regular')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Ver motivo do alerta de DEF4G56' })).not.toBeInTheDocument()
+  })
+
+  it('mantém apenas um resumo ao percorrer alertas e remove todos ao rolar', async () => {
+    mocks.listSupplies.mockResolvedValue({ data: { data: [
+      { id: 'first', vehicle_plate: 'ABC1D23', is_consumption_anomaly: true, anomaly_details: 'Motivo do primeiro registro.' },
+      { id: 'second', vehicle_plate: 'DEF4G56', is_consumption_anomaly: true, anomaly_details: 'Motivo do segundo registro.' },
+    ] } })
+    renderPage('/abastecimentos')
+    const first = await screen.findByRole('button', { name: 'Ver motivo do alerta de ABC1D23' })
+    const second = screen.getByRole('button', { name: 'Ver motivo do alerta de DEF4G56' })
+    fireEvent.mouseEnter(first)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Motivo do primeiro registro.')
+    // A previous mouseleave is not guaranteed when rows move under a stationary pointer.
+    fireEvent.mouseEnter(second)
+    expect(screen.getAllByRole('tooltip')).toHaveLength(1)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Motivo do segundo registro.')
+    expect(first).not.toHaveAttribute('aria-describedby')
+    fireEvent.scroll(window)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    fireEvent.focus(first)
+    expect(screen.getAllByRole('tooltip')).toHaveLength(1)
+    expect(screen.getByRole('tooltip')).toHaveTextContent('Motivo do primeiro registro.')
+    fireEvent.click(first)
+    expect(screen.queryByRole('tooltip')).not.toBeInTheDocument()
+    expect(screen.getByRole('dialog')).toHaveTextContent('Motivo do primeiro registro.')
   })
 })

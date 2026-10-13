@@ -1,0 +1,28 @@
+{
+  "environment": "https://testefrota.sirel.com.br",
+  "observed_on": "2026-10-13",
+  "session": "authenticated existing administrator session",
+  "method": "CUA Edge; rendered DOM, visibility waits and screenshots; no API mocks",
+  "bundle": "index-BA6yp1-c.js",
+  "sections": ["Visão Geral", "Custos", "Combustível", "Manutenção", "Utilização", "Condutores", "Alertas", "Relatórios"],
+  "viewports": [{"width":1366,"height":768},{"width":1920,"height":1080},{"width":390,"height":844}],
+  "themes": ["light", "dark"],
+  "cases_observed": 48,
+  "horizontal_overflow_failures": 0,
+  "visible_api_error_messages": 0,
+  "console_errors": [],
+  "flows": {
+    "cost_date_and_type_preserved_across_tabs": true,
+    "cost_denominator_to_possession_record": true,
+    "calculation_context_preserved_in_possession_record": true,
+    "escape_returns_to_parent_then_closes": true,
+    "fuel_anomaly_to_domain_supply_rule_and_sample": true,
+    "fuel_anomaly_to_vehicle_rule_and_sample": true,
+    "legacy_alert_plate_brand_model": true,
+    "legacy_alert_vehicle_calculation_context": true,
+    "driver_empty_ranking_controls_remain_available": true,
+    "driver_to_vehicle_preserves_origin_and_period": true
+  },
+  "cleanup": "viewport reset and original light theme restored",
+  "limits": ["Public UI coverage used administrator session; restricted scope regression is automated, not a real login for every role", "Browser sweep checks loading and geometry, not a full WCAG certification", "All twelve report formats validated through read-only services; public download validated for executive PDF/XLSX"]
+}

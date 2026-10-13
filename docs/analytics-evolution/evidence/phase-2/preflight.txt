@@ -1,0 +1,30 @@
+feature/analytics-evolution-hml
+082af32dee326408d023d0133272ae8eaa71eb20
+ M ../docs/analytics-evolution/11_STATUS.md
+ M ../frontend/src/components/Modal.jsx
+ M ../frontend/src/components/analytics/AdvancedFilters.jsx
+ M ../frontend/src/components/analytics/CostPerKmRanking.jsx
+ M ../frontend/src/components/analytics/DriverRiskTable.jsx
+ M ../frontend/src/components/analytics/EfficiencyChart.jsx
+ M ../frontend/src/components/analytics/KPICards.jsx
+ M ../frontend/src/components/analytics/SmartInsightsList.jsx
+ M ../frontend/src/components/analytics/TrendChart.jsx
+ M ../frontend/src/components/analytics/VehicleDetailsTable.jsx
+ M ../frontend/src/main.jsx
+ M ../frontend/src/pages/AdminAnalyticsDashboard.jsx
+?? ../docs/analytics-evolution/DELIVERY_PHASE_1.md
+?? ../docs/analytics-evolution/EXECPLAN_PHASE_1.md
+?? ../docs/analytics-evolution/evidence/phase-1/
+?? ../frontend/src/components/analytics/AnalyticsEntityDrawer.jsx
+?? ../frontend/src/components/analytics/AnalyticsEntityDrawer.test.jsx
+?? ../frontend/src/components/analytics/AnalyticsEntityLink.jsx
+?? ../frontend/src/components/analytics/AnalyticsKpiCard.jsx
+?? ../frontend/src/components/analytics/AnalyticsSection.jsx
+?? ../frontend/src/components/analytics/AnalyticsSeverityBadge.jsx
+?? ../frontend/src/components/analytics/AnalyticsSubnav.jsx
+?? ../frontend/src/components/analytics/analyticsSections.js
+?? ../frontend/src/components/analytics/useAnalyticsDetailStack.js
+?? ../frontend/src/components/analytics/useAnalyticsV1.js
+?? ../frontend/src/pages/AdminAnalyticsDashboard.test.jsx
+?? ../frontend/src/styles/analytics-evolution.css
+?? ../output/playwright/analytics-phase-1/

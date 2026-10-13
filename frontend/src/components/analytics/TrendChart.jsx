@@ -1,3 +1,4 @@
+import AnalyticsSection from './AnalyticsSection'
 import {
   ResponsiveContainer,
   LineChart,
@@ -9,14 +10,13 @@ import {
   Legend,
 } from 'recharts'
 
-export default function TrendChart({ rows = [] }) {
+export default function TrendChart({ rows = [], ...sectionProps }) {
   return (
-    <section className="surface-panel">
-      <h3 className="section-title">Evolução de custos (12 meses)</h3>
+    <AnalyticsSection title="Evolução de custos (12 meses)" empty={rows.length === 0} {...sectionProps}>
       {rows.length === 0 ? (
         <div className="empty-state">Sem dados históricos.</div>
       ) : (
-        <div style={{ width: '100%', height: 280 }}>
+        <div className="analytics-chart">
           <ResponsiveContainer>
             <LineChart data={rows}>
               <CartesianGrid strokeDasharray="3 3" />
@@ -32,6 +32,6 @@ export default function TrendChart({ rows = [] }) {
           </ResponsiveContainer>
         </div>
       )}
-    </section>
+    </AnalyticsSection>
   )
 }
