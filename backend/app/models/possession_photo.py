@@ -20,6 +20,13 @@ class VehiclePossessionPhoto(Base):
         ForeignKey("vehicle_possession.id", ondelete="CASCADE"),
         nullable=False,
     )
+    evidence_stage: Mapped[str] = mapped_column(String(20), nullable=False, server_default="unspecified")
+    return_confirmation_id: Mapped[UUID | None] = mapped_column(
+        PGUUID(as_uuid=True), ForeignKey("vehicle_possession_return_confirmation.id"), nullable=True,
+    )
+    return_confirmation_version: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    uploaded_by_user_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id"), nullable=True)
+    content_sha256: Mapped[str | None] = mapped_column(String(64), nullable=True)
     photo_path: Mapped[str] = mapped_column(String(255), nullable=False)
     photo_mime_type: Mapped[str] = mapped_column(String(100), nullable=False)
     photo_size_bytes: Mapped[int] = mapped_column(Integer, nullable=False)

@@ -16,6 +16,7 @@ const mocks = vi.hoisted(() => ({
   getReturnContext: vi.fn(),
   getRectificationContext: vi.fn(),
   correctReturnConfirmation: vi.fn(),
+  appendPostClosurePhotos: vi.fn(),
   isAdmin: false,
   isProduction: false,
   canEdit: true,
@@ -33,6 +34,7 @@ vi.mock('../api/possession', () => ({
     getReturnContext: mocks.getReturnContext,
     getRectificationContext: mocks.getRectificationContext,
     correctReturnConfirmation: mocks.correctReturnConfirmation,
+    appendPostClosurePhotos: mocks.appendPostClosurePhotos,
   },
 }))
 vi.mock('../context/AuthContext', () => ({
@@ -323,6 +325,43 @@ describe('PossessionPage', () => {
     fireEvent.click(screen.getByRole('button', { name: /Mais ações da posse/ }))
     expect(screen.queryByRole('menuitem', { name: 'Retificar', exact: true })).not.toBeInTheDocument()
     expect(screen.queryByRole('button', { name: 'Retificar devolução' })).not.toBeInTheDocument()
+  })
+
+  it('adiciona fotos a uma posse encerrada sem abrir ou enviar retificação', async () => {
+    mocks.isProduction = true
+    mocks.list.mockResolvedValue({ data: [{ ...possession, end_date: '2026-07-13T17:00:00Z', is_active: false }] })
+    mocks.appendPostClosurePhotos.mockResolvedValue({ data: { added_count: 1 } })
+    URL.createObjectURL = vi.fn(() => 'blob:post-closure')
+    URL.revokeObjectURL = vi.fn()
+    render(<MemoryRouter><PossessionPage /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'Encerradas', exact: true }))
+    await screen.findByText('ENCERRADA')
+    fireEvent.click(screen.getByRole('button', { name: /Mais ações da posse/ }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Adicionar fotos', exact: true }))
+    expect(screen.getByRole('button', { name: 'Salvar fotos' })).toBeDisabled()
+    expect(screen.queryByRole('textbox', { name: /Justificativa/ })).not.toBeInTheDocument()
+    fireEvent.change(screen.getByLabelText('Selecionar fotos da devolução'), { target: { files: [new File(['x'], 'foto.png', { type: 'image/png' })] } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar fotos' }))
+    await waitFor(() => expect(mocks.appendPostClosurePhotos).toHaveBeenCalledOnce())
+    expect(mocks.appendPostClosurePhotos.mock.calls[0][1].getAll('photos')).toHaveLength(1)
+    expect(mocks.update).not.toHaveBeenCalled()
+    expect(mocks.getRectificationContext).not.toHaveBeenCalled()
+  })
+
+  it('não oferece adicionar fotos em posse ativa ou perfil sem edição', async () => {
+    mocks.isProduction = true
+    const { unmount } = render(<MemoryRouter><PossessionPage /></MemoryRouter>)
+    await screen.findByText('ATIVA')
+    fireEvent.click(screen.getByRole('button', { name: /Mais ações da posse/ }))
+    expect(screen.queryByRole('menuitem', { name: 'Adicionar fotos' })).not.toBeInTheDocument()
+    unmount()
+    mocks.canEdit = false
+    mocks.list.mockResolvedValue({ data: [{ ...possession, end_date: '2026-07-13T17:00:00Z', is_active: false }] })
+    render(<MemoryRouter><PossessionPage /></MemoryRouter>)
+    fireEvent.click(screen.getByRole('button', { name: 'Encerradas', exact: true }))
+    await screen.findByText('ENCERRADA')
+    fireEvent.click(screen.getByRole('button', { name: /Mais ações da posse/ }))
+    expect(screen.queryByRole('menuitem', { name: 'Adicionar fotos' })).not.toBeInTheDocument()
   })
 
 })

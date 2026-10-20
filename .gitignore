@@ -52,3 +52,7 @@ deploy/.ci-uploads/
 
 .DS_Store
 Thumbs.db
+
+# Local evidence and staged builds for possession return photos
+/storage/hml-frontend-build/
+/storage/return-photos-*/

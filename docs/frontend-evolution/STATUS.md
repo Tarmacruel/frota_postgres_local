@@ -1,5 +1,10 @@
 # Status — evolução do frontend Frota PMTF
 
+## 20/10/2026 — Fotos no encerramento da posse
+
+Demanda funcional autorizada pelo usuário, aplicada somente à homologação. Campo opcional com seleção múltipla, prévia/remoção, envio atômico, identificação das evidências e migration aditiva 0053. Backend 637 aprovados/109 ignorados; frontend 320 aprovados/62 arquivos; lint 0 erros/40 avisos preexistentes; build HML aprovado. Teste integrado com dados fictícios, integridade do arquivo, acesso protegido e QA claro/escuro/móvel concluídos. Produção preservada. [Entrega e manutenção](../RETURN_PHOTOS_HML_20261020.md).
+
+
 ## 13/10/2026 — Publicação do Analytics e resumos de Abastecimentos
 
 - Promoção integral de HML `169cde9` para produção autorizada pelo usuário e ativada às 15:43:43; release `df84161`, bundle público `index-CfE8XNxs.js`. [Entrega e evidências](../ANALYTICS_PRODUCTION_RELEASE_20261013.md).
@@ -188,3 +193,11 @@ Após autorização expressa do usuário, as três fases e a correção do PDF f
 Gates locais: frontend 317/317; backend 626 aprovados/109 ignorados; lint 0 erros/40 avisos; build de produção aprovado. Dez listagens, catálogos, filtros/foco e 13 escopos de Produção conferidos com conexão somente leitura. PDF/XLSX gerados em memória com todas as 1.983 posses. Na sessão pública autenticada, a paginação compacta carregou e o PDF de “Todas” confirmou abertura em nova guia. Readiness público e de origem `ok`, dez assets publicados conferidos por SHA-256, rotas protegidas 401 sem sessão e docs 404.
 
 A HML também foi restabelecida pelo script `loan-tests.ps1 -Action start`; **https://testefrota.sirel.com.br** e sua origem responderam HTTP 200 com aplicação/banco saudáveis. Deploy automático permanece desabilitado. [ExecPlan, evidências e rollback](../PAGINATION_PRODUCTION_RELEASE_20261020.md).
+
+## Fotos no encerramento e anexos posteriores — 20/10/2026
+
+Solicitação funcional autorizada e publicada somente na homologação. O encerramento aceita fotos opcionais na mesma transação da confirmação (migration 0053). Nova ação **Adicionar fotos** em posses já encerradas permite anexar imagens sem retificar: etapa `post_return`, usuário e hash registrados, evento próprio de auditoria, prevenção de duplicação por conteúdo e preservação do conteúdo de assinatura/termo anterior.
+
+Backend: **644 aprovados/109 ignorados/8 avisos**; frontend: **322/322 em 62 arquivos**; lint **0 erros/40 avisos**; build e `git diff --check` aprovados. QA autenticado na posse fictícia 1589: foto adicional salva, reenvio deduplicado, encerramento/revisão/updated_at/confirmações/hash idênticos antes e depois, arquivo conferido por SHA-256 e um evento de auditoria. Claro/escuro e formulário em 390 px conferidos, sem overflow horizontal e console sem erros. Código/configuração/index de produção preservados, readiness dos dois ambientes saudável, assets públicos de HML iguais ao build.
+
+Código em `D:\FROTAS\02-HOMOLOGACAO\codigo`; organização local documentada em `D:\FROTAS\LEIA-ME-AMBIENTES.md`, com atalhos que preservam os caminhos dos processos. Cloudflared atualizado para 2026.10.2 na etapa anterior. Alterações locais na branch `feature/fotos-devolucao-hml`, sem commit/push. [Entrega e backup dos anexos posteriores](../POST_CLOSURE_PHOTOS_HML_20261020.md); [fotos durante o encerramento](../RETURN_PHOTOS_HML_20261020.md).

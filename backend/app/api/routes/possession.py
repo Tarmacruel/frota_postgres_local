@@ -20,6 +20,7 @@ from app.schemas.possession import (
     PossessionOut,
     PossessionOdometerSuggestion,
     PossessionPhotoCreate,
+    PossessionPhotoAppendResult,
     PossessionTermPublicOut,
     PossessionUpdate,
 )
@@ -39,6 +40,7 @@ from app.schemas.possession_return import (
 )
 from app.schemas.possession_report import PossessionReportRequest
 from app.services.possession_service import PossessionService
+from app.services.possession_return_photo_service import PossessionReturnPhotoService
 from app.services.possession_report_service import (
     REPORT_NO_CACHE_HEADERS,
     PossessionReportService,
@@ -553,15 +555,65 @@ async def get_possession_return_term_document(
     return await PossessionService(db).get_document_file(possession_id, document_kind="return", current_user=current_user)
 
 
+async def parse_post_closure_photos(request: Request):
+    if not request.headers.get('content-type', '').lower().startswith('multipart/form-data'):
+        raise HTTPException(415, 'Envie as fotos como anexos do formulário.')
+    async with request.form(max_files=10, max_fields=0) as form:
+        if set(form.keys()) != {'photos'}:
+            _raise_form_error('photos', 'Selecione ao menos uma foto. Apenas fotos são aceitas nesta ação.')
+        photos = form.getlist('photos')
+        if any(not hasattr(photo, 'filename') for photo in photos):
+            _raise_form_error('photos', 'Anexos inválidos.')
+        yield photos
+
+
+@router.post('/{possession_id}/post-closure-photos', response_model=PossessionPhotoAppendResult)
+async def append_post_closure_photos(
+    possession_id: UUID,
+    photos = Depends(parse_post_closure_photos),
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_writer),
+    _permission: User = Depends(require_permission('possession', 'edit')),
+):
+    added = await PossessionReturnPhotoService(db).append_to_closed(possession_id, photos, current_user)
+    return {'possession': await PossessionService(db)._get_by_id(possession_id, current_user), 'added_count': added}
+
+
+async def parse_return_with_photos(request: Request):
+    """Keep existing JSON clients while accepting an atomic multipart return."""
+    uploads = []
+    try:
+        if request.headers.get("content-type", "").lower().startswith("multipart/form-data"):
+            async with request.form(max_files=10, max_fields=1, max_part_size=64 * 1024) as form:
+                if set(form.keys()) - {"payload_json", "photos"}:
+                    _raise_form_error("body", "Campos inválidos no encerramento da posse.")
+                if len(form.getlist("payload_json")) != 1:
+                    _raise_form_error("payload_json", "Informe os dados da devolução uma única vez.")
+                raw = form.get("payload_json")
+                uploads = form.getlist("photos")
+                if not isinstance(raw, str) or any(not hasattr(photo, "filename") for photo in uploads):
+                    _raise_form_error("body", "Dados ou fotos da devolução inválidos.")
+                data = PossessionEndWithConfirmation.model_validate_json(raw)
+                yield data, uploads
+        else:
+            data = PossessionEndWithConfirmation.model_validate(await request.json())
+            yield data, []
+    except (ValidationError, json.JSONDecodeError) as exc:
+        if isinstance(exc, ValidationError):
+            raise RequestValidationError(exc.errors()) from exc
+        _raise_form_error("body", "Dados da devolução em formato inválido.")
+
+
 @router.put("/{possession_id}/end", response_model=PossessionOut)
 async def end_possession(
     possession_id: UUID,
-    data: PossessionEndWithConfirmation,
+    parsed = Depends(parse_return_with_photos),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_writer),
     _permission: User = Depends(require_permission("possession", "edit")),
 ):
-    await PossessionReturnService(db).end(possession_id, data, current_user)
+    data, photos = parsed
+    await PossessionReturnService(db).end(possession_id, data, current_user, photos=photos)
     return await PossessionService(db)._get_by_id(possession_id, current_user)
 
 

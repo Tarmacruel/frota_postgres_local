@@ -20,7 +20,7 @@ function Get-OwnedApiProcess {
     if ($process.CommandLine -notlike "*$runner*run*" -or $process.ExecutablePath -notlike "$testRoot\backend\.venv\Scripts\python.exe") {
         throw 'Recorded PID belongs to another process; refusing to act.'
     }
-    if ($process.CreationDate.ToUniversalTime().ToString('o') -ne $record.createdAt) { throw 'Recorded PID was reused.' }
+    if ($process.CreationDate.ToUniversalTime() -ne ([datetime]$record.createdAt).ToUniversalTime()) { throw 'Recorded PID was reused.' }
     return $process
 }
 

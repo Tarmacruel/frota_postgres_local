@@ -10,6 +10,7 @@ import Pagination from '../components/Pagination'
 import PossessionForm from '../components/PossessionForm'
 import PossessionReportBuilder from '../components/PossessionReportBuilder'
 import PossessionEndModal from '../components/PossessionEndModal'
+import PossessionPostClosurePhotosModal from '../components/PossessionPostClosurePhotosModal'
 import PossessionRevisionHistory from '../components/PossessionRevisionHistory'
 import PossessionTripsModal from '../components/PossessionTripsModal'
 import SearchableSelect from '../components/SearchableSelect'
@@ -143,6 +144,12 @@ export default function PossessionPage() {
   const [tripOverview, setTripOverview] = useState({})
   const [endingRecord, setEndingRecord] = useState(null)
   const [returnContext, setReturnContext] = useState(null)
+  const [postPhotoRecord, setPostPhotoRecord] = useState(null)
+  const [postPhotoFiles, setPostPhotoFiles] = useState([])
+  const [postPhotoError, setPostPhotoError] = useState('')
+  const [postPhotoSaving, setPostPhotoSaving] = useState(false)
+  const postPhotoSending = useRef(false)
+  const [endPhotos, setEndPhotos] = useState([])
   const [endError, setEndError] = useState('')
   const [endForm, setEndForm] = useState(buildEndState(null))
   const [ending, setEnding] = useState(false)
@@ -448,6 +455,7 @@ export default function PossessionPage() {
   }
 
   function closeEndModal() {
+    setEndPhotos([])
     setEndingRecord(null)
     setReturnContext(null)
     setEndError('')
@@ -592,8 +600,14 @@ export default function PossessionPage() {
         vehicle_condition_notes: endForm.vehicle_condition_notes,
         declaration_accepted: endForm.declaration_accepted,
       }
-      await possessionAPI.end(endingRecord.id, payload)
-      setFeedback('Devolução confirmada e posse encerrada com sucesso.')
+      let requestPayload = payload
+      if (endPhotos.length) {
+        requestPayload = new FormData()
+        requestPayload.append('payload_json', JSON.stringify(payload))
+        endPhotos.forEach((file) => requestPayload.append('photos', file, file.name))
+      }
+      await possessionAPI.end(endingRecord.id, requestPayload)
+      setFeedback(endPhotos.length ? `Devolução confirmada com ${endPhotos.length} foto(s) e posse encerrada com sucesso.` : 'Devolução confirmada e posse encerrada com sucesso.')
       closeEndModal()
       await loadPossessions()
     } catch (err) {
@@ -770,9 +784,46 @@ export default function PossessionPage() {
     )
   }
 
+  function openPostClosurePhotos(record) {
+    setPostPhotoRecord(record)
+    setPostPhotoFiles([])
+    setPostPhotoError('')
+  }
+
+  function closePostClosurePhotos() {
+    if (postPhotoSending.current) return
+    setPostPhotoRecord(null)
+    setPostPhotoFiles([])
+    setPostPhotoError('')
+  }
+
+  async function handlePostClosurePhotos(event) {
+    event.preventDefault()
+    if (!postPhotoRecord || !postPhotoFiles.length || postPhotoSending.current) return
+    if (!canRectifyPossession) { setPostPhotoError('Você não tem permissão para adicionar fotos.'); return }
+    postPhotoSending.current = true
+    setPostPhotoSaving(true)
+    setPostPhotoError('')
+    try {
+      const payload = new FormData()
+      postPhotoFiles.forEach((file) => payload.append('photos', file, file.name))
+      const { data } = await possessionAPI.appendPostClosurePhotos(postPhotoRecord.id, payload)
+      setFeedback(data.added_count ? `${data.added_count} foto(s) adicionada(s) à posse encerrada.` : 'As fotos selecionadas já estavam anexadas a esta posse.')
+      postPhotoSending.current = false
+      closePostClosurePhotos()
+      await loadPossessions()
+    } catch (error) {
+      setPostPhotoError(getApiErrorMessage(error, 'Não foi possível adicionar as fotos.'))
+    } finally {
+      postPhotoSending.current = false
+      setPostPhotoSaving(false)
+    }
+  }
+
   function buildPossessionMenuItems(record) {
     const overview = tripOverview[record.id]
     return [
+      { key: 'post-photos', label: 'Adicionar fotos', icon: 'spark', hidden: record.is_active || !canRectifyPossession, onClick: () => openPostClosurePhotos(record) },
       { key: 'photos', label: 'Ver fotos', icon: 'search', hidden: !record.photo_available, onClick: () => setPhotoRecord(record) },
       { key: 'terms', label: 'Termos', icon: 'catalog', onClick: () => setTermRecord(record) },
       { key: 'rectify', label: 'Retificar', icon: 'maintenance', hidden: !canRectifyPossession, onClick: () => openEditModal(record) },
@@ -1276,12 +1327,24 @@ export default function PossessionPage() {
         </form>}
       </Modal>
 
+      <PossessionPostClosurePhotosModal
+        record={postPhotoRecord}
+        files={postPhotoFiles}
+        onFilesChange={setPostPhotoFiles}
+        saving={postPhotoSaving}
+        error={postPhotoError}
+        onClose={closePostClosurePhotos}
+        onSubmit={handlePostClosurePhotos}
+      />
+
       <PossessionEndModal
         record={endingRecord}
         context={returnContext}
         form={endForm}
         ending={ending}
         error={endError}
+        photos={endPhotos}
+        onPhotosChange={setEndPhotos}
         onChange={(patch) => setEndForm((current) => ({ ...current, ...patch }))}
         onClose={closeEndModal}
         onSubmit={handleEndPossession}
@@ -1387,8 +1450,8 @@ export default function PossessionPage() {
                 <div className="stack">
                   <strong>Foto {index + 1}</strong>
                   <span className="muted">Condutor: {photoRecord.driver_name}</span>
-                  <span className="muted">Capturada em: {formatTimestamp(photo.captured_at)}</span>
-                  <span className="muted">{photo.is_legacy ? 'Foto legada do registro' : 'Foto complementar da posse'}</span>
+                  <span className="muted">{['return', 'post_return'].includes(photo.evidence_stage) ? `Enviada em: ${formatTimestamp(photo.uploaded_at)}` : `Capturada em: ${formatTimestamp(photo.captured_at)}`}</span>
+                  <span className="muted">{photo.evidence_stage === 'post_return' ? 'Foto adicionada após o encerramento' : photo.evidence_stage === 'return' ? `Foto da devolução · versão ${photo.return_confirmation_version}` : photo.is_legacy ? 'Foto legada do registro · etapa não informada' : 'Foto complementar da posse · etapa não informada'}</span>
                 </div>
                 <div className="actions-inline">
                   <button type="button" className="mini-button" onClick={() => openProtectedFile(photo.url)}>

@@ -128,6 +128,10 @@ class PossessionPhotoCreate(BaseModel):
 
 
 class PossessionPhotoOut(BaseModel):
+    evidence_stage: str = 'unspecified'
+    return_confirmation_id: UUID | None = None
+    return_confirmation_version: int | None = None
+    uploaded_at: datetime | None = None
     id: UUID | None = None
     url: str
     captured_at: datetime | None
@@ -213,3 +217,8 @@ class PossessionTermPublicOut(BaseModel):
     observation: str | None
     created_at: datetime
     signature_summary: dict | None = None
+
+
+class PossessionPhotoAppendResult(BaseModel):
+    possession: PossessionOut
+    added_count: int

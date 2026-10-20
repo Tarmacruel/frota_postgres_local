@@ -260,6 +260,8 @@ async def test_unique_responsibility_signature_hashes_canonical_delivery_scope_o
     user = SimpleNamespace(role=UserRole.PRODUCAO, organization_id=None)
 
     first = await service._build_possession_responsibility_context(possession_id, current_user=user)
+    record.photos.append(SimpleNamespace(id=uuid4(), photo_mime_type='image/png', photo_size_bytes=20,
+                                        photo_captured_at=None, created_at=datetime.now(timezone.utc), evidence_stage='post_return'))
     record.trips.append(SimpleNamespace(sequence_number=2, origin="Nova rota"))
     second = await service._build_possession_responsibility_context(possession_id, current_user=user)
 
