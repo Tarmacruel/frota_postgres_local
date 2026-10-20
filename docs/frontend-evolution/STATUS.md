@@ -180,3 +180,11 @@ Limites: não existe medição de tempo/bytes anterior à fase na mesma base par
 O usuário encontrou HTTP 422 ao pré-visualizar as 1.583 posses da aba “Todas”: o gerador tinha limite de 1.500 linhas. O limite do PDF foi ampliado para 5.000, igual ao XLSX, e a tela passou a mostrar a mensagem real da API junto dos botões quando uma geração falha. Mudanças apenas em homologação, sem banco, migration ou produção.
 
 Validação autenticada: a tela exibiu 1.583 registros, concluiu a geração e abriu nova guia do PDF; a auditoria registrou `REPORT_PREVIEW` com `record_count=1583`, `outcome=SUCCESS`, em 3.941 ms. Backend 626 aprovados/109 ignorados; frontend 317/317; lint 0 erros/40 avisos; build e `git diff --check` aprovados. Bundle público conferido por SHA-256. O limite operacional de 5.000 permanece e a mensagem específica fica visível se for ultrapassado. [Detalhes no ExecPlan da Fase 3](EXECPLAN_PAGINATION_PHASE_3.md).
+
+## Publicação da paginação em produção — 20/10/2026
+
+Após autorização expressa do usuário, as três fases e a correção do PDF foram commitadas em `818193c` e integradas à `main` pelo [PR #68](https://github.com/Tarmacruel/frota_postgres_local/pull/68), merge `dfc5236`, com os três checks obrigatórios aprovados. Publicação concluída em **https://frota.sirel.com.br**, às 14:15:16, em janela de aproximadamente 12 segundos. Backups do banco, configurações, anexos, build e Git preservados. Nenhuma migration ou importação de dados de HML; configurações de produção preservadas por SHA-256.
+
+Gates locais: frontend 317/317; backend 626 aprovados/109 ignorados; lint 0 erros/40 avisos; build de produção aprovado. Dez listagens, catálogos, filtros/foco e 13 escopos de Produção conferidos com conexão somente leitura. PDF/XLSX gerados em memória com todas as 1.983 posses. Na sessão pública autenticada, a paginação compacta carregou e o PDF de “Todas” confirmou abertura em nova guia. Readiness público e de origem `ok`, dez assets publicados conferidos por SHA-256, rotas protegidas 401 sem sessão e docs 404.
+
+A HML também foi restabelecida pelo script `loan-tests.ps1 -Action start`; **https://testefrota.sirel.com.br** e sua origem responderam HTTP 200 com aplicação/banco saudáveis. Deploy automático permanece desabilitado. [ExecPlan, evidências e rollback](../PAGINATION_PRODUCTION_RELEASE_20261020.md).
