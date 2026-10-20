@@ -151,3 +151,7 @@ class FineOut(BaseModel):
 
 class FineListResponse(PaginatedResponse[FineOut]):
     pass
+
+
+class FineInfractionListResponse(PaginatedResponse[FineInfractionOut]):
+    pass

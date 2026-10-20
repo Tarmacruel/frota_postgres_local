@@ -137,6 +137,10 @@ class FineService:
         items = await self.fines.list_infractions(search=search, active_only=active_only, limit=limit)
         return [self._serialize_infraction(item) for item in items]
 
+    async def list_infractions_paginated(self, **filters):
+        items, total = await self.fines.list_infractions_paginated(**filters)
+        return [self._serialize_infraction(item) for item in items], total
+
     async def create_infraction(self, data: FineInfractionCreate, current_user: User) -> dict:
         payload = data.model_dump()
         payload["normalized_description"] = self.normalize_description(payload["description"])

@@ -191,7 +191,7 @@ class PossessionOut(BaseModel):
 
 
 class PossessionListResponse(PaginatedResponse[PossessionOut]):
-    pass
+    summary: dict[str, int] | None = None
 
 
 class PossessionTermPublicOut(BaseModel):

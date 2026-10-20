@@ -96,4 +96,27 @@ describe('PossessionReportBuilder', () => {
     fireEvent.keyDown(firstColumn, { key: 'ArrowDown', altKey: true })
     expect(screen.getByText(/Nº da posse movida para baixo/i)).toBeInTheDocument()
   })
+
+  it('mostra ao lado do botão o motivo de uma falha de PDF enviada como blob', async () => {
+    const user = userEvent.setup()
+    const previewWindow = { opener: null, close: vi.fn() }
+    vi.spyOn(window, 'open').mockReturnValue(previewWindow)
+    const errorBody = { detail: { message: 'O relatório excedeu o limite permitido.' } }
+    const errorBlob = new Blob([JSON.stringify(errorBody)], { type: 'application/json' })
+    errorBlob.text = vi.fn().mockResolvedValue(JSON.stringify(errorBody))
+    mocks.previewReportPdf.mockRejectedValue({
+      response: {
+        status: 422,
+        data: errorBlob,
+      },
+    })
+    render(<PossessionReportBuilder />)
+
+    await user.click(await screen.findByRole('button', { name: 'Pré-visualizar PDF' }))
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('O relatório excedeu o limite permitido.')
+    expect(previewWindow.close).toHaveBeenCalled()
+    expect(mocks.previewReportPdf).toHaveBeenCalledWith(expect.objectContaining({ mode: 'POSSESSION' }))
+    vi.restoreAllMocks()
+  })
 })

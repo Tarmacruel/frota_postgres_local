@@ -31,6 +31,10 @@ class DataImportBatchOut(BaseModel):
     applied_at: datetime | None
 
 
+class DataImportBatchListResponse(PaginatedResponse[DataImportBatchOut]):
+    pass
+
+
 class DataImportRowOut(BaseModel):
     id: UUID
     batch_id: UUID

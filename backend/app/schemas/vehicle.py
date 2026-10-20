@@ -131,4 +131,4 @@ class VehicleOut(BaseModel):
 
 
 class VehicleListResponse(PaginatedResponse[VehicleOut]):
-    pass
+    summary: dict[str, int | datetime | None] | None = None

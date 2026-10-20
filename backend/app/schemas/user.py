@@ -6,6 +6,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.core.cpf import normalize_cpf
 from app.models.user import UserRole
 from app.schemas.common import normalize_email
+from app.schemas.common import PaginatedResponse
 
 
 class PermissionFlags(BaseModel):
@@ -86,6 +87,10 @@ class UserOut(BaseModel):
     @classmethod
     def validate_email(cls, value: str) -> str:
         return normalize_email(value)
+
+
+class UserListResponse(PaginatedResponse[UserOut]):
+    summary: dict[str, int] = Field(default_factory=dict)
 
 
 class UserSignerOut(BaseModel):

@@ -9,7 +9,7 @@ vi.mock('../hooks/useMasterDataCatalog', () => ({ useMasterDataCatalog: () => ({
 vi.mock('../api/paymentProcesses', () => ({
   paymentProcessesAPI: { list: vi.fn(), dashboard: vi.fn(), getById: vi.fn(), remove: vi.fn() },
   paymentSuppliersAPI: { list: async () => ({ data: [] }) },
-  paymentContractsAPI: { list: async () => ({ data: [] }) },
+  paymentContractsAPI: { options: async () => ({ data: [] }) },
 }))
 beforeEach(() => {
   vi.resetAllMocks()

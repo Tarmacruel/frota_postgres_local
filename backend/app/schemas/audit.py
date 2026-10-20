@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict
+from app.schemas.common import PaginatedResponse
 
 
 class AuditLogOut(BaseModel):
@@ -19,3 +20,12 @@ class AuditLogOut(BaseModel):
     entity_label: str
     details: dict | None
     created_at: datetime
+
+
+class AuditLogWithOrganizationOut(AuditLogOut):
+    organization_id: UUID | None = None
+    organization_name: str = "Sem secretaria"
+
+
+class AuditListResponse(PaginatedResponse[AuditLogWithOrganizationOut]):
+    deleted: int = 0

@@ -115,6 +115,13 @@
   display: flex;
   flex-wrap: wrap;
   gap: 8px;
+  align-items: center;
+}
+
+.pagination-ellipsis {
+  min-width: 20px;
+  text-align: center;
+  color: var(--muted);
 }
 
 .pagination-page {
@@ -2691,6 +2698,7 @@ button {
   .data-table tbody td {
     padding: 0;
     border-bottom: 0;
+    overflow-wrap: anywhere;
   }
 
   .data-table tbody td + td {

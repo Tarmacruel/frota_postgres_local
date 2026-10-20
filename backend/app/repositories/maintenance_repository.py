@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime
 from uuid import UUID
-from sqlalchemy import func, select
+from sqlalchemy import func, or_, select
 from app.repositories.vehicle_scope import record_visible
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.models.location_history import LocationHistory
 from app.models.maintenance import MaintenanceRecord
-from app.models.master_data import Allocation, Department
+from app.models.master_data import Allocation, Department, Organization
+from app.models.vehicle import Vehicle
 
 
 class MaintenanceRepository:
@@ -59,40 +60,54 @@ class MaintenanceRepository:
         only_open: bool | None = None,
         search: str | None = None,
         organization_id: UUID | None = None,
-    ) -> tuple[list[MaintenanceRecord], int]:
-        stmt = select(MaintenanceRecord).options(joinedload(MaintenanceRecord.vehicle))
-        count_stmt = select(func.count(MaintenanceRecord.id))
-
+        filter_organization_id: UUID | None = None,
+        unassigned: bool = False,
+        focus_id: UUID | None = None,
+        with_summary: bool = False,
+    ) -> tuple[list[MaintenanceRecord], int] | tuple[list[MaintenanceRecord], int, dict]:
+        conditions = []
+        location_query = select(LocationHistory.id).join(
+            Allocation, Allocation.id == LocationHistory.allocation_id
+        ).join(Department, Department.id == Allocation.department_id).join(
+            Organization, Organization.id == Department.organization_id
+        ).where(LocationHistory.vehicle_id == MaintenanceRecord.vehicle_id,
+            LocationHistory.end_date.is_(None)).correlate(MaintenanceRecord)
         if vehicle_id:
-            stmt = stmt.where(MaintenanceRecord.vehicle_id == vehicle_id)
-            count_stmt = count_stmt.where(MaintenanceRecord.vehicle_id == vehicle_id)
+            conditions.append(MaintenanceRecord.vehicle_id == vehicle_id)
         if organization_id:
-            stmt = self._filter_by_active_organization(stmt, organization_id)
-            count_stmt = self._filter_by_active_organization(count_stmt, organization_id)
-        if start:
-            stmt = stmt.where(func.coalesce(MaintenanceRecord.end_date, func.now()) >= start)
-            count_stmt = count_stmt.where(func.coalesce(MaintenanceRecord.end_date, func.now()) >= start)
-        if end:
-            stmt = stmt.where(MaintenanceRecord.start_date <= end)
-            count_stmt = count_stmt.where(MaintenanceRecord.start_date <= end)
-        if only_open is True:
-            stmt = stmt.where(MaintenanceRecord.end_date.is_(None))
-            count_stmt = count_stmt.where(MaintenanceRecord.end_date.is_(None))
-        elif only_open is False:
-            stmt = stmt.where(MaintenanceRecord.end_date.is_not(None))
-            count_stmt = count_stmt.where(MaintenanceRecord.end_date.is_not(None))
-        if search:
-            term = f"%{search.strip()}%"
-            filter_clause = (
-                MaintenanceRecord.service_description.ilike(term)
-                | MaintenanceRecord.parts_replaced.ilike(term)
-            )
-            stmt = stmt.where(filter_clause)
-            count_stmt = count_stmt.where(filter_clause)
+            conditions.append(record_visible(MaintenanceRecord.vehicle_id, MaintenanceRecord.start_date, organization_id))
+        if focus_id:
+            conditions.append(MaintenanceRecord.id == focus_id)
+        else:
+            if filter_organization_id:
+                conditions.append(location_query.where(Department.organization_id == filter_organization_id).exists())
+            elif unassigned:
+                conditions.append(~location_query.exists())
+            if start:
+                conditions.append(func.coalesce(MaintenanceRecord.end_date, func.now()) >= start)
+            if end:
+                conditions.append(MaintenanceRecord.start_date <= end)
+            if only_open is True:
+                conditions.append(MaintenanceRecord.end_date.is_(None))
+            elif only_open is False:
+                conditions.append(MaintenanceRecord.end_date.is_not(None))
+            if search and search.strip():
+                term = f"%{search.strip()}%"
+                conditions.append(or_(
+                    MaintenanceRecord.service_description.ilike(term),
+                    MaintenanceRecord.parts_replaced.ilike(term),
+                    MaintenanceRecord.vehicle.has(Vehicle.plate.ilike(term)),
+                    location_query.where(Organization.name.ilike(term)).exists(),
+                ))
 
+        stmt = select(MaintenanceRecord).options(joinedload(MaintenanceRecord.vehicle)).where(*conditions)
         stmt = stmt.order_by(MaintenanceRecord.start_date.desc(), MaintenanceRecord.created_at.desc()).offset((page - 1) * limit).limit(limit)
-        total = int((await self.db.execute(count_stmt)).scalar_one())
+        total = int((await self.db.execute(select(func.count(MaintenanceRecord.id)).where(*conditions))).scalar_one())
         items = list((await self.db.execute(stmt)).scalars().unique().all())
+        if with_summary:
+            open_count = int((await self.db.execute(select(func.count(MaintenanceRecord.id)).where(
+                *conditions, MaintenanceRecord.end_date.is_(None)))).scalar_one())
+            return items, total, {"total": total, "open": open_count, "closed": total - open_count}
         return items, total
 
     def _filter_by_active_organization(self, stmt, organization_id: UUID):

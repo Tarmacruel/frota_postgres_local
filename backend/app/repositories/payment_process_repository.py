@@ -208,6 +208,39 @@ class PaymentProcessRepository:
         stmt = stmt.order_by(PaymentSupplier.name.asc(), PaymentContract.number.asc())
         return list((await self.db.execute(stmt)).scalars().unique().all())
 
+    async def list_contract_options(self) -> list[dict]:
+        rows = await self.db.execute(select(PaymentContract.id, PaymentContract.supplier_id,
+                                            PaymentContract.number, PaymentContract.kind,
+                                            PaymentContract.status, PaymentContract.contract_type,
+                                            PaymentContract.object_description,
+                                            PaymentSupplier.name.label("supplier_name"))
+                                     .join(PaymentSupplier, PaymentSupplier.id == PaymentContract.supplier_id)
+                                     .order_by(PaymentSupplier.name, PaymentContract.number))
+        return [dict(row) for row in rows.mappings().all()]
+
+    async def list_contracts_paginated(self, *, page: int, limit: int,
+                                       supplier_id: UUID | None = None,
+                                       status_filter: PaymentContractStatus | None = None,
+                                       kind: PaymentProcessKind | None = None,
+                                       search: str | None = None):
+        base = select(PaymentContract).join(PaymentSupplier, PaymentSupplier.id == PaymentContract.supplier_id)
+        if supplier_id:
+            base = base.where(PaymentContract.supplier_id == supplier_id)
+        if status_filter:
+            base = base.where(PaymentContract.status == status_filter)
+        if kind:
+            base = base.where(PaymentContract.kind == kind)
+        if search and search.strip():
+            term = f"%{search.strip()}%"
+            base = base.where(or_(PaymentContract.number.ilike(term), PaymentContract.contract_type.ilike(term),
+                                  PaymentContract.object_description.ilike(term), PaymentContract.notes.ilike(term),
+                                  PaymentSupplier.name.ilike(term)))
+        total = (await self.db.execute(select(func.count()).select_from(base.subquery()))).scalar_one()
+        rows = await self.db.execute(base.options(*self._contract_options())
+                                     .order_by(PaymentSupplier.name, PaymentContract.number, PaymentContract.id)
+                                     .offset((page - 1) * limit).limit(limit))
+        return list(rows.scalars().unique().all()), total
+
     async def get_contract(self, contract_id: UUID) -> PaymentContract | None:
         result = await self.db.execute(select(PaymentContract).options(*self._contract_options()).where(PaymentContract.id == contract_id))
         return result.scalar_one_or_none()

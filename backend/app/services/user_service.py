@@ -27,6 +27,9 @@ class UserService:
     async def list(self, skip: int, limit: int):
         return await self.users.list(skip=skip, limit=limit)
 
+    async def list_paginated(self, **filters):
+        return await self.users.list_paginated(**filters)
+
     async def list_signers(self, current_user: User) -> list[User]:
         organization_id = None if current_user.role == UserRole.ADMIN else current_user.organization_id
         if current_user.role == UserRole.PRODUCAO and organization_id is None:

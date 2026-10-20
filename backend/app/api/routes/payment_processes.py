@@ -19,6 +19,7 @@ from app.schemas.payment_process import (
     PaymentContractManagementOut,
     PaymentContractManagementSummaryOut,
     PaymentContractOut,
+    PaymentContractListResponse,
     PaymentContractUpdate,
     PaymentDashboardOut,
     PaymentProcessChecklistUpdate,
@@ -34,6 +35,7 @@ from app.schemas.payment_process import (
     PaymentSupplierUpdate,
 )
 from app.services.payment_process_service import XLSX_MEDIA_TYPE, PaymentProcessService
+from app.schemas.common import build_pagination
 
 router = APIRouter(prefix="/api/payment-processes", tags=["PaymentProcesses"])
 supplier_router = APIRouter(prefix="/api/payment-suppliers", tags=["PaymentSuppliers"])
@@ -242,6 +244,31 @@ async def delete_payment_supplier(
     current_user: User = Depends(require_permission("payment_processes", "edit")),
 ):
     return await PaymentProcessService(db).delete_supplier(supplier_id, current_user)
+
+
+@contract_router.get("/options")
+async def list_payment_contract_options(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("payment_processes", "view")),
+):
+    return await PaymentProcessService(db).list_contract_options()
+
+
+@contract_router.get("/paginated", response_model=PaymentContractListResponse)
+async def list_payment_contracts_paginated(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=10, ge=1, le=100),
+    supplier_id: UUID | None = Query(default=None),
+    status_filter: PaymentContractStatus | None = Query(default=None, alias="status"),
+    kind: PaymentProcessKind | None = Query(default=None),
+    search: str | None = Query(default=None, max_length=160),
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("payment_processes", "view")),
+):
+    rows, total = await PaymentProcessService(db).list_contracts_paginated(
+        page=page, limit=limit, supplier_id=supplier_id, status_filter=status_filter,
+        kind=kind, search=search)
+    return {"data": rows, "pagination": build_pagination(page, limit, total)}
 
 
 @contract_router.get("", response_model=list[PaymentContractOut])

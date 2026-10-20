@@ -1,6 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import UsersPage from './UsersPage'
+import { exportRowsToXlsx } from '../utils/exportData'
 
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn() }))
 vi.mock('../api/client', () => ({ default: api }))
@@ -14,7 +15,7 @@ vi.mock('../components/SearchableSelect', () => ({
 
 beforeEach(() => {
   vi.resetAllMocks()
-  api.get.mockResolvedValue({ data: [] })
+  api.get.mockResolvedValue({ data: { data: [], pagination: { page: 1, pages: 1, total: 0 }, summary: {} } })
 })
 
 it('impede envio de CPF inválido e indica o campo para correção', () => {
@@ -44,7 +45,7 @@ it('mostra validação local dentro do modal e limpa ao reabrir', async () => {
 })
 
 it.each(['cadastro', 'edição'])('preserva os dados e mostra erro da API no modal de %s', async (mode) => {
-  api.get.mockResolvedValue({ data: mode === 'edição' ? [{ id: 'user', name: 'Pessoa teste', email: 'teste@local', role: 'PADRAO', organization_id: 'org' }] : [] })
+  api.get.mockResolvedValue({ data: { data: mode === 'edição' ? [{ id: 'user', name: 'Pessoa teste', email: 'teste@local', role: 'PADRAO', organization_id: 'org' }] : [], pagination: { page: 1, pages: 1, total: mode === 'edição' ? 1 : 0 }, summary: {} } })
   const failure = { response: { data: { detail: [{ loc: ['body', 'cpf'], msg: 'Valor inválido' }], request_id: 'test-ref' } } }
   api.post.mockRejectedValue(failure)
   api.put.mockRejectedValue(failure)
@@ -60,4 +61,28 @@ it.each(['cadastro', 'edição'])('preserva os dados e mostra erro da API no mod
   expect(screen.getByRole('alert')).toHaveTextContent('test-ref')
   expect(screen.getByLabelText('Nome completo')).toHaveValue('Pessoa teste')
   expect(screen.getByLabelText(mode === 'edição' ? 'Substituir CPF (opcional)' : 'CPF')).toHaveValue('52998224725')
+})
+
+it('exporta todas as páginas do filtro, além da página exibida', async () => {
+  const users = [
+    { id: 'a', name: 'Pessoa A', email: 'a@local', role: 'ADMIN' },
+    { id: 'b', name: 'Pessoa B', email: 'b@local', role: 'ADMIN' },
+  ]
+  api.get.mockImplementation((_path, { params }) => Promise.resolve({ data: {
+    data: params.limit === 200 ? [users[params.page - 1]] : [users[0]],
+    pagination: { page: params.page, pages: params.limit === 200 ? 2 : 1, total: 2 },
+    summary: { ADMIN: 2 },
+  } }))
+  render(<UsersPage />)
+  await screen.findByText('Pessoa A')
+  fireEvent.click(screen.getByRole('button', { name: 'Exportar XLSX' }))
+  await waitFor(() => expect(exportRowsToXlsx).toHaveBeenCalledWith(expect.objectContaining({ rows: users })))
+  expect(api.get).toHaveBeenCalledWith('/users/paginated', { params: expect.objectContaining({ page: 2, limit: 200 }) })
+})
+
+it('mostra falha de carregamento sem substituir a tabela por dados antigos', async () => {
+  api.get.mockRejectedValue(new Error('Falha simulada de rede'))
+  render(<UsersPage />)
+  expect(await screen.findByText('Falha simulada de rede')).toBeInTheDocument()
+  expect(screen.getByText('Nenhum usuário encontrado para os filtros aplicados.')).toBeInTheDocument()
 })

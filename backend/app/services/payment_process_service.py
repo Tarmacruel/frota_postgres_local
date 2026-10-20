@@ -529,6 +529,13 @@ class PaymentProcessService:
         contracts = await self.repository.list_contracts(supplier_id=supplier_id, status_filter=status_filter, kind=kind, search=search)
         return [await self._serialize_contract(contract) for contract in contracts]
 
+    async def list_contract_options(self):
+        return await self.repository.list_contract_options()
+
+    async def list_contracts_paginated(self, **filters):
+        contracts, total = await self.repository.list_contracts_paginated(**filters)
+        return [await self._serialize_contract(contract) for contract in contracts], total
+
     async def get_contract(self, contract_id: UUID) -> dict:
         contract = await self.repository.get_contract(contract_id)
         if not contract:

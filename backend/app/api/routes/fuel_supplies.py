@@ -70,6 +70,7 @@ async def list_fuel_supplies(
     start_date: datetime | None = Query(default=None),
     end_date: datetime | None = Query(default=None),
     only_anomalies: bool | None = Query(default=None),
+    search: str | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("fuel_supplies", "view")),
 ):
@@ -83,6 +84,7 @@ async def list_fuel_supplies(
         start_date=start_date,
         end_date=end_date,
         only_anomalies=only_anomalies,
+        search=search,
         current_user=current_user,
     )
 

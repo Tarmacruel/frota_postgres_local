@@ -1,5 +1,5 @@
 import FuelSupplyOrderCancelForm from '../components/FuelSupplyOrderCancelForm'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import FuelSupplyAlertBadge from '../components/FuelSupplyAlertBadge'
@@ -16,7 +16,6 @@ import { fuelStationsAPI } from '../api/fuelStations'
 import { masterDataAPI } from '../api/masterData'
 import { fuelSuppliesAPI } from '../api/fuelSupplies'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
-import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 import { downloadFuelSupplyOrderDocument, previewFuelSupplyOrderDocument } from '../utils/fuelSupplyOrderDocument'
@@ -145,6 +144,12 @@ export default function FuelSuppliesPage() {
   const [lastIssuedOrder, setLastIssuedOrder] = useState(null)
   const [currentHistoryPage, setCurrentHistoryPage] = useState(1)
   const [currentOrdersPage, setCurrentOrdersPage] = useState(1)
+  const [historyPagination, setHistoryPagination] = useState({ pages: 1, total: 0 })
+  const [ordersPagination, setOrdersPagination] = useState({ pages: 1, total: 0 })
+  const [openOrdersCount, setOpenOrdersCount] = useState(null)
+  const [anomaliesCount, setAnomaliesCount] = useState(null)
+  const historyRequest = useRef(0)
+  const ordersRequest = useRef(0)
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
   const [isBatchOrderModalOpen, setIsBatchOrderModalOpen] = useState(false)
   const [batchTourReplayToken, setBatchTourReplayToken] = useState(0)
@@ -176,7 +181,7 @@ export default function FuelSuppliesPage() {
     async function loadDependencies() {
       try {
         const [vehiclesResponse, organizationsResponse, stationsResponse] = await Promise.all([
-          api.get('/vehicles', { params: { limit: VEHICLE_LIST_LIMIT } }),
+          api.get('/vehicles/options'),
           masterDataAPI.listOrganizations(),
           fuelStationsAPI.list({ active_only: true }),
         ])
@@ -190,53 +195,83 @@ export default function FuelSuppliesPage() {
     loadDependencies()
   }, [])
 
-  async function loadRecords() {
+  async function loadRecords(page = currentHistoryPage) {
+    const request = ++historyRequest.current
     try {
       setHistoryLoading(true)
       setError('')
-      const params = { limit: 100, page: 1 }
+      const params = { limit: 10, page, search: search.trim() || undefined }
       if (filters.vehicle_id) params.vehicle_id = filters.vehicle_id
       if (filters.organization_id) params.organization_id = filters.organization_id
       if (filters.fuel_station_id) params.fuel_station_id = filters.fuel_station_id
       if (filters.only_anomalies === 'true') params.only_anomalies = true
-      const { data } = await fuelSuppliesAPI.list(params)
+      const [pageResponse, countResponse] = await Promise.all([
+        fuelSuppliesAPI.list(params),
+        fuelSuppliesAPI.list({ ...params, page: 1, limit: 1, only_anomalies: true }).catch(() => null),
+      ])
+      const { data } = pageResponse
+      if (request !== historyRequest.current) return
+      if (page > data.pagination.pages) {
+        setCurrentHistoryPage(data.pagination.pages)
+        return
+      }
       setRecords(data.data || [])
+      setHistoryPagination(data.pagination)
+      setAnomaliesCount(countResponse?.data?.pagination?.total ?? null)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível carregar os abastecimentos.'))
+      if (request === historyRequest.current) setError(getApiErrorMessage(err, 'Não foi possível carregar os abastecimentos.'))
     } finally {
-      setHistoryLoading(false)
+      if (request === historyRequest.current) setHistoryLoading(false)
     }
   }
 
-  async function loadOrders() {
+  async function loadOrders(page = currentOrdersPage) {
     if (!canViewOrders) {
       setOrders([])
+      setOrdersPagination({ pages: 1, total: 0 })
+      setOpenOrdersCount(0)
       setOrdersLoading(false)
       return
     }
+    const request = ++ordersRequest.current
     try {
       setOrdersLoading(true)
       setError('')
-      const params = buildOrderQueryParams({ includePaging: true })
-      const { data } = await fuelSupplyOrdersAPI.list(params)
+      const params = buildOrderQueryParams({ includePaging: true, page })
+      const [pageResponse, countResponse] = await Promise.all([
+        fuelSupplyOrdersAPI.list(params),
+        fuelSupplyOrdersAPI.list({ ...params, page: 1, limit: 1, status: 'OPEN' }).catch(() => null),
+      ])
+      const { data } = pageResponse
+      if (request !== ordersRequest.current) return
+      if (page > data.pagination.pages) {
+        setCurrentOrdersPage(data.pagination.pages)
+        return
+      }
       setOrders(asArray(data))
+      setOrdersPagination(data.pagination)
+      setOpenOrdersCount(countResponse?.data?.pagination?.total ?? null)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível carregar as ordens de abastecimento.'))
+      if (request === ordersRequest.current) setError(getApiErrorMessage(err, 'Não foi possível carregar as ordens de abastecimento.'))
     } finally {
-      setOrdersLoading(false)
+      if (request === ordersRequest.current) setOrdersLoading(false)
     }
   }
 
   useEffect(() => {
-    loadRecords()
-  }, [filters])
+    historyRequest.current += 1
+    const timer = setTimeout(() => loadRecords(), search.trim() ? 250 : 0)
+    return () => clearTimeout(timer)
+  }, [filters, search, currentHistoryPage])
 
   useEffect(() => {
-    loadOrders()
-  }, [orderFilters, canViewOrders])
+    ordersRequest.current += 1
+    const timer = setTimeout(() => loadOrders(), orderSearch.trim() ? 250 : 0)
+    return () => clearTimeout(timer)
+  }, [orderFilters, orderSearch, currentOrdersPage, canViewOrders])
 
-  function buildOrderQueryParams({ includePaging = false } = {}) {
-    const params = includePaging ? { limit: 100, page: 1 } : {}
+  function buildOrderQueryParams({ includePaging = false, page = currentOrdersPage } = {}) {
+    const params = includePaging ? { limit: 10, page, search: orderSearch.trim() || undefined } : {}
     if (orderFilters.status !== 'TODOS') params.status = orderFilters.status
     if (orderFilters.organization_id) params.organization_id = orderFilters.organization_id
     if (orderFilters.fuel_station_id) params.fuel_station_id = orderFilters.fuel_station_id
@@ -252,24 +287,10 @@ export default function FuelSuppliesPage() {
     return rows.filter((order) => orderMatchesSearch(order, orderSearch))
   }
 
-  const filteredRecords = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    return records.filter((record) => {
-      if (!term) return true
-      return [record.vehicle_plate, record.organization_name, record.fuel_station_name, record.fuel_station, record.fuel_type, record.additive_type, record.notes]
-        .filter(Boolean)
-        .some((value) => value.toLowerCase().includes(term))
-    })
-  }, [records, search])
-
-  const filteredOrders = useMemo(() => {
-    return orders.filter((order) => orderMatchesSearch(order, orderSearch))
-  }, [orders, orderSearch])
-
-  const totalHistoryPages = Math.max(1, Math.ceil(filteredRecords.length / 10))
-  const paginatedRecords = filteredRecords.slice((currentHistoryPage - 1) * 10, currentHistoryPage * 10)
-  const totalOrdersPages = Math.max(1, Math.ceil(filteredOrders.length / 10))
-  const paginatedOrders = filteredOrders.slice((currentOrdersPage - 1) * 10, currentOrdersPage * 10)
+  const totalHistoryPages = historyPagination.pages
+  const paginatedRecords = records
+  const totalOrdersPages = ordersPagination.pages
+  const paginatedOrders = orders
 
   const orderExportColumns = useMemo(() => [
     { header: 'Ordem', value: (order) => formatOrderNumber(order) },
@@ -313,11 +334,11 @@ export default function FuelSuppliesPage() {
 
   useEffect(() => {
     setCurrentHistoryPage(1)
-  }, [search, filters, records.length])
+  }, [search, filters])
 
   useEffect(() => {
     setCurrentOrdersPage(1)
-  }, [orderSearch, orderFilters, orders.length])
+  }, [orderSearch, orderFilters])
 
   async function handleCancelOrder(order) {
     if (!canEditOrder) {
@@ -353,7 +374,7 @@ export default function FuelSuppliesPage() {
   }
 
   async function handlePreviewOrdersPdf() {
-    if (orders.length === 0) {
+    if (ordersPagination.total === 0) {
       setFeedback('Não há ordens filtradas para pré-visualizar em PDF.')
       return
     }
@@ -383,7 +404,7 @@ export default function FuelSuppliesPage() {
   }
 
   async function handleExportOrdersXlsx() {
-    if (orders.length === 0) {
+    if (ordersPagination.total === 0) {
       setFeedback('Não há ordens filtradas para exportar.')
       return
     }
@@ -502,15 +523,15 @@ export default function FuelSuppliesPage() {
 
       <div className="panel-metrics">
         <div className="metric-inline">
-          <strong>{orders.filter((order) => order.status === 'OPEN').length}</strong>
+          <strong>{openOrdersCount ?? '—'}</strong>
           <span>ordens abertas</span>
         </div>
         <div className="metric-inline">
-          <strong>{records.length}</strong>
-          <span>abastecimentos carregados</span>
+          <strong>{historyPagination.total}</strong>
+          <span>abastecimentos encontrados</span>
         </div>
         <div className="metric-inline">
-          <strong>{records.filter((record) => record.is_consumption_anomaly).length}</strong>
+          <strong>{anomaliesCount ?? '—'}</strong>
           <span>alertas de consumo</span>
         </div>
         <div className="metric-inline">

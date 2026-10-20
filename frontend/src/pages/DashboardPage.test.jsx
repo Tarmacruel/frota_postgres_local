@@ -36,35 +36,29 @@ beforeEach(() => {
   auth.permissions = { vehicles: true, maintenance: true, possession: true }
   auth.canCreateVehicle = true
   api.get.mockImplementation((url) => {
-    if (url === '/vehicles') {
-      return Promise.resolve({ data: [
-        { id: 'v1', status: 'ATIVO', current_driver_name: 'Condutor' },
-        { id: 'v2', status: 'ATIVO', current_driver_name: null },
-        { id: 'v3', status: 'MANUTENCAO' },
-        { id: 'v4', status: 'INATIVO' },
-      ] })
+    if (url === '/vehicles/paginated') {
+      return Promise.resolve({ data: { summary: { total: 4, active: 2, maintenance: 1, inactive: 1, active_without_driver: 1 } } })
     }
-    if (url === '/maintenance') {
-      return Promise.resolve({ data: [
+    if (url === '/maintenance/paginated') {
+      return Promise.resolve({ data: { data: [
         { id: 'm1', vehicle_plate: 'ABC1D23', service_description: 'Troca de óleo', start_date: '2026-09-30T08:00:00', updated_at: '2026-09-30T09:00:00', end_date: null },
-        { id: 'm2', end_date: '2026-09-29T10:00:00' },
-      ] })
+      ], pagination: { total: 1 } } })
     }
-    if (url === '/possession/active') return Promise.resolve({ data: [{ id: 'p1' }, { id: 'p2' }] })
+    if (url === '/possession/paginated') return Promise.resolve({ data: { pagination: { total: 2 } } })
     return Promise.reject(new Error(`Consulta inesperada: ${url}`))
   })
 })
 
-it('mantém as três consultas existentes e apresenta os indicadores calculados', async () => {
+it('consulta resumos e quatro manutenções para apresentar os indicadores', async () => {
   mount()
 
   expect(await screen.findByRole('heading', { name: 'Olá, Ana!' })).toBeInTheDocument()
   await waitFor(() => expect(screen.getByText('Troca de óleo')).toBeInTheDocument())
 
   expect(api.get).toHaveBeenCalledTimes(3)
-  expect(api.get).toHaveBeenNthCalledWith(1, '/vehicles', { params: { limit: expect.any(Number) } })
-  expect(api.get).toHaveBeenNthCalledWith(2, '/maintenance')
-  expect(api.get).toHaveBeenNthCalledWith(3, '/possession/active')
+  expect(api.get).toHaveBeenNthCalledWith(1, '/vehicles/paginated', { params: { page: 1, limit: 1 } })
+  expect(api.get).toHaveBeenNthCalledWith(2, '/maintenance/paginated', { params: { page: 1, limit: 4, only_open: true } })
+  expect(api.get).toHaveBeenNthCalledWith(3, '/possession/paginated', { params: { page: 1, limit: 1, active: true } })
   expect(within(screen.getByLabelText('Veículos ativos')).getByText('2')).toBeInTheDocument()
   expect(within(screen.getByLabelText('Em manutenção')).getByText('1')).toBeInTheDocument()
   expect(within(screen.getByLabelText('Sem condutor')).getByText('1')).toBeInTheDocument()

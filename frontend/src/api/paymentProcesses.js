@@ -53,6 +53,8 @@ export const paymentSuppliersAPI = {
 
 export const paymentContractsAPI = {
   list: (params) => api.get('/payment-contracts', { params }),
+  options: () => api.get('/payment-contracts/options'),
+  listPaginated: (params) => api.get('/payment-contracts/paginated', { params }),
   managementSummary: (params) => api.get('/payment-contracts/management-summary', { params }),
   getById: (id) => api.get(`/payment-contracts/${id}`),
   management: (id, params) => api.get(`/payment-contracts/${id}/management`, { params }),

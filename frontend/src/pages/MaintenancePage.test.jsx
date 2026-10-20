@@ -1,15 +1,16 @@
-import { render, screen } from '@testing-library/react'
+import { render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
 import MaintenancePage from './MaintenancePage'
 import api from '../api/client'
 import { maintenanceAPI } from '../api/maintenance'
+import { previewRowsToPdf } from '../utils/exportData'
 
 const auth = vi.hoisted(() => ({ create: true, edit: true, remove: true }))
 
 vi.mock('../api/client', () => ({ default: { get: vi.fn() } }))
-vi.mock('../api/maintenance', () => ({ maintenanceAPI: { list: vi.fn(), remove: vi.fn() } }))
+vi.mock('../api/maintenance', () => ({ maintenanceAPI: { listPaginated: vi.fn(), remove: vi.fn() } }))
 vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({
     canCreate: () => auth.create,
@@ -20,7 +21,6 @@ vi.mock('../context/AuthContext', () => ({
 }))
 vi.mock('../hooks/useMasterDataCatalog', () => ({ useMasterDataCatalog: () => ({ organizations: [] }) }))
 vi.mock('../components/SearchableSelect', () => ({ default: ({ placeholder }) => <button type="button">{placeholder}</button> }))
-vi.mock('../components/Pagination', () => ({ default: () => null }))
 vi.mock('../components/Modal', () => ({ default: ({ open, title, children }) => open ? <div role="dialog" aria-label={title}>{children}</div> : null }))
 vi.mock('../components/MaintenanceForm', () => ({ default: ({ initialData }) => <div>{initialData ? `Editando ${initialData.vehicle_plate}` : 'Novo formulário'}</div> }))
 vi.mock('../utils/exportData', () => ({ exportRowsToXlsx: vi.fn(), previewRowsToPdf: vi.fn() }))
@@ -34,7 +34,7 @@ beforeEach(() => {
   auth.edit = true
   auth.remove = true
   api.get.mockResolvedValue({ data: [vehicle] })
-  maintenanceAPI.list.mockResolvedValue({ data: [maintenance] })
+  maintenanceAPI.listPaginated.mockResolvedValue({ data: { data: [maintenance], pagination: { page: 1, pages: 1, total: 1 }, summary: { total: 1, open: 1, closed: 0 } } })
 })
 
 it('mantém as fontes atuais e apresenta miniatura, status e ações da manutenção', async () => {
@@ -42,8 +42,8 @@ it('mantém as fontes atuais e apresenta miniatura, status e ações da manuten�
   render(<MemoryRouter><MaintenancePage /></MemoryRouter>)
 
   expect(await screen.findByText('Revisão preventiva')).toBeInTheDocument()
-  expect(api.get).toHaveBeenCalledWith('/vehicles', { params: { limit: expect.any(Number) } })
-  expect(maintenanceAPI.list).toHaveBeenCalledWith({})
+  expect(api.get).toHaveBeenCalledWith('/vehicles/options')
+  expect(maintenanceAPI.listPaginated).toHaveBeenCalledWith(expect.objectContaining({ page: 1, limit: 10 }))
   expect(screen.getByAltText('Miniatura ilustrativa de Sedan ABC1D23')).toBeInTheDocument()
   expect(screen.getByText('EM ANDAMENTO')).toBeInTheDocument()
   await user.click(screen.getByRole('button', { name: 'Mais ações da manutenção de ABC1D23' }))
@@ -60,4 +60,39 @@ it('oculta a coluna de ações quando o perfil não pode editar nem excluir', as
   await screen.findByText('Revisão preventiva')
   expect(screen.queryByRole('columnheader', { name: 'Ações' })).not.toBeInTheDocument()
   expect(screen.queryByRole('button', { name: 'Nova manutenção' })).not.toBeInTheDocument()
+})
+
+it('consulta somente a página solicitada e mantém o total do servidor', async () => {
+  const user = userEvent.setup()
+  maintenanceAPI.listPaginated.mockImplementation(({ page, limit }) => Promise.resolve({ data: {
+    data: [{ ...maintenance, id: `maintenance-${page}`, service_description: `Revisão ${page}` }],
+    pagination: { page, pages: 2, total: 11, limit },
+    summary: { total: 11, open: 8, closed: 3 },
+  } }))
+  render(<MemoryRouter><MaintenancePage /></MemoryRouter>)
+
+  expect(await screen.findByText('Revisão 1')).toBeInTheDocument()
+  await user.click(screen.getByRole('button', { name: 'Página 2' }))
+  expect(await screen.findByText('Revisão 2')).toBeInTheDocument()
+  expect(maintenanceAPI.listPaginated).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, limit: 10 }))
+  expect(maintenanceAPI.listPaginated).toHaveBeenCalledTimes(2)
+})
+
+it('busca todos os lotes filtrados somente ao pedir o PDF', async () => {
+  const user = userEvent.setup()
+  maintenanceAPI.listPaginated.mockImplementation(({ page, limit }) => Promise.resolve({ data: {
+    data: Array.from({ length: page === 1 ? limit : 1 }, (_, index) => ({
+      ...maintenance, id: `maintenance-${page}-${index}`,
+    })),
+    pagination: { page, pages: Math.ceil(101 / limit), total: 101, limit },
+    summary: { total: 101, open: 101, closed: 0 },
+  } }))
+  render(<MemoryRouter><MaintenancePage /></MemoryRouter>)
+
+  await screen.findAllByText('101')
+  expect(maintenanceAPI.listPaginated).toHaveBeenCalledTimes(1)
+  await user.click(screen.getByRole('button', { name: 'Pré-visualizar PDF' }))
+  await waitFor(() => expect(previewRowsToPdf).toHaveBeenCalledWith(expect.objectContaining({ rows: expect.arrayContaining([expect.objectContaining({ id: 'maintenance-2-0' })]) })))
+  expect(previewRowsToPdf.mock.calls[0][0].rows).toHaveLength(101)
+  expect(maintenanceAPI.listPaginated).toHaveBeenCalledWith(expect.objectContaining({ page: 2, limit: 100 }))
 })

@@ -233,7 +233,7 @@ function isOverdueProcess(row) {
 
 export default function PaymentProcessesPage() {
   const { canEdit, canDeleteModule, user } = useAuth()
-  const { organizations } = useMasterDataCatalog()
+  const { organizations } = useMasterDataCatalog({ organizationsOnly: true })
   const canManage = canEdit('payment_processes')
   const canDeleteProcesses = canDeleteModule('payment_processes')
   const [activeView, setActiveView] = useState('processes')
@@ -332,7 +332,7 @@ export default function PaymentProcessesPage() {
     try {
       const [supplierResponse, contractResponse] = await Promise.all([
         paymentSuppliersAPI.list({ active_only: false }),
-        paymentContractsAPI.list(),
+        paymentContractsAPI.options(),
       ])
       setSuppliers(supplierResponse.data || [])
       setContracts(contractResponse.data || [])
@@ -1722,6 +1722,27 @@ function ContractsView({
   setAmendmentForm,
   createAmendment,
 }) {
+  const [listedContracts, setListedContracts] = useState([])
+  const [contractPagination, setContractPagination] = useState({ page: 1, pages: 1, total: 0 })
+  const [contractPage, setContractPage] = useState(1)
+  const [contractSearch, setContractSearch] = useState('')
+  const [contractError, setContractError] = useState('')
+
+  useEffect(() => { setContractPage(1) }, [contractSearch])
+  useEffect(() => {
+    let active = true
+    paymentContractsAPI.listPaginated({ page: contractPage, limit: 10, search: contractSearch.trim() || undefined })
+      .then(({ data }) => {
+        if (!active) return
+        setListedContracts(data.data || [])
+        setContractPagination(data.pagination)
+        setContractError('')
+        if (contractPage > data.pagination.pages) setContractPage(data.pagination.pages)
+      })
+      .catch((err) => { if (active) setContractError(getApiErrorMessage(err, 'Não foi possível carregar os contratos.')) })
+    return () => { active = false }
+  }, [contractPage, contractSearch, contracts])
+
   return (
     <>
       <section className="payment-workspace payment-contract-workspace">
@@ -1729,10 +1750,12 @@ function ContractsView({
           <div className="payment-section-head">
             <div>
               <h2 className="section-title">Contratos</h2>
-              <span className="muted">{contracts.length} contrato(s)</span>
+              <span className="muted">{contractPagination.total} contrato(s)</span>
             </div>
             {canManage ? <button className="app-button" type="button" onClick={openCreateContract}>Novo contrato</button> : null}
           </div>
+          <input className="app-input" type="search" value={contractSearch} onChange={(event) => setContractSearch(event.target.value)} placeholder="Buscar contrato ou fornecedor" />
+          {contractError ? <div className="alert alert-error">{contractError}</div> : null}
           <div className="table-wrap table-wrap-wide">
             <table className="data-table management-table payment-contract-table">
               <thead>
@@ -1749,9 +1772,9 @@ function ContractsView({
                 </tr>
               </thead>
               <tbody>
-                {contracts.length === 0 ? (
+                {listedContracts.length === 0 ? (
                   <tr><td colSpan={9}><div className="empty-state">Nenhum contrato cadastrado.</div></td></tr>
-                ) : contracts.map((contract) => (
+                ) : listedContracts.map((contract) => (
                   <tr key={contract.id} className={selectedContract?.id === contract.id ? 'is-selected' : ''} onClick={() => setSelectedContract(contract)}>
                     <td data-label="Fornecedor"><strong>{contract.supplier_name || '-'}</strong><br /><span className="muted">{kindLabel(contract.kind)}</span></td>
                     <td data-label="Número"><button type="button" className="management-record-open" aria-pressed={selectedContract?.id === contract.id} onClick={(event) => { event.stopPropagation(); setSelectedContract(contract) }}>{contract.number}</button><br /><span className="muted">{contract.contract_type || '-'}</span></td>
@@ -1767,6 +1790,7 @@ function ContractsView({
               </tbody>
             </table>
           </div>
+          <Pagination currentPage={contractPagination.page} totalPages={contractPagination.pages} onPageChange={setContractPage} />
         </div>
 
         <aside className="toolbar-card payment-process-panel payment-detail-panel payment-contract-detail-panel">

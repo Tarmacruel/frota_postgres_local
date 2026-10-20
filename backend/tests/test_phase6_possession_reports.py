@@ -15,6 +15,7 @@ from pydantic import ValidationError
 
 from app.api.routes import possession as possession_routes
 from app.models.user import UserRole
+from app.models.possession import VehiclePossession
 from app.repositories.possession_report_repository import PossessionReportRepository
 from app.schemas.possession_report import (
     PossessionReportMode,
@@ -318,6 +319,26 @@ async def test_preview_audit_contains_metadata_without_report_rows(monkeypatch):
     assert details["outcome"] == "SUCCESS"
     assert "segredo-da-linha" not in serialized
     assert "column_keys" in details
+
+
+@pytest.mark.asyncio
+async def test_pdf_preview_includes_all_possessions_above_previous_1500_row_limit():
+    service = PossessionReportService(AsyncMock())
+    service.reports.load = AsyncMock(return_value=[
+        VehiclePossession(public_number=number, driver_name="Condutor", start_date=datetime.now(timezone.utc))
+        for number in range(1, 1_584)
+    ])
+    service.audit.record = AsyncMock()
+    request = PossessionReportRequest(
+        mode="POSSESSION", preset="CUSTOM", column_keys=["possession_number"]
+    )
+
+    content, filename = await service.render_pdf(request, _user(UserRole.ADMIN))
+
+    assert content.startswith(b"%PDF-")
+    assert filename.endswith(".pdf")
+    assert service.reports.load.await_args.kwargs["limit"] >= 1_583
+    assert service.audit.record.await_args.kwargs["details"]["record_count"] == 1_583
 
 
 @pytest.mark.asyncio

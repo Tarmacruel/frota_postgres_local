@@ -2,13 +2,14 @@ from __future__ import annotations
 
 from datetime import datetime
 from uuid import UUID
-from sqlalchemy import and_, func, or_, select
+from sqlalchemy import String, and_, cast, func, or_, select
 from app.repositories.vehicle_scope import record_visible, responsible_to
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.models.fuel_supply import FuelSupply
+from app.models.fuel_station import FuelStation
 from app.models.location_history import LocationHistory
-from app.models.master_data import Allocation, Department
+from app.models.master_data import Allocation, Department, Organization
 from app.models.vehicle import Vehicle
 
 
@@ -42,6 +43,7 @@ class FuelSupplyRepository:
         end_date: datetime | None = None,
         only_anomalies: bool | None = None,
         fuel_station: str | None = None,
+        search: str | None = None,
     ) -> tuple[list[FuelSupply], int]:
         stmt = select(FuelSupply).options(joinedload(FuelSupply.vehicle), joinedload(FuelSupply.driver), joinedload(FuelSupply.organization), joinedload(FuelSupply.fuel_station_ref))
         count_stmt = select(func.count(FuelSupply.id))
@@ -63,6 +65,17 @@ class FuelSupplyRepository:
             filters.append(FuelSupply.is_consumption_anomaly.is_(only_anomalies))
         if fuel_station:
             filters.append(func.lower(FuelSupply.fuel_station) == fuel_station.lower())
+        if search and search.strip():
+            term = f"%{search.strip()}%"
+            filters.append(or_(
+                FuelSupply.vehicle.has(Vehicle.plate.ilike(term)),
+                FuelSupply.organization.has(Organization.name.ilike(term)),
+                FuelSupply.fuel_station_ref.has(FuelStation.name.ilike(term)),
+                FuelSupply.fuel_station.ilike(term),
+                cast(FuelSupply.fuel_type, String).ilike(term),
+                cast(FuelSupply.additive_type, String).ilike(term),
+                FuelSupply.notes.ilike(term),
+            ))
 
         if filters:
             clause = and_(*filters)

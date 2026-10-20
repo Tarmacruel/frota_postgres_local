@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
 import DriverSelect from '../components/DriverSelect'
@@ -6,7 +6,6 @@ import SearchableSelect from '../components/SearchableSelect'
 import { ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 import { finesAPI } from '../api/fines'
 import { vehiclesAPI } from '../api/vehicles'
-import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -79,6 +78,9 @@ export default function FinesPage() {
   const canEditFine = canEdit('fines')
   const [vehicles, setVehicles] = useState([])
   const [infractions, setInfractions] = useState([])
+  const [chosenInfraction, setChosenInfraction] = useState(null)
+  const [infractionsLoading, setInfractionsLoading] = useState(false)
+  const infractionRequestId = useRef(0)
   const [records, setRecords] = useState([])
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
   const [search, setSearch] = useState('')
@@ -92,15 +94,17 @@ export default function FinesPage() {
   const [editingRecord, setEditingRecord] = useState(null)
   const [form, setForm] = useState(initialForm)
   const [submitting, setSubmitting] = useState(false)
-  const { organizations } = useMasterDataCatalog()
+  const { organizations } = useMasterDataCatalog({ organizationsOnly: true })
 
   const organizationOptions = organizations.map((organization) => ({
     value: organization.id,
     label: organization.name,
   }))
 
-  const infractionOptions = useMemo(() => infractions.filter((item) => item.is_active).map(infractionOption), [infractions])
-  const selectedInfraction = infractions.find((item) => item.id === form.infraction_type_id)
+  const availableInfractions = useMemo(() => chosenInfraction && !infractions.some((item) => item.id === chosenInfraction.id)
+    ? [chosenInfraction, ...infractions] : infractions, [infractions, chosenInfraction])
+  const infractionOptions = useMemo(() => availableInfractions.filter((item) => item.is_active || item.id === form.infraction_type_id).map(infractionOption), [availableInfractions, form.infraction_type_id])
+  const selectedInfraction = availableInfractions.find((item) => item.id === form.infraction_type_id)
 
   function getVehicleOrganizationName(vehicleId) {
     return vehicles.find((vehicle) => vehicle.id === vehicleId)?.current_location?.organization_name || 'Sem secretaria'
@@ -118,20 +122,21 @@ export default function FinesPage() {
     { header: 'Status', value: (item) => item.status },
   ]
 
-  async function loadInfractions(params = {}) {
-    const { data } = await finesAPI.listInfractions({
-      limit: 500,
-      active_only: true,
-      ...params,
-    })
-    setInfractions(data)
-  }
+  const loadInfractions = useCallback(async (term = '') => {
+    const currentRequest = ++infractionRequestId.current
+    try {
+      setInfractionsLoading(true)
+      const { data } = await finesAPI.listInfractionsPaginated({ page: 1, limit: 30, active_only: true, search: term.trim() || undefined })
+      if (currentRequest === infractionRequestId.current) setInfractions(data.data || [])
+    } catch {
+      if (currentRequest === infractionRequestId.current) setInfractions([])
+    } finally {
+      if (currentRequest === infractionRequestId.current) setInfractionsLoading(false)
+    }
+  }, [])
 
   async function loadAux() {
-    const [vehicleResponse] = await Promise.all([
-      vehiclesAPI.list({ limit: VEHICLE_LIST_LIMIT }),
-      loadInfractions(),
-    ])
+    const vehicleResponse = await vehiclesAPI.listOptions()
     setVehicles(Array.isArray(vehicleResponse.data) ? vehicleResponse.data : [])
   }
 
@@ -148,7 +153,8 @@ export default function FinesPage() {
   }
 
   function handleInfractionChange(value) {
-    const next = infractions.find((item) => item.id === value)
+    const next = availableInfractions.find((item) => item.id === value)
+    setChosenInfraction(next || null)
     setForm((prev) => ({
       ...prev,
       infraction_type_id: value,
@@ -182,12 +188,14 @@ export default function FinesPage() {
 
   function openCreate() {
     setEditingRecord(null)
+    setChosenInfraction(null)
     setForm(initialForm)
     setIsModalOpen(true)
   }
 
   function openEdit(record) {
     setEditingRecord(record)
+    setChosenInfraction(record.infraction_type || null)
     setForm({
       vehicle_id: record.vehicle_id,
       driver_id: record.driver_id || '',
@@ -253,13 +261,14 @@ export default function FinesPage() {
   }
 
   async function handlePreviewPdf() {
-    if (!records.length) return
+    if (!pagination.total) return
+    const reportRows = await allFilteredFines()
     await previewRowsToPdf({
       title: 'Frota PMTF - Multas',
       fileName: 'frota-pmtf-multas',
-      subtitle: 'Relatório da página atual de multas cadastradas.',
+      subtitle: 'Relatório das multas filtradas.',
       columns: exportColumns,
-      rows: records,
+      rows: reportRows,
       filters: [
         { label: 'Status', value: statusFilter },
         ...(organizationFilter ? [{ label: 'Secretaria', value: organizationOptions.find((item) => item.value === organizationFilter)?.label || 'Selecionada' }] : []),
@@ -270,18 +279,37 @@ export default function FinesPage() {
   }
 
   async function handleExportXlsx() {
-    if (!records.length) return
+    if (!pagination.total) return
+    const reportRows = await allFilteredFines()
     await exportRowsToXlsx({
       fileName: 'frota-pmtf-multas',
       sheetName: 'Multas',
       columns: exportColumns,
-      rows: records,
+      rows: reportRows,
       filters: [
         { label: 'Status', value: statusFilter },
         ...(organizationFilter ? [{ label: 'Secretaria', value: organizationOptions.find((item) => item.value === organizationFilter)?.label || 'Selecionada' }] : []),
         ...(vehicleFilter ? [{ label: 'Veículo', value: vehicles.find((item) => item.id === vehicleFilter)?.plate || 'Selecionado' }] : []),
       ],
     })
+  }
+
+  async function allFilteredFines() {
+    const reportRows = []
+    let page = 1
+    let pages
+    do {
+      const { data } = await finesAPI.list({
+        page, limit: 100, vehicle_id: vehicleFilter || undefined,
+        organization_id: organizationFilter || undefined,
+        status: statusFilter !== 'TODOS' ? statusFilter : undefined,
+        search: search || undefined,
+      })
+      reportRows.push(...(data.data || []))
+      pages = data.pagination.pages
+      page += 1
+    } while (page <= pages)
+    return reportRows
   }
 
   return (
@@ -350,7 +378,7 @@ export default function FinesPage() {
           </div>
           <div className="form-field modal-field-span">
             <label>Enquadramento</label>
-            <SearchableSelect value={form.infraction_type_id} onChange={handleInfractionChange} options={infractionOptions} placeholder="Selecionar infração CTB/CONTRAN" searchPlaceholder="Buscar código, artigo ou descrição" />
+            <SearchableSelect value={form.infraction_type_id} onChange={handleInfractionChange} options={infractionOptions} placeholder="Selecionar infração CTB/CONTRAN" searchPlaceholder="Buscar código, artigo ou descrição" remoteSearch onSearch={loadInfractions} loading={infractionsLoading} />
           </div>
           {selectedInfraction ? (
             <div className="evidence-meta-card modal-field-span">

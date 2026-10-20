@@ -1,5 +1,6 @@
 import PageHeader from '../components/ui/PageHeader'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import Pagination from '../components/Pagination'
 import api from '../api/client'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -48,7 +49,9 @@ function summarizeDetails(details) {
 
 export default function AuditPage() {
   const [logs, setLogs] = useState([])
-  const [users, setUsers] = useState([])
+  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
+  const [deletedCount, setDeletedCount] = useState(0)
+  const requestId = useRef(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
@@ -56,37 +59,34 @@ export default function AuditPage() {
   const [actionFilter, setActionFilter] = useState('TODAS')
   const [entityFilter, setEntityFilter] = useState('TODOS')
   const [organizationFilter, setOrganizationFilter] = useState('TODAS')
-  const { organizations } = useMasterDataCatalog()
-
-  const actorOrganizations = useMemo(() => {
-    return new Map(users.map((user) => [user.id, {
-      id: user.organization_id || '',
-      name: user.organization_name || 'Sem secretaria',
-    }]))
-  }, [users])
+  const { organizations } = useMasterDataCatalog({ organizationsOnly: true })
 
   function getActorOrganization(log) {
-    return actorOrganizations.get(log.actor_user_id) || { id: '', name: 'Sem secretaria' }
+    return { id: log.organization_id || '', name: log.organization_name || 'Sem secretaria' }
   }
 
-  const filteredLogs = useMemo(() => {
-    return logs.filter((log) => {
-      const term = search.trim().toLowerCase()
-      const actorOrganization = getActorOrganization(log)
-      const matchesSearch =
-        !term ||
-        [log.actor_name, log.actor_email, actorOrganization.name, log.entity_label, log.entity_type, log.action, summarizeDetails(log.details)]
-          .filter(Boolean)
-          .some((value) => String(value).toLowerCase().includes(term))
+  const filteredLogs = logs
 
-      const matchesAction = actionFilter === 'TODAS' || log.action === actionFilter
-      const matchesEntity = entityFilter === 'TODOS' || log.entity_type === entityFilter
-      const matchesOrganization =
-        organizationFilter === 'TODAS' ||
-        (organizationFilter === 'SEM_SECRETARIA' ? !actorOrganization.id : actorOrganization.id === organizationFilter)
-      return matchesSearch && matchesAction && matchesEntity && matchesOrganization
-    })
-  }, [logs, search, actionFilter, entityFilter, organizationFilter, actorOrganizations])
+  const queryParams = useCallback((page = 1, limit = 20) => ({
+      page, limit, search: search.trim() || undefined,
+      action: actionFilter !== 'TODAS' ? actionFilter : undefined,
+      entity_type: entityFilter !== 'TODOS' ? entityFilter : undefined,
+      organization_id: !['TODAS', 'SEM_SECRETARIA'].includes(organizationFilter) ? organizationFilter : undefined,
+      without_organization: organizationFilter === 'SEM_SECRETARIA' || undefined,
+  }), [search, actionFilter, entityFilter, organizationFilter])
+
+  async function allFilteredLogs() {
+    const records = []
+    let page = 1
+    let pages
+    do {
+      const { data } = await api.get('/audit/paginated', { params: queryParams(page, 200) })
+      records.push(...data.data)
+      pages = data.pagination.pages
+      page += 1
+    } while (page <= pages)
+    return records
+  }
 
   const exportColumns = [
     { header: 'Data', value: (log) => formatDate(log.created_at) },
@@ -99,29 +99,28 @@ export default function AuditPage() {
     { header: 'Detalhes', value: (log) => summarizeDetails(log.details) },
   ]
 
-  useEffect(() => {
-    async function loadAudit() {
-      try {
-        setLoading(true)
-        setError('')
-        const [auditResponse, usersResponse] = await Promise.all([
-          api.get('/audit', { params: { limit: 200 } }),
-          api.get('/users'),
-        ])
-        setLogs(auditResponse.data)
-        setUsers(usersResponse.data)
-      } catch (err) {
-        setError(getApiErrorMessage(err, 'Não foi possível carregar a trilha de auditoria.'))
-      } finally {
-        setLoading(false)
-      }
+  const loadAudit = useCallback(async (page = 1) => {
+    const currentRequest = ++requestId.current
+    try {
+      setLoading(true)
+      setError('')
+      const { data } = await api.get('/audit/paginated', { params: queryParams(page) })
+      if (currentRequest !== requestId.current) return
+      setLogs(data.data || [])
+      setPagination(data.pagination)
+      setDeletedCount(data.deleted || 0)
+      if (page > 1 && page > data.pagination.pages) loadAudit(data.pagination.pages)
+    } catch (err) {
+      if (currentRequest === requestId.current) setError(getApiErrorMessage(err, 'Não foi possível carregar a trilha de auditoria.'))
+    } finally {
+      if (currentRequest === requestId.current) setLoading(false)
     }
+  }, [queryParams])
 
-    loadAudit()
-  }, [])
+  useEffect(() => { loadAudit(1) }, [loadAudit])
 
   async function handleExportPdf() {
-    if (filteredLogs.length === 0) {
+    if (pagination.total === 0) {
       setFeedback('Não há eventos de auditoria filtrados para pré-visualizar.')
       return
     }
@@ -129,12 +128,13 @@ export default function AuditPage() {
     try {
       setError('')
       setFeedback('')
+      const reportRows = await allFilteredLogs()
       await previewRowsToPdf({
         title: 'Frota PMTF - Auditoria',
         fileName: 'frota-pmtf-auditoria',
         subtitle: 'Relatório administrativo da trilha de auditoria filtrada.',
         columns: exportColumns,
-        rows: filteredLogs,
+        rows: reportRows,
         filters: [
           { label: 'Ação', value: actionFilter === 'TODAS' ? 'Todas' : actionFilter },
           { label: 'Entidade', value: entityFilter === 'TODOS' ? 'Todas' : entityFilter },
@@ -157,7 +157,7 @@ export default function AuditPage() {
   }
 
   async function handleExportXlsx() {
-    if (filteredLogs.length === 0) {
+    if (pagination.total === 0) {
       setFeedback('Não há eventos de auditoria filtrados para exportar.')
       return
     }
@@ -165,11 +165,12 @@ export default function AuditPage() {
     try {
       setError('')
       setFeedback('')
+      const reportRows = await allFilteredLogs()
       await exportRowsToXlsx({
         fileName: 'frota-pmtf-auditoria',
         sheetName: 'Auditoria',
         columns: exportColumns,
-        rows: filteredLogs,
+        rows: reportRows,
         filters: [
           { label: 'Ação', value: actionFilter === 'TODAS' ? 'Todas' : actionFilter },
           { label: 'Entidade', value: entityFilter === 'TODOS' ? 'Todas' : entityFilter },
@@ -232,11 +233,11 @@ export default function AuditPage() {
 
       <div className="panel-metrics">
         <div className="metric-inline">
-          <strong>{filteredLogs.length}</strong>
+          <strong>{pagination.total}</strong>
           <span>eventos exibidos</span>
         </div>
         <div className="metric-inline">
-          <strong>{filteredLogs.filter((log) => log.action === 'DELETE').length}</strong>
+          <strong>{deletedCount}</strong>
           <span>exclusões registradas</span>
         </div>
       </div>
@@ -291,6 +292,7 @@ export default function AuditPage() {
           </table>
         </div>
       </div>
+      <Pagination currentPage={pagination.page} totalPages={pagination.pages} onPageChange={loadAudit} />
     </div>
   )
 }

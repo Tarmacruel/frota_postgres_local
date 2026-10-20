@@ -12,8 +12,8 @@ from app.models.user import User
 from app.models.vehicle import Vehicle
 from app.repositories.maintenance_repository import MaintenanceRepository
 from app.repositories.vehicle_repository import VehicleRepository
-from app.schemas.common import PaginatedResponse, build_pagination
-from app.schemas.maintenance import MaintenanceCreate, MaintenanceUpdate
+from app.schemas.common import build_pagination
+from app.schemas.maintenance import MaintenanceCreate, MaintenanceListResponse, MaintenanceUpdate
 from app.services.audit_service import AuditService
 
 
@@ -60,13 +60,16 @@ class MaintenanceService:
         end: datetime | None = None,
         only_open: bool | None = None,
         search: str | None = None,
+        filter_organization_id: UUID | None = None,
+        unassigned: bool = False,
+        focus_id: UUID | None = None,
         current_user: User | None = None,
-    ) -> PaginatedResponse[dict]:
+    ) -> MaintenanceListResponse:
         if production_scope_is_empty(current_user):
-            return PaginatedResponse[dict](data=[], pagination=build_pagination(page, limit, 0))
+            return MaintenanceListResponse(data=[], pagination=build_pagination(page, limit, 0), summary={"total": 0, "open": 0, "closed": 0})
 
         organization_id = scoped_organization_id(current_user)
-        records, total = await self.records.list_paginated(
+        records, total, summary = await self.records.list_paginated(
             page=page,
             limit=limit,
             vehicle_id=vehicle_id,
@@ -74,9 +77,13 @@ class MaintenanceService:
             end=end,
             only_open=only_open,
             search=search,
+            filter_organization_id=filter_organization_id,
+            unassigned=unassigned,
+            focus_id=focus_id,
+            with_summary=True,
             organization_id=organization_id,
         )
-        return PaginatedResponse[dict](data=[self._serialize(record) for record in records], pagination=build_pagination(page, limit, total))
+        return MaintenanceListResponse(data=[self._serialize(record) for record in records], pagination=build_pagination(page, limit, total), summary=summary)
 
     async def create(self, data: MaintenanceCreate, current_user: User) -> dict:
         vehicle = await self._ensure_vehicle_exists(data.vehicle_id, current_user=current_user)

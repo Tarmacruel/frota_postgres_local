@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link } from 'react-router-dom'
 import api from '../api/client'
-import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 import { AppIcon } from '../components/AppIcon'
@@ -20,9 +19,9 @@ export default function DashboardPage() {
   const canCreateVehicle = canCreate('vehicles')
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
-  const [vehicles, setVehicles] = useState([])
-  const [maintenance, setMaintenance] = useState([])
-  const [activePossessions, setActivePossessions] = useState([])
+  const [vehicleSummary, setVehicleSummary] = useState({})
+  const [openMaintenance, setOpenMaintenance] = useState({ data: [], total: 0 })
+  const [activePossessionsCount, setActivePossessionsCount] = useState(0)
 
   useEffect(() => {
     async function load() {
@@ -30,13 +29,13 @@ export default function DashboardPage() {
         setLoading(true)
         setError('')
         const [vehiclesResponse, maintenanceResponse, possessionResponse] = await Promise.all([
-          canViewVehicles ? api.get('/vehicles', { params: { limit: VEHICLE_LIST_LIMIT } }) : Promise.resolve({ data: [] }),
-          canViewMaintenance ? api.get('/maintenance') : Promise.resolve({ data: [] }),
-          canViewPossession ? api.get('/possession/active') : Promise.resolve({ data: [] }),
+          canViewVehicles ? api.get('/vehicles/paginated', { params: { page: 1, limit: 1 } }) : Promise.resolve({ data: { summary: {} } }),
+          canViewMaintenance ? api.get('/maintenance/paginated', { params: { page: 1, limit: 4, only_open: true } }) : Promise.resolve({ data: { data: [], pagination: { total: 0 } } }),
+          canViewPossession ? api.get('/possession/paginated', { params: { page: 1, limit: 1, active: true } }) : Promise.resolve({ data: { pagination: { total: 0 } } }),
         ])
-        setVehicles(vehiclesResponse.data)
-        setMaintenance(maintenanceResponse.data)
-        setActivePossessions(possessionResponse.data)
+        setVehicleSummary(vehiclesResponse.data.summary || {})
+        setOpenMaintenance({ data: maintenanceResponse.data.data || [], total: maintenanceResponse.data.pagination?.total || 0 })
+        setActivePossessionsCount(possessionResponse.data.pagination?.total || 0)
       } catch (err) {
         setError(getApiErrorMessage(err, 'Não foi possível carregar os indicadores da frota.'))
       } finally {
@@ -48,23 +47,17 @@ export default function DashboardPage() {
   }, [canViewVehicles, canViewMaintenance, canViewPossession])
 
   const stats = useMemo(() => {
-    const ativos = vehicles.filter((item) => item.status === 'ATIVO')
-    const manutencaoCount = vehicles.filter((item) => item.status === 'MANUTENCAO').length
-    const inativos = vehicles.filter((item) => item.status === 'INATIVO').length
-    const manutencoesAbertas = maintenance.filter((item) => !item.end_date)
-    const semCondutor = ativos.filter((item) => !item.current_driver_name).length
-
     return {
-      total: vehicles.length,
-      ativos: ativos.length,
-      manutencao: manutencaoCount,
-      inativos,
-      manutencoesAbertas: manutencoesAbertas.length,
-      possesAtivas: activePossessions.length,
-      semCondutor,
-      manutencoesPendentes: manutencoesAbertas.slice(0, 4),
+      total: vehicleSummary.total || 0,
+      ativos: vehicleSummary.active || 0,
+      manutencao: vehicleSummary.maintenance || 0,
+      inativos: vehicleSummary.inactive || 0,
+      manutencoesAbertas: openMaintenance.total,
+      possesAtivas: activePossessionsCount,
+      semCondutor: vehicleSummary.active_without_driver || 0,
+      manutencoesPendentes: openMaintenance.data,
     }
-  }, [vehicles, maintenance, activePossessions])
+  }, [vehicleSummary, openMaintenance, activePossessionsCount])
 
   const metricCards = [
     { icon: 'vehicles', tone: 'info', label: 'Veículos ativos', value: stats.ativos, note: 'Em uso ou disponíveis' },

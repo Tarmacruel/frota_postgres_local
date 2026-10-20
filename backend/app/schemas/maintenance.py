@@ -83,4 +83,4 @@ class MaintenanceOut(BaseModel):
 
 
 class MaintenanceListResponse(PaginatedResponse[MaintenanceOut]):
-    pass
+    summary: dict[str, int] | None = None

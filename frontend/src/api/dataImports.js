@@ -2,6 +2,7 @@ import api from './client'
 
 export const dataImportsAPI = {
   list: () => api.get('/data-imports'),
+  listPaginated: (params) => api.get('/data-imports/paginated', { params }),
   upload: (file) => {
     const payload = new FormData()
     payload.append('file', file, file.name)

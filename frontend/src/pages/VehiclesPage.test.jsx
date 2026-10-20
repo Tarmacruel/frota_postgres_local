@@ -4,6 +4,7 @@ import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
 import VehiclesPage from './VehiclesPage'
 import api from '../api/client'
+import { exportRowsToXlsx } from '../utils/exportData'
 
 vi.mock('../api/client', () => ({ default: { get: vi.fn(), put: vi.fn() } }))
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: { id: 'vehicle-operator' }, canCreate: () => true, canEdit: () => true, canDeleteModule: () => false, isAdmin: true }) }))
@@ -11,7 +12,11 @@ vi.mock('../hooks/useMasterDataCatalog', () => ({ useMasterDataCatalog: () => ({
 vi.mock('../utils/exportData', () => ({ exportRowsToXlsx: vi.fn(), previewRowsToPdf: vi.fn() }))
 
 const vehicle = { id: 'vehicle-1', plate: 'ABC1D23', brand: 'Marca', model: 'Modelo', vehicle_type: 'SEDAN', ownership_type: 'PROPRIO', status: 'DISPONIVEL', current_location: null }
-beforeEach(() => { vi.resetAllMocks(); api.get.mockResolvedValue({ data: [vehicle] }); api.put.mockResolvedValue({ data: vehicle }) })
+beforeEach(() => {
+  vi.resetAllMocks()
+  api.get.mockImplementation((url) => Promise.resolve(url === '/vehicles/locations' ? { data: [] } : { data: { data: [vehicle], pagination: { page: 1, pages: 1, total: 1 }, summary: { total: 1, own: 1, rented: 0, assigned: 0, active: 0, maintenance: 0, inactive: 0, without_driver: 1, latest_update: null } } }))
+  api.put.mockResolvedValue({ data: vehicle })
+})
 
 async function openCorrection() {
   render(<MemoryRouter><VehiclesPage /></MemoryRouter>)
@@ -52,7 +57,7 @@ it('aplica máscara, limita a 16 dígitos e salva somente os números', async ()
 })
 
 it('carrega o cartão com máscara e permite limpar o número', async () => {
-  api.get.mockResolvedValue({ data: [{ ...vehicle, prime_card_number: '0000123456789012' }] })
+  api.get.mockImplementation((url) => Promise.resolve(url === '/vehicles/locations' ? { data: [] } : { data: { data: [{ ...vehicle, prime_card_number: '0000123456789012' }], pagination: { page: 1, pages: 1, total: 1 }, summary: { total: 1, own: 1, rented: 0, assigned: 0, active: 0, maintenance: 0, inactive: 0, without_driver: 1, latest_update: null } } }))
   await openCorrection()
   const input = screen.getByLabelText('Número do cartão Prime')
   expect(input).toHaveValue('0000 1234 5678 9012')
@@ -67,4 +72,30 @@ it('impede salvar cartão incompleto', async () => {
   fireEvent.submit(screen.getByRole('button', { name: 'Atualizar veículo' }).closest('form'))
   expect(await screen.findByText('Número do cartão Prime deve conter exatamente 16 dígitos.')).toBeInTheDocument()
   expect(api.put).not.toHaveBeenCalled()
+})
+
+it('solicita somente a página visível e busca todo o filtro ao exportar', async () => {
+  const nextVehicle = { ...vehicle, id: 'vehicle-2', plate: 'XYZ9Z99' }
+  api.get.mockImplementation((url, { params } = {}) => {
+    if (url !== '/vehicles/paginated') return Promise.resolve({ data: [] })
+    const rows = params.limit === 100 ? [vehicle, nextVehicle] : params.page === 2 ? [nextVehicle] : [vehicle]
+    return Promise.resolve({ data: { data: rows, pagination: { page: params.page, pages: params.limit === 100 ? 1 : 2, total: 11 }, summary: { total: 11, own: 11, rented: 0, assigned: 0, active: 11, maintenance: 0, inactive: 0, without_driver: 11, latest_update: null } } })
+  })
+  render(<MemoryRouter><VehiclesPage /></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button', { name: 'Página 2' }))
+  expect(await screen.findByText('XYZ9Z99')).toBeInTheDocument()
+  expect(api.get).toHaveBeenCalledWith('/vehicles/paginated', expect.objectContaining({ params: expect.objectContaining({ page: 2, limit: 10 }) }))
+  fireEvent.click(screen.getByRole('button', { name: 'Exportar XLSX' }))
+  await waitFor(() => expect(exportRowsToXlsx).toHaveBeenCalledWith(expect.objectContaining({ rows: [vehicle, nextVehicle] })))
+  expect(api.get).toHaveBeenCalledWith('/vehicles/paginated', expect.objectContaining({ params: expect.objectContaining({ page: 1, limit: 100 }) }))
+})
+
+it('abre um veículo da busca global mesmo fora da primeira página', async () => {
+  const focusedVehicle = { ...vehicle, id: 'vehicle-2', plate: 'XYZ9Z99' }
+  api.get.mockImplementation((url) => Promise.resolve(url === '/vehicles/locations' || url.endsWith('/historico') ? { data: [] } : {
+    data: { data: [focusedVehicle], pagination: { page: 1, pages: 1, total: 1 }, summary: { total: 1, own: 1, rented: 0, assigned: 0, active: 0, maintenance: 0, inactive: 0, without_driver: 1, latest_update: null } },
+  }))
+  render(<MemoryRouter initialEntries={['/vehicles?focus=vehicle-2']}><VehiclesPage /></MemoryRouter>)
+  expect(await screen.findByText('Mostrando apenas XYZ9Z99')).toBeInTheDocument()
+  expect(api.get).toHaveBeenCalledWith('/vehicles/paginated', expect.objectContaining({ params: expect.objectContaining({ focus_id: 'vehicle-2' }) }))
 })

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import DocumentSignaturePanel from '../components/DocumentSignaturePanel'
@@ -13,7 +13,6 @@ import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { previewFuelSupplyOrderDocument } from '../utils/fuelSupplyOrderDocument'
 
-const OPEN_ORDERS_FETCH_LIMIT = 100
 
 function formatDate(value) {
   if (!value) return '-'
@@ -72,7 +71,7 @@ export default function FuelSupplyOrdersPage() {
   const focusedOrderId = searchParams.get('focus')
   const { canEdit } = useAuth()
   const canConfirmOrder = canEdit('fuel_supply_orders')
-  const { organizations } = useMasterDataCatalog()
+  const { organizations } = useMasterDataCatalog({ organizationsOnly: true })
   const [orders, setOrders] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -80,6 +79,8 @@ export default function FuelSupplyOrdersPage() {
   const [search, setSearch] = useState('')
   const [organizationFilter, setOrganizationFilter] = useState('')
   const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState({ pages: 1, total: 0 })
+  const listRequest = useRef(0)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [signatureOrder, setSignatureOrder] = useState(null)
 
@@ -88,27 +89,36 @@ export default function FuelSupplyOrdersPage() {
     [organizations],
   )
 
-  async function loadOrders() {
+  async function loadOrders(page = currentPage) {
+    const request = ++listRequest.current
     try {
       setLoading(true)
       setError('')
       const { data } = await fuelSupplyOrdersAPI.listOpen({
-        limit: OPEN_ORDERS_FETCH_LIMIT,
-        page: 1,
+        limit: 10,
+        page,
         organization_id: organizationFilter || undefined,
+        search: search.trim() || undefined,
       })
-      const payload = Array.isArray(data?.data) ? data.data : Array.isArray(data) ? data : []
-      setOrders(payload)
+      if (request !== listRequest.current) return
+      if (page > data.pagination.pages) {
+        setCurrentPage(data.pagination.pages)
+        return
+      }
+      setOrders(data.data || [])
+      setPagination(data.pagination)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível carregar as ordens abertas de abastecimento.'))
+      if (request === listRequest.current) setError(getApiErrorMessage(err, 'Não foi possível carregar as ordens abertas de abastecimento.'))
     } finally {
-      setLoading(false)
+      if (request === listRequest.current) setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadOrders()
-  }, [organizationFilter])
+    listRequest.current += 1
+    const timer = setTimeout(() => loadOrders(), search.trim() ? 250 : 0)
+    return () => clearTimeout(timer)
+  }, [currentPage, organizationFilter, search])
 
   useEffect(() => {
     if (!focusedOrderId) return undefined
@@ -125,30 +135,12 @@ export default function FuelSupplyOrdersPage() {
     }
   }, [focusedOrderId])
 
-  const filteredOrders = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    return orders.filter((order) => {
-      if (!term) return true
-      return [
-        order.request_number,
-        order.vehicle_plate,
-        order.organization_name,
-        order.created_by_name,
-        order.fuel_station_name,
-        order.fuel_station_phone,
-        order.notes,
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term))
-    })
-  }, [orders, search])
-
-  const totalPages = Math.max(1, Math.ceil(filteredOrders.length / 10))
-  const paginatedOrders = filteredOrders.slice((currentPage - 1) * 10, currentPage * 10)
+  const totalPages = pagination.pages
+  const paginatedOrders = orders
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, organizationFilter, orders.length])
+  }, [search, organizationFilter])
 
   async function handlePreviewOrderDocument(order) {
     try {

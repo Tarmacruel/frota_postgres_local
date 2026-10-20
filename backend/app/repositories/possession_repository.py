@@ -8,7 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 from app.models.driver import Driver
 from app.models.location_history import LocationHistory
-from app.models.master_data import Allocation, Department
+from app.models.master_data import Allocation, Department, Organization
 from app.models.possession import VehiclePossession
 from app.models.possession_trip import VehiclePossessionTrip
 from app.models.vehicle import Vehicle
@@ -138,40 +138,68 @@ class PossessionRepository:
         search: str | None = None,
         organization_id: UUID | None = None,
         include_personal_search: bool = True,
-    ) -> tuple[list[VehiclePossession], int]:
+        filter_organization_id: UUID | None = None,
+        unassigned: bool = False,
+        start_from: datetime | None = None,
+        start_to: datetime | None = None,
+        focus_id: UUID | None = None,
+        with_summary: bool = False,
+    ) -> tuple[list[VehiclePossession], int] | tuple[list[VehiclePossession], int, dict]:
         stmt = (
             select(VehiclePossession)
             .options(joinedload(VehiclePossession.vehicle), joinedload(VehiclePossession.driver), selectinload(VehiclePossession.photos), selectinload(VehiclePossession.return_confirmations))
             .order_by(VehiclePossession.start_date.desc(), VehiclePossession.created_at.desc())
         )
         count_stmt = select(func.count(VehiclePossession.id))
+        active_stmt = select(func.count(VehiclePossession.id))
+        location_query = select(LocationHistory.id).join(
+            Allocation, Allocation.id == LocationHistory.allocation_id
+        ).join(Department, Department.id == Allocation.department_id).join(
+            Organization, Organization.id == Department.organization_id
+        ).where(LocationHistory.vehicle_id == VehiclePossession.vehicle_id,
+            LocationHistory.end_date.is_(None)).correlate(VehiclePossession)
+
+        def apply_filter(predicate):
+            nonlocal stmt, count_stmt, active_stmt
+            stmt = stmt.where(predicate)
+            count_stmt = count_stmt.where(predicate)
+            active_stmt = active_stmt.where(predicate)
 
         if vehicle_id:
-            stmt = stmt.where(VehiclePossession.vehicle_id == vehicle_id)
-            count_stmt = count_stmt.where(VehiclePossession.vehicle_id == vehicle_id)
+            apply_filter(VehiclePossession.vehicle_id == vehicle_id)
         if organization_id:
-            stmt = self._filter_by_active_organization(stmt, organization_id)
-            count_stmt = self._filter_by_active_organization(count_stmt, organization_id)
+            apply_filter(record_visible(VehiclePossession.vehicle_id, VehiclePossession.start_date, organization_id))
+        if focus_id:
+            apply_filter(VehiclePossession.id == focus_id)
+        else:
+            if filter_organization_id:
+                apply_filter(location_query.where(Department.organization_id == filter_organization_id).exists())
+            elif unassigned:
+                apply_filter(~location_query.exists())
+            if start_from:
+                apply_filter(VehiclePossession.start_date >= start_from)
+            if start_to:
+                apply_filter(VehiclePossession.start_date <= start_to)
         if driver_id:
-            stmt = stmt.where(VehiclePossession.driver_id == driver_id)
-            count_stmt = count_stmt.where(VehiclePossession.driver_id == driver_id)
-        if active is True:
-            stmt = stmt.where(VehiclePossession.end_date.is_(None))
-            count_stmt = count_stmt.where(VehiclePossession.end_date.is_(None))
-        elif active is False:
-            stmt = stmt.where(VehiclePossession.end_date.is_not(None))
-            count_stmt = count_stmt.where(VehiclePossession.end_date.is_not(None))
-        if search:
+            apply_filter(VehiclePossession.driver_id == driver_id)
+        if not focus_id and active is True:
+            apply_filter(VehiclePossession.end_date.is_(None))
+        elif not focus_id and active is False:
+            apply_filter(VehiclePossession.end_date.is_not(None))
+        if not focus_id and search:
             normalized_search = search.strip()
             term = f"%{normalized_search}%"
             search_conditions = [
                 VehiclePossession.vehicle.has(Vehicle.plate.ilike(term)),
             ]
+            if with_summary:
+                search_conditions.append(location_query.where(Organization.name.ilike(term)).exists())
             if normalized_search.isdecimal():
                 search_conditions.append(VehiclePossession.public_number == int(normalized_search))
             if include_personal_search:
                 search_conditions.extend(
                     [
+                        VehiclePossession.observation.ilike(term),
                         VehiclePossession.driver_name.ilike(term),
                         VehiclePossession.driver_document.ilike(term),
                         VehiclePossession.driver_contact.ilike(term),
@@ -179,12 +207,14 @@ class PossessionRepository:
                     ]
                 )
             search_predicate = or_(*search_conditions)
-            stmt = stmt.where(search_predicate)
-            count_stmt = count_stmt.where(search_predicate)
+            apply_filter(search_predicate)
 
         stmt = stmt.offset((page - 1) * limit).limit(limit)
         total = int((await self.db.execute(count_stmt)).scalar_one())
         items = list((await self.db.execute(stmt)).scalars().unique().all())
+        if with_summary:
+            active_total = int((await self.db.execute(active_stmt.where(VehiclePossession.end_date.is_(None)))).scalar_one())
+            return items, total, {"total": total, "active": active_total}
         return items, total
 
     def _filter_by_active_organization(self, stmt, organization_id: UUID):

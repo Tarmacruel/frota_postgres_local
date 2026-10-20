@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import MaintenanceForm from '../components/MaintenanceForm'
@@ -6,7 +6,6 @@ import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
 import { maintenanceAPI } from '../api/maintenance'
-import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -62,26 +61,22 @@ export default function MaintenancePage() {
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [editingRecord, setEditingRecord] = useState(null)
   const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState({ pages: 1, total: 0 })
+  const [summary, setSummary] = useState({ total: 0, open: 0, closed: 0 })
+  const listRequest = useRef(0)
   const focusRecordId = searchParams.get('focus')
-  const { organizations } = useMasterDataCatalog()
+  const { organizations } = useMasterDataCatalog({ organizationsOnly: true })
 
   const organizationFilterOptions = useMemo(() => {
-    const hasUnassignedVehicles =
-      vehicles.some((vehicle) => !vehicle.current_location?.organization_id) || organizationFilter === unassignedOrganizationFilter
-
     return [
       { value: '', label: 'Todas as secretarias' },
       ...organizations.map((organization) => ({ value: organization.id, label: organization.name })),
-      ...(hasUnassignedVehicles ? [{ value: unassignedOrganizationFilter, label: 'Sem secretaria' }] : []),
+      { value: unassignedOrganizationFilter, label: 'Sem secretaria' },
     ]
-  }, [organizationFilter, organizations, vehicles])
+  }, [organizations])
 
   function getRecordVehicle(record) {
     return vehicles.find((vehicle) => vehicle.id === record.vehicle_id) || null
-  }
-
-  function getRecordOrganizationId(record) {
-    return getRecordVehicle(record)?.current_location?.organization_id || ''
   }
 
   function getRecordOrganizationName(record) {
@@ -101,26 +96,44 @@ export default function MaintenancePage() {
   ]
 
   async function loadVehicles() {
-    const { data } = await api.get('/vehicles', { params: { limit: VEHICLE_LIST_LIMIT } })
-    setVehicles(data)
+    const { data } = await api.get('/vehicles/options')
+    setVehicles(Array.isArray(data) ? data : [])
   }
 
-  async function loadRecords() {
+  function buildListParams(page = currentPage) {
+    const focused = Boolean(focusRecordId)
+    return {
+      page,
+      limit: 10,
+      vehicle_id: focused ? undefined : vehicleFilter || undefined,
+      start: focused || !startFilter ? undefined : new Date(startFilter).toISOString(),
+      end: focused || !endFilter ? undefined : new Date(endFilter).toISOString(),
+      only_open: focused || statusFilter === 'TODAS' ? undefined : statusFilter === 'EM_ANDAMENTO',
+      search: focused ? undefined : search.trim() || undefined,
+      filter_organization_id: focused || !organizationFilter || organizationFilter === unassignedOrganizationFilter ? undefined : organizationFilter,
+      unassigned: !focused && organizationFilter === unassignedOrganizationFilter ? true : undefined,
+      focus_id: focusRecordId || undefined,
+    }
+  }
+
+  async function loadRecords(page = currentPage) {
+    const request = ++listRequest.current
     try {
       setLoading(true)
       setError('')
-
-      const params = {}
-      if (vehicleFilter) params.vehicle_id = vehicleFilter
-      if (startFilter) params.start = new Date(startFilter).toISOString()
-      if (endFilter) params.end = new Date(endFilter).toISOString()
-
-      const { data } = await maintenanceAPI.list(params)
-      setRecords(data)
+      const { data } = await maintenanceAPI.listPaginated(buildListParams(page))
+      if (request !== listRequest.current) return
+      if (page > data.pagination.pages) {
+        setCurrentPage(data.pagination.pages)
+        return
+      }
+      setRecords(data.data || [])
+      setPagination(data.pagination)
+      setSummary(data.summary || { total: data.pagination.total, open: 0, closed: 0 })
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível carregar as manutenções.'))
+      if (request === listRequest.current) setError(getApiErrorMessage(err, 'Não foi possível carregar as manutenções.'))
     } finally {
-      setLoading(false)
+      if (request === listRequest.current) setLoading(false)
     }
   }
 
@@ -136,8 +149,10 @@ export default function MaintenancePage() {
   }, [])
 
   useEffect(() => {
-    loadRecords()
-  }, [vehicleFilter, startFilter, endFilter])
+    listRequest.current += 1
+    const timer = setTimeout(() => loadRecords(), search.trim() ? 250 : 0)
+    return () => clearTimeout(timer)
+  }, [currentPage, vehicleFilter, startFilter, endFilter, search, statusFilter, organizationFilter, focusRecordId])
 
   useEffect(() => {
     if (!focusRecordId) return
@@ -148,37 +163,13 @@ export default function MaintenancePage() {
     setEndFilter('')
   }, [focusRecordId])
 
-  const baseFilteredRecords = useMemo(() => {
-    return records.filter((record) => {
-      const term = search.trim().toLowerCase()
-      const matchesSearch =
-        !term ||
-        [record.vehicle_plate, getRecordOrganizationName(record), record.service_description, record.parts_replaced]
-          .filter(Boolean)
-          .some((value) => value.toLowerCase().includes(term))
-      const recordOrganizationId = getRecordOrganizationId(record)
-      const matchesOrganization =
-        !organizationFilter ||
-        (organizationFilter === unassignedOrganizationFilter ? !recordOrganizationId : recordOrganizationId === organizationFilter)
-
-      const isOpen = !record.end_date
-      const matchesStatus =
-        statusFilter === 'TODAS' ||
-        (statusFilter === 'EM_ANDAMENTO' && isOpen) ||
-        (statusFilter === 'CONCLUÍDAS' && !isOpen)
-
-      return matchesSearch && matchesOrganization && matchesStatus
-    })
-  }, [organizationFilter, records, search, statusFilter, vehicles])
-
   const focusedRecord = focusRecordId ? records.find((record) => record.id === focusRecordId) || null : null
-  const filteredRecords = focusedRecord ? [focusedRecord] : baseFilteredRecords
-  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / 10))
-  const paginatedRecords = focusedRecord ? filteredRecords : filteredRecords.slice((currentPage - 1) * 10, currentPage * 10)
+  const totalPages = pagination.pages
+  const paginatedRecords = records
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, organizationFilter, statusFilter, vehicleFilter, startFilter, endFilter, focusRecordId, records.length])
+  }, [search, organizationFilter, statusFilter, vehicleFilter, startFilter, endFilter, focusRecordId])
 
   function buildFilterSummary() {
     return [
@@ -232,7 +223,7 @@ export default function MaintenancePage() {
   }
 
   async function handleExportPdf() {
-    if (filteredRecords.length === 0) {
+    if (summary.total === 0) {
       setFeedback('Não há manutenções filtradas para pré-visualizar.')
       return
     }
@@ -240,12 +231,13 @@ export default function MaintenancePage() {
     try {
       setError('')
       setFeedback('')
+      const rows = await loadAllFilteredRecords()
       await previewRowsToPdf({
         title: 'Frota PMTF - Manutenções',
         fileName: 'frota-pmtf-manutenções',
         subtitle: 'Relatório das manutenções filtradas no painel operacional.',
         columns: exportColumns,
-        rows: filteredRecords,
+        rows,
         filters: buildFilterSummary(),
       })
       setFeedback('Pré-visualização do PDF de manutenções aberta em nova guia.')
@@ -255,7 +247,7 @@ export default function MaintenancePage() {
   }
 
   async function handleExportXlsx() {
-    if (filteredRecords.length === 0) {
+    if (summary.total === 0) {
       setFeedback('Não há manutenções filtradas para exportar.')
       return
     }
@@ -263,11 +255,12 @@ export default function MaintenancePage() {
     try {
       setError('')
       setFeedback('')
+      const rows = await loadAllFilteredRecords()
       await exportRowsToXlsx({
         fileName: 'frota-pmtf-manutenções',
         sheetName: 'Manutenções',
         columns: exportColumns,
-        rows: filteredRecords,
+        rows,
         filters: buildFilterSummary(),
       })
       setFeedback('Exportação de manutenções em XLSX iniciada com sucesso.')
@@ -276,8 +269,19 @@ export default function MaintenancePage() {
     }
   }
 
-  const openCount = filteredRecords.filter((item) => !item.end_date).length
-  const closedCount = filteredRecords.length - openCount
+  async function loadAllFilteredRecords() {
+    const rows = []
+    let page = 1
+    while (true) {
+      const { data } = await maintenanceAPI.listPaginated({ ...buildListParams(page), limit: 100 })
+      rows.push(...data.data)
+      if (page >= data.pagination.pages) return rows
+      page += 1
+    }
+  }
+
+  const openCount = summary.open
+  const closedCount = summary.closed
 
   return (
     <div className="surface-panel operation-page operation-page--maintenance">
@@ -340,7 +344,7 @@ export default function MaintenancePage() {
 
       <div className="panel-metrics">
         <div className="metric-inline">
-          <strong>{filteredRecords.length}</strong>
+          <strong>{summary.total}</strong>
           <span>registros exibidos</span>
         </div>
         <div className="metric-inline">
@@ -386,7 +390,7 @@ export default function MaintenancePage() {
                 <tr>
                   <td colSpan={canManageMaintenanceActions ? 8 : 7} className="muted">Carregando manutenções...</td>
                 </tr>
-              ) : filteredRecords.length === 0 ? (
+              ) : pagination.total === 0 ? (
                 <tr>
                   <td colSpan={canManageMaintenanceActions ? 8 : 7}>
                     <div className="empty-state">Nenhum registro encontrado para os filtros atuais.</div>

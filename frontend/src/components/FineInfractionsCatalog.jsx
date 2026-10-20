@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Pagination from './Pagination'
 import { finesAPI } from '../api/fines'
 import { getApiErrorMessage } from '../utils/apiError'
 
 const PAGE_SIZE = 12
-const CATALOG_FETCH_LIMIT = 500
 
 const initialInfractionForm = {
   id: null,
@@ -48,54 +47,34 @@ export default function FineInfractionsCatalog() {
   const [form, setForm] = useState(initialInfractionForm)
   const [search, setSearch] = useState('')
   const [page, setPage] = useState(1)
+  const [totalPages, setTotalPages] = useState(1)
+  const requestId = useRef(0)
   const [loading, setLoading] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
 
-  const filteredInfractions = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    if (!term) return infractions
-    return infractions.filter((item) => [
-      item.code,
-      item.desdobramento,
-      item.description,
-      item.ctb_article,
-      item.severity,
-      item.source,
-    ].filter(Boolean).join(' ').toLowerCase().includes(term))
-  }, [infractions, search])
-
-  const totalPages = Math.max(1, Math.ceil(filteredInfractions.length / PAGE_SIZE))
-  const paginatedInfractions = useMemo(() => {
-    const startIndex = (page - 1) * PAGE_SIZE
-    return filteredInfractions.slice(startIndex, startIndex + PAGE_SIZE)
-  }, [filteredInfractions, page])
-
-  useEffect(() => {
-    loadInfractions()
-  }, [])
-
-  useEffect(() => {
-    setPage(1)
-  }, [search])
-
-  useEffect(() => {
-    if (page > totalPages) setPage(totalPages)
-  }, [page, totalPages])
-
-  async function loadInfractions() {
+  const loadInfractions = useCallback(async (requestedPage = 1) => {
+    const currentRequest = ++requestId.current
     try {
       setLoading(true)
       setError('')
-      const { data } = await finesAPI.listInfractions({ limit: CATALOG_FETCH_LIMIT, active_only: false })
-      setInfractions(Array.isArray(data) ? data : [])
+      const { data } = await finesAPI.listInfractionsPaginated({
+        page: requestedPage, limit: PAGE_SIZE, active_only: false, search: search.trim() || undefined,
+      })
+      if (currentRequest !== requestId.current) return
+      setInfractions(data.data || [])
+      setPage(data.pagination.page)
+      setTotalPages(data.pagination.pages)
+      if (requestedPage > data.pagination.pages) loadInfractions(data.pagination.pages)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível carregar as infrações CTB.'))
+      if (currentRequest === requestId.current) setError(getApiErrorMessage(err, 'Não foi possível carregar as infrações CTB.'))
     } finally {
-      setLoading(false)
+      if (currentRequest === requestId.current) setLoading(false)
     }
-  }
+  }, [search])
+
+  useEffect(() => { loadInfractions(1) }, [loadInfractions])
 
   function resetForm() {
     setForm(initialInfractionForm)
@@ -138,7 +117,7 @@ export default function FineInfractionsCatalog() {
       }
 
       resetForm()
-      await loadInfractions()
+      await loadInfractions(page)
     } catch (err) {
       setError(getApiErrorMessage(err, 'Não foi possível salvar o enquadramento.'))
     } finally {
@@ -153,7 +132,7 @@ export default function FineInfractionsCatalog() {
       setFeedback('')
       await finesAPI.updateInfraction(item.id, { is_active: !item.is_active })
       setFeedback(item.is_active ? 'Enquadramento desativado.' : 'Enquadramento ativado.')
-      await loadInfractions()
+      await loadInfractions(page)
     } catch (err) {
       setError(getApiErrorMessage(err, 'Não foi possível alterar o status do enquadramento.'))
     } finally {
@@ -244,9 +223,9 @@ export default function FineInfractionsCatalog() {
           <tbody>
             {loading ? (
               <tr><td colSpan={6}>Carregando infrações...</td></tr>
-            ) : filteredInfractions.length === 0 ? (
+            ) : infractions.length === 0 ? (
               <tr><td colSpan={6}><div className="empty-state">Nenhuma infração encontrada.</div></td></tr>
-            ) : paginatedInfractions.map((item) => (
+            ) : infractions.map((item) => (
               <tr key={item.id}>
                 <td data-label="Código">
                   <strong>{item.code}/{item.desdobramento}</strong>
@@ -274,7 +253,7 @@ export default function FineInfractionsCatalog() {
           </tbody>
         </table>
       </div>
-      <Pagination currentPage={page} totalPages={totalPages} onPageChange={setPage} />
+      <Pagination currentPage={page} totalPages={totalPages} onPageChange={loadInfractions} />
     </>
   )
 }

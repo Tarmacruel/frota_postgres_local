@@ -22,6 +22,9 @@ class FuelStationService:
     async def list(self, active_only: bool | None = None) -> list[FuelStation]:
         return await self.repo.list(active_only=active_only)
 
+    async def list_paginated(self, **filters):
+        return await self.repo.list_paginated(**filters)
+
     async def get(self, fuel_station_id: UUID) -> FuelStation:
         station = await self.repo.get(fuel_station_id)
         if not station:

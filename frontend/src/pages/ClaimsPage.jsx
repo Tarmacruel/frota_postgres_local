@@ -65,7 +65,7 @@ export default function ClaimsPage() {
   const [editingRecord, setEditingRecord] = useState(null)
   const [viewingAttachmentsRecord, setViewingAttachmentsRecord] = useState(null)
   const [claimFormBusy, setClaimFormBusy] = useState(false)
-  const { organizations } = useMasterDataCatalog()
+  const { organizations } = useMasterDataCatalog({ organizationsOnly: true })
 
   const organizationOptions = organizations.map((organization) => ({
     value: organization.id,
@@ -88,7 +88,7 @@ export default function ClaimsPage() {
   ]
 
   async function loadVehicles() {
-    const { data } = await vehiclesAPI.list()
+    const { data } = await vehiclesAPI.listOptions()
     setVehicles(data)
   }
 

@@ -10,14 +10,30 @@ from app.schemas.auth import MessageOut
 from app.schemas.fuel_station import (
     FuelStationCreate,
     FuelStationOut,
+    FuelStationListResponse,
     FuelStationUpdate,
     FuelStationUserCreate,
     FuelStationUserOut,
     FuelStationUserUpdate,
 )
 from app.services.fuel_station_service import FuelStationService
+from app.schemas.common import build_pagination
 
 router = APIRouter(prefix="/api/fuel-stations", tags=["FuelStations"])
+
+
+@router.get("/paginated", response_model=FuelStationListResponse, dependencies=[Depends(require_permission("fuel_stations", "view"))])
+async def list_fuel_stations_paginated(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=10, ge=1, le=200),
+    search: str | None = Query(default=None),
+    active_only: bool | None = Query(default=None),
+    db: AsyncSession = Depends(get_db_session),
+):
+    rows, total, active_count, inactive_count = await FuelStationService(db).list_paginated(
+        page=page, limit=limit, search=search, active_only=active_only)
+    return {"data": rows, "pagination": build_pagination(page, limit, total),
+            "active_count": active_count, "inactive_count": inactive_count}
 
 
 @router.get("", response_model=list[FuelStationOut], dependencies=[Depends(require_permission("fuel_stations", "view"))])

@@ -96,6 +96,9 @@ class AuditService:
             actor_user_id=actor_user_id,
         )
 
+    async def list_paginated(self, **filters):
+        return await self.audit_logs.list_paginated(**filters)
+
     async def record(
         self,
         *,

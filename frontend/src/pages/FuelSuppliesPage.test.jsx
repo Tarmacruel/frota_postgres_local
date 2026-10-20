@@ -2,6 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FuelSuppliesPage from './FuelSuppliesPage'
+import { exportRowsToXlsx } from '../utils/exportData'
 
 const mocks = vi.hoisted(() => ({
   get: vi.fn(),
@@ -72,6 +73,8 @@ function renderPage(initialEntry = '/abastecimentos?acao=nova-ordem') {
   )
 }
 
+const paged = (rows) => ({ data: { data: rows, pagination: { page: 1, pages: 1, total: rows.length, limit: 10 } } })
+
 describe('FuelSuppliesPage quick order action', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -79,8 +82,8 @@ describe('FuelSuppliesPage quick order action', () => {
     mocks.get.mockResolvedValue({ data: [] })
     mocks.listOrganizations.mockResolvedValue({ data: [] })
     mocks.listStations.mockResolvedValue({ data: [] })
-    mocks.listSupplies.mockResolvedValue({ data: { data: [] } })
-    mocks.listOrders.mockResolvedValue({ data: { data: [] } })
+    mocks.listSupplies.mockResolvedValue(paged([]))
+    mocks.listOrders.mockResolvedValue(paged([]))
   })
 
   it('abre o formulário oficial e remove apenas o comando da URL', async () => {
@@ -125,14 +128,25 @@ describe('FuelSuppliesPage administrative adjustments', () => {
     mocks.get.mockResolvedValue({ data: [] })
     mocks.listOrganizations.mockResolvedValue({ data: [] })
     mocks.listStations.mockResolvedValue({ data: [] })
-    mocks.listSupplies.mockResolvedValue({ data: { data: [] } })
-    mocks.listOrders.mockResolvedValue({ data: { data: [] } })
+    mocks.listSupplies.mockResolvedValue(paged([]))
+    mocks.listOrders.mockResolvedValue(paged([]))
+  })
+
+  it('carrega todas as ordens filtradas somente ao solicitar o XLSX', async () => {
+    mocks.listOrders.mockResolvedValue(paged([{ id: 'order-1', status: 'EXPIRED' }]))
+    const reportRows = Array.from({ length: 12 }, (_, index) => ({ id: `order-${index + 1}`, status: 'EXPIRED' }))
+    const { fuelSupplyOrdersAPI } = await import('../api/fuelSupplyOrders')
+    fuelSupplyOrdersAPI.listAllForReport.mockResolvedValue(reportRows)
+    renderPage('/abastecimentos')
+
+    await waitFor(() => expect(mocks.listOrders).toHaveBeenCalledWith(expect.objectContaining({ page: 1, limit: 10 })))
+    expect(fuelSupplyOrdersAPI.listAllForReport).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar XLSX' }))
+    await waitFor(() => expect(exportRowsToXlsx).toHaveBeenCalledWith(expect.objectContaining({ rows: reportRows })))
   })
 
   it('oferece retificação auditável para abastecimento confirmado por ordem', async () => {
-    mocks.listSupplies.mockResolvedValue({
-      data: {
-        data: [{
+    mocks.listSupplies.mockResolvedValue(paged([{
           id: 'supply-1',
           fuel_supply_order_id: 'order-1',
           vehicle_plate: 'THE3C94',
@@ -144,9 +158,7 @@ describe('FuelSuppliesPage administrative adjustments', () => {
           odometer_km: 9278,
           fuel_type: 'Gasolina comum',
           receipt_url: '/api/fuel-supplies/supply-1/receipt',
-        }],
-      },
-    })
+        }]))
 
     renderPage('/abastecimentos')
 
@@ -157,17 +169,13 @@ describe('FuelSuppliesPage administrative adjustments', () => {
   })
 
   it('oferece reabertura auditável para ordem expirada', async () => {
-    mocks.listOrders.mockResolvedValue({
-      data: {
-        data: [{
+    mocks.listOrders.mockResolvedValue(paged([{
           id: 'order-expired',
           status: 'EXPIRED',
           vehicle_plate: 'THE3C94',
           expires_at: '2026-07-10T17:45:00Z',
           requested_liters: 30,
-        }],
-      },
-    })
+        }]))
 
     renderPage('/abastecimentos')
 
@@ -180,11 +188,11 @@ describe('FuelSuppliesPage administrative adjustments', () => {
 
   it('exibe motivo persistido por hover e clique, preservando filtros e ações', async () => {
     const reason = 'Alerta: consumo 6.45 km/l está mais de 30% abaixo da média histórica (10.20 km/l).'
-    mocks.listSupplies.mockResolvedValue({ data: { data: [{
+    mocks.listSupplies.mockResolvedValue(paged([{
       id: 'alert-1', vehicle_plate: 'ABC1D23', supplied_at: '2026-10-06T14:01:00Z',
       is_consumption_anomaly: true, anomaly_details: reason, liters: 40, consumption_km_l: 6.45,
       fuel_supply_order_id: 'order-1', receipt_url: '/api/fuel-supplies/alert-1/receipt',
-    }] } })
+    }]))
     renderPage('/abastecimentos?vehicle_id=vehicle-1')
     const trigger = await screen.findByRole('button', { name: 'Ver motivo do alerta de ABC1D23' })
     const search = screen.getByPlaceholderText('Buscar por placa, secretaria, posto, combustível ou aditivo')
@@ -205,10 +213,10 @@ describe('FuelSuppliesPage administrative adjustments', () => {
   })
 
   it('informa motivo ausente sem fabricar regra e mantém Regular sem ação de alerta', async () => {
-    mocks.listSupplies.mockResolvedValue({ data: { data: [
+    mocks.listSupplies.mockResolvedValue(paged([
       { id: 'missing', vehicle_plate: 'ABC1D23', is_consumption_anomaly: true, anomaly_details: '   ' },
       { id: 'regular', vehicle_plate: 'DEF4G56', is_consumption_anomaly: false },
-    ] } })
+    ]))
     renderPage('/abastecimentos')
     fireEvent.click(await screen.findByRole('button', { name: 'Ver motivo do alerta de ABC1D23' }))
     expect(screen.getByRole('dialog')).toHaveTextContent('Motivo não informado no registro deste abastecimento.')
@@ -217,10 +225,10 @@ describe('FuelSuppliesPage administrative adjustments', () => {
   })
 
   it('mantém apenas um resumo ao percorrer alertas e remove todos ao rolar', async () => {
-    mocks.listSupplies.mockResolvedValue({ data: { data: [
+    mocks.listSupplies.mockResolvedValue(paged([
       { id: 'first', vehicle_plate: 'ABC1D23', is_consumption_anomaly: true, anomaly_details: 'Motivo do primeiro registro.' },
       { id: 'second', vehicle_plate: 'DEF4G56', is_consumption_anomaly: true, anomaly_details: 'Motivo do segundo registro.' },
-    ] } })
+    ]))
     renderPage('/abastecimentos')
     const first = await screen.findByRole('button', { name: 'Ver motivo do alerta de ABC1D23' })
     const second = screen.getByRole('button', { name: 'Ver motivo do alerta de DEF4G56' })

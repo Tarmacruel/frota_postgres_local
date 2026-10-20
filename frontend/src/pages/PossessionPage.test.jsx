@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
   get: vi.fn(),
   listActive: vi.fn(),
   list: vi.fn(),
+  listPaginated: vi.fn(),
   listTrips: vi.fn(),
   reload: vi.fn(),
   update: vi.fn(),
@@ -25,6 +26,7 @@ vi.mock('../api/possession', () => ({
   possessionAPI: {
     listActive: mocks.listActive,
     list: mocks.list,
+    listPaginated: mocks.listPaginated,
     listTrips: mocks.listTrips,
     end: vi.fn(),
     update: mocks.update,
@@ -44,7 +46,6 @@ vi.mock('../context/AuthContext', () => ({
   }),
 }))
 vi.mock('../hooks/useMasterDataCatalog', () => ({ useMasterDataCatalog: () => ({ organizations: [] }) }))
-vi.mock('../components/Pagination', () => ({ default: () => null }))
 vi.mock('../components/GuidedTour', () => ({ default: () => null }))
 vi.mock('../components/PossessionTripsModal', () => ({ default: () => null }))
 vi.mock('../components/PossessionReportBuilder', () => ({ default: () => <button type="button">Mais opções</button> }))
@@ -90,12 +91,44 @@ describe('PossessionPage', () => {
     mocks.get.mockResolvedValue({ data: [vehicle] })
     mocks.listActive.mockResolvedValue({ data: [possession] })
     mocks.list.mockResolvedValue({ data: [possession] })
+    mocks.listPaginated.mockImplementation(async (params) => {
+      const response = params.active === true ? await mocks.listActive() : await mocks.list()
+      const data = response.data.filter((item) => !params.search || [item.vehicle_plate, item.driver_name, item.driver_matricula, item.driver_document, item.driver_contact, item.observation]
+        .filter(Boolean).some((value) => String(value).toLowerCase().includes(params.search.trim().toLowerCase())))
+      return { data: { data, pagination: { page: params.page, pages: 1, total: data.length }, summary: { total: data.length, active: data.filter((item) => item.is_active).length } } }
+    })
     mocks.listTrips.mockResolvedValue({
       data: {
         data: [{ id: 'trip-1', status: 'EM_ANDAMENTO', sequence_number: 1 }],
         pagination: { page: 1, pages: 1, total: 1, has_next: false, has_prev: false },
       },
     })
+  })
+
+  it('carrega a página solicitada no servidor e mantém o total filtrado', async () => {
+    const second = { ...possession, id: 'possession-2', public_number: 2, driver_name: 'Segundo condutor' }
+    mocks.listPaginated.mockImplementation(async (params) => ({ data: {
+      data: params.page === 2 ? [second] : [possession],
+      pagination: { page: params.page, pages: 2, total: 11 },
+      summary: { total: 11, active: 11 },
+    } }))
+    render(<MemoryRouter><PossessionPage /></MemoryRouter>)
+    fireEvent.click(await screen.findByRole('button', { name: 'Página 2' }))
+    expect(await screen.findByText('Segundo condutor')).toBeInTheDocument()
+    expect(mocks.listPaginated).toHaveBeenCalledWith(expect.objectContaining({ page: 2, limit: 10, active: true }))
+    expect(screen.getAllByText('11', { selector: 'strong' })).toHaveLength(2)
+  })
+
+  it('continua visível durante atualização da API de veículos e sem resumo paginado', async () => {
+    mocks.get.mockImplementation((url) => url === '/vehicles/options'
+      ? Promise.reject({ response: { status: 404 } })
+      : Promise.resolve({ data: [vehicle] }))
+    mocks.listPaginated.mockResolvedValue({ data: {
+      data: [possession], pagination: { page: 1, pages: 1, total: 1 },
+    } })
+    render(<MemoryRouter><PossessionPage /></MemoryRouter>)
+    expect(await screen.findByText('Condutor Teste')).toBeInTheDocument()
+    expect(mocks.get).toHaveBeenCalledWith('/vehicles', { params: { limit: 5000 } })
   })
 
   it('bloqueia o encerramento da posse ao confirmar uma rota aberta no backend', async () => {
@@ -135,17 +168,23 @@ describe('PossessionPage', () => {
     const search = screen.getByPlaceholderText('Buscar por placa, secretaria, condutor, matrícula ou contato')
     for (const value of ['000123-AB', '000123', '  123-ab  ']) {
       fireEvent.change(search, { target: { value } })
-      expect(screen.getByText('Condutor Localizado')).toBeInTheDocument()
-      expect(screen.queryByText('Condutor Legado')).not.toBeInTheDocument()
-      expect(screen.queryByText('Outro Condutor')).not.toBeInTheDocument()
+      await waitFor(() => {
+        expect(screen.getByText('Condutor Localizado')).toBeInTheDocument()
+        expect(screen.queryByText('Condutor Legado')).not.toBeInTheDocument()
+        expect(screen.queryByText('Outro Condutor')).not.toBeInTheDocument()
+      })
     }
     fireEvent.change(search, { target: { value: 'Legado' } })
-    expect(screen.getByText('Condutor Legado')).toBeInTheDocument()
-    expect(screen.queryByText('Condutor Localizado')).not.toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Condutor Legado')).toBeInTheDocument()
+      expect(screen.queryByText('Condutor Localizado')).not.toBeInTheDocument()
+    })
     fireEvent.change(search, { target: { value: '' } })
-    expect(screen.getByText('Condutor Localizado')).toBeInTheDocument()
-    expect(screen.getByText('Condutor Legado')).toBeInTheDocument()
-    expect(screen.getByText('Outro Condutor')).toBeInTheDocument()
+    await waitFor(() => {
+      expect(screen.getByText('Condutor Localizado')).toBeInTheDocument()
+      expect(screen.getByText('Condutor Legado')).toBeInTheDocument()
+      expect(screen.getByText('Outro Condutor')).toBeInTheDocument()
+    })
   })
 
   function setupClosedPossession(confirmed = true) {

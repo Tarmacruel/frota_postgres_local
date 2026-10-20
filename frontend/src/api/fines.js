@@ -5,6 +5,7 @@ export const finesAPI = {
   create: (data) => api.post('/fines', data),
   update: (id, data) => api.put(`/fines/${id}`, data),
   listInfractions: (params) => api.get('/fines/infractions', { params }),
+  listInfractionsPaginated: (params) => api.get('/fines/infractions/paginated', { params }),
   createInfraction: (data) => api.post('/fines/infractions', data),
   updateInfraction: (id, data) => api.put(`/fines/infractions/${id}`, data),
 }
