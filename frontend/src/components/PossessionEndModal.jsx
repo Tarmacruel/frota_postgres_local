@@ -1,5 +1,6 @@
 import { useRef } from 'react'
 import Modal from './Modal'
+import PossessionReturnPhotos from './PossessionReturnPhotos'
 
 export default function PossessionEndModal({
   record,
@@ -10,6 +11,8 @@ export default function PossessionEndModal({
   onChange,
   onClose,
   onSubmit,
+  photos = [],
+  onPhotosChange,
 }) {
   const dateInputRef = useRef(null)
   if (!record) return null
@@ -81,6 +84,8 @@ export default function PossessionEndModal({
           />
           <span className="helper-text">Registre avarias, ressalvas ou “Sem ressalvas”, conforme a conferência realizada.</span>
         </div>
+
+        <PossessionReturnPhotos files={photos} onChange={onPhotosChange} disabled={ending} />
 
         <section className="possession-return-declaration modal-field-span" aria-labelledby="return-declaration-title">
           <div className="possession-return-declaration-heading">

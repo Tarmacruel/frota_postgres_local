@@ -1480,6 +1480,10 @@ class PossessionService:
                         can_view_location=can_view_location,
                     ),
                     "is_legacy": False,
+                    "evidence_stage": getattr(photo, "evidence_stage", None) or "unspecified",
+                    "return_confirmation_id": getattr(photo, "return_confirmation_id", None),
+                    "return_confirmation_version": getattr(photo, "return_confirmation_version", None),
+                    "uploaded_at": getattr(photo, "created_at", None),
                 }
             )
 

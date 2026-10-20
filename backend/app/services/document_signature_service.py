@@ -694,6 +694,7 @@ class DocumentSignatureService:
                     "created_at": photo.created_at,
                 }
                 for photo in record.photos
+                if getattr(photo, 'evidence_stage', None) != 'post_return'
             ),
             key=lambda item: (str(item["created_at"]), item["id"]),
         )

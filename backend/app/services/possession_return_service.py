@@ -6,7 +6,7 @@ from datetime import datetime, timezone
 from decimal import Decimal, ROUND_HALF_UP
 from uuid import UUID, uuid4
 
-from fastapi import HTTPException, status
+from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.exc import IntegrityError
 from app.services.operational_scope import attribute_operation
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -22,6 +22,7 @@ from app.repositories.possession_trip_repository import (
 from app.schemas.possession_return import PossessionEndWithConfirmation, PossessionReturnCorrection
 from app.services.audit_service import AuditService
 from app.services.possession_service import PossessionService
+from app.services.possession_return_photo_service import PossessionReturnPhotoService
 
 
 DECLARATION_VERSION = "1.0"
@@ -56,6 +57,7 @@ def build_canonical_return_payload(
     request_id: str,
     version: int,
     correction_of_hash: str | None = None,
+    evidence_manifest: list[dict] | None = None,
 ) -> dict:
     payload = {
         "schema_version": CANONICAL_SCHEMA_VERSION,
@@ -77,6 +79,9 @@ def build_canonical_return_payload(
         "last_trip_id": str(last_trip_id) if last_trip_id else None,
         "request_id": request_id,
     }
+    if evidence_manifest:
+        payload["schema_version"] = "possession-return-confirmation.v2"
+        payload["return_evidence"] = evidence_manifest
     if correction_of_hash:
         payload["correction_of_hash"] = correction_of_hash
     return payload
@@ -167,6 +172,8 @@ class PossessionReturnService:
         possession_id: UUID,
         data: PossessionEndWithConfirmation,
         current_user: User,
+        *,
+        photos: list[UploadFile] | None = None,
     ) -> VehiclePossessionReturnConfirmation:
         if data.declaration_accepted is not True:
             raise HTTPException(
@@ -179,6 +186,9 @@ class PossessionReturnService:
         confirmed_at = datetime.now(timezone.utc)
         final_odometer = _decimal_odometer(data.end_odometer_km)
 
+        photo_service = PossessionReturnPhotoService(self.db)
+        photo_payloads = await photo_service.prepare(photos or [])
+        stored_photo_paths = []
         scoped_possession = await self._visible_possession(possession_id, current_user)
         await attribute_operation(self.db, scoped_possession, current_user)
         try:
@@ -216,6 +226,7 @@ class PossessionReturnService:
                 last_trip_id=latest_trip.id if latest_trip else None,
                 request_id=context["request_id"],
                 version=version,
+                evidence_manifest=photo_service.manifest(photo_payloads),
             )
             confirmation = VehiclePossessionReturnConfirmation(
                 possession_id=possession.id,
@@ -241,6 +252,8 @@ class PossessionReturnService:
             await attribute_operation(self.db, possession, current_user)
             possession.end_odometer_km = float(final_odometer)
             await self.confirmations.create(confirmation)
+            photo_service.store(photo_payloads, possession=possession, confirmation=confirmation,
+                                user=current_user, stored_paths=stored_photo_paths)
             await self.audit.record(
                 actor=current_user,
                 action="POSSESSION_RETURN_CONFIRMATION",
@@ -248,6 +261,7 @@ class PossessionReturnService:
                 entity_id=possession.id,
                 entity_label=f"Posse {possession.public_number}",
                 details={
+                    "return_evidence": photo_service.manifest(photo_payloads),
                     "confirmation_id": str(confirmation.id),
                     "confirmation_version": version,
                     "declaration_version": DECLARATION_VERSION,
@@ -270,15 +284,18 @@ class PossessionReturnService:
             return confirmation
         except HTTPException:
             await self.db.rollback()
+            photo_service.cleanup(stored_photo_paths)
             raise
         except IntegrityError as exc:
             await self.db.rollback()
+            photo_service.cleanup(stored_photo_paths)
             raise HTTPException(
                 status_code=409,
                 detail={"code": "RETURN_CONFIRMATION_CONFLICT", "message": "A posse foi alterada por outra operação."},
             ) from exc
         except Exception:
             await self.db.rollback()
+            photo_service.cleanup(stored_photo_paths)
             raise
 
     async def correct(

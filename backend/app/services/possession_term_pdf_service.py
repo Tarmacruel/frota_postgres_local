@@ -435,7 +435,7 @@ class PossessionTermPdfService:
                         (
                             "Registros fotográficos",
                             _count_label(
-                                len(possession.photos),
+                                sum(getattr(photo, 'evidence_stage', None) != 'post_return' for photo in possession.photos),
                                 "evidência vinculada à entrega",
                                 "evidências vinculadas à entrega",
                             ),
