@@ -16,7 +16,6 @@ import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
 import { DIGITAL_DOCUMENT_TYPES } from '../api/documentSignatures'
 import { possessionAPI } from '../api/possession'
-import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -176,29 +175,25 @@ export default function PossessionPage() {
   const editRequest = useRef(0)
   const editSending = useRef(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState({ pages: 1, total: 0 })
+  const [summary, setSummary] = useState({ total: 0, active: 0 })
+  const listRequest = useRef(0)
   const editDocumentInputRef = useRef(null)
   const editPhotoInputRef = useRef(null)
   const endingSubmitRef = useRef(false)
   const focusRecordId = searchParams.get('focus')
-  const { organizations } = useMasterDataCatalog()
+  const { organizations } = useMasterDataCatalog({ organizationsOnly: true })
 
   const organizationFilterOptions = useMemo(() => {
-    const hasUnassignedVehicles =
-      vehicles.some((vehicle) => !vehicle.current_location?.organization_id) || organizationFilter === unassignedOrganizationFilter
-
     return [
       { value: '', label: 'Todas as secretarias' },
       ...organizations.map((organization) => ({ value: organization.id, label: organization.name })),
-      ...(hasUnassignedVehicles ? [{ value: unassignedOrganizationFilter, label: 'Sem secretaria' }] : []),
+      { value: unassignedOrganizationFilter, label: 'Sem secretaria' },
     ]
-  }, [organizationFilter, organizations, vehicles])
+  }, [organizations])
 
   function getRecordVehicle(record) {
     return vehicles.find((vehicle) => vehicle.id === record.vehicle_id) || null
-  }
-
-  function getRecordOrganizationId(record) {
-    return getRecordVehicle(record)?.current_location?.organization_id || ''
   }
 
   function getRecordOrganizationName(record) {
@@ -206,36 +201,53 @@ export default function PossessionPage() {
   }
 
   async function loadVehicles() {
-    const { data } = await api.get('/vehicles', { params: { limit: VEHICLE_LIST_LIMIT } })
-    setVehicles(data)
+    try {
+      const { data } = await api.get('/vehicles/options')
+      setVehicles(Array.isArray(data) ? data : [])
+    } catch (error) {
+      if (error?.response?.status !== 404) throw error
+      const { data } = await api.get('/vehicles', { params: { limit: 5000 } })
+      setVehicles(Array.isArray(data) ? data : [])
+    }
   }
 
-  async function loadPossessions() {
+  function buildListParams(page = currentPage) {
+    const focused = Boolean(focusRecordId)
+    return {
+      page,
+      limit: 10,
+      active: focused || viewFilter === 'TODAS' ? undefined : viewFilter === 'ATIVAS',
+      vehicle_id: focused ? undefined : vehicleFilter || undefined,
+      search: focused ? undefined : search.trim() || undefined,
+      filter_organization_id: focused || !organizationFilter || organizationFilter === unassignedOrganizationFilter ? undefined : organizationFilter,
+      unassigned: !focused && organizationFilter === unassignedOrganizationFilter ? true : undefined,
+      start_from: focused || !startDateFrom ? undefined : dateBoundary(startDateFrom, 'start')?.toISOString(),
+      start_to: focused || !startDateTo ? undefined : dateBoundary(startDateTo, 'end')?.toISOString(),
+      focus_id: focusRecordId || undefined,
+    }
+  }
+
+  async function loadPossessions(page = currentPage) {
+    const request = ++listRequest.current
     try {
       setLoading(true)
       setError('')
-
-      let data = []
-      if (viewFilter === 'ATIVAS') {
-        const response = await possessionAPI.listActive()
-        data = response.data
-      } else if (viewFilter === 'ENCERRADAS') {
-        const response = await possessionAPI.list({ active: false, vehicle_id: vehicleFilter || undefined })
-        data = response.data
-      } else {
-        const response = await possessionAPI.list({ vehicle_id: vehicleFilter || undefined })
-        data = response.data
+      const { data } = await possessionAPI.listPaginated(buildListParams(page))
+      if (request !== listRequest.current) return
+      if (page > data.pagination.pages) {
+        setCurrentPage(data.pagination.pages)
+        return
       }
-
-      if (viewFilter === 'ATIVAS' && vehicleFilter) {
-        data = data.filter((item) => item.vehicle_id === vehicleFilter)
-      }
-
-      setRecords(data)
+      setRecords(data.data)
+      setPagination(data.pagination)
+      setSummary(data.summary || {
+        total: data.pagination.total,
+        active: viewFilter === 'ATIVAS' ? data.pagination.total : data.data.filter((record) => record.is_active).length,
+      })
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível carregar as posses.'))
+      if (request === listRequest.current) setError(getApiErrorMessage(err, 'Não foi possível carregar as posses.'))
     } finally {
-      setLoading(false)
+      if (request === listRequest.current) setLoading(false)
     }
   }
 
@@ -251,8 +263,10 @@ export default function PossessionPage() {
   }, [])
 
   useEffect(() => {
-    loadPossessions()
-  }, [vehicleFilter, viewFilter])
+    listRequest.current += 1
+    const timer = setTimeout(() => loadPossessions(), search.trim() ? 250 : 0)
+    return () => clearTimeout(timer)
+  }, [currentPage, vehicleFilter, viewFilter, search, organizationFilter, startDateFrom, startDateTo, focusRecordId])
 
   useEffect(() => {
     if (focusRecordId && viewFilter !== 'TODAS') {
@@ -267,37 +281,7 @@ export default function PossessionPage() {
     setViewFilter('TODAS')
   }, [focusRecordId])
 
-  const baseFilteredRecords = useMemo(() => {
-    const startFrom = dateBoundary(startDateFrom, 'start')
-    const startTo = dateBoundary(startDateTo, 'end')
-
-    return records.filter((record) => {
-      const term = search.trim().toLowerCase()
-      const matchesSearch =
-        !term ||
-        [record.vehicle_plate, getRecordOrganizationName(record), record.driver_name, record.driver_matricula, record.driver_document, record.driver_contact, record.observation]
-          .filter(Boolean)
-          .some((value) => value.toLowerCase().includes(term))
-      const recordOrganizationId = getRecordOrganizationId(record)
-      const matchesOrganization =
-        !organizationFilter ||
-        (organizationFilter === unassignedOrganizationFilter ? !recordOrganizationId : recordOrganizationId === organizationFilter)
-      let matchesStartDate = true
-
-      if (startFrom || startTo) {
-        const recordStartDate = new Date(record.start_date)
-        matchesStartDate =
-          !Number.isNaN(recordStartDate.getTime()) &&
-          (!startFrom || recordStartDate >= startFrom) &&
-          (!startTo || recordStartDate <= startTo)
-      }
-
-      return matchesSearch && matchesOrganization && matchesStartDate
-    })
-  }, [organizationFilter, records, search, startDateFrom, startDateTo, vehicles])
-
   const focusedRecord = focusRecordId ? records.find((record) => record.id === focusRecordId) || null : null
-  const filteredRecords = focusedRecord ? [focusedRecord] : baseFilteredRecords
   const reportInitialFilters = useMemo(() => ({
     date_from: startDateFrom ? `${startDateFrom}T00:00` : '',
     date_to: startDateTo ? `${startDateTo}T23:59` : '',
@@ -306,8 +290,8 @@ export default function PossessionPage() {
     possession_status: viewFilter === 'ATIVAS' ? 'ACTIVE' : viewFilter === 'ENCERRADAS' ? 'CLOSED' : '',
     search: search.trim(),
   }), [organizationFilter, search, startDateFrom, startDateTo, vehicleFilter, viewFilter])
-  const totalPages = Math.max(1, Math.ceil(filteredRecords.length / 10))
-  const paginatedRecords = focusedRecord ? filteredRecords : filteredRecords.slice((currentPage - 1) * 10, currentPage * 10)
+  const totalPages = pagination.pages
+  const paginatedRecords = records
   const activePageRecordIds = paginatedRecords.filter((record) => record.is_active).map((record) => record.id).join('|')
 
   async function loadOpenTripState(record, signal) {
@@ -359,7 +343,7 @@ export default function PossessionPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, organizationFilter, vehicleFilter, startDateFrom, startDateTo, viewFilter, focusRecordId, records.length])
+  }, [search, organizationFilter, vehicleFilter, startDateFrom, startDateTo, viewFilter, focusRecordId])
 
   function patchSearchParams(updates) {
     const next = new URLSearchParams(searchParams)
@@ -799,7 +783,7 @@ export default function PossessionPage() {
     ]
   }
 
-  const activeCount = filteredRecords.filter((item) => item.is_active).length
+  const activeCount = summary.active
 
   const tourSteps = useMemo(() => ([
     {
@@ -925,7 +909,7 @@ export default function PossessionPage() {
 
       <div className="panel-metrics">
         <div className="metric-inline">
-          <strong>{filteredRecords.length}</strong>
+          <strong>{summary.total}</strong>
           <span>registros exibidos</span>
         </div>
         <div className="metric-inline">
@@ -970,7 +954,7 @@ export default function PossessionPage() {
                 <tr>
                   <td colSpan={10} className="muted">Carregando posses...</td>
                 </tr>
-              ) : filteredRecords.length === 0 ? (
+              ) : pagination.total === 0 ? (
                 <tr>
                   <td colSpan={10}>
                     <div className="empty-state">Nenhum registro de posse encontrado para os filtros atuais.</div>

@@ -12,6 +12,7 @@ from app.schemas.data_import import (
     DataImportApplyOut,
     DataImportBatchDetailOut,
     DataImportBatchOut,
+    DataImportBatchListResponse,
     DataImportRowListResponse,
     DataImportRowOut,
     DataImportRowUpdate,
@@ -19,6 +20,16 @@ from app.schemas.data_import import (
 from app.services.data_import_service import DataImportService
 
 router = APIRouter(prefix="/api/data-imports", tags=["DataImports"])
+
+
+@router.get("/paginated", response_model=DataImportBatchListResponse)
+async def list_data_import_batches_paginated(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=10, ge=1, le=100),
+    db: AsyncSession = Depends(get_db_session),
+    _current_user: User = Depends(require_permission("data_imports", "view")),
+):
+    return await DataImportService(db).list_batches_paginated(page=page, limit=limit)
 
 
 @router.post("/upload", response_model=DataImportBatchDetailOut)

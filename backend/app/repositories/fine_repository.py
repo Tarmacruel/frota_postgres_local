@@ -105,6 +105,23 @@ class FineRepository:
         stmt = stmt.order_by(FineInfraction.is_provisional.asc(), FineInfraction.code.asc(), FineInfraction.desdobramento.asc()).limit(limit)
         return list((await self.db.execute(stmt)).scalars().all())
 
+    async def list_infractions_paginated(self, *, page: int, limit: int,
+                                        search: str | None = None, active_only: bool = False):
+        stmt = select(FineInfraction)
+        if active_only:
+            stmt = stmt.where(FineInfraction.is_active.is_(True))
+        if search and search.strip():
+            term = f"%{search.strip()}%"
+            stmt = stmt.where(or_(FineInfraction.code.ilike(term), FineInfraction.desdobramento.ilike(term),
+                                  FineInfraction.description.ilike(term), FineInfraction.ctb_article.ilike(term),
+                                  FineInfraction.normalized_description.ilike(term),
+                                  FineInfraction.severity.ilike(term), FineInfraction.source.ilike(term)))
+        total = (await self.db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
+        rows = await self.db.execute(stmt.order_by(FineInfraction.is_provisional.asc(),
+                                                   FineInfraction.code.asc(), FineInfraction.desdobramento.asc(),
+                                                   FineInfraction.id.asc()).offset((page - 1) * limit).limit(limit))
+        return list(rows.scalars().all()), total
+
     async def get_infraction_by_id(self, infraction_id: UUID) -> FineInfraction | None:
         return (await self.db.execute(select(FineInfraction).where(FineInfraction.id == infraction_id))).scalar_one_or_none()
 

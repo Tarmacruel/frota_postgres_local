@@ -239,6 +239,11 @@ async def list_possession_paginated(
     driver_id: UUID | None = Query(default=None),
     active: bool | None = Query(default=None),
     search: str | None = Query(default=None),
+    filter_organization_id: UUID | None = Query(default=None),
+    unassigned: bool = Query(default=False),
+    start_from: datetime | None = Query(default=None),
+    start_to: datetime | None = Query(default=None),
+    focus_id: UUID | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("possession", "view")),
 ):
@@ -249,6 +254,11 @@ async def list_possession_paginated(
         active=active,
         driver_id=driver_id,
         search=search,
+        filter_organization_id=filter_organization_id,
+        unassigned=unassigned,
+        start_from=start_from,
+        start_to=start_to,
+        focus_id=focus_id,
         current_user=current_user,
     )
 

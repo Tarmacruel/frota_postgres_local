@@ -1,6 +1,6 @@
 import { formatPrimeCardNumber } from '../utils/primeCard'
 import JustificationField from '../components/JustificationField'
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import AccordionSection from '../components/AccordionSection'
 import BadgeOwnership from '../components/BadgeOwnership'
@@ -9,7 +9,6 @@ import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
-import { VEHICLE_LIST_LIMIT } from '../constants/pagination'
 import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -319,6 +318,10 @@ export default function VehiclesPage() {
   const [feedback, setFeedback] = useState('')
   const [isModalOpen, setIsModalOpen] = useState(false)
   const [currentPage, setCurrentPage] = useState(1)
+  const [pagination, setPagination] = useState({ pages: 1, total: 0 })
+  const [locationLabels, setLocationLabels] = useState([])
+  const [summary, setSummary] = useState({ total: 0, own: 0, rented: 0, assigned: 0, active: 0, maintenance: 0, inactive: 0, without_driver: 0, latest_update: null })
+  const listRequest = useRef(0)
   const {
     organizations,
     allocations,
@@ -351,15 +354,12 @@ export default function VehiclesPage() {
         description: `${organization.departments.length} departamento(s)`,
       }))
       .sort((a, b) => a.label.localeCompare(b.label))
-    const hasUnassignedVehicles =
-      vehicles.some((vehicle) => !vehicle.current_location?.organization_id) || organizationFilter === unassignedOrganizationFilter
-
     return [
       { value: 'TODOS', label: 'Todas as secretarias' },
       ...baseOptions,
-      ...(hasUnassignedVehicles ? [{ value: unassignedOrganizationFilter, label: 'Sem secretaria' }] : []),
+      { value: unassignedOrganizationFilter, label: 'Sem secretaria' },
     ]
-  }, [organizationFilter, organizations, vehicles])
+  }, [organizations])
 
   const departmentOptions = (form.organization_id ? modalGetDepartmentsByOrganization(form.organization_id) : []).map((department) => ({
     value: department.id,
@@ -375,7 +375,7 @@ export default function VehiclesPage() {
   }))
 
   const locationOptions = useMemo(() => {
-    const unique = new Map()
+    const unique = new Map(locationLabels.map((label) => [label, { value: label, label }]))
 
     allocations.forEach((allocation) => {
       unique.set(allocation.display_name, {
@@ -384,17 +384,12 @@ export default function VehiclesPage() {
       })
     })
 
-    vehicles
-      .map((vehicle) => buildVehicleLocationLabel(vehicle))
-      .filter(Boolean)
-      .forEach((label) => {
-        if (!unique.has(label)) {
-          unique.set(label, { value: label, label })
-        }
-      })
-
     return [{ value: 'TODOS', label: 'Todas as lotações' }, ...Array.from(unique.values()).sort((a, b) => a.label.localeCompare(b.label))]
-  }, [allocations, vehicles])
+  }, [allocations, locationLabels])
+
+  useEffect(() => {
+    api.get('/vehicles/locations').then(({ data }) => setLocationLabels(data)).catch(() => {})
+  }, [])
 
   const xlsxExportColumns = [
     { header: 'Placa', value: (vehicle) => formatPlate(vehicle.plate), align: 'center', width: 66 },
@@ -419,36 +414,68 @@ export default function VehiclesPage() {
     { header: 'Atualizado', value: (vehicle) => formatDate(vehicle.updated_at), align: 'center', width: 82 },
   ]
 
-  async function loadVehicles() {
+  function buildListParams(page = currentPage, focusedId = focusVehicleId) {
+    return {
+      page,
+      limit: 10,
+      status: statusFilter !== 'TODOS' && !focusedId ? statusFilter : undefined,
+      ownership_type: ownershipFilter !== 'TODOS' && !focusedId ? ownershipFilter : undefined,
+      search: search.trim() && !focusedId ? search.trim() : undefined,
+      filter_organization_id: organizationFilter !== 'TODOS' && organizationFilter !== unassignedOrganizationFilter && !focusedId ? organizationFilter : undefined,
+      unassigned: organizationFilter === unassignedOrganizationFilter && !focusedId ? true : undefined,
+      location: locationFilter !== 'TODOS' && !focusedId ? locationFilter : undefined,
+      focus_id: focusedId || undefined,
+    }
+  }
+
+  async function loadVehicles(page = currentPage) {
+    const request = ++listRequest.current
     try {
       setLoading(true)
       setError('')
-      const params = { limit: VEHICLE_LIST_LIMIT }
-      if (statusFilter !== 'TODOS') params.status = statusFilter
-      const { data } = await api.get('/vehicles', { params })
-      setVehicles(data)
+      const { data } = await api.get('/vehicles/paginated', { params: buildListParams(page) })
+      if (request !== listRequest.current) return
+      if (page > data.pagination.pages) {
+        setCurrentPage(data.pagination.pages)
+        return
+      }
+      setVehicles(data.data)
+      setPagination(data.pagination)
+      setSummary(data.summary || {
+        total: data.pagination.total,
+        own: data.data.filter((vehicle) => vehicle.ownership_type === 'PROPRIO').length,
+        rented: data.data.filter((vehicle) => vehicle.ownership_type === 'LOCADO').length,
+        assigned: data.data.filter((vehicle) => vehicle.ownership_type === 'CEDIDO').length,
+        active: data.data.filter((vehicle) => vehicle.status === 'ATIVO').length,
+        maintenance: data.data.filter((vehicle) => vehicle.status === 'MANUTENCAO').length,
+        inactive: data.data.filter((vehicle) => vehicle.status === 'INATIVO').length,
+        without_driver: data.data.filter((vehicle) => !vehicle.current_driver_name).length,
+        latest_update: null,
+      })
 
       if (selectedVehicle?.id) {
-        const updatedSelection = data.find((vehicle) => vehicle.id === selectedVehicle.id) || null
+        const updatedSelection = data.data.find((vehicle) => vehicle.id === selectedVehicle.id) || null
         setSelectedVehicle(updatedSelection)
         if (!updatedSelection) {
           setSelectedHistory([])
         }
       }
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível carregar os veículos.'))
+      if (request === listRequest.current) setError(getApiErrorMessage(err, 'Não foi possível carregar os veículos.'))
     } finally {
-      setLoading(false)
+      if (request === listRequest.current) setLoading(false)
     }
   }
 
   useEffect(() => {
-    loadVehicles()
-  }, [statusFilter])
+    listRequest.current += 1
+    const timer = setTimeout(() => loadVehicles(), search.trim() ? 250 : 0)
+    return () => clearTimeout(timer)
+  }, [currentPage, search, organizationFilter, locationFilter, ownershipFilter, statusFilter, focusVehicleId])
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, organizationFilter, locationFilter, ownershipFilter, statusFilter, selectedVehicle?.id, vehicles.length])
+  }, [search, organizationFilter, locationFilter, ownershipFilter, statusFilter, focusVehicleId])
 
   useEffect(() => {
     if (!focusVehicleId) {
@@ -466,39 +493,8 @@ export default function VehiclesPage() {
     loadHistory(focusVehicleId, { toggle: false, syncUrl: false })
   }, [focusVehicleId, vehicles])
 
-  const baseFilteredVehicles = vehicles.filter((vehicle) => {
-    const term = search.trim().toLowerCase()
-    const matchesSearch =
-      !term ||
-      [
-        vehicle.plate,
-        vehicle.chassis_number,
-        vehicle.brand,
-        vehicle.model,
-        buildVehicleOrganizationLabel(vehicle),
-        buildVehicleLocationLabel(vehicle),
-        vehicle.current_driver_name,
-        vehicle.owner_organization_name,
-        getOwnershipLabel(vehicle.ownership_type),
-      ]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term))
-
-    const vehicleOrganizationId = vehicle.current_location?.organization_id
-    const matchesOrganization =
-      organizationFilter === 'TODOS' ||
-      (organizationFilter === unassignedOrganizationFilter ? !vehicleOrganizationId : (vehicleOrganizationId === organizationFilter || vehicle.owner_organization_id === organizationFilter))
-    const matchesLocation = locationFilter === 'TODOS' || buildVehicleLocationLabel(vehicle) === locationFilter
-    const matchesOwnership = ownershipFilter === 'TODOS' || vehicle.ownership_type === ownershipFilter
-
-    return matchesSearch && matchesOrganization && matchesLocation && matchesOwnership
-  })
-
-  const filteredVehicles = selectedVehicle
-    ? vehicles.filter((vehicle) => vehicle.id === selectedVehicle.id)
-    : baseFilteredVehicles
-  const totalPages = Math.max(1, Math.ceil(filteredVehicles.length / 10))
-  const paginatedVehicles = selectedVehicle ? filteredVehicles : filteredVehicles.slice((currentPage - 1) * 10, currentPage * 10)
+  const totalPages = pagination.pages
+  const paginatedVehicles = vehicles
 
   function patchSearchParams(updates) {
     const next = new URLSearchParams(searchParams)
@@ -713,7 +709,7 @@ export default function VehiclesPage() {
   }
 
   async function handlePreviewPdf() {
-    if (filteredVehicles.length === 0) {
+    if (summary.total === 0) {
       setFeedback('Não há veículos filtrados para pré-visualizar em PDF.')
       return
     }
@@ -721,14 +717,15 @@ export default function VehiclesPage() {
     try {
       setError('')
       setFeedback('')
+      const rows = await loadAllFilteredVehicles()
       await previewRowsToPdf({
         title: 'Frota PMTF - Veículos',
         fileName: 'frota-pmtf-veículos',
         subtitle: 'Relatório dos veículos filtrados no painel operacional.',
         columns: pdfExportColumns,
-        rows: filteredVehicles,
+        rows,
         filters: buildFilterSummary(statusFilter, ownershipFilter, organizationFilter, locationFilter, search, organizationFilterOptions, locationOptions),
-        summaryMetrics: vehicleReportMetrics,
+        summaryMetrics: buildVehicleReportMetrics(rows),
         summaryChartItems: [
           { label: 'Ativos', value: visibleActiveVehicles, tone: 'green' },
           { label: 'Manutenção', value: visibleMaintenanceVehicles, tone: 'amber' },
@@ -746,7 +743,7 @@ export default function VehiclesPage() {
   }
 
   async function handleExportXlsx() {
-    if (filteredVehicles.length === 0) {
+    if (summary.total === 0) {
       setFeedback('Não há veículos filtrados para exportar.')
       return
     }
@@ -754,17 +751,43 @@ export default function VehiclesPage() {
     try {
       setError('')
       setFeedback('')
+      const rows = await loadAllFilteredVehicles()
       await exportRowsToXlsx({
         fileName: 'frota-pmtf-veículos',
         sheetName: 'Veículos',
         columns: xlsxExportColumns,
-        rows: filteredVehicles,
+        rows,
         filters: buildFilterSummary(statusFilter, ownershipFilter, organizationFilter, locationFilter, search, organizationFilterOptions, locationOptions),
       })
       setFeedback('Exportação em XLSX iniciada com sucesso.')
     } catch (err) {
       setError(getApiErrorMessage(err, 'Não foi possível exportar os veículos em XLSX.'))
     }
+  }
+
+  async function loadAllFilteredVehicles() {
+    const rows = []
+    let page = 1
+    while (true) {
+      const { data } = await api.get('/vehicles/paginated', { params: { ...buildListParams(page), limit: 100 } })
+      rows.push(...data.data)
+      if (page >= data.pagination.pages) break
+      page += 1
+    }
+    return rows
+  }
+
+  function buildVehicleReportMetrics(rows) {
+    return [
+      { label: 'Total de veículos', value: rows.length, tone: 'blue' },
+      { label: 'Ativos', value: rows.filter((vehicle) => vehicle.status === 'ATIVO').length, tone: 'green' },
+      { label: 'Em manutenção', value: rows.filter((vehicle) => vehicle.status === 'MANUTENCAO').length, tone: 'amber' },
+      { label: 'Inativos', value: rows.filter((vehicle) => vehicle.status === 'INATIVO').length, tone: 'red' },
+      { label: 'Sem condutor', value: rows.filter((vehicle) => !vehicle.current_driver_name).length, tone: 'slate' },
+      { label: 'Próprios', value: rows.filter((vehicle) => vehicle.ownership_type === 'PROPRIO').length, tone: 'green' },
+      { label: 'Locados', value: rows.filter((vehicle) => vehicle.ownership_type === 'LOCADO').length, tone: 'amber' },
+      { label: 'Cedidos', value: rows.filter((vehicle) => vehicle.ownership_type === 'CEDIDO').length, tone: 'blue' },
+    ]
   }
 
   async function handlePreviewHistoryPdf() {
@@ -819,27 +842,14 @@ export default function VehiclesPage() {
     }
   }
 
-  const visibleOwnVehicles = filteredVehicles.filter((vehicle) => vehicle.ownership_type === 'PROPRIO').length
-  const visibleRentedVehicles = filteredVehicles.filter((vehicle) => vehicle.ownership_type === 'LOCADO').length
-  const visibleAssignedVehicles = filteredVehicles.filter((vehicle) => vehicle.ownership_type === 'CEDIDO').length
-  const visibleActiveVehicles = filteredVehicles.filter((vehicle) => vehicle.status === 'ATIVO').length
-  const visibleMaintenanceVehicles = filteredVehicles.filter((vehicle) => vehicle.status === 'MANUTENCAO').length
-  const visibleInactiveVehicles = filteredVehicles.filter((vehicle) => vehicle.status === 'INATIVO').length
-  const visibleWithoutDriver = filteredVehicles.filter((vehicle) => !vehicle.current_driver_name).length
-  const latestUpdate = filteredVehicles
-    .map((vehicle) => vehicle.updated_at)
-    .filter(Boolean)
-    .sort((left, right) => new Date(right).getTime() - new Date(left).getTime())[0]
-  const vehicleReportMetrics = [
-    { label: 'Total de veículos', value: filteredVehicles.length, tone: 'blue' },
-    { label: 'Ativos', value: visibleActiveVehicles, tone: 'green' },
-    { label: 'Em manutenção', value: visibleMaintenanceVehicles, tone: 'amber' },
-    { label: 'Inativos', value: visibleInactiveVehicles, tone: 'red' },
-    { label: 'Sem condutor', value: visibleWithoutDriver, tone: 'slate' },
-    { label: 'Próprios', value: visibleOwnVehicles, tone: 'green' },
-    { label: 'Locados', value: visibleRentedVehicles, tone: 'amber' },
-    { label: 'Cedidos', value: visibleAssignedVehicles, tone: 'blue' },
-  ]
+  const visibleOwnVehicles = summary.own
+  const visibleRentedVehicles = summary.rented
+  const visibleAssignedVehicles = summary.assigned
+  const visibleActiveVehicles = summary.active
+  const visibleMaintenanceVehicles = summary.maintenance
+  const visibleInactiveVehicles = summary.inactive
+  const visibleWithoutDriver = summary.without_driver
+  const latestUpdate = summary.latest_update
 
   return (
     <div className="surface-panel operation-page operation-page--vehicles">
@@ -903,7 +913,7 @@ export default function VehiclesPage() {
 
       <div className="panel-metrics">
         <div className="metric-inline">
-          <strong>{filteredVehicles.length}</strong>
+          <strong>{summary.total}</strong>
           <span>veículos exibidos</span>
         </div>
         <div className="metric-inline">
@@ -957,7 +967,7 @@ export default function VehiclesPage() {
                 <tr>
                   <td colSpan="11" className="muted">Carregando veículos...</td>
                 </tr>
-              ) : filteredVehicles.length === 0 ? (
+              ) : pagination.total === 0 ? (
                 <tr>
                   <td colSpan="11">
                     <div className="empty-state">

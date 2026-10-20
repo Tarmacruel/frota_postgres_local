@@ -1,6 +1,6 @@
 import PageHeader from '../components/ui/PageHeader'
 import StatusChip from '../components/ui/StatusChip'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
@@ -259,6 +259,7 @@ function officialResultFields(item, entityType) {
 
 export default function DataImportsPage() {
   const [batches, setBatches] = useState([])
+  const [batchPagination, setBatchPagination] = useState({ page: 1, pages: 1, total: 0 })
   const [selectedBatch, setSelectedBatch] = useState(null)
   const [rows, setRows] = useState([])
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
@@ -282,6 +283,10 @@ export default function DataImportsPage() {
   const [editDraft, setEditDraft] = useState({ mapped: {}, official: {}, triage: {}, notes: '' })
   const [vehicleSelectItems, setVehicleSelectItems] = useState([])
   const [fineInfractionItems, setFineInfractionItems] = useState([])
+  const [vehicleOptionsLoading, setVehicleOptionsLoading] = useState(false)
+  const [infractionOptionsLoading, setInfractionOptionsLoading] = useState(false)
+  const vehicleRequestId = useRef(0)
+  const infractionRequestId = useRef(0)
   const {
     organizations,
     allocations,
@@ -321,7 +326,7 @@ export default function DataImportsPage() {
     keywords: [item.code, item.desdobramento, item.description, item.ctb_article].filter(Boolean).join(' '),
   })), [fineInfractionItems])
 
-  const selectedRowsForExport = useMemo(() => rows.map((row) => ({
+  const rowForExport = (row) => ({
     linha: row.row_number,
     status: statusLabel(row.status),
     acao: actionLabel(row.suggested_action),
@@ -330,21 +335,23 @@ export default function DataImportsPage() {
     extras: safeJson(row.official_extra_data),
     conflitos: (row.conflicts || []).join('; '),
     erros: (row.validation_errors || []).join('; '),
-  })), [rows])
+  })
 
   const officialSearchTotal = officialSearchResults.vehicles.length + officialSearchResults.drivers.length
   const canSearchVehicles = searchType === 'ALL' || searchType === 'VEHICLE'
   const canSearchDrivers = searchType === 'ALL' || searchType === 'DRIVER'
   const canSearchSelectedBatch = selectedBatch && (searchType === 'ALL' || selectedBatch.entity_type === searchType)
 
-  async function loadBatches(selectId = selectedBatch?.id) {
+  async function loadBatches(selectId = selectedBatch?.id, page = batchPagination.page) {
     try {
       setLoading(true)
       setError('')
-      const { data } = await dataImportsAPI.list()
-      setBatches(data)
-      const nextSelected = data.find((batch) => batch.id === selectId) || data[0] || null
+      const { data } = await dataImportsAPI.listPaginated({ page, limit: 10 })
+      setBatches(data.data || [])
+      setBatchPagination(data.pagination)
+      const nextSelected = data.data.find((batch) => batch.id === selectId) || data.data[0] || null
       setSelectedBatch(nextSelected)
+      if (page > 1 && page > data.pagination.pages) loadBatches(null, data.pagination.pages)
     } catch (err) {
       setError(getApiErrorMessage(err, 'Não foi possível carregar os lotes de importação.'))
     } finally {
@@ -414,24 +421,33 @@ export default function DataImportsPage() {
   }
 
   useEffect(() => {
-    loadBatches()
+    loadBatches(null, 1)
   }, [])
 
-  useEffect(() => {
-    async function loadFineDraftCatalogs() {
-      try {
-        const [vehiclesResponse, infractionsResponse] = await Promise.all([
-          api.get('/vehicles', { params: { limit: 5000 } }),
-          finesAPI.listInfractions({ limit: 500, active_only: true }),
-        ])
-        setVehicleSelectItems(Array.isArray(vehiclesResponse.data) ? vehiclesResponse.data : [])
-        setFineInfractionItems(infractionsResponse.data || [])
-      } catch {
-        setVehicleSelectItems([])
-        setFineInfractionItems([])
-      }
+  const searchVehicleOptions = useCallback(async (term = '') => {
+    const currentRequest = ++vehicleRequestId.current
+    try {
+      setVehicleOptionsLoading(true)
+      const { data } = await api.get('/vehicles/paginated', { params: { page: 1, limit: 30, search: term.trim() || undefined } })
+      if (currentRequest === vehicleRequestId.current) setVehicleSelectItems(data.data || [])
+    } catch {
+      if (currentRequest === vehicleRequestId.current) setVehicleSelectItems([])
+    } finally {
+      if (currentRequest === vehicleRequestId.current) setVehicleOptionsLoading(false)
     }
-    loadFineDraftCatalogs()
+  }, [])
+
+  const searchInfractionOptions = useCallback(async (term = '') => {
+    const currentRequest = ++infractionRequestId.current
+    try {
+      setInfractionOptionsLoading(true)
+      const { data } = await finesAPI.listInfractionsPaginated({ page: 1, limit: 30, active_only: true, search: term.trim() || undefined })
+      if (currentRequest === infractionRequestId.current) setFineInfractionItems(data.data || [])
+    } catch {
+      if (currentRequest === infractionRequestId.current) setFineInfractionItems([])
+    } finally {
+      if (currentRequest === infractionRequestId.current) setInfractionOptionsLoading(false)
+    }
   }, [])
 
   useEffect(() => {
@@ -453,7 +469,7 @@ export default function DataImportsPage() {
       setUploadFile(null)
       setSelectedBatch(data)
       setFeedback('Arquivo analisado e enviado para revisão manual.')
-      await loadBatches(data.id)
+      await loadBatches(data.id, 1)
     } catch (err) {
       setError(getApiErrorMessage(err, 'Não foi possível analisar o arquivo.'))
     } finally {
@@ -541,10 +557,17 @@ export default function DataImportsPage() {
     try {
       setError('')
       setFeedback('')
-      const response = entityType === 'VEHICLE'
-        ? await api.get('/vehicles', { params: { limit: 1000 } })
-        : await api.get('/drivers', { params: { limit: 1000 } })
-      const rowsToExport = Array.isArray(response.data) ? response.data : response.data.data
+      const rowsToExport = []
+      let page = 1
+      let pages
+      do {
+        const { data } = entityType === 'VEHICLE'
+          ? await api.get('/vehicles/paginated', { params: { page, limit: 100 } })
+          : await api.get('/drivers', { params: { page, limit: 100 } })
+        rowsToExport.push(...(data.data || []))
+        pages = data.pagination?.pages || 1
+        page += 1
+      } while (page <= pages)
       const columns = entityType === 'VEHICLE'
         ? [
           { header: 'Placa', value: (item) => item.plate },
@@ -582,6 +605,16 @@ export default function DataImportsPage() {
   }
 
   async function exportVisibleRows(format) {
+    if (!selectedBatch) return
+    const reportRows = []
+    let page = 1
+    let pages
+    do {
+      const { data } = await dataImportsAPI.rows(selectedBatch.id, { page, limit: 200, status: rowStatus || undefined })
+      reportRows.push(...(data.data || []).map(rowForExport))
+      pages = data.pagination.pages
+      page += 1
+    } while (page <= pages)
     const columns = [
       { header: 'Linha', value: (item) => item.linha },
       { header: 'Status', value: (item) => item.status },
@@ -595,7 +628,7 @@ export default function DataImportsPage() {
       sheetName: 'Revisão',
       title: 'Frota PMTF - Revisão de importação',
       columns,
-      rows: selectedRowsForExport,
+      rows: reportRows,
     }
     if (format === 'pdf') {
       await previewRowsToPdf(options)
@@ -679,6 +712,7 @@ export default function DataImportsPage() {
             emptyLabel="Nenhum veículo encontrado."
             allowClear
             clearLabel="Limpar veículo"
+            remoteSearch onSearch={searchVehicleOptions} loading={vehicleOptionsLoading}
           />
         </div>
       )
@@ -697,6 +731,7 @@ export default function DataImportsPage() {
             emptyLabel="Nenhum enquadramento encontrado."
             allowClear
             clearLabel="Limpar enquadramento"
+            remoteSearch onSearch={searchInfractionOptions} loading={infractionOptionsLoading}
           />
         </div>
       )
@@ -899,7 +934,7 @@ export default function DataImportsPage() {
       <div className="metrics-grid">
         <div className="metric-card">
           <span>Lotes</span>
-          <strong>{batches.length}</strong>
+          <strong>{batchPagination.total}</strong>
         </div>
         <div className="metric-card">
           <span>Linhas no lote</span>
@@ -963,6 +998,7 @@ export default function DataImportsPage() {
               </tbody>
             </table>
           </div>
+          <Pagination currentPage={batchPagination.page} totalPages={batchPagination.pages} onPageChange={(page) => loadBatches(null, page)} />
         </section>
 
         <section className="toolbar-card data-import-panel">
@@ -1143,8 +1179,8 @@ export default function DataImportsPage() {
                 <strong>Lote revisado</strong>
                 <div className="actions-inline">
                   <button type="button" className="secondary-button" onClick={() => downloadUrl(dataImportsAPI.exportUrl(selectedBatch.id))}>CSV completo</button>
-                  <button type="button" className="secondary-button" onClick={() => exportVisibleRows('xlsx')}>XLSX visível</button>
-                  <button type="button" className="secondary-button" onClick={() => exportVisibleRows('pdf')}>PDF visível</button>
+                  <button type="button" className="secondary-button" onClick={() => exportVisibleRows('xlsx')}>XLSX filtrado</button>
+                  <button type="button" className="secondary-button" onClick={() => exportVisibleRows('pdf')}>PDF filtrado</button>
                 </div>
               </article>
               <article className="evidence-meta-card">

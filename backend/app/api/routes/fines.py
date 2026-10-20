@@ -11,12 +11,14 @@ from app.schemas.fine import (
     FineCreate,
     FineInfractionCreate,
     FineInfractionOut,
+    FineInfractionListResponse,
     FineInfractionUpdate,
     FineListResponse,
     FineOut,
     FineUpdate,
 )
 from app.services.fine_service import FineService
+from app.schemas.common import build_pagination
 
 router = APIRouter(prefix="/api/fines", tags=["Fines"])
 
@@ -41,6 +43,20 @@ async def list_fines(
         search=search,
         current_user=current_user,
     )
+
+
+@router.get("/infractions/paginated", response_model=FineInfractionListResponse)
+async def list_fine_infractions_paginated(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=12, ge=1, le=200),
+    search: str | None = Query(default=None, max_length=120),
+    active_only: bool = Query(default=False),
+    db: AsyncSession = Depends(get_db_session),
+    _current_user: User = Depends(require_permission("fines", "view")),
+):
+    rows, total = await FineService(db).list_infractions_paginated(
+        page=page, limit=limit, search=search, active_only=active_only)
+    return {"data": rows, "pagination": build_pagination(page, limit, total)}
 
 
 @router.get("/infractions", response_model=list[FineInfractionOut])

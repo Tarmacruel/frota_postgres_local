@@ -125,6 +125,13 @@ class DataImportService:
         result = await self.db.execute(select(DataImportBatch).order_by(DataImportBatch.created_at.desc()))
         return [self._serialize_batch(batch) for batch in result.scalars().all()]
 
+    async def list_batches_paginated(self, *, page: int, limit: int) -> PaginatedResponse[dict]:
+        total = (await self.db.execute(select(func.count(DataImportBatch.id)))).scalar_one()
+        result = await self.db.execute(select(DataImportBatch).order_by(DataImportBatch.created_at.desc(), DataImportBatch.id.desc())
+                                       .offset((page - 1) * limit).limit(limit))
+        return PaginatedResponse[dict](data=[self._serialize_batch(batch) for batch in result.scalars().all()],
+                                       pagination=build_pagination(page, limit, total))
+
     async def get_batch(self, batch_id: UUID) -> dict:
         batch = await self._get_batch(batch_id, with_rows=True)
         preview = list(batch.rows[:25])

@@ -25,8 +25,8 @@ from app.repositories.vehicle_repository import VehicleRepository
 from app.repositories.vehicle_loan_repository import VehicleLoanRepository
 from app.models.vehicle_loan import VehicleLoan
 from app.models.master_data import Organization
-from app.schemas.common import PaginatedResponse, build_pagination
-from app.schemas.vehicle import VehicleCreate, VehicleUpdate
+from app.schemas.common import build_pagination
+from app.schemas.vehicle import VehicleCreate, VehicleListResponse, VehicleUpdate
 
 VEHICLE_OPTIONAL_FIELDS = (
     "prime_card_number",
@@ -69,6 +69,16 @@ class VehicleService:
             items.append(self._serialize_vehicle(vehicle, active, possession, current_user=current_user))
         return await self._loan_metadata(items, current_user)
 
+    async def list_options(self, current_user: User | None = None) -> list[dict]:
+        if production_scope_is_empty(current_user):
+            return []
+        return await self.vehicles.list_options(scoped_organization_id(current_user))
+
+    async def list_location_options(self, current_user: User | None = None) -> list[str]:
+        if production_scope_is_empty(current_user):
+            return []
+        return await self.vehicles.list_location_options(scoped_organization_id(current_user))
+
     async def list_paginated(
         self,
         *,
@@ -77,20 +87,29 @@ class VehicleService:
         status_filter: VehicleStatus | None = None,
         ownership_type: VehicleOwnershipType | None = None,
         search: str | None = None,
+        filter_organization_id: UUID | None = None,
+        unassigned: bool = False,
+        location: str | None = None,
+        focus_id: UUID | None = None,
         sort: str = "created_at",
         order: str = "desc",
         current_user: User | None = None,
-    ) -> PaginatedResponse[dict]:
+    ) -> VehicleListResponse:
         if production_scope_is_empty(current_user):
-            return PaginatedResponse[dict](data=[], pagination=build_pagination(page, limit, 0))
+            return VehicleListResponse(data=[], pagination=build_pagination(page, limit, 0), summary={"total": 0, "own": 0, "rented": 0, "assigned": 0, "active": 0, "maintenance": 0, "inactive": 0, "without_driver": 0, "latest_update": None})
 
         organization_id = scoped_organization_id(current_user)
-        vehicles, total = await self.vehicles.list_paginated(
+        vehicles, total, summary = await self.vehicles.list_paginated(
             page=page,
             limit=limit,
             status=status_filter,
             ownership_type=ownership_type,
             search=search,
+            filter_organization_id=filter_organization_id,
+            unassigned=unassigned,
+            location=location,
+            focus_id=focus_id,
+            with_summary=True,
             sort=sort,
             order=order,
             organization_id=organization_id,
@@ -100,7 +119,7 @@ class VehicleService:
             active = await self.vehicles.get_active_history(vehicle.id)
             possession = await self.vehicles.get_active_possession(vehicle.id)
             items.append(self._serialize_vehicle(vehicle, active, possession, current_user=current_user))
-        return PaginatedResponse[dict](data=await self._loan_metadata(items, current_user), pagination=build_pagination(page, limit, total))
+        return VehicleListResponse(data=await self._loan_metadata(items, current_user), pagination=build_pagination(page, limit, total), summary=summary)
 
     async def get_history(
         self,

@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import datetime
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator
+from app.schemas.common import PaginatedResponse
 
 
 class FuelStationCreate(BaseModel):
@@ -54,6 +55,11 @@ class FuelStationOut(BaseModel):
     active: bool
     created_at: datetime
     updated_at: datetime
+
+
+class FuelStationListResponse(PaginatedResponse[FuelStationOut]):
+    active_count: int = 0
+    inactive_count: int = 0
 
 
 class FuelStationUserCreate(BaseModel):

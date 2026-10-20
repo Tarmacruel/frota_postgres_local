@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from uuid import UUID
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.models.fuel_station import FuelStation, FuelStationUser
@@ -19,6 +19,22 @@ class FuelStationRepository:
             stmt = stmt.where(FuelStation.active.is_(False))
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
+
+    async def list_paginated(self, *, page: int, limit: int, search: str | None = None,
+                             active_only: bool | None = None):
+        stmt = select(FuelStation)
+        if active_only is not None:
+            stmt = stmt.where(FuelStation.active.is_(active_only))
+        if search and search.strip():
+            term = f"%{search.strip()}%"
+            stmt = stmt.where(or_(FuelStation.name.ilike(term), FuelStation.cnpj.ilike(term),
+                                  FuelStation.address.ilike(term), FuelStation.phone.ilike(term)))
+        total = (await self.db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
+        rows = await self.db.execute(stmt.order_by(FuelStation.name, FuelStation.id)
+                                     .offset((page - 1) * limit).limit(limit))
+        active_count = (await self.db.execute(select(func.count()).where(FuelStation.active.is_(True)))).scalar_one()
+        inactive_count = (await self.db.execute(select(func.count()).where(FuelStation.active.is_(False)))).scalar_one()
+        return list(rows.scalars().all()), total, active_count, inactive_count
 
     async def get(self, fuel_station_id: UUID) -> FuelStation | None:
         result = await self.db.execute(select(FuelStation).where(FuelStation.id == fuel_station_id))

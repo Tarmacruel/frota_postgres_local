@@ -2,6 +2,7 @@ import api from './client'
 
 export const fuelStationsAPI = {
   list: (params) => api.get('/fuel-stations', { params }),
+  listPaginated: (params) => api.get('/fuel-stations/paginated', { params }),
   create: (data) => api.post('/fuel-stations', data),
   update: (id, data) => api.put(`/fuel-stations/${id}`, data),
   remove: (id) => api.delete(`/fuel-stations/${id}`),

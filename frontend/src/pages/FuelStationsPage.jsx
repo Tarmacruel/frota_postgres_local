@@ -1,7 +1,9 @@
 import StatusChip from '../components/ui/StatusChip'
 import PageHeader from '../components/ui/PageHeader'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Modal from '../components/Modal'
+import Pagination from '../components/Pagination'
+import SearchableSelect from '../components/SearchableSelect'
 import StationLocationPicker from '../components/StationLocationPicker'
 import { fuelStationsAPI } from '../api/fuelStations'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -47,8 +49,16 @@ export default function FuelStationsPage() {
   const canEditStation = canEdit('fuel_stations')
   const canDeleteStation = canDeleteModule('fuel_stations')
   const [stations, setStations] = useState([])
+  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
+  const [stationCounts, setStationCounts] = useState({ active: 0, inactive: 0 })
+  const stationRequestId = useRef(0)
   const [users, setUsers] = useState([])
+  const [chosenUser, setChosenUser] = useState(null)
+  const [usersLoading, setUsersLoading] = useState(false)
+  const userRequestId = useRef(0)
   const [selectedStationId, setSelectedStationId] = useState('')
+  const selectedStationIdRef = useRef('')
+  selectedStationIdRef.current = selectedStationId
   const [links, setLinks] = useState([])
   const [stationForm, setStationForm] = useState(initialStationForm)
   const [userId, setUserId] = useState('')
@@ -62,16 +72,11 @@ export default function FuelStationsPage() {
 
   const selectedStation = useMemo(() => stations.find((item) => item.id === selectedStationId), [stations, selectedStationId])
 
-  const filteredStations = useMemo(() => {
-    const term = search.trim().toLowerCase()
-    return stations.filter((station) => {
-      const matchesSearch = !term || [station.name, station.cnpj, station.address, station.phone]
-        .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(term))
-      const matchesStatus = statusFilter === 'TODOS' || (statusFilter === 'ATIVOS' ? station.active : !station.active)
-      return matchesSearch && matchesStatus
-    })
-  }, [search, stations, statusFilter])
+  const filteredStations = stations
+  const userOptions = useMemo(() => {
+    const items = chosenUser && !users.some((item) => item.id === chosenUser.id) ? [chosenUser, ...users] : users
+    return items.map((item) => ({ value: item.id, label: `${item.name} (${item.email})` }))
+  }, [users, chosenUser])
 
   const exportColumns = useMemo(() => [
     { header: 'Nome', value: (station) => station.name },
@@ -85,19 +90,36 @@ export default function FuelStationsPage() {
     { header: 'Atualizado em', value: (station) => formatDate(station.updated_at) },
   ], [])
 
-  async function loadStations({ preferredStationId = null } = {}) {
-    const { data } = await fuelStationsAPI.list()
-    setStations(data)
+  const stationParams = useCallback((page = 1, limit = 10) => (
+    { page, limit, search: search.trim() || undefined,
+      active_only: statusFilter === 'TODOS' ? undefined : statusFilter === 'ATIVOS' }
+  ), [search, statusFilter])
 
-    const currentOrPreferredId = preferredStationId || selectedStationId
-    const stillExists = currentOrPreferredId && data.some((item) => item.id === currentOrPreferredId)
-    setSelectedStationId(stillExists ? currentOrPreferredId : (data[0]?.id || ''))
-  }
+  const loadStations = useCallback(async ({ preferredStationId = null, page = 1 } = {}) => {
+    const currentRequest = ++stationRequestId.current
+    const { data } = await fuelStationsAPI.listPaginated(stationParams(page))
+    if (currentRequest !== stationRequestId.current) return
+    setStations(data.data || [])
+    setPagination(data.pagination)
+    setStationCounts({ active: data.active_count || 0, inactive: data.inactive_count || 0 })
+    const currentOrPreferredId = preferredStationId || selectedStationIdRef.current
+    const stillExists = currentOrPreferredId && data.data.some((item) => item.id === currentOrPreferredId)
+    setSelectedStationId(stillExists ? currentOrPreferredId : (data.data[0]?.id || ''))
+    if (page > 1 && page > data.pagination.pages) loadStations({ page: data.pagination.pages })
+  }, [stationParams])
 
-  async function loadUsers() {
-    const { data } = await api.get('/users', { params: { limit: 200, skip: 0 } })
-    setUsers(data)
-  }
+  const searchUsers = useCallback(async (term = '') => {
+    const currentRequest = ++userRequestId.current
+    try {
+      setUsersLoading(true)
+      const { data } = await api.get('/users/paginated', { params: { page: 1, limit: 30, search: term.trim() || undefined } })
+      if (currentRequest === userRequestId.current) setUsers(data.data || [])
+    } catch {
+      if (currentRequest === userRequestId.current) setUsers([])
+    } finally {
+      if (currentRequest === userRequestId.current) setUsersLoading(false)
+    }
+  }, [])
 
   async function loadLinks(stationId) {
     if (!stationId) {
@@ -113,7 +135,7 @@ export default function FuelStationsPage() {
       try {
         setLoading(true)
         setError('')
-        await Promise.all([loadStations(), isAdmin ? loadUsers() : Promise.resolve()])
+        await loadStations({ page: 1 })
       } catch (err) {
         setError(getApiErrorMessage(err, 'Não foi possível carregar postos e usuários.'))
       } finally {
@@ -121,7 +143,7 @@ export default function FuelStationsPage() {
       }
     }
     bootstrap()
-  }, [])
+  }, [loadStations])
 
   useEffect(() => {
     if (!isAdmin) {
@@ -189,7 +211,7 @@ export default function FuelStationsPage() {
 
       setFeedback(stationForm.id ? 'Posto atualizado com sucesso.' : 'Posto cadastrado com sucesso.')
       closeModal()
-      await loadStations({ preferredStationId: data.id })
+      await loadStations({ preferredStationId: data.id, page: 1 })
     } catch (err) {
       setError(getApiErrorMessage(err, 'Não foi possível salvar o posto.'))
     } finally {
@@ -208,7 +230,7 @@ export default function FuelStationsPage() {
       setError('')
       await fuelStationsAPI.remove(stationId)
       setFeedback('Posto removido com sucesso.')
-      await loadStations({ preferredStationId: selectedStationId === stationId ? null : selectedStationId })
+      await loadStations({ preferredStationId: selectedStationId === stationId ? null : selectedStationId, page: pagination.page })
     } catch (err) {
       setError(getApiErrorMessage(err, 'Não foi possível remover o posto.'))
     }
@@ -247,8 +269,21 @@ export default function FuelStationsPage() {
     }
   }
 
+  async function allFilteredStations() {
+    const records = []
+    let page = 1
+    let pages
+    do {
+      const { data } = await fuelStationsAPI.listPaginated(stationParams(page, 200))
+      records.push(...(data.data || []))
+      pages = data.pagination.pages
+      page += 1
+    } while (page <= pages)
+    return records
+  }
+
   async function handlePreviewPdf() {
-    if (filteredStations.length === 0) {
+    if (pagination.total === 0) {
       setFeedback('Não há postos filtrados para pré-visualizar em PDF.')
       return
     }
@@ -256,20 +291,21 @@ export default function FuelStationsPage() {
     try {
       setError('')
       setFeedback('')
+      const reportRows = await allFilteredStations()
       await previewRowsToPdf({
         title: 'Frota PMTF - Postos de combustível',
         fileName: 'frota-pmtf-postos-combustivel',
         subtitle: 'Relatório institucional dos postos credenciados no módulo de abastecimentos.',
         columns: exportColumns,
-        rows: filteredStations,
+        rows: reportRows,
         filters: [
           { label: 'Status', value: statusFilter === 'TODOS' ? 'Todos os postos' : statusFilter === 'ATIVOS' ? 'Somente ativos' : 'Somente inativos' },
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
         summaryMetrics: [
-          { label: 'Postos exibidos', value: filteredStations.length },
-          { label: 'Ativos', value: filteredStations.filter((station) => station.active).length },
-          { label: 'Inativos', value: filteredStations.filter((station) => !station.active).length },
+          { label: 'Postos exibidos', value: reportRows.length },
+          { label: 'Ativos', value: reportRows.filter((station) => station.active).length },
+          { label: 'Inativos', value: reportRows.filter((station) => !station.active).length },
         ],
       })
       setFeedback('Pré-visualização do PDF dos postos aberta em nova guia.')
@@ -279,7 +315,7 @@ export default function FuelStationsPage() {
   }
 
   async function handleExportXlsx() {
-    if (filteredStations.length === 0) {
+    if (pagination.total === 0) {
       setFeedback('Não há postos filtrados para exportar.')
       return
     }
@@ -287,11 +323,12 @@ export default function FuelStationsPage() {
     try {
       setError('')
       setFeedback('')
+      const reportRows = await allFilteredStations()
       await exportRowsToXlsx({
         fileName: 'frota-pmtf-postos-combustivel',
         sheetName: 'Postos de combustível',
         columns: exportColumns,
-        rows: filteredStations,
+        rows: reportRows,
         filters: [
           { label: 'Status', value: statusFilter === 'TODOS' ? 'Todos os postos' : statusFilter === 'ATIVOS' ? 'Somente ativos' : 'Somente inativos' },
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
@@ -339,15 +376,15 @@ export default function FuelStationsPage() {
 
       <div className="panel-metrics">
         <div className="metric-inline">
-          <strong>{filteredStations.length}</strong>
+          <strong>{pagination.total}</strong>
           <span>postos exibidos</span>
         </div>
         <div className="metric-inline">
-          <strong>{stations.filter((station) => station.active).length}</strong>
+          <strong>{stationCounts.active}</strong>
           <span>postos ativos</span>
         </div>
         <div className="metric-inline">
-          <strong>{stations.filter((station) => !station.active).length}</strong>
+          <strong>{stationCounts.inactive}</strong>
           <span>postos inativos</span>
         </div>
         {isAdmin ? <div className="metric-inline">
@@ -423,6 +460,8 @@ export default function FuelStationsPage() {
         </div>
       </div>
 
+      <Pagination currentPage={pagination.page} totalPages={pagination.pages} onPageChange={(page) => loadStations({ page })} />
+
       {isAdmin ? <div className="surface-panel panel-nested">
         <div className="panel-heading">
           <div>
@@ -431,10 +470,10 @@ export default function FuelStationsPage() {
           </div>
         </div>
         <div className="filter-inline" style={{ marginBottom: 12 }}>
-          <select className="app-input" value={userId} onChange={(event) => setUserId(event.target.value)}>
-            <option value="">Selecione um usuário</option>
-            {users.map((user) => <option key={user.id} value={user.id}>{user.name} ({user.email})</option>)}
-          </select>
+          <SearchableSelect value={userId} onChange={(value) => {
+            setUserId(value)
+            setChosenUser(users.find((item) => item.id === value) || null)
+          }} options={userOptions} placeholder="Selecione um usuário" searchPlaceholder="Buscar usuário" remoteSearch onSearch={searchUsers} loading={usersLoading} />
           {canCreateStation ? <button type="button" className="app-button" onClick={createLink} disabled={!selectedStationId || !userId}>Vincular usuário</button> : null}
         </div>
         <div className="table-wrap">

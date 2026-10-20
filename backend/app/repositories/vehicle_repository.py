@@ -2,11 +2,11 @@ from __future__ import annotations
 
 from datetime import datetime
 from uuid import UUID
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.models.location_history import LocationHistory
-from app.models.master_data import Allocation, Department
+from app.models.master_data import Allocation, Department, Organization
 from app.models.possession import VehiclePossession
 from app.repositories.vehicle_scope import vehicle_visible
 from app.models.vehicle import Vehicle, VehicleOwnershipType, VehicleStatus
@@ -21,6 +21,58 @@ class VehicleRepository:
     async def get_by_id(self, vehicle_id: UUID) -> Vehicle | None:
         result = await self.db.execute(select(Vehicle).where(Vehicle.id == vehicle_id))
         return result.scalar_one_or_none()
+
+    async def list_options(self, organization_id: UUID | None = None) -> list[dict]:
+        stmt = select(
+            Vehicle.id, Vehicle.plate, Vehicle.brand, Vehicle.model, Vehicle.chassis_number,
+            Vehicle.renavam, Vehicle.is_provisional,
+            Vehicle.ownership_type, Vehicle.owner_organization_id,
+            LocationHistory.department.label('legacy_department'),
+            Allocation.id.label('allocation_id'), Allocation.name.label('allocation_name'),
+            Department.id.label('department_id'), Department.name.label('department_name'),
+            Organization.id.label('organization_id'), Organization.name.label('organization_name'),
+            VehiclePossession.driver_name.label('current_driver_name'),
+        ).outerjoin(LocationHistory, and_(LocationHistory.vehicle_id == Vehicle.id,
+            LocationHistory.end_date.is_(None))).outerjoin(
+            Allocation, Allocation.id == LocationHistory.allocation_id
+        ).outerjoin(Department, Department.id == Allocation.department_id).outerjoin(
+            Organization, Organization.id == Department.organization_id
+        ).outerjoin(VehiclePossession, and_(VehiclePossession.vehicle_id == Vehicle.id,
+            VehiclePossession.end_date.is_(None))).order_by(Vehicle.plate)
+        if organization_id:
+            stmt = stmt.where(vehicle_visible(Vehicle.id, organization_id))
+        rows = (await self.db.execute(stmt)).mappings().all()
+        options = []
+        for row in rows:
+            location = None
+            if row['legacy_department']:
+                label = ' - '.join(part for part in (row['organization_name'], row['department_name'],
+                    row['allocation_name']) if part) if row['allocation_id'] else row['legacy_department']
+                location = {'organization_id': row['organization_id'], 'organization_name': row['organization_name'],
+                    'department_id': row['department_id'], 'allocation_id': row['allocation_id'], 'display_name': label}
+            options.append({
+                'id': row['id'], 'plate': row['plate'], 'brand': row['brand'], 'model': row['model'],
+                'chassis_number': row['chassis_number'], 'renavam': row['renavam'],
+                'is_provisional': row['is_provisional'], 'ownership_type': row['ownership_type'],
+                'current_location': location, 'current_department': location['display_name'] if location else None,
+                'current_driver_name': row['current_driver_name'],
+                'can_operate_vehicle': organization_id is None or organization_id == row['organization_id'],
+            })
+        return options
+
+    async def list_location_options(self, organization_id: UUID | None = None) -> list[str]:
+        stmt = select(LocationHistory.department, Organization.name, Department.name, Allocation.name).join(
+            Vehicle, Vehicle.id == LocationHistory.vehicle_id
+        ).outerjoin(Allocation, Allocation.id == LocationHistory.allocation_id).outerjoin(
+            Department, Department.id == Allocation.department_id
+        ).outerjoin(Organization, Organization.id == Department.organization_id).where(
+            LocationHistory.end_date.is_(None)
+        )
+        if organization_id:
+            stmt = stmt.where(vehicle_visible(Vehicle.id, organization_id))
+        rows = (await self.db.execute(stmt)).all()
+        return sorted({(' - '.join(part for part in (organization, department, allocation) if part)
+            if allocation else legacy) for legacy, organization, department, allocation in rows if legacy})
 
     async def get_by_id_for_update(self, vehicle_id: UUID) -> Vehicle | None:
         result = await self.db.execute(
@@ -60,7 +112,12 @@ class VehicleRepository:
         sort: str = "created_at",
         order: str = "desc",
         organization_id: UUID | None = None,
-    ) -> tuple[list[Vehicle], int]:
+        filter_organization_id: UUID | None = None,
+        unassigned: bool = False,
+        location: str | None = None,
+        focus_id: UUID | None = None,
+        with_summary: bool = False,
+    ) -> tuple[list[Vehicle], int] | tuple[list[Vehicle], int, dict]:
         sort_map = {
             "created_at": Vehicle.created_at,
             "updated_at": Vehicle.updated_at,
@@ -71,32 +128,78 @@ class VehicleRepository:
         sort_column = sort_map.get(sort, Vehicle.created_at)
         sort_column = sort_column.asc() if order.lower() == "asc" else sort_column.desc()
 
-        stmt = select(Vehicle)
-        count_stmt = select(func.count(Vehicle.id))
+        location_query = select(LocationHistory.id).join(
+            Allocation, Allocation.id == LocationHistory.allocation_id
+        ).join(Department, Department.id == Allocation.department_id).join(
+            Organization, Organization.id == Department.organization_id
+        ).where(LocationHistory.vehicle_id == Vehicle.id, LocationHistory.end_date.is_(None))
+        location_label = Organization.name + ' - ' + Department.name + ' - ' + Allocation.name
+        conditions = []
         if organization_id:
-            stmt = self._filter_by_active_organization(stmt, organization_id)
-            count_stmt = self._filter_by_active_organization(count_stmt, organization_id)
-        if status:
-            stmt = stmt.where(Vehicle.status == status)
-            count_stmt = count_stmt.where(Vehicle.status == status)
-        if ownership_type:
-            stmt = stmt.where(Vehicle.ownership_type == ownership_type)
-            count_stmt = count_stmt.where(Vehicle.ownership_type == ownership_type)
-        if search:
-            term = f"%{search.strip()}%"
-            filter_clause = (
-                Vehicle.plate.ilike(term)
-                | Vehicle.chassis_number.ilike(term)
-                | Vehicle.brand.ilike(term)
-                | Vehicle.model.ilike(term)
-            )
-            stmt = stmt.where(filter_clause)
-            count_stmt = count_stmt.where(filter_clause)
+            conditions.append(vehicle_visible(Vehicle.id, organization_id))
+        if focus_id:
+            conditions.append(Vehicle.id == focus_id)
+        else:
+            if status:
+                conditions.append(Vehicle.status == status)
+            if ownership_type:
+                conditions.append(Vehicle.ownership_type == ownership_type)
+            if filter_organization_id:
+                conditions.append(or_(Vehicle.owner_organization_id == filter_organization_id,
+                    location_query.where(Department.organization_id == filter_organization_id).exists()))
+            elif unassigned:
+                conditions.append(~location_query.exists())
+            if location:
+                conditions.append(or_(location_query.where(location_label == location).exists(),
+                    select(LocationHistory.id).where(LocationHistory.vehicle_id == Vehicle.id,
+                        LocationHistory.end_date.is_(None), LocationHistory.allocation_id.is_(None),
+                        LocationHistory.department == location).correlate(Vehicle).exists()))
+            if search and search.strip():
+                term = f"%{search.strip()}%"
+                search_conditions = [Vehicle.plate.ilike(term), Vehicle.chassis_number.ilike(term),
+                    Vehicle.brand.ilike(term), Vehicle.model.ilike(term),
+                    location_query.where(or_(Organization.name.ilike(term), Department.name.ilike(term),
+                        Allocation.name.ilike(term), location_label.ilike(term))).exists(),
+                    select(LocationHistory.id).where(LocationHistory.vehicle_id == Vehicle.id,
+                        LocationHistory.end_date.is_(None), LocationHistory.department.ilike(term)).correlate(Vehicle).exists(),
+                    select(Organization.id).where(Organization.id == Vehicle.owner_organization_id,
+                        Organization.name.ilike(term)).correlate(Vehicle).exists(),
+                    select(VehiclePossession.id).where(VehiclePossession.vehicle_id == Vehicle.id,
+                        VehiclePossession.end_date.is_(None), VehiclePossession.driver_name.ilike(term)).correlate(Vehicle).exists()]
+                ownership_labels = {VehicleOwnershipType.PROPRIO: 'Próprio',
+                    VehicleOwnershipType.LOCADO: 'Locado', VehicleOwnershipType.CEDIDO: 'Cedido'}
+                matching_ownership = [value for value, label in ownership_labels.items()
+                    if search.strip().lower() in label.lower()]
+                if matching_ownership:
+                    search_conditions.append(Vehicle.ownership_type.in_(matching_ownership))
+                conditions.append(or_(*search_conditions))
+
+        stmt = select(Vehicle).where(*conditions)
+        active_driver = select(VehiclePossession.id).where(
+            VehiclePossession.vehicle_id == Vehicle.id, VehiclePossession.end_date.is_(None)
+        ).correlate(Vehicle).exists()
+        summary_stmt = select(
+            func.count(Vehicle.id).label('total'),
+            func.count(Vehicle.id).filter(Vehicle.ownership_type == VehicleOwnershipType.PROPRIO).label('own'),
+            func.count(Vehicle.id).filter(Vehicle.ownership_type == VehicleOwnershipType.LOCADO).label('rented'),
+            func.count(Vehicle.id).filter(Vehicle.ownership_type == VehicleOwnershipType.CEDIDO).label('assigned'),
+            func.count(Vehicle.id).filter(Vehicle.status == VehicleStatus.ATIVO).label('active'),
+            func.count(Vehicle.id).filter(Vehicle.status == VehicleStatus.MANUTENCAO).label('maintenance'),
+            func.count(Vehicle.id).filter(Vehicle.status == VehicleStatus.INATIVO).label('inactive'),
+            func.count(Vehicle.id).filter(~active_driver).label('without_driver'),
+            func.count(Vehicle.id).filter(Vehicle.status == VehicleStatus.ATIVO, ~active_driver).label('active_without_driver'),
+            func.max(Vehicle.updated_at).label('latest_update'),
+        ).where(*conditions)
 
         stmt = stmt.order_by(sort_column).offset((page - 1) * limit).limit(limit)
-        total = int((await self.db.execute(count_stmt)).scalar_one())
+        if with_summary:
+            summary = (await self.db.execute(summary_stmt)).mappings().one()
+            total = int(summary['total'])
+        else:
+            summary = None
+            total = int((await self.db.execute(select(func.count(Vehicle.id)).where(*conditions))).scalar_one())
         items = list((await self.db.execute(stmt)).scalars().all())
-        return items, total
+        return (items, total, dict(summary)) if with_summary else (items, total)
 
     async def is_vehicle_in_organization(self, vehicle_id: UUID, organization_id: UUID) -> bool:
         stmt = (

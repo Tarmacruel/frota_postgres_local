@@ -31,7 +31,7 @@ const LEGACY_SOURCES = { fuel: ['efficiency', 'tco'], alerts: ['insights'], cost
 const NO_LEGACY_SOURCES = []
 
 export default function AdminAnalyticsDashboard() {
-  const { organizations, error: catalogError } = useMasterDataCatalog()
+  const { organizations, error: catalogError } = useMasterDataCatalog({ organizationsOnly: true })
   const [searchParams, setSearchParams] = useSearchParams()
   const requestedView = searchParams.get('view')
   const view = ANALYTICS_SECTIONS.some(([key]) => key === requestedView) ? requestedView : 'overview'

@@ -34,6 +34,9 @@ async def list_maintenance_paginated(
     end: datetime | None = Query(default=None),
     only_open: bool | None = Query(default=None),
     search: str | None = Query(default=None),
+    filter_organization_id: UUID | None = Query(default=None),
+    unassigned: bool = Query(default=False),
+    focus_id: UUID | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("maintenance", "view")),
 ):
@@ -45,6 +48,9 @@ async def list_maintenance_paginated(
         end=end,
         only_open=only_open,
         search=search,
+        filter_organization_id=filter_organization_id,
+        unassigned=unassigned,
+        focus_id=focus_id,
         current_user=current_user,
     )
 

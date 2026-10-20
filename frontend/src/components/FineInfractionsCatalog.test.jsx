@@ -4,7 +4,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FineInfractionsCatalog from './FineInfractionsCatalog'
 
 const mocks = vi.hoisted(() => ({
-  listInfractions: vi.fn(),
+  listInfractionsPaginated: vi.fn(),
   createInfraction: vi.fn(),
   updateInfraction: vi.fn(),
 }))
@@ -35,25 +35,25 @@ const infraction = {
 describe('FineInfractionsCatalog', () => {
   beforeEach(() => {
     vi.clearAllMocks()
-    mocks.listInfractions.mockResolvedValue({ data: [infraction] })
+    mocks.listInfractionsPaginated.mockResolvedValue({ data: { data: [infraction], pagination: { page: 1, pages: 1, total: 1 } } })
     mocks.createInfraction.mockResolvedValue({ data: infraction })
     mocks.updateInfraction.mockResolvedValue({ data: infraction })
   })
 
-  it('carrega todo o catálogo dentro do limite aceito pelo backend', async () => {
+  it('carrega somente a primeira página do catálogo', async () => {
     render(<FineInfractionsCatalog />)
 
     expect(await screen.findByText(infraction.description)).toBeInTheDocument()
-    expect(mocks.listInfractions).toHaveBeenCalledWith({ limit: 500, active_only: false })
+    expect(mocks.listInfractionsPaginated).toHaveBeenCalledWith({ page: 1, limit: 12, active_only: false, search: undefined })
     expect(screen.getByLabelText('Pontos')).toHaveAttribute('max', '99')
     expect(screen.queryByRole('alert')).not.toBeInTheDocument()
   })
 
   it('normaliza o cadastro e não envia o identificador interno no payload', async () => {
     const user = userEvent.setup()
-    mocks.listInfractions.mockResolvedValue({ data: [] })
+    mocks.listInfractionsPaginated.mockResolvedValue({ data: { data: [], pagination: { page: 1, pages: 1, total: 0 } } })
     render(<FineInfractionsCatalog />)
-    await waitFor(() => expect(mocks.listInfractions).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(mocks.listInfractionsPaginated).toHaveBeenCalledTimes(1))
 
     await user.type(screen.getByLabelText('Código'), ' 7455 ')
     await user.clear(screen.getByLabelText('Desdobramento'))

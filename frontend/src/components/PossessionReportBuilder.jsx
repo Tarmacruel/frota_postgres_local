@@ -1,6 +1,6 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { possessionAPI } from '../api/possession'
-import { getApiErrorMessage } from '../utils/apiError'
+import { getApiBlobErrorMessage, getApiErrorMessage } from '../utils/apiError'
 import { getHttpStatus } from '../utils/httpError'
 import DriverSelect from './DriverSelect'
 import Modal from './Modal'
@@ -210,7 +210,7 @@ export default function PossessionReportBuilder({ vehicles = EMPTY_VEHICLES, ini
       setAnnouncement('Pré-visualização PDF gerada pelo servidor e aberta em nova guia.')
     } catch (requestError) {
       previewWindow?.close()
-      handleRequestError(requestError, 'Não foi possível gerar a pré-visualização PDF.')
+      await handleRequestError(requestError, 'Não foi possível gerar a pré-visualização PDF.')
     } finally {
       setBusy('')
     }
@@ -232,7 +232,7 @@ export default function PossessionReportBuilder({ vehicles = EMPTY_VEHICLES, ini
       URL.revokeObjectURL(objectUrl)
       setAnnouncement('Exportação XLSX segura iniciada.')
     } catch (requestError) {
-      handleRequestError(requestError, 'Não foi possível exportar o relatório XLSX.')
+      await handleRequestError(requestError, 'Não foi possível exportar o relatório XLSX.')
     } finally {
       setBusy('')
     }
@@ -247,19 +247,19 @@ export default function PossessionReportBuilder({ vehicles = EMPTY_VEHICLES, ini
       setColumnKeys(response.data.column_keys)
       setAnnouncement('Preferência salva sem filtros nem dados pessoais.')
     } catch (requestError) {
-      handleRequestError(requestError, 'Não foi possível salvar a preferência.')
+      await handleRequestError(requestError, 'Não foi possível salvar a preferência.')
     } finally {
       setBusy('')
     }
   }
 
-  function handleRequestError(requestError, fallback) {
+  async function handleRequestError(requestError, fallback) {
     const httpStatus = getHttpStatus(requestError)
     if (httpStatus === 401) setError('Sua sessão expirou. Entre novamente para continuar.')
     else if (httpStatus === 403) setError('Seu perfil não autoriza esta coluna, preset ou tipo de exportação.')
     else if (httpStatus === 409) setError('A configuração mudou. Recarregue as opções antes de tentar novamente.')
-    else if (httpStatus === 422) setError('Revise o período, os filtros e a quantidade de colunas selecionadas.')
-    else setError(getApiErrorMessage(requestError, fallback))
+    else if (httpStatus === 422) setError(await getApiBlobErrorMessage(requestError, 'Revise o período, os filtros e a quantidade de colunas selecionadas.'))
+    else setError(await getApiBlobErrorMessage(requestError, fallback))
   }
 
   const actionDisabled = loading || Boolean(busy) || !metadata
@@ -279,6 +279,7 @@ export default function PossessionReportBuilder({ vehicles = EMPTY_VEHICLES, ini
         Mais opções
       </button>
       <span className="sr-status" role="status" aria-live="polite">{open ? '' : announcement}</span>
+      {!open && error ? <div className="error-banner" role="alert">{error}</div> : null}
 
       <Modal
         open={open}

@@ -1046,7 +1046,7 @@ export default function CadastrosPage() {
                 {expandedPanels.infractions ? 'Recolher' : 'Expandir'}
               </button>
             </div>
-            {expandedPanels.infractions ? <FineInfractionsCatalog /> : null}
+            {activeTab === 'infractions' && expandedPanels.infractions ? <FineInfractionsCatalog /> : null}
           </section>
         ) : null}
       </div>

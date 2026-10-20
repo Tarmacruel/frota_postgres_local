@@ -42,6 +42,10 @@ async def list_vehicles_paginated(
     status_filter: VehicleStatus | None = Query(default=None, alias="status"),
     ownership_type: VehicleOwnershipType | None = Query(default=None),
     search: str | None = Query(default=None),
+    filter_organization_id: UUID | None = Query(default=None),
+    unassigned: bool = Query(default=False),
+    location: str | None = Query(default=None),
+    focus_id: UUID | None = Query(default=None),
     sort: str = Query(default="created_at"),
     order: str = Query(default="desc"),
     db: AsyncSession = Depends(get_db_session),
@@ -53,10 +57,30 @@ async def list_vehicles_paginated(
         status_filter=status_filter,
         ownership_type=ownership_type,
         search=search,
+        filter_organization_id=filter_organization_id,
+        unassigned=unassigned,
+        location=location,
+        focus_id=focus_id,
         sort=sort,
         order=order,
         current_user=current_user,
     )
+
+
+@router.get("/options")
+async def list_vehicle_options(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("vehicles", "view")),
+):
+    return await VehicleService(db).list_options(current_user)
+
+
+@router.get("/locations", response_model=list[str])
+async def list_vehicle_locations(
+    db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_permission("vehicles", "view")),
+):
+    return await VehicleService(db).list_location_options(current_user)
 
 
 @router.get("/em-atividade", response_model=list[VehicleOut])

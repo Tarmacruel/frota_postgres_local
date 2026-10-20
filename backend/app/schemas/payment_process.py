@@ -134,6 +134,10 @@ class PaymentContractOut(BaseModel):
     updated_at: datetime
 
 
+class PaymentContractListResponse(PaginatedResponse[PaymentContractOut]):
+    pass
+
+
 class PaymentContractManagementKpi(BaseModel):
     key: str
     label: str

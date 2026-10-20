@@ -1,7 +1,8 @@
 import StatusChip from '../components/ui/StatusChip'
 import PageHeader from '../components/ui/PageHeader'
-import { useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import Modal from '../components/Modal'
+import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
@@ -38,6 +39,9 @@ function formatDate(value) {
 
 export default function UsersPage() {
   const [users, setUsers] = useState([])
+  const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
+  const [summary, setSummary] = useState({})
+  const requestId = useRef(0)
   const [form, setForm] = useState(initialForm)
   const [editingUser, setEditingUser] = useState(null)
   const [search, setSearch] = useState('')
@@ -56,25 +60,34 @@ export default function UsersPage() {
   const [permissionsForm, setPermissionsForm] = useState(() => normalizePermissions())
   const [permissionsLoading, setPermissionsLoading] = useState(false)
   const [permissionsSaving, setPermissionsSaving] = useState(false)
-  const { organizations, loading: catalogLoading, error: catalogError } = useMasterDataCatalog()
+  const { organizations, loading: catalogLoading, error: catalogError } = useMasterDataCatalog({ organizationsOnly: true })
 
   const organizationOptions = organizations.map((organization) => ({
     value: organization.id,
     label: organization.name,
   }))
 
-  const filteredUsers = useMemo(() => {
-    return users.filter((user) => {
-      const term = search.trim().toLowerCase()
-      const matchesSearch =
-        !term || [user.name, user.email, user.cpf_masked, user.organization_name, getRoleLabel(user.role)].some((value) => String(value).toLowerCase().includes(term))
-      const matchesRole = roleFilter === 'TODOS' || user.role === roleFilter
-      const matchesOrganization =
-        organizationFilter === 'TODAS' ||
-        (organizationFilter === 'SEM_SECRETARIA' ? !user.organization_id : user.organization_id === organizationFilter)
-      return matchesSearch && matchesRole && matchesOrganization
-    })
-  }, [users, search, roleFilter, organizationFilter])
+  const filteredUsers = users
+
+  const queryParams = useCallback((page = 1, limit = 10) => ({
+      page, limit, search: search.trim() || undefined,
+      role: roleFilter !== 'TODOS' ? roleFilter : undefined,
+      organization_id: !['TODAS', 'SEM_SECRETARIA'].includes(organizationFilter) ? organizationFilter : undefined,
+      without_organization: organizationFilter === 'SEM_SECRETARIA' || undefined,
+  }), [search, roleFilter, organizationFilter])
+
+  async function allFilteredUsers() {
+    const records = []
+    let page = 1
+    let pages
+    do {
+      const { data } = await api.get('/users/paginated', { params: queryParams(page, 200) })
+      records.push(...data.data)
+      pages = data.pagination.pages
+      page += 1
+    } while (page <= pages)
+    return records
+  }
 
   const exportColumns = [
     { header: 'Nome', value: (user) => user.name },
@@ -87,22 +100,27 @@ export default function UsersPage() {
     { header: 'Atualizado em', value: (user) => formatDate(user.updated_at) },
   ]
 
-  async function loadUsers() {
+  const loadUsers = useCallback(async (page = 1) => {
+    const currentRequest = ++requestId.current
     try {
       setLoading(true)
       setError('')
-      const { data } = await api.get('/users')
-      setUsers(data)
+      const { data } = await api.get('/users/paginated', { params: queryParams(page) })
+      if (currentRequest !== requestId.current) return
+      setUsers(data.data || [])
+      setPagination(data.pagination || { page, pages: 1, total: data.data?.length || 0 })
+      setSummary(data.summary || {})
+      if (page > 1 && page > (data.pagination?.pages || 1)) loadUsers(data.pagination.pages)
     } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível carregar os usuários.'))
+      if (currentRequest === requestId.current) setError(getApiErrorMessage(err, 'Não foi possível carregar os usuários.'))
     } finally {
-      setLoading(false)
+      if (currentRequest === requestId.current) setLoading(false)
     }
-  }
+  }, [queryParams])
 
   useEffect(() => {
-    loadUsers()
-  }, [])
+    loadUsers(1)
+  }, [loadUsers])
 
   function openCreateModal() {
     setCpfError('')
@@ -188,7 +206,7 @@ export default function UsersPage() {
       await api.put(`/users/${permissionsUser.id}/permissions`, { permissions: permissionsForm })
       setFeedback(`Permissões de ${permissionsUser.name} atualizadas com sucesso.`)
       closePermissionsModal()
-      await loadUsers()
+      await loadUsers(pagination.page)
     } catch (err) {
       setPermissionsError(getApiErrorMessage(err, 'Não foi possível salvar as permissões do usuário.'))
     } finally {
@@ -240,7 +258,7 @@ export default function UsersPage() {
       }
 
       closeModal()
-      await loadUsers()
+      await loadUsers(pagination.page)
     } catch (err) {
       setFormError(getApiErrorMessage(err, 'Não foi possível salvar o usuário. Tente novamente.'))
     } finally {
@@ -256,14 +274,14 @@ export default function UsersPage() {
       setFeedback('')
       await api.delete(`/users/${user.id}`)
       setFeedback('Usuário removido com sucesso.')
-      await loadUsers()
+      await loadUsers(pagination.page)
     } catch (err) {
       setError(getApiErrorMessage(err, 'Não foi possível excluir o usuário.'))
     }
   }
 
   async function handleExportPdf() {
-    if (filteredUsers.length === 0) {
+    if (pagination.total === 0) {
       setFeedback('Não há usuários filtrados para pré-visualizar.')
       return
     }
@@ -271,12 +289,13 @@ export default function UsersPage() {
     try {
       setError('')
       setFeedback('')
+      const reportRows = await allFilteredUsers()
       await previewRowsToPdf({
         title: 'Frota PMTF - Usuários',
         fileName: 'frota-pmtf-usuários',
         subtitle: 'Relatório dos perfis administrativos, de produção, posto e consulta.',
         columns: exportColumns,
-        rows: filteredUsers,
+        rows: reportRows,
         filters: [
           { label: 'Perfil', value: roleFilter === 'TODOS' ? 'Todos os perfis' : getRoleLabel(roleFilter) },
           {
@@ -298,7 +317,7 @@ export default function UsersPage() {
   }
 
   async function handleExportXlsx() {
-    if (filteredUsers.length === 0) {
+    if (pagination.total === 0) {
       setFeedback('Não há usuários filtrados para exportar.')
       return
     }
@@ -306,11 +325,12 @@ export default function UsersPage() {
     try {
       setError('')
       setFeedback('')
+      const reportRows = await allFilteredUsers()
       await exportRowsToXlsx({
         fileName: 'frota-pmtf-usuários',
         sheetName: 'Usuários',
         columns: exportColumns,
-        rows: filteredUsers,
+        rows: reportRows,
         filters: [
           { label: 'Perfil', value: roleFilter === 'TODOS' ? 'Todos os perfis' : getRoleLabel(roleFilter) },
           {
@@ -376,27 +396,27 @@ export default function UsersPage() {
 
       <div className="panel-metrics">
         <div className="metric-inline">
-          <strong>{filteredUsers.length}</strong>
+          <strong>{pagination.total}</strong>
           <span>usuários exibidos</span>
         </div>
         <div className="metric-inline">
-          <strong>{users.filter((user) => user.role === 'PRODUCAO').length}</strong>
+          <strong>{summary.PRODUCAO || 0}</strong>
           <span>perfil produção</span>
         </div>
         <div className="metric-inline">
-          <strong>{users.filter((user) => user.role === 'POSTO').length}</strong>
+          <strong>{summary.POSTO || 0}</strong>
           <span>perfil posto</span>
         </div>
         <div className="metric-inline">
-          <strong>{users.filter((user) => user.role === 'ADMIN').length}</strong>
+          <strong>{summary.ADMIN || 0}</strong>
           <span>administradores</span>
         </div>
         <div className="metric-inline">
-          <strong>{users.filter((user) => user.must_change_password).length}</strong>
+          <strong>{summary.must_change_password || 0}</strong>
           <span>trocas pendentes</span>
         </div>
         <div className="metric-inline">
-          <strong>{users.filter((user) => user.must_register_cpf).length}</strong>
+          <strong>{summary.must_register_cpf || 0}</strong>
           <span>CPFs pendentes</span>
         </div>
       </div>
@@ -470,6 +490,8 @@ export default function UsersPage() {
           </table>
         </div>
       </div>
+
+      <Pagination currentPage={pagination.page} totalPages={pagination.pages} onPageChange={loadUsers} />
 
       <Modal
         open={isModalOpen}

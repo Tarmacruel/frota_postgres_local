@@ -7,7 +7,8 @@ from app.api.deps import get_current_user_ready, require_admin, require_permissi
 from app.db.session import get_db_session
 from app.models.user import User
 from app.schemas.auth import MessageOut
-from app.schemas.user import UserCreate, UserOut, UserPermissionsOut, UserPermissionsUpdate, UserSignerOut, UserUpdate
+from app.schemas.user import UserCreate, UserOut, UserListResponse, UserPermissionsOut, UserPermissionsUpdate, UserSignerOut, UserUpdate
+from app.schemas.common import build_pagination
 from app.schemas.possession_report import PossessionReportPreferenceIn, PossessionReportPreferenceOut
 from app.services.possession_report_service import PossessionReportService
 from app.services.user_service import UserService
@@ -22,6 +23,23 @@ async def list_users(
     db: AsyncSession = Depends(get_db_session),
 ):
     return await UserService(db).list(skip=skip, limit=limit)
+
+
+@router.get("/paginated", response_model=UserListResponse, dependencies=[Depends(require_admin)])
+async def list_users_paginated(
+    page: int = Query(default=1, ge=1),
+    limit: int = Query(default=10, ge=1, le=200),
+    search: str | None = Query(default=None),
+    role: str | None = Query(default=None),
+    organization_id: UUID | None = Query(default=None),
+    without_organization: bool = Query(default=False),
+    db: AsyncSession = Depends(get_db_session),
+):
+    rows, total, summary = await UserService(db).list_paginated(
+        page=page, limit=limit, search=search, role=role,
+        organization_id=organization_id, without_organization=without_organization,
+    )
+    return {"data": rows, "pagination": build_pagination(page, limit, total), "summary": summary}
 
 
 @router.get("/signers", response_model=list[UserSignerOut])

@@ -2,11 +2,16 @@ from __future__ import annotations
 
 from datetime import datetime
 from uuid import UUID
-from sqlalchemy import and_, func, or_, select, update
+from sqlalchemy import String, and_, cast, func, or_, select, update
 from app.repositories.vehicle_scope import record_visible, responsible_to
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 from app.models.fuel_supply_order import FuelSupplyOrder, FuelSupplyOrderStatus
+from app.models.fuel_supply import FuelSupply
+from app.models.fuel_station import FuelStation
+from app.models.master_data import Organization
+from app.models.user import User
+from app.models.vehicle import Vehicle
 from app.models.location_history import LocationHistory
 from app.models.master_data import Allocation, Department
 
@@ -73,6 +78,7 @@ class FuelSupplyOrderRepository:
         due_until: datetime | None = None,
         created_from: datetime | None = None,
         created_to: datetime | None = None,
+        search: str | None = None,
     ) -> tuple[list[FuelSupplyOrder], int]:
         stmt = select(FuelSupplyOrder).options(
             joinedload(FuelSupplyOrder.vehicle),
@@ -102,6 +108,18 @@ class FuelSupplyOrderRepository:
             filters.append(FuelSupplyOrder.created_at >= created_from)
         if created_to:
             filters.append(FuelSupplyOrder.created_at <= created_to)
+        if search and search.strip():
+            term = f"%{search.strip()}%"
+            number_term = f"{search.strip()[3:]}%" if search.strip().upper().startswith('AB-') else term
+            filters.append(or_(
+                cast(FuelSupplyOrder.id, String).ilike(number_term),
+                FuelSupplyOrder.notes.ilike(term),
+                FuelSupplyOrder.vehicle.has(Vehicle.plate.ilike(term)),
+                FuelSupplyOrder.organization.has(Organization.name.ilike(term)),
+                FuelSupplyOrder.fuel_station_ref.has(or_(FuelStation.name.ilike(term), FuelStation.phone.ilike(term))),
+                FuelSupplyOrder.creator.has(User.name.ilike(term)),
+                FuelSupplyOrder.supply.has(cast(FuelSupply.fuel_type, String).ilike(term)),
+            ))
 
         if filters:
             clause = and_(*filters)

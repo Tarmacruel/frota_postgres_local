@@ -25,7 +25,7 @@ from app.repositories.possession_repository import PossessionRepository
 from app.repositories.possession_trip_repository import PossessionReturnConfirmationRepository, PossessionTripRepository
 from app.repositories.vehicle_repository import VehicleRepository
 from app.schemas.common import PaginatedResponse, build_pagination
-from app.schemas.possession import PossessionAdminUpdate, PossessionCreate, PossessionPhotoCreate, PossessionUpdate
+from app.schemas.possession import PossessionAdminUpdate, PossessionCreate, PossessionListResponse, PossessionPhotoCreate, PossessionUpdate
 from app.schemas.possession_trip import TripCreate
 from app.services.admin_notification_service import AdminNotificationService
 from app.services.audit_service import AuditService
@@ -100,26 +100,38 @@ class PossessionService:
         active: bool | None = None,
         driver_id: UUID | None = None,
         search: str | None = None,
+        filter_organization_id: UUID | None = None,
+        unassigned: bool = False,
+        start_from: datetime | None = None,
+        start_to: datetime | None = None,
+        focus_id: UUID | None = None,
         current_user: User | None = None,
-    ) -> PaginatedResponse[dict]:
+    ) -> PossessionListResponse:
         if production_scope_is_empty(current_user):
-            return PaginatedResponse[dict](data=[], pagination=build_pagination(page, limit, 0))
+            return PossessionListResponse(data=[], pagination=build_pagination(page, limit, 0), summary={"total": 0, "active": 0})
 
         organization_id = scoped_organization_id(current_user)
         can_view_personal_data = self._can_view_personal_data(current_user)
-        records, total = await self.possessions.list_paginated(
+        result = await self.possessions.list_paginated(
             page=page,
             limit=limit,
             vehicle_id=vehicle_id,
             active=active,
             driver_id=driver_id if can_view_personal_data else None,
             search=search,
+            filter_organization_id=filter_organization_id,
+            unassigned=unassigned,
+            start_from=start_from,
+            start_to=start_to,
+            focus_id=focus_id,
+            with_summary=True,
             organization_id=organization_id,
             include_personal_search=can_view_personal_data,
         )
+        records, total = result[:2]
+        summary = result[2] if len(result) > 2 else {"total": total, "active": sum(record.end_date is None for record in records)}
         can_view_location = self._can_view_location(current_user)
-        return PaginatedResponse[dict](
-            data=[
+        return PossessionListResponse(data=[
                 await self._serialize_with_signatures(
                     record,
                     can_view_location=can_view_location,
@@ -128,8 +140,7 @@ class PossessionService:
                 )
                 for record in records
             ],
-            pagination=build_pagination(page, limit, total),
-        )
+            pagination=build_pagination(page, limit, total), summary=summary)
 
     async def list_active(self, current_user: User | None = None) -> list[dict]:
         return await self.list(active=True, current_user=current_user)

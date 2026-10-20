@@ -101,7 +101,7 @@ async def test_list_serializes_eager_loaded_vehicle():
 async def test_paginated_list_keeps_production_organization_scope():
     service, _db = _service()
     organization_id = uuid4()
-    service.records.list_paginated = AsyncMock(return_value=([], 0))
+    service.records.list_paginated = AsyncMock(return_value=([], 0, {"total": 0, "open": 0, "closed": 0}))
 
     result = await service.list_paginated(
         page=1,
