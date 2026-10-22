@@ -20,6 +20,7 @@ from sqlalchemy.ext.asyncio import AsyncSession, create_async_engine
 from app.core.config import settings
 from app.db.base import Base
 from app.models import Organization, User, UserRole, Vehicle
+from app.models.audit_log import AuditLog
 from app.models.contract_balance import ContractControl, ContractMovement, ContractReservation, MaintenanceOrder
 from app.models.fuel_station import FuelStation
 from app.models.fuel_supply_order import FuelSupplyOrder
@@ -209,6 +210,76 @@ async def test_confirmation_and_rectification_adjust_only_the_real_amount(pg, tm
         fuel_type='DIESEL S10', reason='Valor corrigido conforme comprovante do teste'), c.actor)
     assert (await c.service.balances(c.contract.id))['available_balance'] == 74
     assert (await c.service.balances(c.contract.id))['reserved_amount'] == 0
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('actual_fuel,actual_liters,actual_amount,changed', [
+    ('Etanol', 9, '45.00', True),
+    ('Gasolina aditivada', 11, '75.90', True),
+    ('Etanol', 18, '124.20', True),
+    ('gasolina  comum', 10, '61.00', False),
+])
+async def test_confirmation_records_actual_fuel_without_repricing_or_double_debit(
+        pg, tmp_path, monkeypatch, actual_fuel, actual_liters, actual_amount, changed):
+    from PIL import Image
+    from httpx import ASGITransport, AsyncClient
+    from app.main import app
+    from app.api.deps import get_current_user_ready
+    from app.db.session import get_db_session
+    c = pg
+    monkeypatch.setattr(settings, 'STORAGE_DIR', tmp_path)
+    price = await c.service.add_price(c.contract.id, PriceCreate(provider_id=c.provider.id,
+        fuel_type='GASOLINA COMUM', unit_price=Decimal('6.10'),
+        valid_from=datetime.now(timezone.utc)-timedelta(seconds=10)), c.actor)
+    data = order_payload(c, liters=10).model_copy(update={
+        'requested_fuel_type': 'GASOLINA COMUM', 'expected_price_id': price.id})
+    service = FuelSupplyOrderService(c.db)
+    order = await service.create_order(data, c.actor)
+    assert (await c.service.balances(c.contract.id))['available_balance'] == Decimal('39')
+    image = BytesIO()
+    Image.new('RGB', (2, 2), color='white').save(image, 'PNG')
+    actuals = dict(odometer_km=100, liters=actual_liters, total_amount=actual_amount,
+                  fuel_type=actual_fuel, supplied_at=datetime.now(timezone.utc).isoformat())
+    async def session():
+        yield c.db
+    app.dependency_overrides[get_db_session] = session
+    app.dependency_overrides[get_current_user_ready] = lambda: c.actor
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+            endpoint = f"/api/fuel-supply-orders/{order['id']}/confirm"
+            response = await client.post(endpoint, data=actuals, files={'receipt': ('teste.png', image.getvalue(), 'image/png')})
+            assert response.status_code == 200, response.text
+            done = response.json()
+            repeated = await client.post(endpoint, data=actuals, files={'receipt': ('teste.png', image.getvalue(), 'image/png')})
+            assert repeated.status_code == 409
+    finally:
+        app.dependency_overrides.clear()
+    assert done['requested_fuel_type'] == 'GASOLINA COMUM'
+    assert done['requested_liters'] == 10
+    assert done['supply_fuel_type'] == actual_fuel
+    assert done['supply_liters'] == actual_liters
+    assert Decimal(str(done['supply_total_amount'])) == Decimal(actual_amount)
+    balance = await c.service.balances(c.contract.id)
+    assert balance['available_balance'] == Decimal('100')-Decimal(actual_amount)
+    assert balance['reserved_amount'] == 0
+    assert balance['consumed_since_opening'] == Decimal(actual_amount)
+    assert balance['divergence_open'] == (Decimal(actual_amount) > 100)
+    reservation = await c.db.scalar(select(ContractReservation).where(ContractReservation.source_id == order['id']))
+    assert reservation.fuel_type == 'GASOLINA COMUM'
+    assert reservation.price_id == price.id and reservation.unit_price == Decimal('6.10')
+    counts = dict((await c.db.execute(select(ContractMovement.movement_type, func.count())
+        .where(ContractMovement.contract_id == c.contract.id).group_by(ContractMovement.movement_type))).all())
+    assert counts['RESERVE'] == counts['CONSUMPTION'] == 1
+    audit = await c.db.scalar(select(AuditLog).where(AuditLog.entity_id == order['id'], AuditLog.action == 'ORDER_CONFIRMED'))
+    assert audit.details['fuel_type_changed'] == changed
+    assert audit.details['requested_fuel_type'] == 'GASOLINA COMUM'
+    assert audit.details['fuel_type'] == actual_fuel
+    assert audit.details['requested_liters'] == 10 and audit.details['liters'] == actual_liters
+    assert Decimal(str(audit.details['total_amount'])) == Decimal(actual_amount)
+    if balance['divergence_open']:
+        with pytest.raises(HTTPException) as exc:
+            await service.create_order(order_payload(c), c.actor)
+        assert exc.value.status_code == 409
 
 
 @pytest.mark.asyncio

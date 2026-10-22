@@ -307,8 +307,7 @@ class FuelSupplyOrderService:
             await self._ensure_station_access(current_user=current_user, order=order)
 
         receipt_payload = await self._read_and_validate_receipt(receipt)
-        if settings.CONTRACT_BALANCE_ENABLED and fuel_key(data.fuel_type) != fuel_key(order.requested_fuel_type):
-            raise HTTPException(409, 'Combustível diferente do autorizado no pedido')
+        # The order preserves the estimate; the receipt records the fuel and amount actually supplied.
         supplied_at = data.supplied_at or now
 
         previous_supply = await self.supplies.get_latest_for_vehicle(order.vehicle_id, before_supply_at=supplied_at)
@@ -391,6 +390,11 @@ class FuelSupplyOrderService:
                     "consumption_km_l": consumption_km_l,
                     "is_consumption_anomaly": is_anomaly,
                     "fuel_type": supply.fuel_type,
+                    "requested_fuel_type": order.requested_fuel_type,
+                    "fuel_type_changed": bool(order.requested_fuel_type) and fuel_key(supply.fuel_type) != fuel_key(order.requested_fuel_type),
+                    "requested_liters": float(order.requested_liters) if order.requested_liters is not None else None,
+                    "liters": supply.liters,
+                    "total_amount": float(supply.total_amount),
                     "additive_type": supply.additive_type,
                     "additive_quantity_liters": supply.additive_quantity_liters,
                 },

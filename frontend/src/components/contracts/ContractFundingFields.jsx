@@ -20,7 +20,7 @@ export default function ContractFundingFields({ funding, externalFuelType = fals
         <label>Prestador executante<select className="app-select" aria-label="Prestador para reserva" value={funding.provider?.id || ''} onChange={(e) => funding.selectProvider(e.target.value)} required>
           <option value="">Selecione o prestador</option>{funding.providers.map((p) => <option key={p.id} value={p.id}>{p.station_name || p.name}</option>)}
         </select></label>
-        {funding.kind === 'FUEL' && !externalFuelType ? <label>Combustível autorizado<select className="app-select" aria-label="Combustível autorizado" value={funding.fuelType} onChange={(e) => funding.selectFuel(e.target.value)} required>
+        {funding.kind === 'FUEL' && !externalFuelType ? <label>Combustível solicitado<select className="app-select" aria-label="Combustível solicitado" value={funding.fuelType} onChange={(e) => funding.selectFuel(e.target.value)} required>
           <option value="">Selecione o combustível</option>{funding.fuels.map((f) => <option key={f} value={f}>{f}</option>)}
         </select></label> : null}
         {funding.loading ? <p role="status">Calculando reserva…</p> : <dl className="contract-funding__summary">

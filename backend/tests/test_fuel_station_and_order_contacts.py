@@ -371,6 +371,7 @@ def make_order():
         updated_at=now,
         supply=None,
     )
+    order.requested_fuel_type = None
     return order, station
 
 
@@ -407,6 +408,11 @@ async def test_confirm_order_links_created_supply_and_serializes_real_values(mon
     assert result["supply_fuel_type"] == "Diesel S10"
     assert result["supply_odometer_km"] == 12345
     assert result["supply_receipt_url"] == f"/api/fuel-supplies/{service.supplies.created.id}/receipt"
+    confirmation = next(row for row in service.audit.records if row['action'] == 'ORDER_CONFIRMED')
+    assert confirmation['details']['requested_fuel_type'] is None
+    assert confirmation['details']['fuel_type_changed'] is False
+    assert confirmation['details']['requested_liters'] == 40
+    assert confirmation['details']['liters'] == 38.5
 
 
 @pytest.mark.asyncio
