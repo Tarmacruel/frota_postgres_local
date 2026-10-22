@@ -21,11 +21,13 @@
   body.internal-app-active .environment-banner strong { font-size: 10px; letter-spacing: .08em; }
   body.internal-app-active .environment-banner > span { display: none; }
   body.internal-app-active .app-shell {
+    --mobile-header-top: 0px;
     display: block; min-width: 0; padding: 0; background: var(--ui-app-bg);
   }
+  body.internal-app-active .environment-banner + .app-shell { --mobile-header-top: 26px; }
   body.internal-app-active .content-shell { min-width: 0; gap: 0; }
   body.internal-app-active .app-shell .app-topbar {
-    position: sticky; top: 26px; z-index: 95; display: flex; flex-direction: row;
+    position: sticky; top: var(--mobile-header-top); z-index: 95; display: flex; flex-direction: row;
     min-height: 60px; padding: 8px 12px; gap: 8px; border-width: 0 0 1px;
     border-radius: 0; box-shadow: none; align-items: center; flex-wrap: nowrap;
   }
@@ -60,7 +62,7 @@
     min-width: 0; overflow: visible;
   }
   body.internal-app-active .app-shell .app-sidebar {
-    top: 26px; bottom: 0; left: 0; width: min(328px, calc(100vw - 40px)); max-height: none;
+    top: var(--mobile-header-top); bottom: 0; left: 0; width: min(328px, calc(100vw - 40px)); max-height: none;
     padding: 16px 12px calc(14px + env(safe-area-inset-bottom, 0px)); border-radius: 0 20px 20px 0;
   }
   body.internal-app-active .app-sidebar .nav-link { min-height: 48px; padding: 10px 12px; font-size: 14px; }
