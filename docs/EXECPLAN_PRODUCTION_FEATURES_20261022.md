@@ -30,7 +30,9 @@ Conferir sessão de produção, tour, catálogo/paleta, CNH e navegação mobile
 Backend pytest no diretório backend; frontend vitest completo, lint e build. CI obrigatório e smoke com migrations em PostgreSQL descartável. Resultado e logs serão registrados no backup e no relatório de publicação.
 
 ## Resultado
-Preparação em andamento. Nenhuma alteração operacional em produção nesta etapa inicial.
+Publicação inicial concluída pelo PR #71, merge `8158a24`, após os três checks obrigatórios. Gates locais: 672 testes backend aprovados/109 ignorados, 371 frontend, lint 0 erros/40 avisos existentes, build de produção concluído. Ativação entre 07:39:22 e 07:39:44 de 22/10/2026. Schema 0055; fingerprints de todas as 57 tabelas existentes idênticos durante a migração. Novas tabelas vazias, sem fixtures da homologação. Configurações preservadas, watchdog Ready, nove assets públicos com hashes idênticos, produção e homologação saudáveis e endpoints protegidos com 401 anônimo. Fotos históricas servidas e endpoints de consulta/CNH/tour conferidos em transação somente leitura.
+
+Na QA visual de produção, o tour apareceu automaticamente e a paleta exibiu 12 opções com prévia. Foi identificado um ajuste necessário no CSS mobile: top fixo de 26px reservava a faixa de homologação mesmo quando ausente em produção, sobrepondo parcialmente o título. Corrigir somente o deslocamento da barra e do menu: 0px por padrão e 26px quando a faixa estiver presente. Aplicar primeiro em homologação, conferir nos dois ambientes e publicar por PR separado com checks. Sem alteração de backend ou nova migração.
 
 ## Pendências / decisões
 Autorização de produção recebida. Apenas migrations aditivas 0054/0055; número da CNH já faz parte do banco existente. O tour será apresentado aos usuários que ainda não o concluíram. Não reiniciar PostgreSQL, Cloudflare nem homologação.
