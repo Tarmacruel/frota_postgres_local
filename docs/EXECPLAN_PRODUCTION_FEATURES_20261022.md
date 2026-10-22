@@ -34,6 +34,8 @@ Publicação inicial concluída pelo PR #71, merge `8158a24`, após os três che
 
 Na QA visual de produção, o tour apareceu automaticamente e a paleta exibiu 12 opções com prévia. Foi identificado um ajuste necessário no CSS mobile: top fixo de 26px reservava a faixa de homologação mesmo quando ausente em produção, sobrepondo parcialmente o título. Corrigir somente o deslocamento da barra e do menu: 0px por padrão e 26px quando a faixa estiver presente. Aplicar primeiro em homologação, conferir nos dois ambientes e publicar por PR separado com checks. Sem alteração de backend ou nova migração.
 
+Correção concluída pelo PR #72, merge `da64c60`, com os três checks aprovados. Publicação do frontend entre 07:45:53 e 07:45:54, sem reiniciar API. Conferência real: produção sem faixa com top 0px, cabeçalho terminando em 60,9px e título iniciando em 76,9px; homologação com faixa e cabeçalho em 26px. Nove assets finais verificados. CNH em criação, aviso na posse, link em nova aba, foco no campo Número da CNH e preservação do rascunho conferidos em produção sem salvar operações ou cadastros. Tema claro/escuro e navegação mobile conferidos. Apenas a confirmação do tour da conta de QA foi gravada. [Relatório final](PRODUCTION_FEATURES_RELEASE_20261022.md).
+
 ## Pendências / decisões
 Autorização de produção recebida. Apenas migrations aditivas 0054/0055; número da CNH já faz parte do banco existente. O tour será apresentado aos usuários que ainda não o concluíram. Não reiniciar PostgreSQL, Cloudflare nem homologação.
 
