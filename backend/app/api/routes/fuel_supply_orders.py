@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import IndicatorRequest, indicator_context
+
 from datetime import datetime
 from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, Query, UploadFile, status
@@ -84,10 +86,11 @@ async def list_fuel_supply_orders(
     created_from: datetime | None = Query(default=None),
     created_to: datetime | None = Query(default=None),
     search: str | None = Query(default=None),
+    kpis: IndicatorRequest = Depends(indicator_context('fuel_orders')),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("fuel_supply_orders", "view")),
 ):
-    return await FuelSupplyOrderService(db).list(
+    return kpis.attach(await FuelSupplyOrderService(db).list(
         page=page,
         limit=limit,
         current_user=current_user,
@@ -99,7 +102,7 @@ async def list_fuel_supply_orders(
         created_from=created_from,
         created_to=created_to,
         search=search,
-    )
+    ))
 
 
 @router.get("/{order_id}", response_model=FuelSupplyOrderOut)

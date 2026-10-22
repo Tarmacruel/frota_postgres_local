@@ -1,3 +1,5 @@
+import IndicatorBar from '../components/ui/IndicatorBar'
+import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
@@ -41,6 +43,9 @@ function buildVehicleOption(vehicle) {
 }
 
 export default function MaintenancePage() {
+  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
+  useEffect(() => { setCurrentPage(1) }, [indicator])
+
   const { canCreate, canEdit, canDeleteModule, isAdmin } = useAuth()
   const canCreateMaintenance = canCreate('maintenance')
   const canEditMaintenance = canEdit('maintenance')
@@ -102,7 +107,7 @@ export default function MaintenancePage() {
 
   function buildListParams(page = currentPage) {
     const focused = Boolean(focusRecordId)
-    return {
+    return { indicator: indicator === 'total' ? undefined : indicator,
       page,
       limit: 10,
       vehicle_id: focused ? undefined : vehicleFilter || undefined,
@@ -128,7 +133,7 @@ export default function MaintenancePage() {
         return
       }
       setRecords(data.data || [])
-      setPagination(data.pagination)
+      setPagination(data.pagination); setIndicators(data.indicators || null)
       setSummary(data.summary || { total: data.pagination.total, open: 0, closed: 0 })
     } catch (err) {
       if (request === listRequest.current) setError(getApiErrorMessage(err, 'Não foi possível carregar as manutenções.'))
@@ -146,13 +151,13 @@ export default function MaintenancePage() {
       }
     }
     loadPage()
-  }, [])
+  }, [indicator])
 
   useEffect(() => {
     listRequest.current += 1
     const timer = setTimeout(() => loadRecords(), search.trim() ? 250 : 0)
     return () => clearTimeout(timer)
-  }, [currentPage, vehicleFilter, startFilter, endFilter, search, statusFilter, organizationFilter, focusRecordId])
+  }, [currentPage, vehicleFilter, startFilter, endFilter, search, statusFilter, organizationFilter, focusRecordId, indicator])
 
   useEffect(() => {
     if (!focusRecordId) return
@@ -169,7 +174,7 @@ export default function MaintenancePage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, organizationFilter, statusFilter, vehicleFilter, startFilter, endFilter, focusRecordId])
+  }, [search, organizationFilter, statusFilter, vehicleFilter, startFilter, endFilter, focusRecordId, indicator])
 
   function buildFilterSummary() {
     return [
@@ -280,8 +285,6 @@ export default function MaintenancePage() {
     }
   }
 
-  const openCount = summary.open
-  const closedCount = summary.closed
 
   return (
     <div className="surface-panel operation-page operation-page--maintenance">
@@ -344,20 +347,7 @@ export default function MaintenancePage() {
         </div>
       </div>
 
-      <div className="panel-metrics">
-        <div className="metric-inline">
-          <strong>{summary.total}</strong>
-          <span>registros exibidos</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{openCount}</strong>
-          <span>em andamento</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{closedCount}</strong>
-          <span>concluídas</span>
-        </div>
-      </div>
+      <IndicatorBar state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={loading} error={error} resultCount={pagination.total} />
 
       {focusedRecord ? (
         <div className="table-focus-banner">

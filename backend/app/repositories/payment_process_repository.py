@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import populate_indicators, filter_indicator
+
 from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
@@ -101,6 +103,8 @@ class PaymentProcessRepository:
             stmt = stmt.where(clause)
             count_stmt = count_stmt.where(clause)
 
+        stmt = await populate_indicators(self.db, 'payments', stmt)
+        count_stmt = filter_indicator(self.db, 'payments', count_stmt)
         stmt = (
             stmt.order_by(PaymentProcess.due_date.asc().nullslast(), PaymentProcess.issue_date.desc().nullslast(), PaymentProcess.created_at.desc())
             .offset((page - 1) * limit)
@@ -143,6 +147,7 @@ class PaymentProcessRepository:
         )
         if filters:
             stmt = stmt.where(and_(*filters))
+        stmt = filter_indicator(self.db, 'payments', stmt)
         stmt = stmt.order_by(PaymentProcess.due_date.asc().nullslast(), PaymentProcess.issue_date.desc().nullslast(), PaymentProcess.created_at.desc()).limit(limit)
         return list((await self.db.execute(stmt)).scalars().unique().all())
 

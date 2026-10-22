@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import AuditPage from './AuditPage'
@@ -22,7 +23,7 @@ it('exporta todas as páginas da auditoria com o filtro aplicado', async () => {
     pagination: { page: params.page, pages: params.limit === 200 ? 2 : 1, total: 2 },
     deleted: 2,
   } }))
-  render(<AuditPage />)
+  render(<MemoryRouter><AuditPage /></MemoryRouter>)
   fireEvent.change(screen.getAllByRole('combobox')[1], { target: { value: 'DELETE' } })
   await screen.findByText('Pessoa A')
   fireEvent.click(screen.getByRole('button', { name: 'Exportar XLSX' }))
@@ -32,7 +33,7 @@ it('exporta todas as páginas da auditoria com o filtro aplicado', async () => {
 
 it('mostra a falha de requisição na listagem', async () => {
   api.get.mockRejectedValue(new Error('Falha simulada de rede'))
-  render(<AuditPage />)
+  render(<MemoryRouter><AuditPage /></MemoryRouter>)
   expect(await screen.findByText('Falha simulada de rede')).toBeInTheDocument()
   expect(screen.getByText('Nenhum evento de auditoria encontrado para os filtros atuais.')).toBeInTheDocument()
 })

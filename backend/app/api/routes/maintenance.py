@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import IndicatorRequest, indicator_context
+
 from datetime import datetime
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query
@@ -37,10 +39,11 @@ async def list_maintenance_paginated(
     filter_organization_id: UUID | None = Query(default=None),
     unassigned: bool = Query(default=False),
     focus_id: UUID | None = Query(default=None),
+    kpis: IndicatorRequest = Depends(indicator_context('maintenance')),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("maintenance", "view")),
 ):
-    return await MaintenanceService(db).list_paginated(
+    return kpis.attach(await MaintenanceService(db).list_paginated(
         page=page,
         limit=limit,
         vehicle_id=vehicle_id,
@@ -52,7 +55,7 @@ async def list_maintenance_paginated(
         unassigned=unassigned,
         focus_id=focus_id,
         current_user=current_user,
-    )
+    ))
 
 
 @router.get("/{record_id}", response_model=MaintenanceOut)

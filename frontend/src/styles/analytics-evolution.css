@@ -1,4 +1,10 @@
 /* Analytics: shared tokens, V1 foundation and V2 overview. */
+.analytics-kpi-primary { display: flex; flex-direction: column; align-items: flex-start; gap: 6px; width: 100%; border: 0; border-radius: var(--ui-radius-control); padding: 8px; background: transparent; color: var(--ui-text); text-align: left; font: inherit; cursor: pointer; }
+.analytics-kpi-primary small { color: var(--ui-text-muted); font-size: 11px; }
+.analytics-kpi-primary:hover { background: var(--ui-surface-subtle); }
+.analytics-kpi-primary:focus-visible, .analytics-kpi-interactive:focus-visible { outline: 3px solid var(--ui-primary); outline-offset: 3px; }
+.analytics-kpi-interactive { width: 100%; text-align: left; font: inherit; border: 0; border-left: 3px solid var(--ui-info); cursor: pointer; }
+.analytics-kpi-interactive:hover { background: var(--ui-info-soft, var(--ui-surface)); }
 .analytics-cockpit { display: grid; gap: var(--ui-space-4); }
 .analytics-cockpit .analytics-chart { overflow: hidden; }
 .analytics-cockpit-filters { display: grid; grid-template-columns: repeat(2, minmax(125px, .8fr)) repeat(2, minmax(160px, 1.2fr)) auto auto; align-items: end; gap: var(--ui-space-2); }

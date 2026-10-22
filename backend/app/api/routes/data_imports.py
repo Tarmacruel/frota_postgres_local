@@ -1,5 +1,8 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import IndicatorRequest, indicator_context
+from app.models.data_import import DataImportSuggestedAction
+
 from uuid import UUID
 from fastapi import APIRouter, Depends, File, Query, UploadFile
 from fastapi.responses import Response
@@ -26,10 +29,11 @@ router = APIRouter(prefix="/api/data-imports", tags=["DataImports"])
 async def list_data_import_batches_paginated(
     page: int = Query(default=1, ge=1),
     limit: int = Query(default=10, ge=1, le=100),
+    kpis: IndicatorRequest = Depends(indicator_context('imports')),
     db: AsyncSession = Depends(get_db_session),
     _current_user: User = Depends(require_permission("data_imports", "view")),
 ):
-    return await DataImportService(db).list_batches_paginated(page=page, limit=limit)
+    return kpis.attach(await DataImportService(db).list_batches_paginated(page=page, limit=limit))
 
 
 @router.post("/upload", response_model=DataImportBatchDetailOut)
@@ -66,6 +70,7 @@ async def list_data_import_rows(
     status_filter: DataImportRowStatus | None = Query(default=None, alias="status"),
     has_conflict: bool | None = Query(default=None),
     has_error: bool | None = Query(default=None),
+    action: DataImportSuggestedAction | None = Query(default=None),
     search: str | None = Query(default=None, min_length=1, max_length=120),
     db: AsyncSession = Depends(get_db_session),
     _current_user: User = Depends(require_permission("data_imports", "view")),
@@ -77,6 +82,7 @@ async def list_data_import_rows(
         row_status=status_filter,
         has_conflict=has_conflict,
         has_error=has_error,
+        row_action=action,
         search=search,
     )
 

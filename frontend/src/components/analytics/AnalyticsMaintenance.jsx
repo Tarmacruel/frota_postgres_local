@@ -74,13 +74,13 @@ export default function AnalyticsMaintenance({ enabled = true, organizations = [
 
     <AnalyticsSection title="Manutenções registradas" description="Custo e quantidade por data de início da intervenção." {...state}>
       <div className="analytics-costs-summary">
-        <div><span>Custo registrado</span><strong>{amountLabel(data?.cost)}</strong>
+        <div><button type="button" className="analytics-kpi-primary" onClick={() => openHistory('Custo de manutenção')}><span>Custo registrado</span><strong>{amountLabel(data?.cost)}</strong><small>Ver composição →</small></button>
           <button type="button" className="analytics-entity-link" onClick={() => openHistory('Custo de manutenção')}>Ver intervenções</button></div>
-        <div><span>Custo de manutenção por km válido</span><strong>{formatValue(data?.cost_per_km, 'BRL/km')}</strong>
+        <div><button type="button" className="analytics-kpi-primary" onClick={() => openHistory('Numerador do custo de manutenção por km', 'measured')}><span>Custo de manutenção por km válido</span><strong>{formatValue(data?.cost_per_km, 'BRL/km')}</strong><small>Ver composição →</small></button>
           <p>{formatValue(data?.measured_distance_km, 'km')} · {data?.measured_vehicles ?? '—'} veículo(s) com km válido</p>
           <button type="button" className="analytics-entity-link" onClick={() => openHistory('Numerador do custo de manutenção por km', 'measured')}>Ver numerador</button>
           <button type="button" className="analytics-entity-link" onClick={openMileage}>Ver posses do denominador</button></div>
-        <div><span>Intervenções iniciadas</span><strong>{data?.interventions ?? '—'}</strong>
+        <div><button type="button" className="analytics-kpi-primary" onClick={() => openHistory('Intervenções iniciadas')}><span>Intervenções iniciadas</span><strong>{data?.interventions ?? '—'}</strong><small>Ver composição →</small></button>
           <button type="button" className="analytics-entity-link" onClick={() => openHistory('Intervenções iniciadas')}>Ver intervenções</button></div>
       </div>
       {data?.cost.missing_or_invalid ? <p role="status" className="analytics-scope-note">{data.cost.missing_or_invalid} custo(s) ausente(s) ou inválido(s); subtotal conhecido identificado.</p> : null}

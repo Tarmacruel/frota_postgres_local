@@ -1,3 +1,4 @@
+import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import UsersPage from './UsersPage'
@@ -19,7 +20,7 @@ beforeEach(() => {
 })
 
 it('impede envio de CPF inválido e indica o campo para correção', () => {
-  render(<UsersPage />)
+  render(<MemoryRouter><UsersPage /></MemoryRouter>)
   fireEvent.click(screen.getByRole('button', { name: 'Novo usuário' }))
   fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '52998224724' } })
   fireEvent.click(screen.getByRole('button', { name: 'Criar usuário' }))
@@ -33,7 +34,7 @@ it('impede envio de CPF inválido e indica o campo para correção', () => {
 })
 
 it('mostra validação local dentro do modal e limpa ao reabrir', async () => {
-  render(<UsersPage />)
+  render(<MemoryRouter><UsersPage /></MemoryRouter>)
   fireEvent.click(screen.getByRole('button', { name: 'Novo usuário' }))
   fireEvent.click(screen.getByRole('button', { name: 'Criar usuário' }))
   expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('Informe o CPF')
@@ -49,7 +50,7 @@ it.each(['cadastro', 'edição'])('preserva os dados e mostra erro da API no mod
   const failure = { response: { data: { detail: [{ loc: ['body', 'cpf'], msg: 'Valor inválido' }], request_id: 'test-ref' } } }
   api.post.mockRejectedValue(failure)
   api.put.mockRejectedValue(failure)
-  render(<UsersPage />)
+  render(<MemoryRouter><UsersPage /></MemoryRouter>)
   if (mode === 'edição') fireEvent.click(await screen.findByRole('button', { name: 'Editar' }))
   else fireEvent.click(screen.getByRole('button', { name: 'Novo usuário' }))
   fireEvent.change(screen.getByLabelText('Nome completo'), { target: { value: 'Pessoa teste' } })
@@ -73,7 +74,7 @@ it('exporta todas as páginas do filtro, além da página exibida', async () => 
     pagination: { page: params.page, pages: params.limit === 200 ? 2 : 1, total: 2 },
     summary: { ADMIN: 2 },
   } }))
-  render(<UsersPage />)
+  render(<MemoryRouter><UsersPage /></MemoryRouter>)
   await screen.findByText('Pessoa A')
   fireEvent.click(screen.getByRole('button', { name: 'Exportar XLSX' }))
   await waitFor(() => expect(exportRowsToXlsx).toHaveBeenCalledWith(expect.objectContaining({ rows: users })))
@@ -82,7 +83,23 @@ it('exporta todas as páginas do filtro, além da página exibida', async () => 
 
 it('mostra falha de carregamento sem substituir a tabela por dados antigos', async () => {
   api.get.mockRejectedValue(new Error('Falha simulada de rede'))
-  render(<UsersPage />)
+  render(<MemoryRouter><UsersPage /></MemoryRouter>)
   expect(await screen.findByText('Falha simulada de rede')).toBeInTheDocument()
   expect(screen.getByText('Nenhum usuário encontrado para os filtros aplicados.')).toBeInTheDocument()
+})
+
+it('filtra pelo KPI na API, mantém os totais completos e permite limpar', async () => {
+  api.get.mockImplementation((_path, { params }) => Promise.resolve({ data: {
+    data: [], pagination: { page: params.page, pages: 1, total: params.indicator === 'cpf' ? 3 : 38 },
+    indicators: { population: 38, items: [{ key: 'total', label: 'Usuários', value: 38 }, { key: 'cpf', label: 'CPFs pendentes', value: 3 }] },
+  } }))
+  render(<MemoryRouter><UsersPage /></MemoryRouter>)
+  const button = await screen.findByRole('button', { name: /CPFs pendentes/ })
+  fireEvent.click(button)
+  await waitFor(() => expect(api.get).toHaveBeenLastCalledWith('/users/paginated', { params: expect.objectContaining({ page: 1, indicator: 'cpf' }) }))
+  await waitFor(() => expect(button).toBeEnabled())
+  expect(screen.getByText('38')).toBeInTheDocument()
+  expect(button).toHaveAttribute('aria-pressed', 'true')
+  fireEvent.click(screen.getByRole('button', { name: 'Limpar indicador' }))
+  await waitFor(() => expect(api.get).toHaveBeenLastCalledWith('/users/paginated', { params: expect.objectContaining({ page: 1, indicator: undefined }) }))
 })

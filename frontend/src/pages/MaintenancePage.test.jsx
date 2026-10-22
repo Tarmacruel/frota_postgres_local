@@ -85,7 +85,7 @@ it('busca todos os lotes filtrados somente ao pedir o PDF', async () => {
       ...maintenance, id: `maintenance-${page}-${index}`,
     })),
     pagination: { page, pages: Math.ceil(101 / limit), total: 101, limit },
-    summary: { total: 101, open: 101, closed: 0 },
+    summary: { total: 101, open: 101, closed: 0 }, indicators: { items: [{ key: 'total', label: 'Manutenções', value: 101 }] },
   } }))
   render(<MemoryRouter><MaintenancePage /></MemoryRouter>)
 

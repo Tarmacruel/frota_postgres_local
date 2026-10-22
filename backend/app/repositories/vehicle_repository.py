@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import active_context, populate_indicators, filter_indicator
+
 from datetime import datetime
 from uuid import UUID
 from sqlalchemy import and_, func, or_, select
@@ -197,6 +199,7 @@ class VehicleRepository:
             func.max(Vehicle.updated_at).label('latest_update'),
         ).where(*conditions)
 
+        stmt = await populate_indicators(self.db, 'vehicles', stmt)
         stmt = stmt.order_by(sort_column).offset((page - 1) * limit).limit(limit)
         if with_summary:
             summary = (await self.db.execute(summary_stmt)).mappings().one()
@@ -204,6 +207,9 @@ class VehicleRepository:
         else:
             summary = None
             total = int((await self.db.execute(select(func.count(Vehicle.id)).where(*conditions))).scalar_one())
+        context = active_context(self.db, 'vehicles')
+        if context and context.selected != 'total':
+            total = int((await self.db.execute(filter_indicator(self.db, 'vehicles', select(func.count(Vehicle.id)).where(*conditions)))).scalar_one())
         items = list((await self.db.execute(stmt)).scalars().all())
         return (items, total, dict(summary)) if with_summary else (items, total)
 

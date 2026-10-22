@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import IndicatorRequest, indicator_context
+
 from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, Query, Response, UploadFile, status
 from fastapi.exceptions import RequestValidationError
@@ -46,10 +48,11 @@ async def list_claims(
     status_filter: ClaimStatus | None = Query(default=None, alias="status"),
     tipo: ClaimType | None = Query(default=None),
     search: str | None = Query(default=None),
+    kpis: IndicatorRequest = Depends(indicator_context('claims')),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("claims", "view")),
 ):
-    return await ClaimService(db).list(
+    return kpis.attach(await ClaimService(db).list(
         page=page,
         limit=limit,
         vehicle_id=vehicle_id,
@@ -58,7 +61,7 @@ async def list_claims(
         tipo=tipo,
         search=search,
         current_user=current_user,
-    )
+    ))
 
 
 @router.post("/with-attachments", response_model=ClaimOut, status_code=status.HTTP_201_CREATED)

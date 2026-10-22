@@ -13,6 +13,8 @@ function formatDate(value) {
 
 export default function DashboardPage() {
   const { user, isAdmin, canCreate, canView, canWrite } = useAuth()
+  const canViewDrivers = canView('drivers')
+  const [driverSummary, setDriverSummary] = useState({})
   const canViewVehicles = canView('vehicles')
   const canViewMaintenance = canView('maintenance')
   const canViewPossession = canView('possession')
@@ -28,11 +30,13 @@ export default function DashboardPage() {
       try {
         setLoading(true)
         setError('')
-        const [vehiclesResponse, maintenanceResponse, possessionResponse] = await Promise.all([
+        const [vehiclesResponse, maintenanceResponse, possessionResponse, driversResponse] = await Promise.all([
           canViewVehicles ? api.get('/vehicles/paginated', { params: { page: 1, limit: 1 } }) : Promise.resolve({ data: { summary: {} } }),
           canViewMaintenance ? api.get('/maintenance/paginated', { params: { page: 1, limit: 4, only_open: true } }) : Promise.resolve({ data: { data: [], pagination: { total: 0 } } }),
           canViewPossession ? api.get('/possession/paginated', { params: { page: 1, limit: 1, active: true } }) : Promise.resolve({ data: { pagination: { total: 0 } } }),
+          canViewDrivers ? api.get('/drivers', { params: { page: 1, limit: 1, active: true } }) : Promise.resolve({ data: { summary: {} } }),
         ])
+        setDriverSummary(driversResponse.data.summary || {})
         setVehicleSummary(vehiclesResponse.data.summary || {})
         setOpenMaintenance({ data: maintenanceResponse.data.data || [], total: maintenanceResponse.data.pagination?.total || 0 })
         setActivePossessionsCount(possessionResponse.data.pagination?.total || 0)
@@ -44,7 +48,7 @@ export default function DashboardPage() {
     }
 
     load()
-  }, [canViewVehicles, canViewMaintenance, canViewPossession])
+  }, [canViewVehicles, canViewMaintenance, canViewPossession, canViewDrivers])
 
   const stats = useMemo(() => {
     return {
@@ -60,11 +64,15 @@ export default function DashboardPage() {
   }, [vehicleSummary, openMaintenance, activePossessionsCount])
 
   const metricCards = [
-    { icon: 'vehicles', tone: 'info', label: 'Veículos ativos', value: stats.ativos, note: 'Em uso ou disponíveis' },
-    { icon: 'maintenance', tone: 'warning', label: 'Em manutenção', value: stats.manutencao, note: 'Demandam retorno operacional' },
-    { icon: 'drivers', tone: 'neutral', label: 'Sem condutor', value: stats.semCondutor, note: 'Aguardando posse' },
-    { icon: 'audit', tone: 'danger', label: 'Pendências abertas', value: stats.manutencoesAbertas, note: 'Precisam de atenção' },
-  ]
+    { icon: 'vehicles', tone: 'info', to: '/vehicles?indicator=active', label: 'Veículos ativos', value: stats.ativos, note: 'Em uso ou disponíveis' },
+    { icon: 'maintenance', tone: 'warning', to: '/vehicles?indicator=maintenance', label: 'Em manutenção', value: stats.manutencao, note: 'Demandam retorno operacional' },
+    { icon: 'drivers', tone: 'neutral', to: '/vehicles?indicator=without_driver', label: 'Sem condutor', value: stats.semCondutor, note: 'Aguardando posse' },
+    { icon: 'audit', tone: 'danger', to: '/manutencoes?indicator=open', label: 'Pendências abertas', value: stats.manutencoesAbertas, note: 'Precisam de atenção' },
+    { icon: 'vehicles', tone: 'neutral', label: 'Veículos inativos', value: stats.inativos, to: '/vehicles?indicator=inactive', note: 'Consultar a situação da frota' },
+    { icon: 'drivers', tone: 'success', label: 'Posses ativas', value: stats.possesAtivas, to: '/posses?indicator=active', note: 'Veículos sob responsabilidade' },
+    { icon: 'drivers', tone: 'danger', label: 'CNHs vencidas', value: driverSummary.expired ?? 0, to: '/condutores?cnh_status=expired', note: 'Condutores ativos' },
+    { icon: 'drivers', tone: 'warning', label: 'CNHs não informadas', value: driverSummary.missing ?? 0, to: '/condutores?cnh_status=missing', note: 'Sem número ou validade · ativos' },
+  ].filter((item) => item.to.startsWith('/vehicles') ? canViewVehicles : item.to.startsWith('/condutores') ? canViewDrivers : item.to.startsWith('/posses') ? canViewPossession : canViewMaintenance)
 
   const primaryActions = [
     { icon: 'vehicles', title: 'Abrir veículos ativos', description: 'Consulte a frota pronta para operação.', to: '/vehicles?status=ATIVO', cta: 'Consultar ativos' },
@@ -110,7 +118,7 @@ export default function DashboardPage() {
       {error ? <div className="alert alert-error dashboard-alert">{error}</div> : null}
 
       <section className="dashboard-kpi-grid" aria-label="Indicadores da frota">
-        {metricCards.map((item) => <StatCard key={item.label} {...item} loading={loading} />)}
+        {metricCards.map((item) => <StatCard key={item.label} {...item} loading={loading || Boolean(error)} />)}
       </section>
 
       <section className="dashboard-section" aria-labelledby="dashboard-actions-title">
@@ -159,8 +167,8 @@ export default function DashboardPage() {
           <section className="dashboard-panel dashboard-day-panel" aria-labelledby="dashboard-day-title">
             <div className="dashboard-section__heading"><div><h2 id="dashboard-day-title">Leitura rápida do dia</h2><p>Resumo da base neste momento.</p></div></div>
             <div className="dashboard-day-metrics">
-              <div><strong>{loading ? '--' : stats.possesAtivas}</strong><span>posses ativas</span></div>
-              <div><strong>{loading ? '--' : stats.inativos}</strong><span>inativos</span></div>
+              {canViewPossession ? <Link to="/posses?indicator=active"><strong>{loading ? '--' : stats.possesAtivas}</strong><span>posses ativas →</span></Link> : null}
+              {canViewVehicles ? <Link to="/vehicles?indicator=inactive"><strong>{loading ? '--' : stats.inativos}</strong><span>inativos →</span></Link> : null}
             </div>
             <p className="dashboard-day-summary">A base reúne {loading ? '--' : stats.total} veículos cadastrados.</p>
           </section>

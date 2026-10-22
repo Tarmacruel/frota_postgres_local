@@ -1,5 +1,6 @@
+import { MemoryRouter } from 'react-router-dom'
 import '../test/mockJustificationSuggestions'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import PaymentProcessesPage from './PaymentProcessesPage'
 import { paymentProcessesAPI } from '../api/paymentProcesses'
@@ -7,7 +8,7 @@ import { paymentProcessesAPI } from '../api/paymentProcesses'
 vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ user: { id: 'operator', role: 'ADMIN' }, canEdit: () => true, canDeleteModule: () => true }) }))
 vi.mock('../hooks/useMasterDataCatalog', () => ({ useMasterDataCatalog: () => ({ organizations: [] }) }))
 vi.mock('../api/paymentProcesses', () => ({
-  paymentProcessesAPI: { list: vi.fn(), dashboard: vi.fn(), getById: vi.fn(), remove: vi.fn() },
+  paymentProcessesAPI: { list: vi.fn(), dashboard: vi.fn(), getById: vi.fn(), remove: vi.fn(), listAllForReport: vi.fn() },
   paymentSuppliersAPI: { list: async () => ({ data: [] }) },
   paymentContractsAPI: { options: async () => ({ data: [] }) },
 }))
@@ -21,7 +22,7 @@ beforeEach(() => {
 })
 
 it('sugere motivo de exclusão sem excluir até a confirmação obrigatória', async () => {
-  render(<PaymentProcessesPage />)
+  render(<MemoryRouter><PaymentProcessesPage /></MemoryRouter>)
   fireEvent.click(await screen.findByText('QA-001'))
   fireEvent.click(await screen.findByRole('button', { name: 'Excluir processo', exact: true }))
   const input = screen.getByLabelText('Justificativa da exclusão')
@@ -34,4 +35,15 @@ it('sugere motivo de exclusão sem excluir até a confirmação obrigatória', a
   expect(paymentProcessesAPI.remove).not.toHaveBeenCalled()
   fireEvent.click(within(modal).getByRole('button', { name: 'Excluir processo', exact: true }))
   await waitFor(() => expect(paymentProcessesAPI.remove).toHaveBeenCalledWith('payment', { reason: 'Exclusão de processo de pagamento cadastrado em duplicidade.' }))
+})
+
+it('mantém o detalhamento fechado quando a resposta dos alertas chega depois de fechar', async () => {
+  let resolve
+  paymentProcessesAPI.listAllForReport.mockReturnValue(new Promise((done) => { resolve = done }))
+  render(<MemoryRouter><PaymentProcessesPage /></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button', { name: /Alertas gerais da base:/ }))
+  const dialog = screen.getByRole('dialog', { name: 'Alertas gerais dos processos' })
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Fechar', exact: true }))
+  await act(async () => resolve([{ id: 'alert', alerts: ['Pendência de teste'] }]))
+  expect(screen.queryByRole('dialog', { name: 'Alertas gerais dos processos' })).not.toBeInTheDocument()
 })

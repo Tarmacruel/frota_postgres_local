@@ -1,3 +1,5 @@
+import IndicatorBar from '../components/ui/IndicatorBar'
+import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import PageHeader from '../components/ui/PageHeader'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Pagination from '../components/Pagination'
@@ -48,9 +50,10 @@ function summarizeDetails(details) {
 }
 
 export default function AuditPage() {
+  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
+
   const [logs, setLogs] = useState([])
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
-  const [deletedCount, setDeletedCount] = useState(0)
   const requestId = useRef(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
@@ -67,13 +70,13 @@ export default function AuditPage() {
 
   const filteredLogs = logs
 
-  const queryParams = useCallback((page = 1, limit = 20) => ({
+  const queryParams = useCallback((page = 1, limit = 20) => ({ indicator: indicator === 'total' ? undefined : indicator,
       page, limit, search: search.trim() || undefined,
       action: actionFilter !== 'TODAS' ? actionFilter : undefined,
       entity_type: entityFilter !== 'TODOS' ? entityFilter : undefined,
       organization_id: !['TODAS', 'SEM_SECRETARIA'].includes(organizationFilter) ? organizationFilter : undefined,
       without_organization: organizationFilter === 'SEM_SECRETARIA' || undefined,
-  }), [search, actionFilter, entityFilter, organizationFilter])
+  }), [search, actionFilter, entityFilter, organizationFilter, indicator])
 
   async function allFilteredLogs() {
     const records = []
@@ -107,15 +110,14 @@ export default function AuditPage() {
       const { data } = await api.get('/audit/paginated', { params: queryParams(page) })
       if (currentRequest !== requestId.current) return
       setLogs(data.data || [])
-      setPagination(data.pagination)
-      setDeletedCount(data.deleted || 0)
+      setPagination(data.pagination); setIndicators(data.indicators || null)
       if (page > 1 && page > data.pagination.pages) loadAudit(data.pagination.pages)
     } catch (err) {
       if (currentRequest === requestId.current) setError(getApiErrorMessage(err, 'Não foi possível carregar a trilha de auditoria.'))
     } finally {
       if (currentRequest === requestId.current) setLoading(false)
     }
-  }, [queryParams])
+  }, [queryParams, setIndicators])
 
   useEffect(() => { loadAudit(1) }, [loadAudit])
 
@@ -231,16 +233,7 @@ export default function AuditPage() {
         </div>
       </div>
 
-      <div className="panel-metrics">
-        <div className="metric-inline">
-          <strong>{pagination.total}</strong>
-          <span>eventos exibidos</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{deletedCount}</strong>
-          <span>exclusões registradas</span>
-        </div>
-      </div>
+      <IndicatorBar state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={loading} error={error} resultCount={pagination.total} />
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}

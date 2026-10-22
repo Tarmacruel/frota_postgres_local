@@ -74,3 +74,15 @@ it('reaplica somente o recorte escolhido', async () => {
   await user.click(screen.getByRole('button', { name: 'Aplicar filtros' }))
   await waitFor(() => expect(analyticsV2API.fuel).toHaveBeenCalledTimes(2))
 })
+
+it('abre a composição do KPI sem ampliar o acesso a registros individuais', async () => {
+  const user = userEvent.setup()
+  analyticsV2API.fuel.mockResolvedValue({ data: { ...data, can_view_records: false } })
+  render(<AnalyticsFuel onOpenEntity={vi.fn()} />)
+  const metric = await screen.findByRole('button', { name: /Km de posses válidas/ })
+  await user.click(metric)
+  const dialog = screen.getByRole('dialog', { name: 'Km de posses válidas' })
+  expect(within(dialog).getByText('ABC1D23')).toBeInTheDocument()
+  expect(within(dialog).getByRole('columnheader', { name: 'Km válidos' })).toBeInTheDocument()
+  expect(within(dialog).queryByRole('button', { name: 'Ver abastecimentos de origem' })).not.toBeInTheDocument()
+})

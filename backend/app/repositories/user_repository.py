@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import populate_indicators
+
 from uuid import UUID
 from sqlalchemy import String, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -39,6 +41,7 @@ class UserRepository:
         if without_organization:
             filters.append(User.organization_id.is_(None))
         base = select(User).outerjoin(Organization, Organization.id == User.organization_id).where(*filters)
+        base = await populate_indicators(self.db, 'users', base)
         total = (await self.db.execute(select(func.count()).select_from(base.subquery()))).scalar_one()
         rows = await self.db.execute(base.options(joinedload(User.organization), selectinload(User.permission_entries))
                                      .order_by(User.created_at.desc(), User.id.desc())

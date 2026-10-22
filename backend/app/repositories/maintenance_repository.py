@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import populate_indicators, filter_indicator
+
 from datetime import datetime
 from uuid import UUID
 from sqlalchemy import func, or_, select
@@ -101,8 +103,10 @@ class MaintenanceRepository:
                 ))
 
         stmt = select(MaintenanceRecord).options(joinedload(MaintenanceRecord.vehicle)).where(*conditions)
+        stmt = await populate_indicators(self.db, 'maintenance', stmt)
+        count_stmt = filter_indicator(self.db, 'maintenance', select(func.count(MaintenanceRecord.id)).where(*conditions))
         stmt = stmt.order_by(MaintenanceRecord.start_date.desc(), MaintenanceRecord.created_at.desc()).offset((page - 1) * limit).limit(limit)
-        total = int((await self.db.execute(select(func.count(MaintenanceRecord.id)).where(*conditions))).scalar_one())
+        total = int((await self.db.execute(count_stmt)).scalar_one())
         items = list((await self.db.execute(stmt)).scalars().unique().all())
         if with_summary:
             open_count = int((await self.db.execute(select(func.count(MaintenanceRecord.id)).where(

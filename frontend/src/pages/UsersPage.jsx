@@ -1,3 +1,5 @@
+import IndicatorBar from '../components/ui/IndicatorBar'
+import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import StatusChip from '../components/ui/StatusChip'
 import PageHeader from '../components/ui/PageHeader'
 import { useCallback, useEffect, useRef, useState } from 'react'
@@ -38,9 +40,10 @@ function formatDate(value) {
 }
 
 export default function UsersPage() {
+  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
+
   const [users, setUsers] = useState([])
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
-  const [summary, setSummary] = useState({})
   const requestId = useRef(0)
   const [form, setForm] = useState(initialForm)
   const [editingUser, setEditingUser] = useState(null)
@@ -69,12 +72,12 @@ export default function UsersPage() {
 
   const filteredUsers = users
 
-  const queryParams = useCallback((page = 1, limit = 10) => ({
+  const queryParams = useCallback((page = 1, limit = 10) => ({ indicator: indicator === 'total' ? undefined : indicator,
       page, limit, search: search.trim() || undefined,
       role: roleFilter !== 'TODOS' ? roleFilter : undefined,
       organization_id: !['TODAS', 'SEM_SECRETARIA'].includes(organizationFilter) ? organizationFilter : undefined,
       without_organization: organizationFilter === 'SEM_SECRETARIA' || undefined,
-  }), [search, roleFilter, organizationFilter])
+  }), [search, roleFilter, organizationFilter, indicator])
 
   async function allFilteredUsers() {
     const records = []
@@ -108,15 +111,14 @@ export default function UsersPage() {
       const { data } = await api.get('/users/paginated', { params: queryParams(page) })
       if (currentRequest !== requestId.current) return
       setUsers(data.data || [])
-      setPagination(data.pagination || { page, pages: 1, total: data.data?.length || 0 })
-      setSummary(data.summary || {})
+      setPagination(data.pagination || { page, pages: 1, total: data.data?.length || 0 }); setIndicators(data.indicators || null)
       if (page > 1 && page > (data.pagination?.pages || 1)) loadUsers(data.pagination.pages)
     } catch (err) {
       if (currentRequest === requestId.current) setError(getApiErrorMessage(err, 'Não foi possível carregar os usuários.'))
     } finally {
       if (currentRequest === requestId.current) setLoading(false)
     }
-  }, [queryParams])
+  }, [queryParams, setIndicators])
 
   useEffect(() => {
     loadUsers(1)
@@ -394,32 +396,7 @@ export default function UsersPage() {
         </div>
       </div>
 
-      <div className="panel-metrics">
-        <div className="metric-inline">
-          <strong>{pagination.total}</strong>
-          <span>usuários exibidos</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{summary.PRODUCAO || 0}</strong>
-          <span>perfil produção</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{summary.POSTO || 0}</strong>
-          <span>perfil posto</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{summary.ADMIN || 0}</strong>
-          <span>administradores</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{summary.must_change_password || 0}</strong>
-          <span>trocas pendentes</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{summary.must_register_cpf || 0}</strong>
-          <span>CPFs pendentes</span>
-        </div>
-      </div>
+      <IndicatorBar state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={loading} error={error} resultCount={pagination.total} />
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {catalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError}</div> : null}

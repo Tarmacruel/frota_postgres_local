@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import IndicatorRequest, indicator_context
+
 from app.services.vehicle_tag_service import with_vehicle_tags
 
 from datetime import datetime
@@ -51,10 +53,11 @@ async def list_vehicles_paginated(
     focus_id: UUID | None = Query(default=None),
     sort: str = Query(default="created_at"),
     order: str = Query(default="desc"),
+    kpis: IndicatorRequest = Depends(indicator_context('vehicles')),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("vehicles", "view")),
 ):
-    return await with_vehicle_tags(db, await VehicleService(db).list_paginated(
+    return kpis.attach(await with_vehicle_tags(db, await VehicleService(db).list_paginated(
         page=page,
         limit=limit,
         status_filter=status_filter,
@@ -68,7 +71,7 @@ async def list_vehicles_paginated(
         sort=sort,
         order=order,
         current_user=current_user,
-    ), current_user, vehicle_key="id")
+    ), current_user, vehicle_key="id"))
 
 
 @router.get("/options")

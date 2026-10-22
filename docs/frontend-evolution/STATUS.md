@@ -1,5 +1,9 @@
 # Status — evolução do frontend Frota PMTF
 
+## 22/10/2026 — Evolução dos KPIs em homologação
+
+Demanda funcional autorizada: 79 indicadores SQL em 13 módulos, seleção e remoção acessíveis, URLs filtradas, totais completos antes da paginação e composição contextual de custos/combustível. Início, condutores, cadastros e importações integrados; experiência mobile com faixa deslizável. Frontend **382 aprovados/67 arquivos**, lint **0 erros/39 avisos anteriores**; backend **688 aprovados/109 ignorados**. SQL/API somente leitura verificaram filtros, paginação e escopo vazio/positivo; browser claro/escuro/390px, composição e exportações cobertas. Sem migration ou publicação em produção. [Entrega, cobertura, evidências e reversão](../INTERACTIVE_KPIS_HML_20261022.md).
+
 ## 20/10/2026 — Fotos no encerramento da posse
 
 Demanda funcional autorizada pelo usuário, aplicada somente à homologação. Campo opcional com seleção múltipla, prévia/remoção, envio atômico, identificação das evidências e migration aditiva 0053. Backend 637 aprovados/109 ignorados; frontend 320 aprovados/62 arquivos; lint 0 erros/40 avisos preexistentes; build HML aprovado. Teste integrado com dados fictícios, integridade do arquivo, acesso protegido e QA claro/escuro/móvel concluídos. Produção preservada. [Entrega e manutenção](../RETURN_PHOTOS_HML_20261020.md).

@@ -86,13 +86,13 @@ export default function AnalyticsCosts({ enabled = true, organizations = [], cat
 
     <AnalyticsSection title="Custo operacional registrado" description="Combustível, manutenção e multas. Estimativas de sinistros ficam fora do total." {...state}>
       <div className="analytics-costs-summary">
-        <div><span>Total do período</span><strong>{amountLabel(data?.totals.operational_cost)}</strong>
+        <div><button type="button" className="analytics-kpi-primary" onClick={() => openEvents('Custo operacional registrado')}><span>Total do período</span><strong>{amountLabel(data?.totals.operational_cost)}</strong><small>Ver composição →</small></button>
           <button type="button" className="analytics-entity-link" onClick={() => openEvents('Custo operacional registrado')}>Ver registros</button></div>
-        <div><span>Custo operacional por km válido</span><strong>{formatValue(data?.cost_per_km, 'BRL/km')}</strong>
+        <div><button type="button" className="analytics-kpi-primary" onClick={() => openEvents('Custo operacional por km válido', { measuredOnly: true })}><span>Custo operacional por km válido</span><strong>{formatValue(data?.cost_per_km, 'BRL/km')}</strong><small>Ver composição →</small></button>
           <p>{formatValue(data?.measured_distance_km, 'km')} em {data?.measured_vehicles} veículo(s) medidos</p>
           <button type="button" className="analytics-entity-link" onClick={() => openEvents('Custo operacional por km válido', { measuredOnly: true })}>Ver registros do numerador</button>
           <button type="button" className="analytics-entity-link" onClick={openMileage}>Ver posses do denominador</button></div>
-        <div><span>Sinistros estimados · fora do total</span><strong>{amountLabel(data?.totals.claim_estimate)}</strong>
+        <div><button type="button" className="analytics-kpi-primary" onClick={() => openEvents('Sinistros estimados', { source: 'claim' })}><span>Sinistros estimados · fora do total</span><strong>{amountLabel(data?.totals.claim_estimate)}</strong><small>Ver composição →</small></button>
           <button type="button" className="analytics-entity-link" onClick={() => openEvents('Sinistros estimados', { source: 'claim' })}>Ver registros</button></div>
       </div>
       {data?.totals.operational_cost.missing_or_invalid ? <p role="status" className="analytics-scope-note">{data.totals.operational_cost.missing_or_invalid} valor(es) ausente(s) ou inválido(s). O total completo não está disponível.</p> : null}

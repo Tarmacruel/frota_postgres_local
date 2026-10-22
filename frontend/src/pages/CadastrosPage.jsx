@@ -505,6 +505,9 @@ export default function CadastrosPage() {
         </>}
       />
 
+      <div className="metrics-grid" role="group" aria-label="Indicadores da estrutura organizacional">
+        {[['organizations', 'Órgãos', organizations.length], ['departments', 'Departamentos', departments.length], ['allocations', 'Lotações', allocations.length]].map(([key, label, count]) => <button key={key} type="button" className="metric-card kpi-value-trigger" aria-pressed={activeTab === key} disabled={loading} onClick={() => { setActiveTab(key); document.getElementById('catalog-records')?.scrollIntoView({ block: 'start', behavior: 'smooth' }) }}><span>{label}</span><strong>{loading ? '—' : count}</strong><small>Consultar cadastro →</small></button>)}
+      </div>
       <section className="surface-panel panel-nested" style={{ marginBottom: 16 }}>
         <div className="panel-heading">
           <div>
@@ -556,7 +559,7 @@ export default function CadastrosPage() {
       {catalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
-      <div className="actions-inline management-tabs" role="group" aria-label="Categorias de cadastros">
+      <div id="catalog-records" className="actions-inline management-tabs" role="group" aria-label="Categorias de cadastros">
         <button
           className={activeTab === 'organizations' ? 'app-button' : 'ghost-button'}
           type="button"

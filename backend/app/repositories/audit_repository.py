@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import populate_indicators
+
 from uuid import UUID
 from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -59,6 +61,7 @@ class AuditRepository:
                                   AuditLog.entity_label.ilike(term), AuditLog.entity_type.ilike(term),
                                   AuditLog.action.ilike(term), Organization.name.ilike(term),
                                   cast(AuditLog.details, String).ilike(term)))
+        base = await populate_indicators(self.db, 'audit', base)
         count_base = base.order_by(None).subquery()
         total = (await self.db.execute(select(func.count()).select_from(count_base))).scalar_one()
         deleted = (await self.db.execute(select(func.count()).select_from(count_base).where(count_base.c.action == "DELETE"))).scalar_one()

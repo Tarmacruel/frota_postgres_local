@@ -1,6 +1,8 @@
+import IndicatorBar from '../components/ui/IndicatorBar'
+import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import JustificationField from '../components/JustificationField'
 import PageHeader from '../components/ui/PageHeader'
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   Area,
   Bar,
@@ -232,6 +234,23 @@ function isOverdueProcess(row) {
 }
 
 export default function PaymentProcessesPage() {
+  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
+  const [alertDetails, setAlertDetails] = useState(null)
+  const [alertDetailsLoading, setAlertDetailsLoading] = useState(false)
+  const processRequest = useRef(0)
+  const alertRequest = useRef(0)
+  useEffect(() => { setPagination((current) => ({ ...current, page: 1 })) }, [indicator])
+  async function showAllAlerts() {
+    const request = ++alertRequest.current
+    setAlertDetails([]); setAlertDetailsLoading(true)
+    try {
+      const rows = await paymentProcessesAPI.listAllForReport({})
+      if (request === alertRequest.current) setAlertDetails(rows.filter((row) => row.alerts?.length))
+    }
+    catch (err) { if (request === alertRequest.current) { setError(getApiErrorMessage(err, 'Não foi possível carregar os alertas.')); setAlertDetails(null) } }
+    finally { if (request === alertRequest.current) setAlertDetailsLoading(false) }
+  }
+
   const { canEdit, canDeleteModule, user } = useAuth()
   const { organizations } = useMasterDataCatalog({ organizationsOnly: true })
   const canManage = canEdit('payment_processes')
@@ -271,6 +290,7 @@ export default function PaymentProcessesPage() {
   const [amendmentForm, setAmendmentForm] = useState({ amendment_type: '', number: '', signed_at: '', value_delta: '', valid_until: '', notes: '' })
 
   const queryParams = useMemo(() => ({
+    indicator: indicator === 'total' ? undefined : indicator,
     page: pagination.page,
     limit: PAGE_SIZE,
     kind: filters.kind || undefined,
@@ -282,7 +302,7 @@ export default function PaymentProcessesPage() {
     due_from: filters.due_from || undefined,
     due_to: filters.due_to || undefined,
     search: filters.search || undefined,
-  }), [filters, pagination.page])
+  }), [filters, pagination.page, indicator])
 
   const reportColumns = useMemo(() => [
     { header: 'Processo', value: (row) => row.process_number || '-' },
@@ -351,10 +371,13 @@ export default function PaymentProcessesPage() {
   }
 
   async function loadRecords(page = 1) {
+    const request = ++processRequest.current
     setLoading(true)
     setError('')
     try {
       const { data } = await paymentProcessesAPI.list({ ...queryParams, page })
+      if (request !== processRequest.current) return
+      setIndicators(data.indicators || null)
       const nextRecords = data.data || []
       setRecords(nextRecords)
       setPagination(data.pagination || { page, pages: 1, total: 0, limit: PAGE_SIZE })
@@ -362,10 +385,11 @@ export default function PaymentProcessesPage() {
         setSelectedProcess(null)
       }
     } catch (err) {
+      if (request !== processRequest.current) return
       setError(getApiErrorMessage(err, 'Não foi possível carregar os processos de pagamento.'))
       setRecords([])
     } finally {
-      setLoading(false)
+      if (request === processRequest.current) setLoading(false)
     }
   }
 
@@ -784,14 +808,12 @@ export default function PaymentProcessesPage() {
 
       {activeView === 'processes' ? (
         <>
-          <section className="metrics-grid payment-workflow-metrics">
-            <Metric label="Processos" value={dashboard?.total_processes ?? pagination.total} />
-            <Metric label="Em aberto" value={dashboard?.open_processes ?? 0} />
-            <Metric label="Vencidos" value={dashboard?.overdue_processes ?? 0} />
-            <Metric label="Alertas" value={dashboard?.alerts_count ?? 0} />
-            <Metric label="Pendente" value={formatCurrency(dashboard?.pending_amount)} />
-            <Metric label="Pago" value={formatCurrency(dashboard?.paid_amount)} />
-          </section>
+          <IndicatorBar state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={loading} error={error} resultCount={pagination.total} />
+          <button type="button" className="secondary-button" onClick={showAllAlerts}>Alertas gerais da base: {dashboard?.alerts_count ?? '—'} · ver detalhes</button>
+          <Modal open={alertDetails !== null} title="Alertas gerais dos processos" onClose={() => { alertRequest.current++; setAlertDetails(null); setAlertDetailsLoading(false) }}>
+            <p>Todos os processos no seu escopo, independentemente dos filtros da lista. Cada processo pode ter mais de um alerta.</p>
+            {alertDetailsLoading ? <p role="status">Carregando alertas…</p> : !alertDetails?.length ? <p>Nenhum alerta encontrado.</p> : <><p>{alertDetails.length} processo(s) com alerta.</p><ul className="kpi-detail-list">{alertDetails.map((row) => <li key={row.id}><strong>{row.process_number || row.supplier_name || row.id}</strong><ul>{row.alerts.map((text, index) => <li key={index}>{text}</li>)}</ul><button type="button" className="ghost-button" onClick={() => { setAlertDetails(null); openProcess(row.id) }}>Abrir processo</button></li>)}</ul></>}
+          </Modal>
 
           <section className="toolbar-card payment-process-panel payment-filter-panel">
             <div className="payment-process-filter-stack payment-workflow-filter-grid">
@@ -1093,14 +1115,6 @@ export default function PaymentProcessesPage() {
   )
 }
 
-function Metric({ label, value }) {
-  return (
-    <div className="metric-card">
-      <span>{label}</span>
-      <strong>{value}</strong>
-    </div>
-  )
-}
 
 function Field({ label, children }) {
   return (

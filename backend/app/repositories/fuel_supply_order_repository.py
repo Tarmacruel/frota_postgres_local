@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import populate_indicators, filter_indicator
+
 from datetime import datetime
 from uuid import UUID
 from sqlalchemy import String, and_, cast, func, or_, select, update
@@ -126,6 +128,8 @@ class FuelSupplyOrderRepository:
             stmt = stmt.where(clause)
             count_stmt = count_stmt.where(clause)
 
+        stmt = await populate_indicators(self.db, 'fuel_orders', stmt)
+        count_stmt = filter_indicator(self.db, 'fuel_orders', count_stmt)
         stmt = stmt.order_by(FuelSupplyOrder.created_at.desc()).offset((page - 1) * limit).limit(limit)
         total = int((await self.db.execute(count_stmt)).scalar_one())
         records = list((await self.db.execute(stmt)).scalars().unique().all())

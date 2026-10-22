@@ -407,7 +407,7 @@ class PaymentProcessService:
             return self._empty_dashboard()
 
         organization_id = scoped_organization_id(current_user)
-        records = await self.repository.list_for_export(organization_id=organization_id, limit=10000)
+        records = await self.repository.list_for_export(organization_id=organization_id, limit=None)
         today = date.today()
         soon_limit = today + timedelta(days=7)
         total_amount = Decimal("0")

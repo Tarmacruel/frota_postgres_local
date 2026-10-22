@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import populate_indicators, filter_indicator
+
 from datetime import datetime
 from uuid import UUID
 from sqlalchemy import func, or_, select
@@ -209,6 +211,8 @@ class PossessionRepository:
             search_predicate = or_(*search_conditions)
             apply_filter(search_predicate)
 
+        stmt = await populate_indicators(self.db, 'possession', stmt)
+        count_stmt = filter_indicator(self.db, 'possession', count_stmt)
         stmt = stmt.offset((page - 1) * limit).limit(limit)
         total = int((await self.db.execute(count_stmt)).scalar_one())
         items = list((await self.db.execute(stmt)).scalars().unique().all())

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import IndicatorRequest, indicator_context
+
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -31,10 +33,11 @@ async def list_fines(
     organization_id: UUID | None = Query(default=None),
     status_filter: FineStatus | None = Query(default=None, alias="status"),
     search: str | None = Query(default=None),
+    kpis: IndicatorRequest = Depends(indicator_context('fines')),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("fines", "view")),
 ):
-    return await FineService(db).list(
+    return kpis.attach(await FineService(db).list(
         page=page,
         limit=limit,
         vehicle_id=vehicle_id,
@@ -42,7 +45,7 @@ async def list_fines(
         status_filter=status_filter,
         search=search,
         current_user=current_user,
-    )
+    ))
 
 
 @router.get("/infractions/paginated", response_model=FineInfractionListResponse)

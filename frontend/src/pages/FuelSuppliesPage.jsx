@@ -1,3 +1,6 @@
+import IndicatorBar from '../components/ui/IndicatorBar'
+import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
+import { Link } from 'react-router-dom'
 import FuelSupplyOrderCancelForm from '../components/FuelSupplyOrderCancelForm'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -121,6 +124,10 @@ function asArray(payload) {
 }
 
 export default function FuelSuppliesPage() {
+  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
+  const { selected: orderIndicator, metadata: orderIndicatorMetadata, setMetadata: setOrderIndicators, select: selectOrderIndicator } = useInteractiveKpis('order_indicator')
+  useEffect(() => { setCurrentHistoryPage(1) }, [indicator])
+  useEffect(() => { setCurrentOrdersPage(1) }, [orderIndicator])
   const [searchParams, setSearchParams] = useSearchParams()
   const { canCreate, canEdit, canView, isAdmin, isProduction } = useAuth()
   const canViewOrders = canView('fuel_supply_orders')
@@ -146,8 +153,6 @@ export default function FuelSuppliesPage() {
   const [currentOrdersPage, setCurrentOrdersPage] = useState(1)
   const [historyPagination, setHistoryPagination] = useState({ pages: 1, total: 0 })
   const [ordersPagination, setOrdersPagination] = useState({ pages: 1, total: 0 })
-  const [openOrdersCount, setOpenOrdersCount] = useState(null)
-  const [anomaliesCount, setAnomaliesCount] = useState(null)
   const historyRequest = useRef(0)
   const ordersRequest = useRef(0)
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
@@ -205,16 +210,12 @@ export default function FuelSuppliesPage() {
     try {
       setHistoryLoading(true)
       setError('')
-      const params = { limit: 10, page, search: search.trim() || undefined }
+      const params = { limit: 10, page, search: search.trim() || undefined, indicator: indicator === 'total' ? undefined : indicator }
       if (filters.vehicle_id) params.vehicle_id = filters.vehicle_id
       if (filters.organization_id) params.organization_id = filters.organization_id
       if (filters.fuel_station_id) params.fuel_station_id = filters.fuel_station_id
       if (filters.only_anomalies === 'true') params.only_anomalies = true
-      const [pageResponse, countResponse] = await Promise.all([
-        fuelSuppliesAPI.list(params),
-        fuelSuppliesAPI.list({ ...params, page: 1, limit: 1, only_anomalies: true }).catch(() => null),
-      ])
-      const { data } = pageResponse
+      const { data } = await fuelSuppliesAPI.list(params)
       if (request !== historyRequest.current) return
       if (page > data.pagination.pages) {
         setCurrentHistoryPage(data.pagination.pages)
@@ -222,7 +223,7 @@ export default function FuelSuppliesPage() {
       }
       setRecords(data.data || [])
       setHistoryPagination(data.pagination)
-      setAnomaliesCount(countResponse?.data?.pagination?.total ?? null)
+      setIndicators(data.indicators || null)
     } catch (err) {
       if (request === historyRequest.current) setError(getApiErrorMessage(err, 'Não foi possível carregar os abastecimentos.'))
     } finally {
@@ -234,7 +235,6 @@ export default function FuelSuppliesPage() {
     if (!canViewOrders) {
       setOrders([])
       setOrdersPagination({ pages: 1, total: 0 })
-      setOpenOrdersCount(0)
       setOrdersLoading(false)
       return
     }
@@ -243,11 +243,7 @@ export default function FuelSuppliesPage() {
       setOrdersLoading(true)
       setError('')
       const params = buildOrderQueryParams({ includePaging: true, page })
-      const [pageResponse, countResponse] = await Promise.all([
-        fuelSupplyOrdersAPI.list(params),
-        fuelSupplyOrdersAPI.list({ ...params, page: 1, limit: 1, status: 'OPEN' }).catch(() => null),
-      ])
-      const { data } = pageResponse
+      const { data } = await fuelSupplyOrdersAPI.list(params)
       if (request !== ordersRequest.current) return
       if (page > data.pagination.pages) {
         setCurrentOrdersPage(data.pagination.pages)
@@ -255,7 +251,7 @@ export default function FuelSuppliesPage() {
       }
       setOrders(asArray(data))
       setOrdersPagination(data.pagination)
-      setOpenOrdersCount(countResponse?.data?.pagination?.total ?? null)
+      setOrderIndicators(data.indicators || null)
     } catch (err) {
       if (request === ordersRequest.current) setError(getApiErrorMessage(err, 'Não foi possível carregar as ordens de abastecimento.'))
     } finally {
@@ -267,16 +263,17 @@ export default function FuelSuppliesPage() {
     historyRequest.current += 1
     const timer = setTimeout(() => loadRecords(), search.trim() ? 250 : 0)
     return () => clearTimeout(timer)
-  }, [filters, search, currentHistoryPage])
+  }, [filters, search, currentHistoryPage, indicator])
 
   useEffect(() => {
     ordersRequest.current += 1
     const timer = setTimeout(() => loadOrders(), orderSearch.trim() ? 250 : 0)
     return () => clearTimeout(timer)
-  }, [orderFilters, orderSearch, currentOrdersPage, canViewOrders])
+  }, [orderFilters, orderSearch, currentOrdersPage, canViewOrders, orderIndicator])
 
   function buildOrderQueryParams({ includePaging = false, page = currentOrdersPage } = {}) {
     const params = includePaging ? { limit: 10, page, search: orderSearch.trim() || undefined } : {}
+    params.indicator = orderIndicator === 'total' ? undefined : orderIndicator
     if (orderFilters.status !== 'TODOS') params.status = orderFilters.status
     if (orderFilters.organization_id) params.organization_id = orderFilters.organization_id
     if (orderFilters.fuel_station_id) params.fuel_station_id = orderFilters.fuel_station_id
@@ -526,24 +523,7 @@ export default function FuelSuppliesPage() {
         </>}
       />
 
-      <div className="panel-metrics">
-        <div className="metric-inline">
-          <strong>{openOrdersCount ?? '—'}</strong>
-          <span>ordens abertas</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{historyPagination.total}</strong>
-          <span>abastecimentos encontrados</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{anomaliesCount ?? '—'}</strong>
-          <span>alertas de consumo</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{fuelStations.length}</strong>
-          <span>postos ativos</span>
-        </div>
-      </div>
+      <p className="interactive-kpis__context"><Link to="/postos?indicator=active">Consultar os {fuelStations.length} postos ativos</Link></p>
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
@@ -619,6 +599,7 @@ export default function FuelSuppliesPage() {
           </MobileFilters>
         </div>
 
+        <IndicatorBar label="Indicadores das ordens" state={{ selected: orderIndicator, metadata: orderIndicatorMetadata, select: selectOrderIndicator }} loading={ordersLoading} error={error} resultCount={ordersPagination.total} />
         <div className="table-wrap table-wrap-wide operation-table-card">
           <table className="data-table data-table-wide operation-table">
             <thead>
@@ -693,6 +674,7 @@ export default function FuelSuppliesPage() {
       </div> : null}
 
       <div className="surface-panel panel-nested operation-module operation-module--fuel-history">
+        <IndicatorBar label="Indicadores dos abastecimentos" state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={historyLoading} error={error} resultCount={historyPagination.total} />
         <div className="panel-heading">
           <div>
             <h3 className="section-title">Histórico de abastecimentos</h3>

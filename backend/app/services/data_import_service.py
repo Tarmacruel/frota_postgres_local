@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import populate_indicators, filter_indicator
+
 import csv
 import hashlib
 import io
@@ -126,8 +128,9 @@ class DataImportService:
         return [self._serialize_batch(batch) for batch in result.scalars().all()]
 
     async def list_batches_paginated(self, *, page: int, limit: int) -> PaginatedResponse[dict]:
-        total = (await self.db.execute(select(func.count(DataImportBatch.id)))).scalar_one()
-        result = await self.db.execute(select(DataImportBatch).order_by(DataImportBatch.created_at.desc(), DataImportBatch.id.desc())
+        stmt = await populate_indicators(self.db, 'imports', select(DataImportBatch))
+        total = (await self.db.execute(filter_indicator(self.db, 'imports', select(func.count(DataImportBatch.id))))).scalar_one()
+        result = await self.db.execute(stmt.order_by(DataImportBatch.created_at.desc(), DataImportBatch.id.desc())
                                        .offset((page - 1) * limit).limit(limit))
         return PaginatedResponse[dict](data=[self._serialize_batch(batch) for batch in result.scalars().all()],
                                        pagination=build_pagination(page, limit, total))
@@ -148,6 +151,7 @@ class DataImportService:
         row_status: DataImportRowStatus | None = None,
         has_conflict: bool | None = None,
         has_error: bool | None = None,
+        row_action: DataImportSuggestedAction | None = None,
         search: str | None = None,
     ) -> PaginatedResponse[dict]:
         await self._get_batch(batch_id)
@@ -157,12 +161,15 @@ class DataImportService:
         if row_status:
             stmt = stmt.where(DataImportRow.status == row_status)
             count_stmt = count_stmt.where(DataImportRow.status == row_status)
+        if row_action:
+            stmt = stmt.where(DataImportRow.suggested_action == row_action)
+            count_stmt = count_stmt.where(DataImportRow.suggested_action == row_action)
         if has_conflict is True:
-            stmt = stmt.where(func.json_array_length(DataImportRow.conflicts) > 0)
-            count_stmt = count_stmt.where(func.json_array_length(DataImportRow.conflicts) > 0)
+            stmt = stmt.where(func.jsonb_array_length(DataImportRow.conflicts) > 0)
+            count_stmt = count_stmt.where(func.jsonb_array_length(DataImportRow.conflicts) > 0)
         if has_error is True:
-            stmt = stmt.where(func.json_array_length(DataImportRow.validation_errors) > 0)
-            count_stmt = count_stmt.where(func.json_array_length(DataImportRow.validation_errors) > 0)
+            stmt = stmt.where(func.jsonb_array_length(DataImportRow.validation_errors) > 0)
+            count_stmt = count_stmt.where(func.jsonb_array_length(DataImportRow.validation_errors) > 0)
         if search and search.strip():
             term = f"%{search.strip()}%"
             search_clause = or_(

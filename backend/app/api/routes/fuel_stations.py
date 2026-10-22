@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import IndicatorRequest, indicator_context
+
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -28,12 +30,13 @@ async def list_fuel_stations_paginated(
     limit: int = Query(default=10, ge=1, le=200),
     search: str | None = Query(default=None),
     active_only: bool | None = Query(default=None),
+    kpis: IndicatorRequest = Depends(indicator_context('fuel_stations')),
     db: AsyncSession = Depends(get_db_session),
 ):
     rows, total, active_count, inactive_count = await FuelStationService(db).list_paginated(
         page=page, limit=limit, search=search, active_only=active_only)
-    return {"data": rows, "pagination": build_pagination(page, limit, total),
-            "active_count": active_count, "inactive_count": inactive_count}
+    return kpis.attach({"data": rows, "pagination": build_pagination(page, limit, total),
+            "active_count": active_count, "inactive_count": inactive_count})
 
 
 @router.get("", response_model=list[FuelStationOut], dependencies=[Depends(require_permission("fuel_stations", "view"))])

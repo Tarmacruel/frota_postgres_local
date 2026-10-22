@@ -1,3 +1,5 @@
+import IndicatorBar from '../components/ui/IndicatorBar'
+import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import { formatPrimeCardNumber } from '../utils/primeCard'
 import JustificationField from '../components/JustificationField'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -302,6 +304,9 @@ function buildVehicleHistorySummary(item) {
 }
 
 export default function VehiclesPage() {
+  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
+  useEffect(() => { setCurrentPage(1) }, [indicator])
+
   const { user, canCreate, canEdit, canDeleteModule, isAdmin } = useAuth()
   const canCreateVehicle = canCreate('vehicles')
   const canEditVehicle = canEdit('vehicles')
@@ -426,7 +431,7 @@ export default function VehiclesPage() {
   ]
 
   function buildListParams(page = currentPage, focusedId = focusVehicleId) {
-    return {
+    return { indicator: indicator === 'total' ? undefined : indicator,
       page,
       limit: 10,
       status: statusFilter !== 'TODOS' && !focusedId ? statusFilter : undefined,
@@ -452,7 +457,7 @@ export default function VehiclesPage() {
         return
       }
       setVehicles(data.data)
-      setPagination(data.pagination)
+      setPagination(data.pagination); setIndicators(data.indicators || null)
       setSummary(data.summary || {
         total: data.pagination.total,
         own: data.data.filter((vehicle) => vehicle.ownership_type === 'PROPRIO').length,
@@ -483,11 +488,11 @@ export default function VehiclesPage() {
     listRequest.current += 1
     const timer = setTimeout(() => loadVehicles(), search.trim() ? 250 : 0)
     return () => clearTimeout(timer)
-  }, [currentPage, search, organizationFilter, locationFilter, ownershipFilter, statusFilter, focusVehicleId, tagFilter])
+  }, [currentPage, search, organizationFilter, locationFilter, ownershipFilter, statusFilter, focusVehicleId, tagFilter, indicator])
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, organizationFilter, locationFilter, ownershipFilter, statusFilter, focusVehicleId, tagFilter])
+  }, [search, organizationFilter, locationFilter, ownershipFilter, statusFilter, focusVehicleId, tagFilter, indicator])
 
   useEffect(() => {
     if (!focusVehicleId) {
@@ -855,9 +860,6 @@ export default function VehiclesPage() {
     }
   }
 
-  const visibleOwnVehicles = summary.own
-  const visibleRentedVehicles = summary.rented
-  const visibleAssignedVehicles = summary.assigned
   const visibleActiveVehicles = summary.active
   const visibleMaintenanceVehicles = summary.maintenance
   const visibleInactiveVehicles = summary.inactive
@@ -929,24 +931,7 @@ export default function VehiclesPage() {
         </div>
       </div>
 
-      <div className="panel-metrics">
-        <div className="metric-inline">
-          <strong>{summary.total}</strong>
-          <span>veículos exibidos</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{visibleOwnVehicles}</strong>
-          <span>próprios visíveis</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{visibleRentedVehicles}</strong>
-          <span>locados visíveis</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{visibleAssignedVehicles}</strong>
-          <span>cedidos visíveis</span>
-        </div>
-      </div>
+      <IndicatorBar state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={loading} error={error} resultCount={pagination.total} />
 
       {selectedVehicle ? (
         <div className="table-focus-banner">

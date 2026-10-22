@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import IndicatorRequest, indicator_context
+
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -21,13 +23,14 @@ async def list_audit_logs_paginated(
     entity_type: str | None = Query(default=None),
     organization_id: UUID | None = Query(default=None),
     without_organization: bool = Query(default=False),
+    kpis: IndicatorRequest = Depends(indicator_context('audit')),
     db: AsyncSession = Depends(get_db_session),
 ):
     rows, total, deleted = await AuditService(db).list_paginated(
         page=page, limit=limit, search=search, action=action, entity_type=entity_type,
         organization_id=organization_id, without_organization=without_organization,
     )
-    return {"data": rows, "pagination": build_pagination(page, limit, total), "deleted": deleted}
+    return kpis.attach({"data": rows, "pagination": build_pagination(page, limit, total), "deleted": deleted})
 
 
 @router.get("", response_model=list[AuditLogOut], dependencies=[Depends(require_admin)])

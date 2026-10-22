@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import IndicatorRequest, indicator_context
+
 from datetime import datetime
 from uuid import UUID
 from fastapi import APIRouter, Depends, File, Form, HTTPException, Query, Request, UploadFile, status
@@ -71,10 +73,11 @@ async def list_fuel_supplies(
     end_date: datetime | None = Query(default=None),
     only_anomalies: bool | None = Query(default=None),
     search: str | None = Query(default=None),
+    kpis: IndicatorRequest = Depends(indicator_context('fuel_supplies')),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("fuel_supplies", "view")),
 ):
-    return await FuelSupplyService(db).list(
+    return kpis.attach(await FuelSupplyService(db).list(
         page=page,
         limit=limit,
         vehicle_id=vehicle_id,
@@ -86,7 +89,7 @@ async def list_fuel_supplies(
         only_anomalies=only_anomalies,
         search=search,
         current_user=current_user,
-    )
+    ))
 
 
 @router.post("", response_model=FuelSupplyOut, status_code=status.HTTP_201_CREATED)

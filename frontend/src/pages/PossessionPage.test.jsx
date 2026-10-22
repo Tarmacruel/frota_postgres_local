@@ -112,7 +112,7 @@ describe('PossessionPage', () => {
     mocks.listPaginated.mockImplementation(async (params) => ({ data: {
       data: params.page === 2 ? [second] : [possession],
       pagination: { page: params.page, pages: 2, total: 11 },
-      summary: { total: 11, active: 11 },
+      summary: { total: 11, active: 11 }, indicators: { items: [{ key: 'total', label: 'Posses', value: 11 }, { key: 'active', label: 'Ativas', value: 11 }] },
     } }))
     render(<MemoryRouter><PossessionPage /></MemoryRouter>)
     fireEvent.click(await screen.findByRole('button', { name: 'Página 2' }))

@@ -55,7 +55,13 @@ export default function DriversPage() {
   const [search, setSearch] = useState('')
   const [activeFilter, setActiveFilter] = useState('ATIVOS')
   const [organizationFilter, setOrganizationFilter] = useState('TODAS')
-  const [cnhFilter, setCnhFilter] = useState('')
+  const cnhFilter = CNH_FILTERS.some((item) => item.value === searchParams.get('cnh_status')) ? searchParams.get('cnh_status') : ''
+  function setCnhFilter(value) {
+    const next = new URLSearchParams(searchParams)
+    if (value) next.set('cnh_status', value)
+    else next.delete('cnh_status')
+    setSearchParams(next)
+  }
   const [summary, setSummary] = useState(null)
   const listRequestRef = useRef(0)
   const [loading, setLoading] = useState(true)
