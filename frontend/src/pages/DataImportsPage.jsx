@@ -313,7 +313,7 @@ export default function DataImportsPage() {
   })), [allocations])
 
   const vehicleOptions = useMemo(() => vehicleSelectItems.map((vehicle) => ({
-    value: vehicle.id,
+    value: vehicle.id, tags: vehicle.tags || [],
     label: `${vehicle.plate}${vehicle.is_provisional ? ' (provisório)' : ''} . ${vehicle.brand} ${vehicle.model}`,
     description: vehicle.current_location?.display_name || vehicle.current_department || vehicle.renavam || '',
     keywords: [vehicle.plate, vehicle.renavam, vehicle.brand, vehicle.model].filter(Boolean).join(' '),

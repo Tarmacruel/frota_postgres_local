@@ -10,7 +10,7 @@ import { getApiErrorMessage } from '../utils/apiError'
 import { availableLoanActions, blockedLoanAction, canRepresent, formatLoanDate, loanEventLabels, loanStatuses } from '../utils/vehicleLoans'
 import './VehicleLoansPage.css'
 import { LOANS_CHANGED_EVENT } from '../hooks/usePendingVehicleLoans'
-import { ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
+import { ResponsiveRecord, MobileFilters, ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 
 const emptyCatalog = { vehicles: [], organizations: [], allocations: [] }
 const ended = ['RETURNED', 'REJECTED', 'CANCELLED']
@@ -48,6 +48,11 @@ export default function VehicleLoansPage() {
   const [modal, setModal] = useState(null)
   const [feedback, setFeedback] = useState('')
   const catalogRequest = useRef(0)
+
+  async function refreshVehicleCatalog() {
+    const { data } = await vehicleLoansAPI.catalog()
+    setCatalog(data)
+  }
 
   async function loadCatalog() {
     const request = ++catalogRequest.current
@@ -116,6 +121,7 @@ export default function VehicleLoansPage() {
       <form className="loan-filters operation-toolbar" onSubmit={(event) => { event.preventDefault(); setPage(1); setAppliedSearch(search.trim()) }}>
         <label>Placa<input className="app-input" value={search} onChange={(e) => setSearch(e.target.value)} maxLength={100} placeholder="Buscar placa" /></label>
         <button className="ghost-button">Buscar</button>
+        <MobileFilters activeCount={[status, direction].filter(Boolean).length}>
         <label>Situação<select className="app-input" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1) }}>
           <option value="">Todas as situações</option>{Object.entries(loanStatuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
@@ -123,19 +129,20 @@ export default function VehicleLoansPage() {
           <option value="">Enviados e recebidos</option><option value="sent">Minha secretaria é a origem</option><option value="received">Minha secretaria é a recebedora</option>
         </select></label>}
         <button type="button" className="ghost-button" onClick={refresh}>Atualizar</button>
+      </MobileFilters>
       </form>
       {listError && <p role="alert" className="loan-error">{listError}</p>}
       {loading ? <p role="status">Carregando empréstimos…</p> : <>
         <p className="section-copy">{pagination.total} registro(s). Devolvidos, rejeitados e cancelados permanecem no histórico.</p>
-        <div className="loan-table-wrap operation-table-card"><table className="loan-table operation-table"><thead><tr><th>Veículo</th><th>Origem → recebedora</th><th>Situação</th><th>Prazo</th><th>Consulta</th></tr></thead><tbody>
+        <div className="loan-table-wrap operation-table-card"><table className="loan-table data-table operation-table"><thead><tr><th>Veículo</th><th>Origem → recebedora</th><th>Situação</th><th>Prazo</th><th>Consulta</th></tr></thead><tbody>
           {rows.length === 0 && <tr><td colSpan={5}>Nenhum empréstimo encontrado para estes filtros.</td></tr>}
-          {rows.map((loan) => <tr key={loan.id} className={loan.id === selectedId ? 'loan-selected' : ''}>
-            <td><div className="operation-vehicle-identity"><VehicleThumbnail vehicleType={loan.vehicle_type} plate={loan.vehicle_plate} /><span><strong>{loan.vehicle_plate}</strong></span></div></td>
-            <td>{loan.origin_organization_name}<br /><span aria-label="para">→ </span>{loan.recipient_organization_name}</td>
-            <td><StatusChip tone={getLoanStatusTone(loan.status)}>{loanStatuses[loan.status]}</StatusChip>{loan.regularized_at && <small className="loan-regularized">Inclusão retroativa</small>}</td>
-            <td>{loan.expected_return_at ? formatLoanDate(loan.expected_return_at) : 'Indeterminado'}</td>
-            <td><button className="mini-button" onClick={() => { setModal(null); setParams({ id: loan.id }) }} aria-label={`Ver empréstimo de ${loan.vehicle_plate}`}>Ver detalhes</button></td>
-          </tr>)}
+          {rows.map((loan) => <ResponsiveRecord key={loan.id} className={loan.id === selectedId ? 'loan-selected' : ''} label={loan.vehicle_plate} identityLabel="Veículo" statusLabel="Situação" summaryLabels={["Origem → recebedora", "Prazo"]}>
+            <td data-label="Veículo"><div className="operation-vehicle-identity"><VehicleThumbnail vehicleType={loan.vehicle_type} plate={loan.vehicle_plate} /><span><strong>{loan.vehicle_plate}</strong></span></div></td>
+            <td data-label="Origem → recebedora">{loan.origin_organization_name}<br /><span aria-label="para">→ </span>{loan.recipient_organization_name}</td>
+            <td data-label="Situação"><StatusChip tone={getLoanStatusTone(loan.status)}>{loanStatuses[loan.status]}</StatusChip>{loan.regularized_at && <small className="loan-regularized">Inclusão retroativa</small>}</td>
+            <td data-label="Prazo">{loan.expected_return_at ? formatLoanDate(loan.expected_return_at) : 'Indeterminado'}</td>
+            <td data-label="Consulta"><button className="mini-button" onClick={() => { setModal(null); setParams({ id: loan.id }) }} aria-label={`Ver empréstimo de ${loan.vehicle_plate}`}>Ver detalhes</button></td>
+          </ResponsiveRecord>)}
         </tbody></table></div>
         <Pagination currentPage={page} totalPages={pagination.pages} onPageChange={setPage} />
       </>}
@@ -191,7 +198,7 @@ export default function VehicleLoansPage() {
         </li>)}</ol>
       </>}
     </section>}
-    {(modal === 'new' || (modal === 'edit' && detail)) && <LoanProposalForm key={modal === 'new' ? 'new' : `${detail.id}-${detail.version}`} loan={modal === 'edit' ? detail : null} catalog={catalog} user={user} onClose={() => setModal(null)} onSaved={saved} onRefresh={refresh} />}
+    {(modal === 'new' || (modal === 'edit' && detail)) && <LoanProposalForm onVehicleOptionsOpen={refreshVehicleCatalog} key={modal === 'new' ? 'new' : `${detail.id}-${detail.version}`} loan={modal === 'edit' ? detail : null} catalog={catalog} user={user} onClose={() => setModal(null)} onSaved={saved} onRefresh={refresh} />}
     {modal === 'regularization' && <VehicleLoanRegularization onClose={() => setModal(null)} onSaved={saved} />}
     {modal && !['new', 'edit', 'regularization'].includes(modal) && detail && <LoanActionForm key={`${detail.id}-${detail.version}-${modal}`} operation={modal} loan={detail} context={context} catalog={catalog} user={user} onClose={() => setModal(null)} onSaved={saved} onRefresh={refresh} />}
   </div>

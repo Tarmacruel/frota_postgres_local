@@ -10,7 +10,7 @@ import FuelSupplyOrderBatchCreateForm from '../components/FuelSupplyOrderBatchCr
 import FuelSupplyOrderDeadlineForm from '../components/FuelSupplyOrderDeadlineForm'
 import FuelSupplyRectifyForm from '../components/FuelSupplyRectifyForm'
 import GuidedTour from '../components/GuidedTour'
-import { ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
+import { MobileFilters, ResponsiveRecord, ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 import api from '../api/client'
 import { fuelStationsAPI } from '../api/fuelStations'
 import { masterDataAPI } from '../api/masterData'
@@ -111,7 +111,7 @@ function buildStationOption(station) {
 
 function buildVehicleOption(vehicle) {
   const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
-  return { value: vehicle.id, label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`, description: locationLabel }
+  return { value: vehicle.id, tags: vehicle.tags || [], label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`, description: locationLabel }
 }
 
 function asArray(payload) {
@@ -194,6 +194,11 @@ export default function FuelSuppliesPage() {
     }
     loadDependencies()
   }, [])
+
+  async function refreshVehicleOptions() {
+    const { data } = await api.get('/vehicles/options')
+    setVehicles(asArray(data))
+  }
 
   async function loadRecords(page = currentHistoryPage) {
     const request = ++historyRequest.current
@@ -561,19 +566,14 @@ export default function FuelSuppliesPage() {
       ) : null}
 
       {canViewOrders ? <div className="surface-panel panel-nested operation-module operation-module--orders">
-        <div className="panel-heading">
-          <div>
-            <h3 className="section-title">Ordens de abastecimento</h3>
-            <p className="section-copy">Acompanhe o ciclo completo das ordens emitidas para os postos credenciados.</p>
-          </div>
-          <div className="actions-inline">
+        <PageHeader title="Ordens de abastecimento" description="Acompanhe o ciclo completo das ordens emitidas para os postos credenciados." actions={<>
             <button className="secondary-button" type="button" onClick={handlePreviewOrdersPdf}>Pré-visualizar PDF</button>
             <button className="ghost-button" type="button" onClick={handleExportOrdersXlsx}>Exportar XLSX</button>
-          </div>
-        </div>
+        </>} />
 
         <div className="operation-toolbar filter-inline">
           <input className="app-input" placeholder="Buscar ordem por placa, secretaria, posto, solicitante ou observação" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} />
+          <MobileFilters activeCount={Object.values(orderFilters).filter(Boolean).length}>
           <select className="app-select" value={orderFilters.status} onChange={(event) => setOrderFilters((prev) => ({ ...prev, status: event.target.value }))}>
             {ORDER_STATUS_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
@@ -616,6 +616,7 @@ export default function FuelSuppliesPage() {
             />
           </label>
           <button className="ghost-button" type="button" onClick={clearOrderFilters}>Limpar filtros</button>
+          </MobileFilters>
         </div>
 
         <div className="table-wrap table-wrap-wide operation-table-card">
@@ -636,7 +637,7 @@ export default function FuelSuppliesPage() {
               {ordersLoading ? <tr><td colSpan={8} className="muted">Carregando ordens...</td></tr> : null}
               {!ordersLoading && paginatedOrders.length === 0 ? <tr><td colSpan={8}><div className="empty-state">Nenhuma ordem encontrada para os filtros aplicados.</div></td></tr> : null}
               {!ordersLoading && paginatedOrders.map((order) => (
-                <tr key={order.id}>
+                <ResponsiveRecord key={order.id} label={order.vehicle_plate} identityLabel="Veículo" statusLabel="Situação" summaryLabels={["Ordem", "Posto", "Prazo"]}>
                   <td data-label="Ordem"><strong>{formatOrderNumber(order)}</strong></td>
                   <td data-label="Veículo">
                     <div className="operation-vehicle-identity">
@@ -683,7 +684,7 @@ export default function FuelSuppliesPage() {
                       />
                     </div>
                   </td>
-                </tr>
+                </ResponsiveRecord>
               ))}
             </tbody>
           </table>
@@ -701,7 +702,8 @@ export default function FuelSuppliesPage() {
 
         <div className="operation-toolbar filter-inline">
           <input className="app-input" placeholder="Buscar por placa, secretaria, posto, combustível ou aditivo" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veículos' }, ...(filters.vehicle_id && !vehicles.some((item) => item.id === filters.vehicle_id) ? [{ value: filters.vehicle_id, label: 'Veiculo do historico de emprestimo' }] : []), ...vehicles.map(buildVehicleOption)]} placeholder="Filtrar veículo" />
+          <MobileFilters activeCount={Object.values(filters).filter(Boolean).length}>
+          <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veículos' }, ...(filters.vehicle_id && !vehicles.some((item) => item.id === filters.vehicle_id) ? [{ value: filters.vehicle_id, label: 'Veiculo do historico de emprestimo' }] : []), ...vehicles.map(buildVehicleOption)]} onOpen={refreshVehicleOptions} placeholder="Filtrar veículo" />
           <SearchableSelect value={filters.organization_id} onChange={(value) => setFilters((prev) => ({ ...prev, organization_id: value }))} options={organizationFilterOptions} placeholder="Filtrar secretaria" />
           <SearchableSelect value={filters.fuel_station_id} onChange={(value) => setFilters((prev) => ({ ...prev, fuel_station_id: value }))} options={[{ value: '', label: 'Todos os postos' }, ...fuelStations.map(buildStationOption)]} placeholder="Filtrar posto" />
           <select className="app-input" value={filters.only_anomalies} onChange={(event) => setFilters((prev) => ({ ...prev, only_anomalies: event.target.value }))}>
@@ -709,6 +711,7 @@ export default function FuelSuppliesPage() {
             <option value="true">Somente alertas</option>
           </select>
           <button className="ghost-button" type="button" onClick={clearHistoryFilters}>Limpar filtros</button>
+          </MobileFilters>
         </div>
 
         <div className="table-wrap table-wrap-wide operation-table-card">
@@ -732,7 +735,7 @@ export default function FuelSuppliesPage() {
               {historyLoading ? <tr><td colSpan={11} className="muted">Carregando abastecimentos...</td></tr> : null}
               {!historyLoading && paginatedRecords.length === 0 ? <tr><td colSpan={11}><div className="empty-state">Nenhum abastecimento encontrado.</div></td></tr> : null}
               {!historyLoading && paginatedRecords.map((record) => (
-                <tr key={record.id}>
+                <ResponsiveRecord key={record.id} label={record.vehicle_plate} identityLabel="Veículo" statusLabel="Status" summaryLabels={["Data", "Litros", "Valor", "Alerta"]}>
                   <td data-label="Veículo"><div className="operation-vehicle-identity"><VehicleThumbnail vehicleType={record.vehicle_type} plate={record.vehicle_plate} /><strong>{record.vehicle_plate}</strong></div></td>
                   <td data-label="Data">{formatDate(record.supplied_at)}</td>
                   <td data-label="Secretaria">{record.organization_name || '-'}</td>
@@ -752,7 +755,7 @@ export default function FuelSuppliesPage() {
                       ) : null}
                     </div>
                   </td>
-                </tr>
+                </ResponsiveRecord>
               ))}
             </tbody>
           </table>
@@ -785,7 +788,7 @@ export default function FuelSuppliesPage() {
 
       <Modal open={isOrderModalOpen && canCreateOrder} onClose={() => setIsOrderModalOpen(false)} title="Nova ordem de abastecimento" description="Emita a ordem para um posto credenciado executar o abastecimento.">
         <FuelSupplyOrderCreateForm
-          vehicles={vehicles}
+          vehicles={vehicles} onVehicleOptionsOpen={refreshVehicleOptions}
           organizations={organizations}
           fuelStations={fuelStations}
           onClose={() => setIsOrderModalOpen(false)}

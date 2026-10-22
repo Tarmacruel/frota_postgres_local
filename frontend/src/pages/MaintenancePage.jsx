@@ -10,7 +10,7 @@ import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
-import { ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
+import { ResponsiveRecord, MobileFilters, ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 
 const statusOptions = [
   { value: 'TODAS', label: 'Todas' },
@@ -33,7 +33,7 @@ function buildVehicleOption(vehicle) {
   const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
   const organizationLabel = vehicle.current_location?.organization_name || 'Sem secretaria'
   return {
-    value: vehicle.id,
+    value: vehicle.id, tags: vehicle.tags || [],
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
     description: `${vehicle.ownership_type === 'LOCADO' ? 'Locado' : 'Próprio'} | ${organizationLabel} | ${locationLabel}`,
     keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.chassis_number, organizationLabel, locationLabel].filter(Boolean).join(' '),
@@ -322,6 +322,7 @@ export default function MaintenancePage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
+            <MobileFilters activeCount={[organizationFilter, vehicleFilter, startFilter, endFilter].filter(Boolean).length}>
             <SearchableSelect
               value={organizationFilter}
               onChange={setOrganizationFilter}
@@ -332,12 +333,13 @@ export default function MaintenancePage() {
             <SearchableSelect
               value={vehicleFilter}
               onChange={setVehicleFilter}
-              options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(buildVehicleOption)]}
+              options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(buildVehicleOption)]} onOpen={loadVehicles}
               placeholder="Filtrar veículo"
               searchPlaceholder="Buscar veículo por placa, modelo ou chassi"
             />
             <input type="datetime-local" className="app-input" value={startFilter} onChange={(event) => setStartFilter(event.target.value)} />
             <input type="datetime-local" className="app-input" value={endFilter} onChange={(event) => setEndFilter(event.target.value)} />
+            </MobileFilters>
           </div>
         </div>
       </div>
@@ -398,7 +400,7 @@ export default function MaintenancePage() {
                 </tr>
               ) : (
                 paginatedRecords.map((record) => (
-                  <tr key={record.id} className={focusedRecord?.id === record.id ? 'is-focused-row' : ''}>
+                  <ResponsiveRecord key={record.id} className={focusedRecord?.id === record.id ? 'is-focused-row' : ''} label={`manutenção ${record.vehicle_plate}`} identityLabel="Veículo" summaryLabels={["Serviço", "Início"]}>
                     <td data-label="Veículo">
                       <div className="operation-vehicle-identity">
                         <VehicleThumbnail vehicleType={record.vehicle_type ?? getRecordVehicle(record)?.vehicle_type} plate={record.vehicle_plate} />
@@ -435,7 +437,7 @@ export default function MaintenancePage() {
                         </div>
                       </td>
                     ) : null}
-                  </tr>
+                  </ResponsiveRecord>
                 ))
               )}
             </tbody>
@@ -452,6 +454,7 @@ export default function MaintenancePage() {
         onClose={closeModal}
       >
         <MaintenanceForm
+          onVehicleOptionsOpen={loadVehicles}
           vehicles={vehicles}
           initialData={editingRecord}
           onClose={closeModal}

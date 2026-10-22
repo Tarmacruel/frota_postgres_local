@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.services.vehicle_tag_service import with_vehicle_tags
+
 import json
 from datetime import datetime
 from uuid import UUID
@@ -230,7 +232,7 @@ async def list_possession(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("possession", "view")),
 ):
-    return await PossessionService(db).list(vehicle_id=vehicle_id, active=active, current_user=current_user)
+    return await with_vehicle_tags(db, await PossessionService(db).list(vehicle_id=vehicle_id, active=active, current_user=current_user), current_user, vehicle_key="vehicle_id")
 
 
 @router.get("/paginated", response_model=PossessionListResponse)
@@ -249,7 +251,7 @@ async def list_possession_paginated(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("possession", "view")),
 ):
-    return await PossessionService(db).list_paginated(
+    return await with_vehicle_tags(db, await PossessionService(db).list_paginated(
         page=page,
         limit=limit,
         vehicle_id=vehicle_id,
@@ -262,7 +264,7 @@ async def list_possession_paginated(
         start_to=start_to,
         focus_id=focus_id,
         current_user=current_user,
-    )
+    ), current_user, vehicle_key="vehicle_id")
 
 
 @router.get("/odometer-suggestion", response_model=PossessionOdometerSuggestion | None)
@@ -280,7 +282,7 @@ async def list_active_possession(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("possession", "view")),
 ):
-    return await PossessionService(db).list_active(current_user=current_user)
+    return await with_vehicle_tags(db, await PossessionService(db).list_active(current_user=current_user), current_user, vehicle_key="vehicle_id")
 
 
 @router.get("/reports/metadata")

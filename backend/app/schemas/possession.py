@@ -139,7 +139,11 @@ class PossessionPhotoOut(BaseModel):
     is_legacy: bool = False
 
 
+from app.schemas.vehicle_tag import VehicleTagMarkOut
+
+
 class PossessionOut(BaseModel):
+    vehicle_tags: list[VehicleTagMarkOut] = []
     model_config = ConfigDict(from_attributes=True)
 
     responsible_organization_id: UUID | None = None

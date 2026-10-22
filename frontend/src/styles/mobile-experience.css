@@ -1,0 +1,222 @@
+/* Mobile workspace. Desktop tables and business controls remain the source of truth. */
+.mobile-account-trigger, .mobile-page-options, .mobile-filters__trigger,
+.responsive-record__toggle, .pagination-mobile-position,
+.mobile-action-scrim, .mobile-action-heading { display: none; }
+.mobile-filters, .mobile-filters__fields, .ui-page-header__secondary { display: contents; }
+
+@media (min-width: 721px) {
+  /* The new disclosure wrappers do not change the desktop flex sizing. */
+  body.internal-app-active .mobile-filters__fields > .app-input { flex: 1 1 220px; }
+  body.internal-app-active .mobile-filters__fields > .app-select,
+  body.internal-app-active .mobile-filters__fields > .searchable-select { flex: 0 1 185px; width: auto; }
+  body.internal-app-active .mobile-filters__fields > .filter-date-field { flex: 0 1 170px; width: auto; }
+  body.internal-app-active .mobile-filters__fields > button { flex: 0 0 auto; }
+}
+
+@media (max-width: 720px) {
+  body.internal-app-active { --mobile-bar-height: 68px; }
+  body.internal-app-active .environment-banner {
+    min-height: 26px; padding: 5px 12px; font-size: 10px; box-shadow: none;
+  }
+  body.internal-app-active .environment-banner strong { font-size: 10px; letter-spacing: .08em; }
+  body.internal-app-active .environment-banner > span { display: none; }
+  body.internal-app-active .app-shell {
+    display: block; min-width: 0; padding: 0; background: var(--ui-app-bg);
+  }
+  body.internal-app-active .content-shell { min-width: 0; gap: 0; }
+  body.internal-app-active .app-shell .app-topbar {
+    position: sticky; top: 26px; z-index: 95; display: flex; flex-direction: row;
+    min-height: 60px; padding: 8px 12px; gap: 8px; border-width: 0 0 1px;
+    border-radius: 0; box-shadow: none; align-items: center; flex-wrap: nowrap;
+  }
+  body.internal-app-active .topbar-leading { flex: 1; min-width: 0; gap: 8px; }
+  body.internal-app-active .topbar-kicker { display: none; }
+  body.internal-app-active .topbar-route-title { font-size: 18px; }
+  body.internal-app-active .app-shell .topbar-actions { display: flex; flex: 0 0 auto; flex-wrap: nowrap; gap: 6px; }
+  body.internal-app-active .app-shell .topbar-search-trigger {
+    flex: 0 0 44px; width: 44px; height: 44px; min-width: 44px; padding: 10px;
+    order: 0; border: 0; background: transparent;
+  }
+  body.internal-app-active .topbar-search-copy > span, body.internal-app-active .topbar-search-hint { display: none; }
+  body.internal-app-active .topbar-search-copy .app-icon { width: 23px; height: 23px; }
+  body.internal-app-active .mobile-account-trigger {
+    display: grid; place-items: center; width: 44px; height: 44px; border-radius: 50%;
+    border: 1px solid var(--ui-border); background: var(--ui-surface-subtle); color: var(--ui-info-text); font-weight: 700;
+  }
+  body.internal-app-active .app-shell .topbar-system-actions { display: none; }
+  body.internal-app-active .app-shell .topbar-system-actions.is-open {
+    display: grid; position: absolute; top: calc(100% + 4px); right: 12px;
+    width: min(310px, calc(100vw - 24px)); padding: 8px; gap: 4px;
+    background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 14px; box-shadow: var(--ui-shadow-md);
+    animation: mobile-panel-in 150ms ease-out;
+  }
+  body.internal-app-active .app-shell .topbar-system-actions .icon-button {
+    width: 100%; height: auto; min-height: 48px; justify-content: flex-start; gap: 12px; padding: 12px;
+  }
+  body.internal-app-active .topbar-system-actions .icon-button::after { content: attr(aria-label); font-size: 14px; text-align: left; }
+  body.internal-app-active .topbar-user { display: none; }
+  body.internal-app-active .app-shell .app-main {
+    padding: 16px 14px calc(var(--mobile-bar-height) + 24px + env(safe-area-inset-bottom, 0px));
+    min-width: 0; overflow: visible;
+  }
+  body.internal-app-active .app-shell .app-sidebar {
+    top: 26px; bottom: 0; left: 0; width: min(328px, calc(100vw - 40px)); max-height: none;
+    padding: 16px 12px calc(14px + env(safe-area-inset-bottom, 0px)); border-radius: 0 20px 20px 0;
+  }
+  body.internal-app-active .app-sidebar .nav-link { min-height: 48px; padding: 10px 12px; font-size: 14px; }
+  body.internal-app-active .app-sidebar.is-compact .nav-text,
+  body.internal-app-active .app-sidebar.is-compact .brand-copy,
+  body.internal-app-active .app-sidebar.is-compact .account-meta { display: block; }
+  body.internal-app-active .app-sidebar.is-compact .nav-section-title { display: block; }
+  body.internal-app-active .app-sidebar.is-compact .nav-link { justify-content: flex-start; }
+  body.internal-app-active .app-shell .mobile-bottom-bar {
+    display: grid; left: 0; right: 0; bottom: 0; gap: 0; min-height: var(--mobile-bar-height);
+    padding: 5px 6px calc(5px + env(safe-area-inset-bottom, 0px)); border-radius: 0;
+    background: var(--ui-surface); border: 0; border-top: 1px solid var(--ui-border); box-shadow: none; backdrop-filter: none;
+  }
+  body.internal-app-active .mobile-bottom-link {
+    display: grid; align-content: center; justify-items: center; gap: 4px; padding: 6px 2px;
+    min-height: 56px; border: 0; background: transparent; font-size: 10px; color: var(--ui-text-muted);
+    border-radius: 10px; cursor: pointer;
+  }
+  body.internal-app-active .mobile-bottom-link .app-icon { width: 22px; height: 22px; }
+  body.internal-app-active .mobile-bottom-link.active { background: var(--ui-info-soft); color: var(--ui-info-text); }
+
+  /* One clear action, with secondary operations available from Opções. */
+  body.internal-app-active .app-shell .operation-page,
+  body.internal-app-active .app-shell .management-page { padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent; }
+  body.internal-app-active .ui-page-header { gap: 12px; margin-bottom: 14px; padding-bottom: 0; border: 0; }
+  body.internal-app-active .ui-page-header__copy { min-width: 0; }
+  body.internal-app-active .ui-page-header__title { font-size: 20px; line-height: 1.25; }
+  body.internal-app-active .ui-page-header__description { display: none; }
+  body.internal-app-active .ui-page-header__actions { display: flex; gap: 8px; flex-wrap: wrap; width: 100%; }
+  body.internal-app-active .ui-page-header__actions > .app-button { flex: 1 1 auto; white-space: nowrap; }
+  body.internal-app-active .mobile-page-options { display: flex; flex: 0 0 auto; align-items: center; justify-content: center; gap: 10px; }
+  body.internal-app-active .ui-page-header__secondary { display: flex; flex-wrap: wrap; gap: 8px; }
+  body.internal-app-active .ui-page-header__secondary.is-progressive { display: none; }
+  body.internal-app-active .ui-page-header__actions.is-open .ui-page-header__secondary.is-progressive {
+    display: grid; grid-template-columns: 1fr; flex-basis: 100%; padding: 10px;
+    background: var(--ui-surface); border: 1px solid var(--ui-border); border-radius: 12px;
+  }
+  body.internal-app-active .ui-page-header__secondary > * { min-width: 0; }
+  body.internal-app-active .ui-page-header__secondary button { width: 100%; }
+  body.internal-app-active .app-shell .operation-toolbar {
+    padding: 0; margin-bottom: 12px; border: 0; box-shadow: none; background: transparent;
+  }
+  body.internal-app-active .operation-toolbar .toolbar-row { gap: 10px; }
+  body.internal-app-active .operation-toolbar .status-pills {
+    display: flex; flex-wrap: nowrap; width: 100%; overflow-x: auto; gap: 6px; padding: 0 0 4px;
+    scrollbar-width: none; overscroll-behavior-x: contain;
+  }
+  body.internal-app-active .status-pills .status-pill { flex: 0 0 auto; min-height: 42px; padding: 8px 13px; font-size: 13px; }
+  body.internal-app-active .operation-toolbar .filter-inline { display: flex; flex-direction: row; align-items: center; flex-wrap: wrap; width: 100%; gap: 8px; }
+  body.internal-app-active .operation-toolbar.filter-inline { display: flex; flex-direction: row; align-items: center; flex-wrap: wrap; width: 100%; gap: 8px; }
+  body.internal-app-active .operation-toolbar.filter-inline > .app-input { flex: 1 1 160px; width: 0; min-width: 0; }
+  body.internal-app-active .operation-module--orders, body.internal-app-active .operation-module--fuel-history { padding: 14px; border: 1px solid var(--ui-border); border-radius: 14px; background: var(--ui-surface); }
+  body.internal-app-active .operation-module .section-title { font-size: 18px; }
+  body.internal-app-active .operation-module .section-copy { font-size: 13px; line-height: 1.4; }
+  body.internal-app-active .operation-page--loans .loan-filters > label { flex: 1 1 160px; width: auto; min-width: 0; }
+  body.internal-app-active .operation-toolbar .filter-inline > .app-input { flex: 1 1 160px; width: 0; min-width: 0; }
+  body.internal-app-active .mobile-filters { display: contents; }
+  body.internal-app-active .mobile-filters__trigger { display: flex; align-items: center; gap: 6px; padding: 8px 12px; }
+  .mobile-filters__trigger svg { width: 20px; height: 20px; }
+  .mobile-filter-count { padding: 2px 6px; border-radius: 12px; background: var(--ui-action-bg); color: var(--ui-action-text); font-size: 12px; }
+  body.internal-app-active .mobile-filters__fields { display: none; }
+  body.internal-app-active .mobile-filters.is-open .mobile-filters__fields {
+    display: grid; grid-template-columns: 1fr; gap: 10px; width: 100%; padding: 14px;
+    border: 1px solid var(--ui-border); border-radius: 12px; background: var(--ui-surface); animation: mobile-panel-in 150ms ease-out;
+  }
+  body.internal-app-active .mobile-filters__fields > * { width: 100%; min-width: 0; max-width: none; }
+  body.internal-app-active .panel-metrics { display: flex; flex-wrap: wrap; gap: 6px 16px; padding: 4px 0 12px; margin: 0; border: 0; }
+  body.internal-app-active .metric-inline { display: flex; align-items: baseline; gap: 5px; padding: 0; min-height: 0; border: 0; box-shadow: none; background: transparent; }
+  body.internal-app-active .metric-inline strong { font-size: 15px; }
+  body.internal-app-active .metric-inline span { font-size: 11px; }
+
+  /* The same semantic table becomes a list; details never duplicate data. */
+  body.internal-app-active .app-shell .operation-table-card { padding: 0; border: 0; background: transparent; box-shadow: none; }
+  body.internal-app-active .app-shell .operation-table-card .table-wrap { padding: 0; overflow: visible; border: 0; }
+  body.internal-app-active .app-shell .operation-table tbody { gap: 12px; }
+  body.internal-app-active .app-shell .operation-table tr.responsive-record {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; grid-auto-flow: row dense; gap: 10px 12px;
+    padding: 16px; border: 1px solid var(--ui-border); border-radius: 14px;
+    background: var(--ui-surface); box-shadow: none; width: 100%; min-width: 0;
+  }
+  body.internal-app-active .app-shell .operation-table tr.responsive-record td {
+    display: block; width: auto; min-width: 0; max-width: 100%; padding: 0; margin: 0;
+    border: 0; text-align: left; white-space: normal; font-size: 14px; overflow-wrap: anywhere;
+  }
+  body.internal-app-active .app-shell .operation-table tr.responsive-record td::before {
+    font-size: 11px; letter-spacing: 0; text-transform: none; margin-bottom: 3px; color: var(--ui-text-muted);
+  }
+  body.internal-app-active .app-shell .operation-table tr.responsive-record td[data-mobile-kind='identity'] { grid-column: 1; order: 0; }
+  body.internal-app-active .app-shell .operation-table tr.responsive-record td[data-mobile-kind='status'] { grid-column: 2; order: 1; align-self: start; }
+  body.internal-app-active .app-shell .operation-table td[data-mobile-kind='identity']::before,
+  body.internal-app-active .app-shell .operation-table td[data-mobile-kind='status']::before,
+  body.internal-app-active .app-shell .operation-table td[data-mobile-kind='actions']::before,
+  body.internal-app-active .app-shell .operation-table .responsive-record__toggle::before { display: none; }
+  body.internal-app-active .app-shell .operation-table tr.responsive-record td[data-mobile-kind='summary'] { grid-column: 1 / -1; order: 2; }
+  body.internal-app-active .app-shell .operation-table tr.responsive-record td[data-mobile-kind='detail'] { display: none; }
+  body.internal-app-active .app-shell .operation-table tr.is-expanded td[data-mobile-kind='detail'] {
+    display: block; grid-column: 1 / -1; order: 3; border-top: 1px solid var(--ui-border); padding-top: 10px;
+  }
+  body.internal-app-active .app-shell .operation-table tr.responsive-record td[data-mobile-kind='actions'] { grid-column: 1 / -1; order: 4; }
+  body.internal-app-active .app-shell .operation-table .responsive-record__toggle { display: block; grid-column: 1 / -1; order: 5; }
+  body.internal-app-active .app-shell .responsive-record__toggle .ghost-button { width: 100%; display: flex; justify-content: space-between; align-items: center; background: transparent; border: 0; color: var(--ui-info-text); padding: 8px 0; font-size: 13px; }
+  body.internal-app-active .operation-vehicle-identity { align-items: flex-start; gap: 8px; }
+  body.internal-app-active .operation-vehicle-identity strong { font-size: 16px; }
+  body.internal-app-active .operation-vehicle-identity .ui-vehicle-thumbnail { width: 42px; }
+  body.internal-app-active .responsive-record:not(.is-expanded) .driver-badge > span { display: none; }
+  body.internal-app-active .operation-row-actions { display: flex; gap: 8px; flex-wrap: wrap; width: 100%; }
+  body.internal-app-active .operation-row-actions > button { flex: 1; }
+  body.internal-app-active .operation-row-actions .ui-action-menu { margin-left: auto; }
+  body.internal-app-active .app-shell .responsive-record:has(.operation-row-actions > .ui-action-menu:only-child) td[data-mobile-kind='actions'] { grid-column: 2; }
+  body.internal-app-active .app-shell .responsive-record:has(.operation-row-actions > .ui-action-menu:only-child) .responsive-record__toggle { grid-column: 1; }
+  body.internal-app-active .pagination-shell { display: flex; flex-wrap: nowrap; justify-content: space-between; gap: 8px; margin-top: 16px; }
+  body.internal-app-active .pagination-pages { display: none; }
+  .pagination-mobile-position { display: block; font-size: 13px; white-space: nowrap; align-self: center; color: var(--ui-text-muted); }
+
+  /* Forms and sheets keep their existing focus/busy/validation behavior. */
+  body.internal-app-active :is(.app-input, .app-select, .app-textarea, .searchable-select-trigger) { min-height: 48px; font-size: 16px; border-radius: 10px; }
+  body.internal-app-active :is(.app-button, .secondary-button, .ghost-button, .mini-button, .icon-button, .ui-icon-button) { min-height: 44px; touch-action: manipulation; }
+  body.internal-app-active :is(.icon-button, .ui-icon-button) { min-width: 44px; }
+  body.internal-app-active .modal-backdrop { padding: 0; align-items: end; justify-items: stretch; }
+  body.internal-app-active .modal-backdrop .modal-shell {
+    display: flex; flex-direction: column; width: 100%; max-width: 100%; height: auto;
+    max-height: calc(100dvh - max(16px, env(safe-area-inset-top, 0px))); margin: 0;
+    padding: 0; border-radius: 20px 20px 0 0; border-bottom: 0; background: var(--ui-surface); overflow: hidden;
+    animation: mobile-sheet-in 180ms ease-out;
+  }
+  body.internal-app-active .modal-shell .modal-header { flex-shrink: 0; margin: 0; padding: 16px; border-bottom: 1px solid var(--ui-border); background: var(--ui-surface); }
+  body.internal-app-active .modal-shell .modal-header .section-copy { font-size: 13px; line-height: 1.4; margin-top: 6px; }
+  body.internal-app-active .modal-shell .modal-body { overflow-y: auto; overscroll-behavior: contain; padding: 16px 16px calc(20px + env(safe-area-inset-bottom, 0px)); min-height: 0; }
+  body.internal-app-active .modal-shell :is(.form-grid, .modal-form-grid) { grid-template-columns: minmax(0, 1fr); }
+  body.internal-app-active .modal-shell :is(.form-grid, .modal-form-grid) > * { min-width: 0; max-width: 100%; grid-column: auto; }
+  body.internal-app-active .modal-shell .modal-field-span { grid-column: 1 / -1; }
+  body.internal-app-active .modal-shell .modal-actions { position: static; padding: 12px 0 0; margin: 8px 0 0; background: var(--ui-surface); }
+  body.internal-app-active .search-overlay-backdrop { padding: 0; }
+  body.internal-app-active .search-overlay-panel { width: 100%; max-height: 100dvh; border-radius: 0 0 20px 20px; }
+  body.internal-app-active .search-overlay-input { font-size: 16px; }
+  .mobile-action-scrim { display: block; position: fixed; inset: 0; border: 0; background: rgb(3 10 22 / .5); z-index: 5999; }
+  body.internal-app-active .ui-action-menu__panel {
+    top: auto !important; left: 0 !important; right: 0; bottom: 0; width: 100%; min-width: 0; max-width: none;
+    max-height: min(80dvh, 600px); overflow-y: auto; overscroll-behavior: contain; z-index: 6000;
+    border-radius: 20px 20px 0 0; padding: 12px 16px calc(16px + env(safe-area-inset-bottom, 0px)); animation: mobile-sheet-in 180ms ease-out;
+  }
+  .mobile-action-heading { display: block; padding: 8px 0 14px; font-size: 14px; font-weight: 700; color: var(--ui-text); border-bottom: 1px solid var(--ui-border); margin-bottom: 4px; }
+  body.internal-app-active .ui-action-menu__item { min-height: 52px; padding: 14px 8px; font-size: 15px; }
+  body.internal-app-active .dashboard-page { padding: 0; border: 0; background: transparent; box-shadow: none; gap: 20px; }
+  body.internal-app-active .dashboard-intro { gap: 12px; padding-bottom: 0; }
+  body.internal-app-active .dashboard-intro h1 { font-size: 24px; }
+  body.internal-app-active .dashboard-intro > div > p:not(.dashboard-intro__eyebrow) { font-size: 13px; line-height: 1.4; }
+  body.internal-app-active .dashboard-intro__actions { display: flex; flex-wrap: wrap; gap: 8px; }
+  body.internal-app-active .dashboard-intro__actions > * { flex: 1; }
+  body.internal-app-active .dashboard-quick-grid { grid-template-columns: minmax(0, 1fr); gap: 0; border-radius: 14px; border: 1px solid var(--ui-border); background: var(--ui-surface); overflow: hidden; }
+  body.internal-app-active .dashboard-quick-action { min-height: 76px; padding: 14px; border: 0; border-radius: 0; border-bottom: 1px solid var(--ui-border); background: transparent; box-shadow: none; }
+  body.internal-app-active .dashboard-quick-action:last-child { border-bottom: 0; }
+}
+@keyframes mobile-panel-in { from { opacity: .5; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+@keyframes mobile-sheet-in { from { transform: translateY(24px); opacity: .6; } to { transform: none; opacity: 1; } }
+@media (prefers-reduced-motion: reduce) {
+  body.internal-app-active .modal-shell, body.internal-app-active .ui-action-menu__panel,
+  body.internal-app-active .mobile-filters__fields, body.internal-app-active .topbar-system-actions { animation: none; }
+}

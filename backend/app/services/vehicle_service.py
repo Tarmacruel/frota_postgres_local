@@ -86,6 +86,7 @@ class VehicleService:
         limit: int,
         status_filter: VehicleStatus | None = None,
         ownership_type: VehicleOwnershipType | None = None,
+        tag_ids: list[UUID] | None = None,
         search: str | None = None,
         filter_organization_id: UUID | None = None,
         unassigned: bool = False,
@@ -104,6 +105,7 @@ class VehicleService:
             limit=limit,
             status=status_filter,
             ownership_type=ownership_type,
+            **({"tag_ids": tag_ids} if tag_ids else {}),
             search=search,
             filter_organization_id=filter_organization_id,
             unassigned=unassigned,
@@ -422,7 +424,7 @@ class VehicleService:
             .where(
                 AuditLog.entity_type == "VEHICLE",
                 AuditLog.entity_id == vehicle_id,
-                AuditLog.action.in_(("CREATE", "UPDATE")),
+                AuditLog.action.in_(("CREATE", "UPDATE", "TAG_APPLY", "TAG_REMOVE")),
             )
             .order_by(AuditLog.created_at.desc())
         )
@@ -576,10 +578,10 @@ class VehicleService:
 
         return {
             "id": log.id,
-            "event_type": "CREATE" if log.action == "CREATE" else "EDIT",
+            "event_type": "TAG" if log.action.startswith("TAG_") else "CREATE" if log.action == "CREATE" else "EDIT",
             "action": log.action,
             "occurred_at": log.created_at,
-            "title": "Cadastro do veículo" if log.action == "CREATE" else "Edição cadastral",
+            "title": (("Etiqueta aplicada: " if log.action == "TAG_APPLY" else "Etiqueta retirada: ") + details.get("tag_name", "")) if log.action.startswith("TAG_") else "Cadastro do veículo" if log.action == "CREATE" else "Edição cadastral",
             "actor_name": log.actor_name,
             "justification": details.get("reason"),
             "allocation_id": None,

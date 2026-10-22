@@ -1,0 +1,16 @@
+.driver-license-notice { display: grid; gap: 8px; padding: 14px 16px; border: 1px solid var(--ui-warning); border-left-width: 3px; border-radius: 10px; background: color-mix(in srgb, var(--ui-warning) 9%, var(--ui-surface)); color: var(--ui-text); font-size: 14px; overflow-wrap: anywhere; min-width: 0; }
+.driver-license-notice > strong { color: var(--ui-warning-text); }
+.driver-license-notice p, .driver-license-notice ul { margin: 0; }
+.driver-license-notice ul { padding-left: 20px; }
+.driver-license-notice li + li { margin-top: 4px; }
+.driver-license-notice .actions-inline { gap: 8px; flex-wrap: wrap; }
+.driver-license-notice a { display: inline-flex; gap: 4px; align-items: center; justify-content: center; flex-wrap: wrap; text-align: center; }
+.driver-license-new-tab { font-size: 12px; font-weight: 400; }
+.driver-license-refresh-error { color: var(--ui-danger-text); }
+.driver-license-status { display: flex; flex-wrap: wrap; gap: 5px; }
+.driver-license-status .ui-status-chip { white-space: normal; }
+.driver-license-detail { display: grid; gap: 4px; }
+.driver-license-refresh-status { margin: 0; font-size: 13px; color: var(--ui-text-muted); }
+@media (max-width: 720px) {
+  .driver-license-notice .actions-inline > * { width: 100%; min-height: 44px; }
+}

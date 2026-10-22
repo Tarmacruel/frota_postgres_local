@@ -27,6 +27,7 @@ class VehicleHistoryEventType(str, Enum):
     CREATE = "CREATE"
     EDIT = "EDIT"
     MOVEMENT = "MOVEMENT"
+    TAG = "TAG"
 
 
 class VehicleHistoryEventOut(BaseModel):

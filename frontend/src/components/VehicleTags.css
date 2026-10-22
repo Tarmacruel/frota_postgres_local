@@ -1,0 +1,74 @@
+.vehicle-tags { display: inline-flex; gap: 5px; flex-wrap: wrap; align-items: center; margin-top: 5px; max-width: 100%; }
+:is(.vehicle-tag, .vehicle-tag-color-choice)[data-color='blue'] { --vehicle-tag-swatch: light-dark(#3564da, #709cff); --vehicle-tag-bg: light-dark(#eaf0ff, #1d345b); --vehicle-tag-ink: light-dark(#2548a3, #adcbff); }
+:is(.vehicle-tag, .vehicle-tag-color-choice)[data-color='amber'] { --vehicle-tag-swatch: light-dark(#be7c05, #e8ac3c); --vehicle-tag-bg: light-dark(#fff1d8, #3b301c); --vehicle-tag-ink: light-dark(#815000, #ffcf76); }
+:is(.vehicle-tag, .vehicle-tag-color-choice)[data-color='red'] { --vehicle-tag-swatch: light-dark(#ce4152, #ff7f8d); --vehicle-tag-bg: light-dark(#ffedf0, #402532); --vehicle-tag-ink: light-dark(#a32b3f, #ffb1bb); }
+:is(.vehicle-tag, .vehicle-tag-color-choice)[data-color='green'] { --vehicle-tag-swatch: light-dark(#22835e, #56c696); --vehicle-tag-bg: light-dark(#e5f5ed, #193b31); --vehicle-tag-ink: light-dark(#1c684d, #9de3be); }
+:is(.vehicle-tag, .vehicle-tag-color-choice)[data-color='purple'] { --vehicle-tag-swatch: light-dark(#8153d6, #b18af1); --vehicle-tag-bg: light-dark(#f0e9ff, #322447); --vehicle-tag-ink: light-dark(#6c3cb5, #d0b0ff); }
+:is(.vehicle-tag, .vehicle-tag-color-choice)[data-color='neutral'] { --vehicle-tag-swatch: light-dark(#718096, #a3b1c5); --vehicle-tag-bg: light-dark(#edf0f5, #283449); --vehicle-tag-ink: light-dark(#4a5a70, #cfdaea); }
+:is(.vehicle-tag, .vehicle-tag-color-choice)[data-color='orange'] { --vehicle-tag-swatch: light-dark(#c6601b, #f9a36e); --vehicle-tag-bg: light-dark(#fff0e5, #412d20); --vehicle-tag-ink: light-dark(#974516, #ffc39d); }
+:is(.vehicle-tag, .vehicle-tag-color-choice)[data-color='teal'] { --vehicle-tag-swatch: light-dark(#168984, #54d0c3); --vehicle-tag-bg: light-dark(#e2f5f2, #153c3a); --vehicle-tag-ink: light-dark(#126965, #94e5d9); }
+:is(.vehicle-tag, .vehicle-tag-color-choice)[data-color='pink'] { --vehicle-tag-swatch: light-dark(#c3488d, #f391c8); --vehicle-tag-bg: light-dark(#fdebf5, #40263b); --vehicle-tag-ink: light-dark(#9b306c, #ffb8e0); }
+:is(.vehicle-tag, .vehicle-tag-color-choice)[data-color='cyan'] { --vehicle-tag-swatch: light-dark(#1687b1, #65cee9); --vehicle-tag-bg: light-dark(#e5f5fb, #163647); --vehicle-tag-ink: light-dark(#116583, #a1e4f7); }
+:is(.vehicle-tag, .vehicle-tag-color-choice)[data-color='indigo'] { --vehicle-tag-swatch: light-dark(#514cb6, #9394ed); --vehicle-tag-bg: light-dark(#ededff, #28274b); --vehicle-tag-ink: light-dark(#423b9c, #c6c3ff); }
+:is(.vehicle-tag, .vehicle-tag-color-choice)[data-color='brown'] { --vehicle-tag-swatch: light-dark(#855e46, #c49a7d); --vehicle-tag-bg: light-dark(#f4ebe4, #3a2c25); --vehicle-tag-ink: light-dark(#704c35, #e1bfa8); }
+.vehicle-tag { display: inline-flex; justify-self: start; align-self: start; border-radius: 5px; padding: 3px 7px; font-size: 0.78rem; font-weight: 600; max-width: 100%; overflow-wrap: anywhere; color: var(--vehicle-tag-ink, var(--ui-info-text)); background: var(--vehicle-tag-bg, var(--ui-surface-subtle)); }
+.vehicle-tag-button { border: 0; padding: 0; background: transparent; font: inherit; text-align: left; max-width: 100%; cursor: pointer; }
+.vehicle-tag-button:hover .vehicle-tag { text-decoration: underline; }
+.vehicle-tag-more { border: 1px solid var(--line); background: var(--ui-surface); color: var(--ui-text); border-radius: 5px; padding: 3px 7px; font: inherit; font-size: 0.78rem; }
+.vehicle-tags-workspace, .vehicle-tag-form { display: grid; gap: 14px; min-width: 0; }
+.modal-backdrop.vehicle-tags-catalog-backdrop { padding: 12px; }
+.modal-shell.vehicle-tags-catalog-modal, body.internal-app-active .modal-shell.vehicle-tags-catalog-modal { width: min(680px, calc(100vw - 24px)); max-height: min(92vh, 940px); max-height: min(92dvh, 940px); padding: 0; display: flex; flex-direction: column; overflow: hidden; background: var(--ui-surface); backdrop-filter: none; -webkit-backdrop-filter: none; border-radius: 8px; }
+.vehicle-tags-catalog-modal > .modal-header, body.internal-app-active .vehicle-tags-catalog-modal > .modal-header { margin: 0; padding: 18px 22px; border-bottom: 1px solid var(--line); align-items: center; flex: 0 0 auto; }
+.vehicle-tags-catalog-modal .section-title { font-size: 1.08rem; line-height: 1.4; }
+.vehicle-tags-catalog-modal .section-copy { display: none; }
+.vehicle-tags-catalog-modal .modal-description-tip { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; flex: 0 0 auto; border: 1px solid var(--line); border-radius: 50%; font-size: 0.7rem; color: var(--ui-text-muted); }
+.vehicle-tags-catalog-modal > .modal-body { padding: 20px 22px 24px; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.vehicle-tag-form { border-top: 1px solid var(--line); padding-top: 16px; }
+.vehicle-tag-form h4, .vehicle-tag-form p, .vehicle-tag-entry p { margin: 0; }
+.vehicle-tag-color-picker { border: 0; margin: 0; padding: 0; min-width: 0; }
+.vehicle-tag-color-picker legend { padding: 0; margin-bottom: 9px; width: 100%; display: flex; justify-content: space-between; align-items: baseline; gap: 8px; flex-wrap: wrap; }
+.vehicle-tag-selected-color, .vehicle-tag-color-count { color: var(--ui-text-muted); }
+.vehicle-tag-color-count { font-size: 0.78rem; }
+.vehicle-tag-palette { display: grid; grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 9px 8px; }
+.vehicle-tag-palette .vehicle-tag-color-choice { position: relative; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px 2px; min-width: 0; min-height: 78px; border: 1px solid transparent; border-radius: 6px; cursor: pointer; }
+.vehicle-tag-color-choice:hover { background: var(--ui-surface-subtle); }
+.vehicle-tag-color-choice:has(input:checked) { border-color: var(--ui-info); background: color-mix(in srgb, var(--ui-info) 9%, var(--ui-surface)); }
+.vehicle-tag-color-choice:has(input:focus-visible) { outline: 3px solid var(--ui-info); outline-offset: 2px; }
+.vehicle-tag-color-choice:has(input:disabled) { opacity: 0.55; cursor: default; }
+.vehicle-tag-color-input { position: absolute; width: 1px; height: 1px; padding: 0; margin: 0; clip-path: inset(50%); overflow: hidden; white-space: nowrap; }
+.vehicle-tag-color-dot { width: 29px; height: 29px; border-radius: 50%; background: var(--vehicle-tag-swatch); color: light-dark(#ffffff, #102039); display: flex; align-items: center; justify-content: center; flex-shrink: 0; font-size: 17px; }
+.vehicle-tag-color-name { font-size: 0.78rem; color: var(--ui-text); }
+.vehicle-tag-preview { padding: 15px 16px; min-height: 91px; background: var(--ui-surface-subtle); border-radius: 6px; display: grid; align-content: center; justify-items: start; gap: 10px; min-width: 0; }
+.vehicle-tag-preview-caption { color: var(--ui-text-muted); font-size: 0.78rem; }
+.vehicle-tag-form label, .vehicle-tag-confirm label { display: grid; gap: 6px; min-width: 0; }
+.vehicle-tag-form textarea, .vehicle-tag-confirm textarea { min-height: 76px; resize: vertical; width: 100%; }
+.vehicle-tag-catalog-row, .vehicle-tag-entry-header { display: flex; gap: 10px; align-items: center; justify-content: space-between; flex-wrap: wrap; }
+.vehicle-tag-catalog-row { padding: 10px 0; border-bottom: 1px solid var(--line); }
+.vehicle-tag-catalog-row > span { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+.vehicle-tag-entry { display: grid; gap: 7px; padding: 12px 0; border-bottom: 1px solid var(--line); overflow-wrap: anywhere; }
+.vehicle-tag-note { white-space: pre-wrap; }
+.vehicle-tag-confirm { padding: 12px; background: var(--ui-surface-subtle); border: 1px solid var(--line); border-radius: 8px; display: grid; gap: 12px; }
+.vehicle-tag-confirm h4, .vehicle-tag-confirm p { margin: 0; }
+body.internal-app-active .modal-shell .vehicle-tag-confirm .secondary-button.danger { color: var(--ui-danger-text); border-color: var(--ui-danger); background: color-mix(in srgb, var(--ui-danger) 10%, var(--ui-surface)); }
+.vehicle-tag-filter { position: relative; }
+.vehicle-tag-filter-panel { position: absolute; z-index: 30; top: calc(100% + 6px); right: 0; padding: 14px; width: min(340px, 85vw); max-height: 420px; overflow-y: auto; display: grid; gap: 12px; color: var(--ui-text); background: var(--ui-surface); border: 1px solid var(--line); border-radius: 8px; box-shadow: var(--shadow); }
+.vehicle-tag-filter-option { display: flex; align-items: center; gap: 10px; }
+.vehicle-tag-filter-option > span { display: grid; gap: 4px; }
+.vehicle-tag-filter-option small { color: var(--ui-text-muted); }
+.vehicle-tag-filter-option input { width: 18px; height: 18px; flex: 0 0 auto; }
+.searchable-select-value .vehicle-tags { display: flex; margin-top: 4px; }
+.searchable-select-option .vehicle-tags { display: flex; }
+.vehicle-tags-current-caption { display: block; font-size: 0.72rem; color: var(--ui-text-muted); margin-top: 4px; }
+@media (max-width: 600px) {
+  .vehicle-tags-catalog-modal > .modal-header, body.internal-app-active .vehicle-tags-catalog-modal > .modal-header { padding: 16px; }
+  .vehicle-tags-catalog-modal > .modal-body { padding: 18px 16px; }
+  .vehicle-tag-palette { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .vehicle-tag-palette .vehicle-tag-color-choice { min-height: 76px; }
+  .vehicle-tag-filter-panel { left: 0; right: auto; }
+  .vehicle-tag-button, .vehicle-tag-more { min-height: 36px; }
+  .vehicle-tag-catalog-row .actions-inline, .vehicle-tag-form > .actions-inline { flex-wrap: wrap; }
+}
+@media (prefers-reduced-motion: no-preference) {
+  .vehicle-tag { transition: color 140ms ease, background-color 140ms ease; }
+  .vehicle-tag-color-choice { transition: background-color 140ms ease, border-color 140ms ease; }
+}

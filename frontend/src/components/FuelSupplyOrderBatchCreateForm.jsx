@@ -1,5 +1,6 @@
 import { useMemo, useState } from 'react'
 import SearchableSelect from './SearchableSelect'
+import { VehicleTagBadges } from './VehicleTags'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
@@ -230,6 +231,7 @@ export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organiza
                     />
                     <span>
                       <strong>{vehicleDescription(vehicle)}</strong>
+                      <VehicleTagBadges tags={vehicle.tags} interactive={false} />
                       <small>{vehicleLocation(vehicle)}</small>
                     </span>
                   </label>

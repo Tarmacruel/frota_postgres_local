@@ -99,3 +99,30 @@ it('abre um veículo da busca global mesmo fora da primeira página', async () =
   expect(await screen.findByText('Mostrando apenas XYZ9Z99')).toBeInTheDocument()
   expect(api.get).toHaveBeenCalledWith('/vehicles/paginated', expect.objectContaining({ params: expect.objectContaining({ focus_id: 'vehicle-2' }) }))
 })
+
+it('filtra etiquetas de autores diferentes por ids e mantém o filtro na exportação', async () => {
+  const labels = [
+    { id: 'tag-a', name: 'Em lavagem', color: 'blue', owner_name: 'Ana' },
+    { id: 'tag-b', name: 'Em lavagem', color: 'blue', owner_name: 'Carlos' },
+  ]
+  api.get.mockImplementation((url) => Promise.resolve(url === '/vehicles/locations' ? { data: [] } : url === '/vehicles/tag-options' ? { data: labels } : { data: { data: [vehicle], pagination: { page: 1, pages: 1, total: 1 }, summary: { total: 1 } } }))
+  render(<MemoryRouter><VehiclesPage /></MemoryRouter>)
+  await screen.findByText('ABC1D23')
+  fireEvent.click(screen.getByRole('button', { name: 'Etiquetas', exact: true }))
+  fireEvent.click(await screen.findByRole('checkbox', { name: /Ana/ }))
+  fireEvent.click(screen.getByRole('checkbox', { name: /Carlos/ }))
+  await waitFor(() => expect(api.get).toHaveBeenCalledWith('/vehicles/paginated', expect.objectContaining({ params: expect.objectContaining({ tag_ids: ['tag-a', 'tag-b'] }), paramsSerializer: { indexes: null } })))
+  fireEvent.click(screen.getByRole('button', { name: 'Concluir filtro' }))
+  fireEvent.click(screen.getByRole('button', { name: 'Exportar XLSX' }))
+  await waitFor(() => expect(exportRowsToXlsx).toHaveBeenCalledWith(expect.objectContaining({ filters: expect.arrayContaining([{ label: 'Etiquetas atuais', value: 'Em lavagem (Ana) ou Em lavagem (Carlos)' }]) })))
+  expect(api.get).toHaveBeenCalledWith('/vehicles/paginated', expect.objectContaining({ params: expect.objectContaining({ limit: 100, tag_ids: ['tag-a', 'tag-b'] }) }))
+})
+
+it('mostra eventos de etiqueta como comunicação visual no histórico', async () => {
+  api.get.mockImplementation((url) => Promise.resolve(url === '/vehicles/locations' ? { data: [] } : url.endsWith('/historico') ? { data: [{ id: 'mark-event', event_type: 'TAG', action: 'TAG_APPLY', occurred_at: '2026-10-21T12:00:00Z', title: 'Etiqueta aplicada: Em lavagem', actor_name: 'Ana', justification: 'Conferência da limpeza' }] } : { data: { data: [vehicle], pagination: { page: 1, pages: 1, total: 1 }, summary: { total: 1 } } }))
+  render(<MemoryRouter><VehiclesPage /></MemoryRouter>)
+  fireEvent.click(await screen.findByRole('button', { name: 'Histórico', exact: true }))
+  expect(await screen.findByText('Marcação de comunicação visual adicionada ao veículo.')).toBeInTheDocument()
+  expect(screen.getByText('Observação', { exact: true })).toBeInTheDocument()
+  expect(screen.queryByText('Edição registrada sem diferenças adicionais nos campos auditados.')).not.toBeInTheDocument()
+})

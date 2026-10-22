@@ -3,7 +3,7 @@ import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
 import DriverSelect from '../components/DriverSelect'
 import SearchableSelect from '../components/SearchableSelect'
-import { ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
+import { MobileFilters, ResponsiveRecord, ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 import { finesAPI } from '../api/fines'
 import { vehiclesAPI } from '../api/vehicles'
 import { useAuth } from '../context/AuthContext'
@@ -44,7 +44,7 @@ function formatMoney(value) {
 function vehicleOption(vehicle) {
   const location = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
   return {
-    value: vehicle.id,
+    value: vehicle.id, tags: vehicle.tags || [],
     label: `${vehicle.plate}${vehicle.is_provisional ? ' (provisório)' : ''} . ${vehicle.brand} ${vehicle.model}`,
     description: `${vehicle.ownership_type} | ${location}`,
     keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.renavam || '', location].join(' '),
@@ -327,9 +327,11 @@ export default function FinesPage() {
       <div className="operation-toolbar toolbar-row">
         <div className="filter-inline">
           <input className="app-input" placeholder="Buscar por auto, enquadramento, descrição, local ou matrícula" value={search} onChange={(e) => setSearch(e.target.value)} />
+          <MobileFilters activeCount={[organizationFilter, vehicleFilter, statusFilter !== 'TODOS'].filter(Boolean).length}>
           <SearchableSelect value={organizationFilter} onChange={setOrganizationFilter} options={[{ value: '', label: 'Todas as secretarias' }, ...organizationOptions]} placeholder="Filtrar secretaria" searchPlaceholder="Buscar secretaria" />
-          <SearchableSelect value={vehicleFilter} onChange={setVehicleFilter} options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(vehicleOption)]} placeholder="Filtrar veículo" searchPlaceholder="Buscar veículo" />
+          <SearchableSelect value={vehicleFilter} onChange={setVehicleFilter} options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(vehicleOption)]} onOpen={loadAux} placeholder="Filtrar veículo" searchPlaceholder="Buscar veículo" />
           <select className="app-select" value={statusFilter} onChange={(e) => setStatusFilter(e.target.value)}>{statusOptions.map((o) => <option key={o} value={o}>{o}</option>)}</select>
+          </MobileFilters>
         </div>
       </div>
 
@@ -342,7 +344,7 @@ export default function FinesPage() {
             <thead><tr><th>Veículo</th><th>Auto</th><th>Enquadramento</th><th>Condutor</th><th>Infração</th><th>Valor</th><th>Status</th>{canEditFine ? <th>Ações</th> : null}</tr></thead>
             <tbody>
               {loading ? <tr><td colSpan={canEditFine ? 8 : 7}>Carregando multas...</td></tr> : records.length === 0 ? <tr><td colSpan={canEditFine ? 8 : 7}><div className="empty-state">Nenhuma multa encontrada.</div></td></tr> : records.map((record) => (
-                <tr key={record.id}>
+                <ResponsiveRecord key={record.id} label={`multa ${record.ticket_number}`} identityLabel="Veículo" summaryLabels={["Auto", "Infração", "Valor"]}>
                   <td data-label="Veículo"><div className="operation-vehicle-identity"><VehicleThumbnail vehicleType={record.vehicle_type} plate={record.vehicle_plate} /><span><strong>{record.vehicle_plate}</strong><span className="muted">{getVehicleOrganizationName(record.vehicle_id)}</span></span></div></td>
                   <td data-label="Auto">{record.ticket_number}</td>
                   <td data-label="Enquadramento"><div className="stack"><strong>{record.infraction_type ? `${record.infraction_type.code}/${record.infraction_type.desdobramento}` : '-'}</strong><span className="muted">{record.infraction_type?.description || record.description}</span></div></td>
@@ -351,7 +353,7 @@ export default function FinesPage() {
                   <td data-label="Valor">{formatMoney(record.amount)}</td>
                   <td data-label="Status"><StatusChip tone={fineStatusTone(record.status)}>{record.status}</StatusChip></td>
                   {canEditFine ? <td data-label="Ações"><ActionMenu label={`Ações da multa ${record.ticket_number}`} items={[{ key: 'edit', label: 'Editar multa', onClick: () => openEdit(record) }]} /></td> : null}
-                </tr>
+                </ResponsiveRecord>
               ))}
             </tbody>
           </table>
@@ -364,7 +366,7 @@ export default function FinesPage() {
         <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
           <div className="form-field">
             <label>Veículo</label>
-            <SearchableSelect value={form.vehicle_id} onChange={handleVehicleChange} options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(vehicleOption)} placeholder="Selecionar veículo" searchPlaceholder="Buscar veículo por placa, RENAVAM, marca ou modelo" />
+            <SearchableSelect value={form.vehicle_id} onChange={handleVehicleChange} options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(vehicleOption)} onOpen={loadAux} placeholder="Selecionar veículo" searchPlaceholder="Buscar veículo por placa, RENAVAM, marca ou modelo" />
           </div>
           <div className="form-field">
             <label>Condutor</label>

@@ -8,7 +8,7 @@ import useFuelSupplyOrderForm from '../hooks/useFuelSupplyOrderForm'
 function buildVehicleOption(vehicle) {
   const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
   return {
-    value: vehicle.id,
+    value: vehicle.id, tags: vehicle.tags || [],
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
     description: locationLabel,
     keywords: [vehicle.plate, vehicle.brand, vehicle.model, locationLabel].filter(Boolean).join(' '),
@@ -29,7 +29,7 @@ function buildDefaultDeadline() {
   return toDateTimeLocalValue(deadline.toISOString())
 }
 
-export default function FuelSupplyOrderCreateForm({ vehicles = [], organizations = [], fuelStations = [], onClose, onSuccess }) {
+export default function FuelSupplyOrderCreateForm({ vehicles = [], onVehicleOptionsOpen, organizations = [], fuelStations = [], onClose, onSuccess }) {
   const [form, setForm] = useFuelSupplyOrderForm(() => ({
     vehicle_id: '',
     expires_at: buildDefaultDeadline(),
@@ -96,7 +96,7 @@ export default function FuelSupplyOrderCreateForm({ vehicles = [], organizations
       <div className="form-field">
         <label>Veículo</label>
         <SearchableSelect
-          value={form.vehicle_id}
+          value={form.vehicle_id} onOpen={onVehicleOptionsOpen}
           onChange={(value) => setForm((current) => ({ ...current, vehicle_id: value }))}
           options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(buildVehicleOption)}
           placeholder="Selecione o veículo"

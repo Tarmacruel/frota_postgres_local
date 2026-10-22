@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AppIcon } from './AppIcon'
+import { VehicleTagBadges } from './VehicleTags'
+import { tagSummary } from '../utils/vehicleTags'
 
 export default function SearchableSelect({
   value,
@@ -17,11 +19,13 @@ export default function SearchableSelect({
   onSearch,
   loading = false,
   loadingLabel = 'Buscando...',
+  onOpen,
 }) {
   const rootRef = useRef(null)
   const inputRef = useRef(null)
   const panelRef = useRef(null)
   const [open, setOpen] = useState(false)
+  const [refreshError, setRefreshError] = useState('')
   const [query, setQuery] = useState('')
   const [openUpward, setOpenUpward] = useState(false)
   const [panelStyle, setPanelStyle] = useState(null)
@@ -38,7 +42,7 @@ export default function SearchableSelect({
     if (!term) return options
 
     return options.filter((option) => {
-      const haystack = [option.label, option.description, option.keywords]
+      const haystack = [option.label, option.description, option.keywords, tagSummary(option.tags)]
         .filter(Boolean)
         .join(' ')
         .toLowerCase()
@@ -132,12 +136,20 @@ export default function SearchableSelect({
       <button
         type="button"
         className="searchable-select-trigger"
-        onClick={() => !disabled && setOpen((current) => !current)}
+        onClick={() => {
+          if (disabled) return
+          if (!open && onOpen) {
+            setRefreshError('')
+            Promise.resolve().then(() => onOpen()).catch(() => setRefreshError('Não foi possível atualizar as opções. Os dados da última consulta continuam visíveis.'))
+          }
+          setOpen((current) => !current)
+        }}
         disabled={disabled}
         aria-label={ariaLabel}
       >
         <span className={`searchable-select-value${selectedOption ? '' : ' is-placeholder'}`}>
           {selectedOption?.label || placeholder}
+          <VehicleTagBadges tags={selectedOption?.tags} interactive={false} />
         </span>
         <AppIcon name={open ? 'chevron-up' : 'chevron-down'} className="app-icon" />
       </button>
@@ -163,6 +175,7 @@ export default function SearchableSelect({
                 </button>
               ) : null}
 
+              {refreshError ? <p role="alert" className="searchable-select-empty">{refreshError}</p> : null}
               <div className="searchable-select-options" onWheel={handleWheel}>
                 {loading ? (
                   <div className="searchable-select-empty">{loadingLabel}</div>
@@ -175,11 +188,12 @@ export default function SearchableSelect({
                       type="button"
                       className={`searchable-select-option${String(option.value) === String(value) ? ' is-selected' : ''}`}
                       title={option.description || option.label}
-                      aria-label={option.description ? `${option.label}. ${option.description}` : option.label}
+                      aria-label={[option.label, option.description, option.tags?.length ? `Etiquetas: ${tagSummary(option.tags)}` : null].filter(Boolean).join(". ")}
                       onClick={() => handleSelect(option.value)}
                     >
                       <strong>{option.label}</strong>
                       {option.description ? <span>{option.description}</span> : null}
+                      <VehicleTagBadges tags={option.tags} interactive={false} />
                     </button>
                   ))
                 )}

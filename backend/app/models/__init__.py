@@ -151,3 +151,5 @@ __all__ = [
     "VehiclePossessionTripStatus",
     "VehiclePossessionReturnConfirmation",
 ]
+
+from app.models.vehicle_tag import VehicleTag, VehicleTagAssignment

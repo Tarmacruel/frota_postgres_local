@@ -17,6 +17,10 @@ export default function VehicleLoanRegularization({ onClose, onSaved }) {
   const [error, setError] = useState('')
   const [retry, setRetry] = useState(0)
   const sending = useRef(false)
+  async function refreshVehicleCatalog() {
+    const { data } = await vehicleLoansAPI.regularizationCatalog()
+    setCatalog(data)
+  }
   useEffect(() => {
     let current = true
     setError('')
@@ -66,7 +70,7 @@ export default function VehicleLoanRegularization({ onClose, onSaved }) {
   const allocations = (org) => (catalog?.allocations || []).filter((item) => item.organization_id === org)
   const vehicle = catalog?.vehicles.find((item) => item.id === form.vehicle_id)
   const ownerChange = vehicle && form.origin && vehicle.owner_organization_id !== form.origin
-  const select = (key, label, options) => <VehicleLoanSelect label={label} options={options} value={form[key]}
+  const select = (key, label, options) => <VehicleLoanSelect label={label} options={options} value={form[key]} onOpen={key === 'vehicle_id' ? refreshVehicleCatalog : undefined}
     disabled={!catalog || busy || !options.length} onChange={(value) => change(key, value)} />
   const input = (key, label, type = 'text', required = true) => <label className="loan-field">{label}<input className="app-input" type={type} required={required} min={type === 'number' ? 0 : undefined} step={type === 'number' ? '0.1' : undefined} value={form[key]} onChange={(event) => change(key, event.target.value)} /></label>
   const area = (key, label, minLength = 8, maxLength = 2000) => <label className="loan-field">{label}<textarea className="app-input" rows={3} required minLength={minLength} maxLength={maxLength} value={form[key]} onChange={(event) => change(key, event.target.value)} /></label>

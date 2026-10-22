@@ -45,7 +45,10 @@ async def loan_catalog(db, user):
     orgs = (await db.scalars(select(Organization).order_by(Organization.name))).all()
     allocations = (await db.scalars(select(Allocation).options(
         joinedload(Allocation.department).joinedload(Department.organization)).order_by(Allocation.name))).all()
-    return {'vehicles': [{'id': row.id, 'plate': row.plate, 'brand': row.brand, 'model': row.model,
+    from app.services.vehicle_tag_service import with_vehicle_tags
+    tagged = await with_vehicle_tags(db, [{'id': row.id, 'tags': []} for row in vehicles], user)
+    tag_map = {row['id']: row['tags'] for row in tagged}
+    return {'vehicles': [{'id': row.id, 'tags': tag_map.get(row.id, []), 'plate': row.plate, 'brand': row.brand, 'model': row.model,
                          'owner_organization_id': row.owner_organization_id} for row in vehicles],
             'organizations': [{'id': row.id, 'name': row.name} for row in orgs],
             'allocations': [{'id': row.id, 'organization_id': row.organization_id,

@@ -5,7 +5,7 @@ import DocumentSignaturePanel from '../components/DocumentSignaturePanel'
 import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
 import FuelSupplyOrderConfirmForm from '../components/FuelSupplyOrderConfirmForm'
-import { ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
+import { MobileFilters, ResponsiveRecord, ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 import { DIGITAL_DOCUMENT_TYPES } from '../api/documentSignatures'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { useAuth } from '../context/AuthContext'
@@ -181,6 +181,7 @@ export default function FuelSupplyOrdersPage() {
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
+          <MobileFilters activeCount={organizationFilter ? 1 : 0}>
           <SearchableSelect
             value={organizationFilter}
             onChange={setOrganizationFilter}
@@ -189,6 +190,7 @@ export default function FuelSupplyOrdersPage() {
             searchPlaceholder="Buscar secretaria"
           />
           <button className="ghost-button" type="button" onClick={loadOrders}>Atualizar</button>
+          </MobileFilters>
         </div>
       </div>
 
@@ -216,7 +218,7 @@ export default function FuelSupplyOrdersPage() {
               {!loading && paginatedOrders.map((order) => {
                 const deadlineMeta = getDeadlineMeta(order)
                 return (
-                  <tr key={order.id}>
+                  <ResponsiveRecord key={order.id} label={order.vehicle_plate} identityLabel="Veículo" summaryLabels={["Ordem", "Posto", "Prazo"]}>
                     <td data-label="Ordem">{formatOrderNumber(order)}</td>
                     <td data-label="Veículo">
                       <div className="operation-vehicle-identity">
@@ -262,7 +264,7 @@ export default function FuelSupplyOrdersPage() {
                         />
                       </div>
                     </td>
-                  </tr>
+                  </ResponsiveRecord>
                 )
               })}
             </tbody>
