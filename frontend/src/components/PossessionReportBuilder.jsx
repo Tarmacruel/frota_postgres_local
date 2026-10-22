@@ -4,6 +4,7 @@ import { getApiBlobErrorMessage, getApiErrorMessage } from '../utils/apiError'
 import { getHttpStatus } from '../utils/httpError'
 import DriverSelect from './DriverSelect'
 import Modal from './Modal'
+import SearchableSelect from './SearchableSelect'
 
 const EMPTY_FILTERS = {
   date_from: '',
@@ -50,7 +51,7 @@ function normalizeFilters(filters, mode) {
   return result
 }
 
-export default function PossessionReportBuilder({ vehicles = EMPTY_VEHICLES, initialFilters = EMPTY_INITIAL_FILTERS }) {
+export default function PossessionReportBuilder({ vehicles = EMPTY_VEHICLES, initialFilters = EMPTY_INITIAL_FILTERS, onVehicleOptionsOpen }) {
   const titleId = useId()
   const firstControlRef = useRef(null)
   const [metadata, setMetadata] = useState(null)
@@ -340,10 +341,8 @@ export default function PossessionReportBuilder({ vehicles = EMPTY_VEHICLES, ini
               </label>
               <label>
                 Veículo
-                <select className="app-input" value={filters.vehicle_id} onChange={(event) => setFilters({ ...filters, vehicle_id: event.target.value })}>
-                  <option value="">Todos os veículos</option>
-                  {vehicles.map((vehicle) => <option key={vehicle.id} value={vehicle.id}>{vehicle.plate} · {vehicle.brand} {vehicle.model}</option>)}
-                </select>
+                <SearchableSelect ariaLabel="Veículo" onOpen={onVehicleOptionsOpen} value={filters.vehicle_id} onChange={(value) => setFilters({ ...filters, vehicle_id: value })}
+                  options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map((vehicle) => ({ value: vehicle.id, label: `${vehicle.plate} · ${vehicle.brand} ${vehicle.model}`, tags: vehicle.tags || [] }))]} placeholder="Todos os veículos" searchPlaceholder="Buscar veículo" />
               </label>
               <div className="report-driver-filter">
                 <span>Condutor</span>

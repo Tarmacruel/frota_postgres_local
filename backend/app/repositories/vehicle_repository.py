@@ -108,6 +108,7 @@ class VehicleRepository:
         limit: int,
         status: VehicleStatus | None = None,
         ownership_type: VehicleOwnershipType | None = None,
+        tag_ids: list[UUID] | None = None,
         search: str | None = None,
         sort: str = "created_at",
         order: str = "desc",
@@ -140,6 +141,11 @@ class VehicleRepository:
         if focus_id:
             conditions.append(Vehicle.id == focus_id)
         else:
+            if tag_ids:
+                from app.models.vehicle_tag import VehicleTagAssignment
+                conditions.append(select(VehicleTagAssignment.id).where(
+                    VehicleTagAssignment.vehicle_id == Vehicle.id, VehicleTagAssignment.tag_id.in_(tag_ids),
+                    VehicleTagAssignment.removed_at.is_(None)).correlate(Vehicle).exists())
             if status:
                 conditions.append(Vehicle.status == status)
             if ownership_type:

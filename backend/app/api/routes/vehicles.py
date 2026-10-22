@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.services.vehicle_tag_service import with_vehicle_tags
+
 from datetime import datetime
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
@@ -32,7 +34,7 @@ async def list_vehicles(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("vehicles", "view")),
 ):
-    return await VehicleService(db).list(skip=skip, limit=limit, status_filter=status_filter, current_user=current_user)
+    return await with_vehicle_tags(db, await VehicleService(db).list(skip=skip, limit=limit, status_filter=status_filter, current_user=current_user), current_user, vehicle_key="id")
 
 
 @router.get("/paginated", response_model=VehicleListResponse)
@@ -41,6 +43,7 @@ async def list_vehicles_paginated(
     limit: int = Query(default=10, ge=1, le=100),
     status_filter: VehicleStatus | None = Query(default=None, alias="status"),
     ownership_type: VehicleOwnershipType | None = Query(default=None),
+    tag_ids: list[UUID] = Query(default=[]),
     search: str | None = Query(default=None),
     filter_organization_id: UUID | None = Query(default=None),
     unassigned: bool = Query(default=False),
@@ -51,11 +54,12 @@ async def list_vehicles_paginated(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("vehicles", "view")),
 ):
-    return await VehicleService(db).list_paginated(
+    return await with_vehicle_tags(db, await VehicleService(db).list_paginated(
         page=page,
         limit=limit,
         status_filter=status_filter,
         ownership_type=ownership_type,
+        tag_ids=tag_ids,
         search=search,
         filter_organization_id=filter_organization_id,
         unassigned=unassigned,
@@ -64,7 +68,7 @@ async def list_vehicles_paginated(
         sort=sort,
         order=order,
         current_user=current_user,
-    )
+    ), current_user, vehicle_key="id")
 
 
 @router.get("/options")
@@ -72,7 +76,7 @@ async def list_vehicle_options(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("vehicles", "view")),
 ):
-    return await VehicleService(db).list_options(current_user)
+    return await with_vehicle_tags(db, await VehicleService(db).list_options(current_user), current_user, vehicle_key="id")
 
 
 @router.get("/locations", response_model=list[str])
@@ -88,7 +92,7 @@ async def vehicles_active(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("vehicles", "view")),
 ):
-    return await VehicleService(db).list(skip=0, limit=VEHICLE_LIST_DEFAULT_LIMIT, status_filter=VehicleStatus.ATIVO, current_user=current_user)
+    return await with_vehicle_tags(db, await VehicleService(db).list(skip=0, limit=VEHICLE_LIST_DEFAULT_LIMIT, status_filter=VehicleStatus.ATIVO, current_user=current_user), current_user, vehicle_key="id")
 
 
 @router.get("/em-manutencao", response_model=list[VehicleOut])
@@ -96,7 +100,7 @@ async def vehicles_maintenance(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("vehicles", "view")),
 ):
-    return await VehicleService(db).list(skip=0, limit=VEHICLE_LIST_DEFAULT_LIMIT, status_filter=VehicleStatus.MANUTENCAO, current_user=current_user)
+    return await with_vehicle_tags(db, await VehicleService(db).list(skip=0, limit=VEHICLE_LIST_DEFAULT_LIMIT, status_filter=VehicleStatus.MANUTENCAO, current_user=current_user), current_user, vehicle_key="id")
 
 
 @router.get("/inativos", response_model=list[VehicleOut])
@@ -104,7 +108,7 @@ async def vehicles_inactive(
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("vehicles", "view")),
 ):
-    return await VehicleService(db).list(skip=0, limit=VEHICLE_LIST_DEFAULT_LIMIT, status_filter=VehicleStatus.INATIVO, current_user=current_user)
+    return await with_vehicle_tags(db, await VehicleService(db).list(skip=0, limit=VEHICLE_LIST_DEFAULT_LIMIT, status_filter=VehicleStatus.INATIVO, current_user=current_user), current_user, vehicle_key="id")
 
 
 @router.post("", response_model=VehicleOut, status_code=status.HTTP_201_CREATED)

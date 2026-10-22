@@ -47,12 +47,21 @@ export default function ActionMenu({ items = [], label = 'Mais ações', classNa
 
   useEffect(() => {
     if (!expanded) return undefined
+    const previousOverflow = document.body.style.overflow
+    const mobile = window.innerWidth <= 720
+    if (mobile) document.body.style.overflow = 'hidden'
     function dismissOutside(event) {
+      if (event.type === 'pointerdown' && event.target.classList?.contains('mobile-action-scrim')) {
+        event.preventDefault()
+        close(true)
+        return
+      }
       if (!rootRef.current?.contains(event.target) && !panelRef.current?.contains(event.target)) setOpen(false)
     }
     document.addEventListener('pointerdown', dismissOutside)
     document.addEventListener('focusin', dismissOutside)
     return () => {
+      if (mobile) document.body.style.overflow = previousOverflow
       document.removeEventListener('pointerdown', dismissOutside)
       document.removeEventListener('focusin', dismissOutside)
     }
@@ -105,8 +114,11 @@ export default function ActionMenu({ items = [], label = 'Mais ações', classNa
         <span className="ui-action-menu__dots" aria-hidden="true">•••</span>
       </button>
       {expanded && createPortal(
+        <>
+        <button className="mobile-action-scrim" type="button" tabIndex={-1} aria-label="Fechar opções" onClick={() => close(true)} />
         <div ref={panelRef} id={menuId} className="ui-action-menu__panel" role="menu"
           aria-labelledby={triggerId} style={position} onKeyDown={onMenuKeyDown}>
+          <div className="mobile-action-heading" aria-hidden="true">{label}</div>
           {visibleItems.map((item) => (
             <button key={item.key || item.label} type="button" role="menuitem" tabIndex={-1}
               className="ui-action-menu__item" data-tone={item.tone || 'default'} disabled={item.disabled}
@@ -115,7 +127,7 @@ export default function ActionMenu({ items = [], label = 'Mais ações', classNa
               <span>{item.label}</span>
             </button>
           ))}
-        </div>, document.body,
+        </div></>, document.body,
       )}
     </div>
   )

@@ -30,6 +30,7 @@ export default function Pagination({ currentPage, totalPages, onPageChange }) {
         {pages.at(-1) < totalPages - 1 ? <span className="pagination-ellipsis" aria-hidden="true">…</span> : null}
         {showLast ? <button type="button" className="pagination-page" onClick={() => onPageChange(totalPages)} aria-label={`Página ${totalPages}`}>{totalPages}</button> : null}
       </div>
+      <span className="pagination-mobile-position" aria-hidden="true">{currentPage} de {totalPages}</span>
       <button type="button" className="ghost-button" onClick={() => onPageChange(currentPage + 1)} disabled={currentPage >= totalPages}>
         Próxima &gt;
       </button>

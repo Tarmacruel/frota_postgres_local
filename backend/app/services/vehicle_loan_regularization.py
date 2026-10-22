@@ -37,6 +37,8 @@ async def regularization_catalog(db, user):
     catalog = await loan_catalog(db, user)
     vehicles = (await db.scalars(select(Vehicle).order_by(Vehicle.plate))).all()
     catalog['vehicles'] = [{'id': v.id, 'plate': v.plate, 'owner_organization_id': v.owner_organization_id} for v in vehicles]
+    from app.services.vehicle_tag_service import with_vehicle_tags
+    catalog['vehicles'] = await with_vehicle_tags(db, catalog['vehicles'], user)
     return catalog
 
 

@@ -17,6 +17,8 @@ const mocks = vi.hoisted(() => ({
   pendingLoans: vi.fn(),
   getFuelSupplyOrdersBatchGuide: vi.fn(),
   acknowledgeFuelSupplyOrdersBatchGuide: vi.fn(),
+  getVehicleTags: vi.fn(),
+  acknowledgeVehicleTags: vi.fn(),
   mustChangePassword: false,
   mustRegisterCpf: false,
 }))
@@ -55,6 +57,8 @@ vi.mock('../api/documentSignatures', () => ({
 
 vi.mock('../api/featureGuides', () => ({
   featureGuidesAPI: {
+    getVehicleTags: mocks.getVehicleTags,
+    acknowledgeVehicleTags: mocks.acknowledgeVehicleTags,
     getFuelSupplyOrdersBatch: mocks.getFuelSupplyOrdersBatchGuide,
     acknowledgeFuelSupplyOrdersBatch: mocks.acknowledgeFuelSupplyOrdersBatchGuide,
   },
@@ -94,6 +98,7 @@ function mobileRoutes() {
 describe('Layout global shell', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.getVehicleTags.mockResolvedValue({ data: { acknowledged: true } })
     window.localStorage.clear()
     window.scrollTo = vi.fn()
     mocks.allowedModules = new Set(['vehicles', 'vehicle_loans', 'possession', 'drivers'])
@@ -144,6 +149,31 @@ describe('Layout global shell', () => {
     expect(container.querySelector('.app-shell')).toHaveClass('sidebar-compact')
     expect(window.localStorage.getItem('frota-sidebar-compact')).toBe('1')
   })
+
+  it('abre todos os módulos pela barra inferior e devolve foco para Menu ao fechar', async () => {
+    const user = userEvent.setup()
+    renderLayout('/vehicles')
+    const trigger = screen.getByRole('button', { name: 'Todos os módulos' })
+    await user.click(trigger)
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    const navigation = screen.getByRole('complementary', { name: 'Navegação principal' })
+    expect(within(navigation).getByRole('link', { name: 'Condutores. Motoristas' })).toHaveAttribute('href', '/condutores')
+    await user.keyboard('{Escape}')
+    expect(trigger).toHaveFocus()
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+  })
+
+  it('abre as ações da conta e fecha com Escape mantendo seu acionador', async () => {
+    const user = userEvent.setup()
+    renderLayout('/vehicles')
+    const trigger = screen.getByRole('button', { name: 'Abrir ações da conta' })
+    await user.click(trigger)
+    expect(trigger).toHaveAttribute('aria-expanded', 'true')
+    expect(document.getElementById(trigger.getAttribute('aria-controls'))).toHaveClass('is-open')
+    await user.keyboard('{Escape}')
+    expect(trigger).toHaveAttribute('aria-expanded', 'false')
+    expect(trigger).toHaveFocus()
+  })
 })
 
 it('exibe contador de empréstimos no menu sem apagá-lo ao abrir a guia', async () => {
@@ -190,7 +220,6 @@ describe('Layout mobile quick actions', () => {
       '/',
       '/vehicles',
       '/posses',
-      '/condutores',
       '/abastecimentos?acao=nova-ordem',
     ])
 
@@ -199,10 +228,11 @@ describe('Layout mobile quick actions', () => {
     const createOrderLink = within(mobileNavigation).getByRole('link', { name: 'Registrar ordem de abastecimento' })
     expect(createOrderLink).toHaveAttribute('href', '/abastecimentos?acao=nova-ordem')
     expect(createOrderLink).not.toHaveAttribute('aria-current')
-    expect(within(mobileNavigation).getByRole('link', { name: 'Condutores' })).toHaveTextContent('Condut.')
+    expect(within(mobileNavigation).getByRole('button', { name: 'Todos os módulos' })).toHaveAttribute('aria-controls', 'app-navigation')
     expect(within(mobileNavigation).queryByText('Manutenções')).not.toBeInTheDocument()
 
     const operationalNavigation = screen.getByRole('navigation', { name: 'Operacional' })
+    expect(within(operationalNavigation).getByRole('link', { name: 'Condutores. Motoristas' })).toHaveAttribute('href', '/condutores')
     expect(within(operationalNavigation).getByRole('link', { name: 'Manutenções. Custos' })).toHaveAttribute('href', '/manutencoes')
     expect(within(operationalNavigation).getByRole('link', { name: 'Ordens abertas. Pendentes' })).toHaveAttribute('href', '/ordens-abastecimento')
   })

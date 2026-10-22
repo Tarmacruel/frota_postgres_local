@@ -204,6 +204,8 @@ app.include_router(data_imports_router)
 app.include_router(document_signatures_router)
 app.include_router(document_artifacts_router)
 app.include_router(drivers_router)
+from app.api.routes.vehicle_tags import router as vehicle_tags_router
+app.include_router(vehicle_tags_router)
 app.include_router(vehicles_router)
 app.include_router(maintenance_router)
 app.include_router(possession_router)

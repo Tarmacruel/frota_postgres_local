@@ -6,6 +6,8 @@ import AccordionSection from '../components/AccordionSection'
 import BadgeOwnership from '../components/BadgeOwnership'
 import DriverBadge from '../components/DriverBadge'
 import Modal from '../components/Modal'
+import { MyVehicleTagsModal, VehicleTagsManager, VehicleTagBadges, VehicleTagFilter } from '../components/VehicleTags'
+import { tagSummary } from '../utils/vehicleTags'
 import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
@@ -13,7 +15,7 @@ import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
-import { ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
+import { ResponsiveRecord, MobileFilters, ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 
 const initialForm = {
   plate: '',
@@ -198,7 +200,7 @@ function buildVehicleReportPlacement(vehicle) {
 function buildVehicleOption(vehicle) {
   const locationLabel = buildVehicleLocationLabel(vehicle)
   return {
-    value: vehicle.id,
+    value: vehicle.id, tags: vehicle.tags || [],
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
     description: `${getOwnershipLabel(vehicle.ownership_type)} | ${locationLabel}`,
     keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.chassis_number, locationLabel, vehicle.current_driver_name]
@@ -249,6 +251,7 @@ const vehicleHistoryFieldLabels = {
 
 function getVehicleHistoryTypeLabel(value) {
   if (value === 'MOVEMENT') return 'Movimentação'
+  if (value === 'TAG') return 'Etiqueta'
   if (value === 'CREATE') return 'Cadastro'
   return 'Edição'
 }
@@ -262,6 +265,9 @@ function formatVehicleHistoryFieldValue(field, value) {
 }
 
 function buildVehicleHistoryChangeLines(item) {
+  if (item.event_type === 'TAG') {
+    return [item.action === 'TAG_APPLY' ? 'Marcação de comunicação visual adicionada ao veículo.' : 'Marcação retirada do veículo; histórico preservado.']
+  }
   if (item.event_type === 'MOVEMENT') {
     return [
       `Lotação: ${item.display_name || item.department || 'Não informada'}`,
@@ -302,6 +308,10 @@ export default function VehiclesPage() {
   const canDeleteVehicle = canDeleteModule('vehicles')
   const [searchParams, setSearchParams] = useSearchParams()
   const [vehicles, setVehicles] = useState([])
+  const [tagFilter, setTagFilter] = useState([])
+  const [tagsOpen, setTagsOpen] = useState(false)
+  const [tagVehicle, setTagVehicle] = useState(null)
+  const [tagsRevision, setTagsRevision] = useState(0)
   const [form, setForm] = useState(initialForm)
   const [selectedHistory, setSelectedHistory] = useState([])
   const [selectedVehicle, setSelectedVehicle] = useState(null)
@@ -401,13 +411,14 @@ export default function VehiclesPage() {
     { header: 'Secretaria', value: (vehicle) => buildVehicleOrganizationLabel(vehicle), width: 106 },
     { header: 'Lotação atual', value: (vehicle) => buildVehicleLocationLabel(vehicle) },
     { header: 'Condutor atual', value: (vehicle) => vehicle.current_driver_name || '—' },
+    { header: 'Etiquetas atuais', value: (vehicle) => tagSummary(vehicle.tags) || '—' },
     { header: 'Atualizado em', value: (vehicle) => formatDate(vehicle.updated_at), align: 'center', width: 92 },
   ]
 
   const pdfExportColumns = [
     { header: 'Placa', value: (vehicle) => formatPlate(vehicle.plate), align: 'center', width: 58 },
     { header: 'Chassi', value: (vehicle) => formatChassis(vehicle.chassis_number), align: 'center', width: 88 },
-    { header: 'Veículo', value: buildVehicleReportDescription, width: 128 },
+    { header: 'Veículo / Etiquetas atuais', value: (vehicle) => [buildVehicleReportDescription(vehicle), tagSummary(vehicle.tags)].filter(Boolean).join('\n'), width: 128 },
     { header: 'Propr. / Status', value: buildVehicleReportStatus, align: 'center', width: 82 },
     { header: 'Secretaria / Lotação', value: buildVehicleReportPlacement, width: 244 },
     { header: 'Condutor', value: (vehicle) => vehicle.current_driver_name || '—', width: 78 },
@@ -425,6 +436,7 @@ export default function VehiclesPage() {
       unassigned: organizationFilter === unassignedOrganizationFilter && !focusedId ? true : undefined,
       location: locationFilter !== 'TODOS' && !focusedId ? locationFilter : undefined,
       focus_id: focusedId || undefined,
+      tag_ids: tagFilter.length && !focusedId ? tagFilter.map((tag) => tag.id) : undefined,
     }
   }
 
@@ -433,7 +445,7 @@ export default function VehiclesPage() {
     try {
       setLoading(true)
       setError('')
-      const { data } = await api.get('/vehicles/paginated', { params: buildListParams(page) })
+      const { data } = await api.get('/vehicles/paginated', { params: buildListParams(page), ...(tagFilter.length ? { paramsSerializer: { indexes: null } } : {}) })
       if (request !== listRequest.current) return
       if (page > data.pagination.pages) {
         setCurrentPage(data.pagination.pages)
@@ -471,11 +483,11 @@ export default function VehiclesPage() {
     listRequest.current += 1
     const timer = setTimeout(() => loadVehicles(), search.trim() ? 250 : 0)
     return () => clearTimeout(timer)
-  }, [currentPage, search, organizationFilter, locationFilter, ownershipFilter, statusFilter, focusVehicleId])
+  }, [currentPage, search, organizationFilter, locationFilter, ownershipFilter, statusFilter, focusVehicleId, tagFilter])
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, organizationFilter, locationFilter, ownershipFilter, statusFilter, focusVehicleId])
+  }, [search, organizationFilter, locationFilter, ownershipFilter, statusFilter, focusVehicleId, tagFilter])
 
   useEffect(() => {
     if (!focusVehicleId) {
@@ -611,6 +623,7 @@ export default function VehiclesPage() {
     setOrganizationFilter('TODOS')
     setLocationFilter('TODOS')
     setOwnershipFilter('TODOS')
+    setTagFilter([])
     clearHistoryFocus(false)
     const next = new URLSearchParams(searchParams)
     next.delete('status')
@@ -724,7 +737,7 @@ export default function VehiclesPage() {
         subtitle: 'Relatório dos veículos filtrados no painel operacional.',
         columns: pdfExportColumns,
         rows,
-        filters: buildFilterSummary(statusFilter, ownershipFilter, organizationFilter, locationFilter, search, organizationFilterOptions, locationOptions),
+        filters: [...buildFilterSummary(statusFilter, ownershipFilter, organizationFilter, locationFilter, search, organizationFilterOptions, locationOptions), ...(tagFilter.length ? [{ label: 'Etiquetas atuais', value: tagFilter.map((tag) => `${tag.name} (${tag.owner_name})`).join(' ou ') }] : [])],
         summaryMetrics: buildVehicleReportMetrics(rows),
         summaryChartItems: [
           { label: 'Ativos', value: visibleActiveVehicles, tone: 'green' },
@@ -757,7 +770,7 @@ export default function VehiclesPage() {
         sheetName: 'Veículos',
         columns: xlsxExportColumns,
         rows,
-        filters: buildFilterSummary(statusFilter, ownershipFilter, organizationFilter, locationFilter, search, organizationFilterOptions, locationOptions),
+        filters: [...buildFilterSummary(statusFilter, ownershipFilter, organizationFilter, locationFilter, search, organizationFilterOptions, locationOptions), ...(tagFilter.length ? [{ label: 'Etiquetas atuais', value: tagFilter.map((tag) => `${tag.name} (${tag.owner_name})`).join(' ou ') }] : [])],
       })
       setFeedback('Exportação em XLSX iniciada com sucesso.')
     } catch (err) {
@@ -769,7 +782,7 @@ export default function VehiclesPage() {
     const rows = []
     let page = 1
     while (true) {
-      const { data } = await api.get('/vehicles/paginated', { params: { ...buildListParams(page), limit: 100 } })
+      const { data } = await api.get('/vehicles/paginated', { params: { ...buildListParams(page), limit: 100 }, ...(tagFilter.length ? { paramsSerializer: { indexes: null } } : {}) })
       rows.push(...data.data)
       if (page >= data.pagination.pages) break
       page += 1
@@ -858,6 +871,8 @@ export default function VehiclesPage() {
         description="Gerencie placa, chassi, tipo do veículo e lotação estruturada sem sair da consulta principal."
         actions={(
           <>
+          {canEditVehicle ? <button className="secondary-button" type="button" data-tour="vehicle-tags-catalog" onClick={() => setTagsOpen(true)}>Minhas etiquetas</button> : null}
+          <button className="ghost-button" type="button" onClick={() => { loadVehicles(); setTagsRevision((value) => value + 1) }}>Atualizar</button>
           {canCreateVehicle ? <button className="app-button" type="button" onClick={openNewVehicleModal}>Novo veículo</button> : null}
           <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
@@ -886,6 +901,7 @@ export default function VehiclesPage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
+            <MobileFilters activeCount={[organizationFilter !== 'TODOS', locationFilter !== 'TODOS', ownershipFilter !== 'TODOS', tagFilter.length > 0].filter(Boolean).length}>
             <SearchableSelect
               value={organizationFilter}
               onChange={setOrganizationFilter}
@@ -906,7 +922,9 @@ export default function VehiclesPage() {
                 <option key={option.value} value={option.value}>{option.label}</option>
               ))}
             </select>
+            <span data-tour="vehicle-tags-filter"><VehicleTagFilter value={tagFilter} onChange={setTagFilter} refreshKey={tagsRevision} /></span>
             <button className="ghost-button" type="button" onClick={clearFilters}>Limpar filtros</button>
+            </MobileFilters>
           </div>
         </div>
       </div>
@@ -977,12 +995,13 @@ export default function VehiclesPage() {
                 </tr>
               ) : (
                 paginatedVehicles.map((vehicle) => (
-                  <tr key={vehicle.id} className={selectedVehicle?.id === vehicle.id ? 'is-focused-row' : ''}>
+                  <ResponsiveRecord key={vehicle.id} className={selectedVehicle?.id === vehicle.id ? 'is-focused-row' : ''} label={vehicle.plate} identityLabel="Placa" summaryLabels={["Modelo", "Lotação atual"]}>
                     <td data-label="Placa">
                       <div className="operation-vehicle-identity">
                         <VehicleThumbnail vehicleType={vehicle.vehicle_type} plate={vehicle.plate} />
                         <span>
                           <strong>{vehicle.plate}</strong>
+                          <VehicleTagBadges tags={vehicle.tags} />
                           {vehicle.loan_status ? <StatusChip tone="info">{vehicle.loan_status === 'RECEBIDO' ? 'Recebido por empréstimo' : 'Emprestado'}</StatusChip> : null}
                         </span>
                       </div>
@@ -1008,13 +1027,14 @@ export default function VehiclesPage() {
                         <ActionMenu
                           label={`Mais ações do veículo ${vehicle.plate}`}
                           items={[
+                            { key: 'tags', label: 'Gerenciar etiquetas', icon: 'catalog', hidden: !canEditVehicle || vehicle.can_manage_registration === false, onClick: () => setTagVehicle(vehicle) },
                             { key: 'edit', label: 'Editar cadastro', icon: 'catalog', hidden: !canEditVehicle || vehicle.can_manage_registration === false, onClick: () => editVehicle(vehicle) },
                             { key: 'delete', label: 'Excluir veículo', icon: 'close', tone: 'danger', hidden: !canDeleteVehicle || vehicle.can_manage_registration === false, onClick: () => handleDelete(vehicle.id) },
                           ]}
                         />
                       </div>
                     </td>
-                  </tr>
+                  </ResponsiveRecord>
                 ))
               )}
             </tbody>
@@ -1022,6 +1042,8 @@ export default function VehiclesPage() {
         </div>
       </div>
 
+      {tagsOpen ? <MyVehicleTagsModal onClose={() => setTagsOpen(false)} onChanged={() => { loadVehicles(); setTagsRevision((value) => value + 1) }} /> : null}
+      {tagVehicle ? <VehicleTagsManager vehicle={tagVehicle} user={user} isAdmin={isAdmin} onClose={() => setTagVehicle(null)} onChanged={() => { loadVehicles(); setTagsRevision((value) => value + 1) }} /> : null}
       {!selectedVehicle ? <Pagination currentPage={currentPage} totalPages={totalPages} onPageChange={setCurrentPage} /> : null}
 
       <section className="surface-panel history-panel">
@@ -1103,8 +1125,8 @@ export default function VehiclesPage() {
                   ))}
                 </div>
                 <div className="history-item-justification">
-                  <span>Justificativa</span>
-                  <strong>{item.justification || 'Sem justificativa registrada'}</strong>
+                  <span>{item.action === 'TAG_APPLY' ? 'Observação' : 'Justificativa'}</span>
+                  <strong>{item.justification || (item.event_type === 'TAG' ? 'Não informada' : 'Sem justificativa registrada')}</strong>
                 </div>
               </li>
             ))}

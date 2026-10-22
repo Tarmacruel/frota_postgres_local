@@ -93,7 +93,7 @@ function revokePreviewUrl(url) {
   }
 }
 
-export default function PossessionForm({ vehicles, onClose, onSuccess, onUnauthorized }) {
+export default function PossessionForm({ vehicles, onVehicleOptionsOpen, onClose, onSuccess, onUnauthorized }) {
   const [form, setForm] = useState({
     vehicle_id: '',
     driver_id: '',
@@ -220,7 +220,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess, onUnautho
     const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
     const ownershipLabel = vehicle.ownership_type === 'LOCADO' ? 'Locado' : vehicle.ownership_type === 'CEDIDO' ? 'Cedido' : 'Próprio'
     return {
-      value: vehicle.id,
+      value: vehicle.id, tags: vehicle.tags || [],
       label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
       description: `${ownershipLabel} | ${locationLabel}`,
       keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.chassis_number, vehicle.current_driver_name, locationLabel]
@@ -577,7 +577,7 @@ export default function PossessionForm({ vehicles, onClose, onSuccess, onUnautho
       <div className="form-field">
         <label>Veículo</label>
         <SearchableSelect
-          value={form.vehicle_id}
+          value={form.vehicle_id} onOpen={onVehicleOptionsOpen}
           onChange={handleVehicleChange}
           options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(buildVehicleOption)}
           placeholder="Selecione o veículo"

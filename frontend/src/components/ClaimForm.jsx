@@ -13,7 +13,7 @@ const statusOptions = ['ABERTO', 'EM_ANALISE', 'ENCERRADO']
 function vehicleOption(vehicle) {
   const location = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
   return {
-    value: vehicle.id,
+    value: vehicle.id, tags: vehicle.tags || [],
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
     description: `${vehicle.ownership_type} | ${location}`,
     keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.chassis_number, location].filter(Boolean).join(' '),
@@ -22,6 +22,7 @@ function vehicleOption(vehicle) {
 
 export default function ClaimForm({
   vehicles,
+  onVehicleOptionsOpen,
   initialData = null,
   onSuccess,
   onClose,
@@ -124,7 +125,7 @@ export default function ClaimForm({
       <div className="form-field modal-field-span">
         <label>Veículo</label>
         <SearchableSelect
-          value={form.vehicle_id}
+          value={form.vehicle_id} onOpen={onVehicleOptionsOpen}
           onChange={(value) => setForm({ ...form, vehicle_id: value })}
           options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(vehicleOption)}
           placeholder="Selecione o veículo envolvido"

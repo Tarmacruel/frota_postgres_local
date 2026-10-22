@@ -2,6 +2,8 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { driversAPI } from '../api/drivers'
 import SearchableSelect from './SearchableSelect'
 import DriverRegistrationModal from './DriverRegistrationModal'
+import DriverLicenseNotice from './DriverLicenseNotice'
+import { getCnhIssues } from '../utils/driverLicense'
 
 function buildOption(driver) {
   const organizationLabel = driver.organization_name || 'Sem secretaria'
@@ -29,12 +31,59 @@ export default function DriverSelect({
   allowClear = false,
   clearLabel = 'Limpar seleção',
   requireRegistration = true,
+  checkLicense = requireRegistration,
 }) {
   const [drivers, setDrivers] = useState([])
   const [loading, setLoading] = useState(true)
   const [pendingDriver, setPendingDriver] = useState(null)
+  const [selectedDetails, setSelectedDetails] = useState(null)
+  const [licenseRefreshing, setLicenseRefreshing] = useState(false)
+  const [licenseRefreshError, setLicenseRefreshError] = useState('')
+  const [licenseFeedback, setLicenseFeedback] = useState('')
+  const licenseRequestRef = useRef(0)
+  const licenseBusyRef = useRef(false)
+  const editingLicenseRef = useRef(false)
+  const onChangeRef = useRef(onChange)
   const requestSequenceRef = useRef(0)
   const searchTimerRef = useRef(null)
+
+  useEffect(() => { onChangeRef.current = onChange }, [onChange])
+  useEffect(() => {
+    licenseRequestRef.current += 1
+    licenseBusyRef.current = false
+    editingLicenseRef.current = false
+    setLicenseRefreshing(false); setLicenseRefreshError(''); setLicenseFeedback('')
+    return () => { licenseRequestRef.current += 1 }
+  }, [value])
+
+  const refreshLicense = useCallback(async () => {
+    if (!value || !checkLicense || disabled || licenseBusyRef.current) return
+    licenseBusyRef.current = true
+    const sequence = ++licenseRequestRef.current
+    setLicenseRefreshing(true); setLicenseRefreshError(''); setLicenseFeedback('')
+    try {
+      const { data } = await driversAPI.getById(value)
+      if (sequence !== licenseRequestRef.current) return
+      if (!data || String(data.id) !== String(value)) throw new Error('Cadastro indisponível')
+      setSelectedDetails(data)
+      setDrivers((current) => [data, ...current.filter((item) => String(item.id) !== String(data.id))])
+      editingLicenseRef.current = false
+      onChangeRef.current?.(data)
+      setLicenseFeedback(getCnhIssues(data).length ? 'Consulta concluída. As pendências da CNH permanecem; regularize os dados indicados acima.' : 'Dados do condutor atualizados. A CNH está sem pendências no cadastro.')
+    } catch {
+      if (sequence === licenseRequestRef.current) setLicenseRefreshError('Não foi possível atualizar o cadastro. O aviso anterior foi mantido; tente novamente.')
+    } finally {
+      if (sequence === licenseRequestRef.current) { licenseBusyRef.current = false; setLicenseRefreshing(false) }
+    }
+  }, [value, checkLicense, disabled])
+
+  useEffect(() => {
+    if (!value || !checkLicense) return undefined
+    const onReturn = () => { if (editingLicenseRef.current && document.visibilityState !== 'hidden') refreshLicense() }
+    window.addEventListener('focus', onReturn)
+    document.addEventListener('visibilitychange', onReturn)
+    return () => { window.removeEventListener('focus', onReturn); document.removeEventListener('visibilitychange', onReturn) }
+  }, [value, checkLicense, refreshLicense])
 
   const loadDrivers = useCallback(async (search = '') => {
     const requestId = ++requestSequenceRef.current
@@ -85,6 +134,7 @@ export default function DriverSelect({
         const { data } = await driversAPI.getById(value)
         if (!cancelled && data) {
           setDrivers((current) => mergeDriver(current, data))
+          setSelectedDetails((current) => String(current?.id) === String(value) ? current : data)
         }
       } catch {
         // Se o registro não puder ser recuperado, preserva o comportamento normal do seletor.
@@ -99,6 +149,7 @@ export default function DriverSelect({
   }, [value, drivers])
 
   const options = useMemo(() => drivers.map(buildOption), [drivers])
+  const selectedDriver = String(selectedDetails?.id) === String(value) ? selectedDetails : drivers.find((driver) => String(driver.id) === String(value))
 
   useEffect(() => {
     if (!requireRegistration || disabled || pendingDriver || !value) return
@@ -121,11 +172,13 @@ export default function DriverSelect({
 
   function handleSelect(nextValue) {
     const nextOption = options.find((option) => String(option.value) === String(nextValue))
-    if (requireRegistration && nextOption?.driver && !nextOption.driver.matricula?.trim()) {
-      setPendingDriver(nextOption.driver)
+    const nextDriver = nextOption?.driver && String(nextOption.driver.id) === String(selectedDetails?.id) ? selectedDetails : nextOption?.driver
+    if (requireRegistration && nextDriver && !nextDriver.matricula?.trim()) {
+      setPendingDriver(nextDriver)
       return
     }
-    onChange?.(nextOption?.driver || null)
+    setSelectedDetails(nextDriver || null)
+    onChange?.(nextDriver || null)
   }
 
   function handleRegistrationSaved(driver) {
@@ -135,6 +188,7 @@ export default function DriverSelect({
     setLoading(false)
     setDrivers((current) => [driver, ...current.filter((item) => String(item.id) !== String(driver.id))])
     setPendingDriver(null)
+    setSelectedDetails(driver)
     onChange?.(driver)
   }
 
@@ -156,6 +210,8 @@ export default function DriverSelect({
         onSearch={handleSearch}
         loading={loading}
       />
+      {checkLicense && value && selectedDriver ? <DriverLicenseNotice driver={selectedDriver} disabled={disabled} refreshing={licenseRefreshing} error={licenseRefreshError} onEdit={() => { editingLicenseRef.current = true }} onRefresh={refreshLicense} /> : null}
+      {checkLicense && licenseFeedback ? <p className="driver-license-refresh-status" role="status">{licenseFeedback}</p> : null}
       {pendingDriver ? (
         <DriverRegistrationModal
           key={pendingDriver.id}

@@ -11,7 +11,7 @@ const ALLOWED_RECEIPT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'im
 function buildVehicleOption(vehicle) {
   const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
   return {
-    value: vehicle.id,
+    value: vehicle.id, tags: vehicle.tags || [],
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
     description: locationLabel,
     keywords: [vehicle.plate, vehicle.brand, vehicle.model, locationLabel].filter(Boolean).join(' '),
@@ -36,7 +36,7 @@ function buildFuelStationOption(station) {
   }
 }
 
-export default function FuelSupplyForm({ vehicles, drivers, organizations, fuelStations, onClose, onSuccess }) {
+export default function FuelSupplyForm({ vehicles, onVehicleOptionsOpen, drivers, organizations, fuelStations, onClose, onSuccess }) {
   const [form, setForm] = useState({
     vehicle_id: '',
     driver_id: '',
@@ -154,7 +154,7 @@ export default function FuelSupplyForm({ vehicles, drivers, organizations, fuelS
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
       <div className="form-field">
         <label>Veículo</label>
-        <SearchableSelect value={form.vehicle_id} onChange={(value) => setForm({ ...form, vehicle_id: value })} options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(buildVehicleOption)} placeholder="Selecione o veículo" searchPlaceholder="Buscar veículo" />
+        <SearchableSelect value={form.vehicle_id} onOpen={onVehicleOptionsOpen} onChange={(value) => setForm({ ...form, vehicle_id: value })} options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(buildVehicleOption)} placeholder="Selecione o veículo" searchPlaceholder="Buscar veículo" />
       </div>
       <div className="form-field">
         <label>Condutor</label>

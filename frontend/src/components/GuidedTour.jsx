@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { calculateTourLayout } from '../utils/guidedTourLayout'
 
@@ -71,11 +71,30 @@ function sameLayout(first, second) {
     && first.spotlight?.height === second.spotlight?.height
 }
 
-export default function GuidedTour({ steps = [], storageKey, replayToken = 0 }) {
+export default function GuidedTour({ steps = [], storageKey, replayToken = 0, autoStart = false, onFinish, onDismiss }) {
   const validSteps = useMemo(() => steps.filter((step) => step?.title && step?.description), [steps])
-  const [open, setOpen] = useState(() => !readCompleted(storageKey))
+  const [open, setOpen] = useState(() => autoStart || !readCompleted(storageKey))
   const [stepIndex, setStepIndex] = useState(0)
   const [layout, setLayout] = useState(null)
+  const [finishing, setFinishing] = useState(false)
+  const [finishError, setFinishError] = useState('')
+  const finishingRef = useRef(false)
+  const finish = useCallback(async (reason) => {
+    if (finishingRef.current) return
+    finishingRef.current = true
+    setFinishing(true)
+    setFinishError('')
+    try {
+      if (onFinish) await onFinish(reason)
+      if (storageKey) persistCompleted(storageKey)
+      setOpen(false)
+    } catch {
+      setFinishError('Não foi possível salvar a visualização do tour. Confira sua conexão e tente encerrar ou pular novamente.')
+    } finally {
+      finishingRef.current = false
+      setFinishing(false)
+    }
+  }, [onFinish, storageKey])
   const dialogRef = useRef(null)
   const previousFocusRef = useRef(null)
   const focusedStepRef = useRef(null)
@@ -246,8 +265,7 @@ export default function GuidedTour({ steps = [], storageKey, replayToken = 0 }) 
         event.preventDefault()
         event.stopPropagation()
         event.stopImmediatePropagation()
-        persistCompleted(storageKey)
-        setOpen(false)
+        finish('skipped')
         return
       }
       if (event.key !== 'Tab' || !dialogRef.current) return
@@ -265,16 +283,12 @@ export default function GuidedTour({ steps = [], storageKey, replayToken = 0 }) 
     }
     document.addEventListener('keydown', handleKeyDown)
     return () => document.removeEventListener('keydown', handleKeyDown)
-  }, [open, storageKey])
+  }, [open, finish])
 
   if (!open || validSteps.length === 0 || typeof document === 'undefined') return null
 
   const current = validSteps[activeStepIndex]
   const isLast = activeStepIndex === validSteps.length - 1
-  const finish = () => {
-    persistCompleted(storageKey)
-    setOpen(false)
-  }
   const dialogStyle = layout
     ? {
         left: `${layout.dialog.left}px`,
@@ -316,13 +330,14 @@ export default function GuidedTour({ steps = [], storageKey, replayToken = 0 }) 
           <h2 id="guided-tour-title">{current.title}</h2>
           <p id="guided-tour-description">{current.description}</p>
         </div>
+        {finishError ? <div className="alert alert-error" role="alert">{finishError}{onDismiss ? <><p>Se continuar sem salvar, o tour poderá aparecer no próximo acesso.</p><button type="button" className="ghost-button" onClick={() => { setOpen(false); onDismiss() }}>Continuar sem salvar</button></> : null}</div> : null}
         <div className="guided-tour-actions">
-          <button type="button" className="ghost-button" onClick={finish}>Pular tour</button>
+          <button type="button" className="ghost-button" disabled={finishing} onClick={() => finish('skipped')}>Pular tour</button>
           <div className="actions-inline">
             <button
               type="button"
               className="secondary-button"
-              disabled={activeStepIndex === 0}
+              disabled={finishing || activeStepIndex === 0}
               onClick={() => setStepIndex((value) => Math.max(0, value - 1))}
             >
               Anterior
@@ -330,9 +345,10 @@ export default function GuidedTour({ steps = [], storageKey, replayToken = 0 }) 
             <button
               type="button"
               className="app-button"
-              onClick={() => (isLast ? finish() : setStepIndex((value) => value + 1))}
+              disabled={finishing}
+              onClick={() => (isLast ? finish('completed') : setStepIndex((value) => value + 1))}
             >
-              {isLast ? 'Encerrar tour' : 'Próximo'}
+              {finishing ? 'Salvando...' : isLast ? 'Encerrar tour' : 'Próximo'}
             </button>
           </div>
         </div>

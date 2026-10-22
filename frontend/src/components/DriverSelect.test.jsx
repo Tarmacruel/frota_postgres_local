@@ -33,6 +33,110 @@ describe('DriverSelect', () => {
     driversAPI.listActive.mockResolvedValue({ data: [] })
   })
 
+  function ControlledDriver() {
+    const [form, setForm] = useState({ driver: null, note: '' })
+    return <><label>Observação<input value={form.note} onChange={(event) => setForm({ ...form, note: event.target.value })} /></label><DriverSelect value={form.driver?.id || ''} onChange={(driver) => setForm({ ...form, driver })} /></>
+  }
+
+  async function selectMatching(user) {
+    await user.click(screen.getByRole('button', { name: 'Condutor' }))
+    await user.click(await screen.findByRole('button', { name: /Condutor 321/ }))
+  }
+
+  it.each([
+    [{ cnh_numero: null, cnh_validade: null }, ['Número da CNH não informado', 'Validade da CNH não informada']],
+    [{ cnh_numero: '00123456789', cnh_validade: '2000-01-01' }, ['CNH vencida']],
+    [{ cnh_numero: null, cnh_validade: '2000-01-01' }, ['Número da CNH não informado', 'CNH vencida']],
+  ])('avisa as pendências de CNH %j sem impedir seleção nem alterar matrícula', async (license, labels) => {
+    const user = userEvent.setup()
+    driversAPI.listActive.mockResolvedValue({ data: [{ ...matchingDriver, ...license }] })
+    render(<ControlledDriver />)
+    await selectMatching(user)
+    const notice = screen.getByRole('alert')
+    for (const label of labels) expect(notice).toHaveTextContent(label)
+    expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    expect(screen.getByRole('link', { name: /Editar dados do condutor/ })).toHaveAttribute('href', '/condutores?editar=driver-321&regularizar=cnh')
+    expect(screen.getByRole('link', { name: /Editar dados do condutor/ })).toHaveAttribute('target', '_blank')
+    expect(driversAPI.update).not.toHaveBeenCalled()
+  })
+
+  it('não avisa cadastro completo nem interfere em consulta de relatório', async () => {
+    const user = userEvent.setup()
+    driversAPI.listActive.mockResolvedValue({ data: [{ ...matchingDriver, cnh_numero: '00123456789', cnh_validade: '2099-12-31' }] })
+    const { rerender } = render(<ControlledDriver />)
+    await selectMatching(user)
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+    rerender(<DriverSelect value={matchingDriver.id} onChange={vi.fn()} requireRegistration={false} />)
+    await waitFor(() => expect(driversAPI.listActive).toHaveBeenCalled())
+    expect(screen.queryByText('CNH precisa ser regularizada')).not.toBeInTheDocument()
+  })
+
+  it('orienta usuário sem edição e mantém o aviso sem oferecer o link', async () => {
+    const user = userEvent.setup()
+    auth.canEdit.mockReturnValue(false)
+    driversAPI.listActive.mockResolvedValue({ data: [matchingDriver] })
+    render(<ControlledDriver />)
+    await selectMatching(user)
+    expect(screen.getByRole('alert')).toHaveTextContent('Solicite a regularização')
+    expect(screen.queryByRole('link', { name: /Editar dados/ })).not.toBeInTheDocument()
+  })
+
+  it('atualiza ao retornar da edição e preserva o preenchimento mais recente da operação', async () => {
+    const user = userEvent.setup()
+    driversAPI.listActive.mockResolvedValue({ data: [matchingDriver] })
+    let resolve
+    driversAPI.getById.mockImplementation(() => new Promise((done) => { resolve = done }))
+    render(<ControlledDriver />)
+    await selectMatching(user)
+    fireEvent.click(screen.getByRole('link', { name: /Editar dados/ }))
+    fireEvent(window, new Event('focus'))
+    fireEvent(document, new Event('visibilitychange'))
+    expect(driversAPI.getById).toHaveBeenCalledTimes(1)
+    await user.type(screen.getByLabelText('Observação'), 'Manter esta observação')
+    resolve({ data: { ...matchingDriver, cnh_numero: '00123456789', cnh_validade: '2099-12-31' } })
+    await waitFor(() => expect(screen.queryByText('CNH precisa ser regularizada')).not.toBeInTheDocument())
+    expect(screen.getByLabelText('Observação')).toHaveValue('Manter esta observação')
+    expect(screen.getByRole('status')).toHaveTextContent('Dados do condutor atualizados')
+  })
+
+  it('mantém pendências quando a atualização falha e permite nova tentativa', async () => {
+    const user = userEvent.setup()
+    driversAPI.listActive.mockResolvedValue({ data: [matchingDriver] })
+    driversAPI.getById.mockRejectedValueOnce({}).mockResolvedValue({ data: { ...matchingDriver, cnh_numero: '00123456789', cnh_validade: '2099-12-31' } })
+    render(<ControlledDriver />)
+    await selectMatching(user)
+    await user.click(screen.getByRole('button', { name: 'Atualizar cadastro' }))
+    expect(screen.getByRole('alert')).toHaveTextContent('O aviso anterior foi mantido')
+    await user.click(screen.getByRole('button', { name: 'Atualizar cadastro' }))
+    await waitFor(() => expect(screen.queryByText('CNH precisa ser regularizada')).not.toBeInTheDocument())
+  })
+
+  it('informa que a consulta não regularizou um cadastro que continua incompleto', async () => {
+    const user = userEvent.setup()
+    driversAPI.listActive.mockResolvedValue({ data: [matchingDriver] })
+    driversAPI.getById.mockResolvedValue({ data: matchingDriver })
+    render(<ControlledDriver />)
+    await selectMatching(user)
+    await user.click(screen.getByRole('button', { name: 'Atualizar cadastro' }))
+    expect(screen.getByRole('status')).toHaveTextContent('As pendências da CNH permanecem')
+    expect(screen.getByRole('alert')).toHaveTextContent('CNH precisa ser regularizada')
+  })
+
+  it('ignora resposta atrasada se o condutor foi removido do formulário', async () => {
+    const user = userEvent.setup(); const onChange = vi.fn()
+    driversAPI.listActive.mockResolvedValue({ data: [matchingDriver] })
+    let resolve
+    driversAPI.getById.mockResolvedValue({ data: matchingDriver })
+    const { rerender } = render(<DriverSelect value={matchingDriver.id} onChange={onChange} />)
+    await screen.findByRole('button', { name: 'Atualizar cadastro' })
+    driversAPI.getById.mockImplementation(() => new Promise((done) => { resolve = done }))
+    await user.click(screen.getByRole('button', { name: 'Atualizar cadastro' }))
+    rerender(<DriverSelect value="" onChange={onChange} />)
+    resolve({ data: { ...matchingDriver, cnh_numero: '00123456789', cnh_validade: '2099-12-31' } })
+    await waitFor(() => expect(screen.queryByText('CNH precisa ser regularizada')).not.toBeInTheDocument())
+    expect(onChange).not.toHaveBeenCalled()
+  })
+
   it('busca no servidor e permite selecionar um condutor além da primeira página', async () => {
     const user = userEvent.setup()
     const onChange = vi.fn()

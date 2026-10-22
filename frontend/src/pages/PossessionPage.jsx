@@ -1,4 +1,5 @@
 import JustificationField from '../components/JustificationField'
+import { VehicleTagBadges } from '../components/VehicleTags'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import DriverSelect from '../components/DriverSelect'
@@ -25,7 +26,7 @@ import { getApiErrorCode, getHttpStatus } from '../utils/httpError'
 import {
   resolvePossessionTermValidationUrl,
 } from '../utils/possessionTermDocument'
-import { ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
+import { ResponsiveRecord, MobileFilters, ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 
 const viewOptions = [
   { value: 'ATIVAS', label: 'Ativas' },
@@ -110,7 +111,7 @@ function buildVehicleOption(vehicle) {
   const organizationLabel = vehicle.current_location?.organization_name || 'Sem secretaria'
   const ownershipLabel = vehicle.ownership_type === 'LOCADO' ? 'Locado' : vehicle.ownership_type === 'CEDIDO' ? 'Cedido' : 'Próprio'
   return {
-    value: vehicle.id,
+    value: vehicle.id, tags: vehicle.tags || [],
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
     description: `${ownershipLabel} | ${organizationLabel} | ${locationLabel}`,
     keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.chassis_number, organizationLabel, locationLabel].filter(Boolean).join(' '),
@@ -888,7 +889,7 @@ export default function PossessionPage() {
             <span data-tour="possession-create" className="route-state-text">Consulta protegida por perfil</span>
           )}
           <div data-tour="possession-reports">
-            <PossessionReportBuilder vehicles={vehicles} initialFilters={reportInitialFilters} />
+            <PossessionReportBuilder vehicles={vehicles} initialFilters={reportInitialFilters} onVehicleOptionsOpen={loadVehicles} />
           </div>
           <button className="secondary-button" type="button" onClick={() => setTourReplayToken((value) => value + 1)}>
             Ver tour rápido
@@ -918,6 +919,7 @@ export default function PossessionPage() {
               value={search}
               onChange={(event) => setSearch(event.target.value)}
             />
+            <MobileFilters activeCount={[organizationFilter, vehicleFilter, startDateFrom, startDateTo].filter(Boolean).length}>
             <SearchableSelect
               value={organizationFilter}
               onChange={setOrganizationFilter}
@@ -928,7 +930,7 @@ export default function PossessionPage() {
             <SearchableSelect
               value={vehicleFilter}
               onChange={setVehicleFilter}
-              options={[{ value: '', label: 'Todos os veículos' }, ...(vehicleFilter && !vehicles.some((item) => item.id === vehicleFilter) ? [{ value: vehicleFilter, label: 'Veículo do histórico de empréstimo' }] : []), ...vehicles.map(buildVehicleOption)]}
+              options={[{ value: '', label: 'Todos os veículos' }, ...(vehicleFilter && !vehicles.some((item) => item.id === vehicleFilter) ? [{ value: vehicleFilter, label: 'Veículo do histórico de empréstimo' }] : []), ...vehicles.map(buildVehicleOption)]} onOpen={loadVehicles}
               placeholder="Filtrar veículo"
               searchPlaceholder="Buscar veículo por placa, modelo, chassi ou lotação"
             />
@@ -954,6 +956,7 @@ export default function PossessionPage() {
                 title="Data final do início da posse"
               />
             </label>
+            </MobileFilters>
           </div>
         </div>
       </div>
@@ -1013,12 +1016,14 @@ export default function PossessionPage() {
                 </tr>
               ) : (
                 paginatedRecords.map((record) => (
-                  <tr key={record.id} className={focusedRecord?.id === record.id ? 'is-focused-row' : ''}>
+                  <ResponsiveRecord key={record.id} className={focusedRecord?.id === record.id ? 'is-focused-row' : ''} label={`posse ${record.public_number || record.id}, ${record.vehicle_plate}`} identityLabel="Veículo" summaryLabels={["Condutor", "Início", "Fim"]}>
                     <td data-label="Veículo">
                       <div className="operation-vehicle-identity">
                         <VehicleThumbnail vehicleType={record.vehicle_type} plate={record.vehicle_plate} />
                         <span>
                           <strong>{record.vehicle_plate}</strong>
+                        {record.vehicle_tags?.length ? <span className="vehicle-tags-current-caption">Etiquetas atuais</span> : null}
+                        <VehicleTagBadges tags={record.vehicle_tags} current />
                           {record.public_number ? <small className="muted">Posse #{record.public_number}</small> : null}
                           <small className="muted">{getRecordOrganizationName(record)}</small>
                         </span>
@@ -1074,7 +1079,7 @@ export default function PossessionPage() {
                         </span>
                       </div>
                     </td>
-                  </tr>
+                  </ResponsiveRecord>
                 ))
               )}
             </tbody>
@@ -1097,7 +1102,7 @@ export default function PossessionPage() {
         onClose={() => setIsCreateModalOpen(false)}
       >
         <PossessionForm
-          vehicles={vehicles}
+          vehicles={vehicles} onVehicleOptionsOpen={loadVehicles}
           onClose={() => setIsCreateModalOpen(false)}
           onUnauthorized={handleUnauthorized}
           onSuccess={async (message) => {

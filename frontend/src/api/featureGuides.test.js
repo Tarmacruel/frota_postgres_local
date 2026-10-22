@@ -23,4 +23,11 @@ describe('featureGuidesAPI', () => {
     expect(mocks.get).toHaveBeenCalledWith('/auth/feature-guides/fuel-supply-orders-batch-v1')
     expect(mocks.post).toHaveBeenCalledWith('/auth/feature-guides/fuel-supply-orders-batch-v1/acknowledge')
   })
+
+  it('consulta e reconhece o tour de etiquetas sem enviar outro usuário no payload', () => {
+    featureGuidesAPI.getVehicleTags()
+    featureGuidesAPI.acknowledgeVehicleTags()
+    expect(mocks.get).toHaveBeenCalledWith('/auth/feature-guides/vehicle-tags-v1')
+    expect(mocks.post).toHaveBeenCalledWith('/auth/feature-guides/vehicle-tags-v1/acknowledge')
+  })
 })

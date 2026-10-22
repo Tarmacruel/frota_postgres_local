@@ -10,6 +10,7 @@ from app.repositories.user_feature_acknowledgement_repository import (
 
 
 FUEL_SUPPLY_ORDERS_BATCH_FEATURE_KEY = "fuel-supply-orders-batch-v1"
+VEHICLE_TAGS_FEATURE_KEY = "vehicle-tags-v1"
 
 
 class FeatureGuideService:

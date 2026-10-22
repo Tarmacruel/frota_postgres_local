@@ -13,7 +13,7 @@ function Reason({ value, onChange, required, context, userId }) {
   </div>
 }
 
-export function LoanProposalForm({ loan, catalog, user, onClose, onSaved, onRefresh }) {
+export function LoanProposalForm({ loan, catalog, user, onClose, onSaved, onRefresh, onVehicleOptionsOpen }) {
   const [form, setForm] = useState({
     vehicle_id: loan?.vehicle_id || '', destination_allocation_id: loan?.destination_allocation_id || '',
     recipient: loan?.recipient_organization_id || '', reason: loan?.reason || '',
@@ -64,7 +64,7 @@ export function LoanProposalForm({ loan, catalog, user, onClose, onSaved, onRefr
       {loan?.status === 'AWAITING_RECEIPT' && <p className="loan-notice">Editar esta proposta retorna o empréstimo ao rascunho. Será necessário enviar novamente.</p>}
       {error && <p role="alert" className="loan-error">{error}</p>}
       <fieldset disabled={busy || stale}>
-        {loan ? <p><strong>Veículo:</strong> {loan.vehicle_plate}</p> : <VehicleLoanSelect label="Veículo"
+        {loan ? <p><strong>Veículo:</strong> {loan.vehicle_plate}</p> : <VehicleLoanSelect label="Veículo" onOpen={onVehicleOptionsOpen}
           value={form.vehicle_id} options={catalog.vehicles} disabled={busy || stale}
           placeholder="Selecione um veículo da origem" searchPlaceholder="Buscar por placa, marca ou modelo"
           onChange={(value) => setForm((prev) => ({ ...prev, vehicle_id: value, recipient: '', destination_allocation_id: '', delivery_odometer_km: '', delivery_condition: '' }))} />}

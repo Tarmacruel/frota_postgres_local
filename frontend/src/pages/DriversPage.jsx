@@ -1,4 +1,5 @@
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
+import { useSearchParams } from 'react-router-dom'
 import AccordionSection from '../components/AccordionSection'
 import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
@@ -9,7 +10,9 @@ import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 import { DRIVER_LICENSE_CATEGORY_OPTIONS } from '../constants/driverCategories'
-import { ActionMenu, PageHeader, StatusChip } from '../components/ui'
+import { ResponsiveRecord, MobileFilters, ActionMenu, PageHeader, StatusChip } from '../components/ui'
+import { formatCnhDate, getCnhAlert, getCnhDaysLeft } from '../utils/driverLicense'
+import '../components/DriverLicenseNotice.css'
 
 const initialForm = {
   nome_completo: '',
@@ -19,37 +22,24 @@ const initialForm = {
   contato: '',
   email: '',
   cnh_categoria: 'B',
+  cnh_numero: '',
   cnh_validade: '',
 }
 
 function formatDate(value) {
   if (!value) return '-'
-  return new Date(value).toLocaleDateString('pt-BR')
-}
-
-function getCnhAlert(cnhDate) {
-  if (!cnhDate) return null
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const validade = new Date(cnhDate)
-  validade.setHours(0, 0, 0, 0)
-  const diffDays = Math.floor((validade - today) / (1000 * 60 * 60 * 24))
-  if (diffDays < 0) return { label: 'CNH vencida', tone: 'danger' }
-  if (diffDays <= 30) return { label: `Vence em ${diffDays} dias`, tone: 'danger' }
-  if (diffDays <= 60) return { label: `Vence em ${diffDays} dias`, tone: 'warning' }
-  return null
+  return formatCnhDate(value)
 }
 
 function getDaysToExpire(cnhDate) {
-  if (!cnhDate) return null
-  const today = new Date()
-  today.setHours(0, 0, 0, 0)
-  const validade = new Date(cnhDate)
-  validade.setHours(0, 0, 0, 0)
-  return Math.floor((validade - today) / (1000 * 60 * 60 * 24))
+  return getCnhDaysLeft(cnhDate)
 }
 
 export default function DriversPage() {
+  const [searchParams, setSearchParams] = useSearchParams()
+  const editId = searchParams.get('editar')
+  const regularizingCnh = searchParams.get('regularizar') === 'cnh'
+  const cnhNumberRef = useRef(null)
   const { canCreate, canEdit, canDeleteModule } = useAuth()
   const canCreateDriver = canCreate('drivers')
   const canEditDriver = canEdit('drivers')
@@ -67,6 +57,8 @@ export default function DriversPage() {
   const [editingRecord, setEditingRecord] = useState(null)
   const [form, setForm] = useState(initialForm)
   const [submitting, setSubmitting] = useState(false)
+  const [openingEdit, setOpeningEdit] = useState(false)
+  const [editRetry, setEditRetry] = useState(0)
   const { organizations, loading: catalogLoading, error: catalogError } = useMasterDataCatalog({ includeAll: true })
 
   const organizationOptions = organizations.map((organization) => ({
@@ -82,6 +74,7 @@ export default function DriversPage() {
     { header: 'Contato', value: (item) => item.contato || '-' },
     { header: 'E-mail', value: (item) => item.email || '-' },
     { header: 'CNH', value: (item) => item.cnh_categoria },
+    { header: 'Número da CNH', value: (item) => item.cnh_numero || 'Não informado' },
     { header: 'Validade CNH', value: (item) => formatDate(item.cnh_validade) },
     { header: 'Status', value: (item) => (item.ativo ? 'ATIVO' : 'INATIVO') },
   ]
@@ -117,7 +110,7 @@ export default function DriversPage() {
     setIsModalOpen(true)
   }
 
-  function openEditModal(record) {
+  const openEditModal = useCallback((record) => {
     setError('')
     setEditingRecord(record)
     setForm({
@@ -128,15 +121,37 @@ export default function DriversPage() {
       contato: record.contato || '',
       email: record.email || '',
       cnh_categoria: record.cnh_categoria,
+      cnh_numero: record.cnh_numero || '',
       cnh_validade: record.cnh_validade || '',
     })
     setIsModalOpen(true)
-  }
+  }, [])
+
+  useEffect(() => {
+    if (!editId) { setOpeningEdit(false); return undefined }
+    if (!canEditDriver) {
+      setError('Você não tem permissão para editar condutores. Solicite a regularização a um usuário autorizado.')
+      return undefined
+    }
+    let cancelled = false
+    setError(''); setOpeningEdit(true); setIsModalOpen(true)
+    driversAPI.getById(editId).then(({ data }) => {
+      if (!cancelled) openEditModal(data)
+    }).catch((err) => {
+      if (!cancelled) { setIsModalOpen(false); setError(getApiErrorMessage(err, 'Não foi possível abrir o cadastro do condutor.')) }
+    }).finally(() => { if (!cancelled) setOpeningEdit(false) })
+    return () => { cancelled = true }
+  }, [editId, canEditDriver, openEditModal, editRetry])
 
   function closeModal() {
     setEditingRecord(null)
     setForm(initialForm)
     setIsModalOpen(false)
+    if (editId) {
+      const next = new URLSearchParams(searchParams)
+      next.delete('editar'); next.delete('regularizar')
+      setSearchParams(next, { replace: true })
+    }
   }
 
   async function handleSubmit(event) {
@@ -163,10 +178,11 @@ export default function DriversPage() {
         contato: form.contato || null,
         email: form.email || null,
         cnh_validade: form.cnh_validade || null,
+        cnh_numero: form.cnh_numero.trim() || null,
       }
       if (editingRecord) {
         await driversAPI.update(editingRecord.id, payload)
-        setFeedback('Condutor atualizado com sucesso.')
+        setFeedback(regularizingCnh ? 'Condutor atualizado com sucesso. Volte à aba da operação; o cadastro será atualizado ao retornar.' : 'Condutor atualizado com sucesso.')
       } else {
         await driversAPI.create(payload)
         setFeedback('Condutor cadastrado com sucesso.')
@@ -259,12 +275,14 @@ export default function DriversPage() {
           </div>
           <div className="filter-inline">
             <input className="app-input" placeholder="Buscar por nome, matrícula, documento ou secretaria" value={search} onChange={(event) => setSearch(event.target.value)} />
+            <MobileFilters activeCount={organizationFilter !== 'TODAS' ? 1 : 0}>
             <select className="app-select" value={organizationFilter} onChange={(event) => setOrganizationFilter(event.target.value)}>
               <option value="TODAS">Todas as secretarias</option>
               {organizations.map((organization) => (
                 <option key={organization.id} value={organization.id}>{organization.name}</option>
               ))}
             </select>
+            </MobileFilters>
           </div>
         </div>
       </div>
@@ -275,7 +293,7 @@ export default function DriversPage() {
           <span>condutores no filtro</span>
         </div>
         <div className="metric-inline">
-          <strong>{records.filter((item) => getCnhAlert(item.cnh_validade)?.label === 'CNH vencida').length}</strong>
+          <strong>{records.filter((item) => { const days = getDaysToExpire(item.cnh_validade); return days !== null && days < 0 }).length}</strong>
           <span>CNHs vencidas</span>
         </div>
         <div className="metric-inline">
@@ -295,6 +313,7 @@ export default function DriversPage() {
       </div>
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
+      {editId && canEditDriver && error && !isModalOpen ? <button type="button" className="ghost-button" onClick={() => setEditRetry((value) => value + 1)}>Tentar abrir cadastro novamente</button> : null}
       {catalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
@@ -322,18 +341,18 @@ export default function DriversPage() {
                 <tr><td colSpan={canManageDriverActions ? 10 : 9}><div className="empty-state">Nenhum condutor encontrado para o filtro atual.</div></td></tr>
               ) : (
                 records.map((record) => {
-                  const cnhAlert = getCnhAlert(record.cnh_validade)
+                  const cnhAlerts = getCnhAlert(record)
                   return (
-                  <tr key={record.id}>
+                  <ResponsiveRecord key={record.id} label={record.nome_completo} identityLabel="Nome" summaryLabels={['Secretaria', ...(cnhAlerts.length ? ['Alerta CNH'] : [])]}>
                     <td data-label="Nome"><strong>{record.nome_completo}</strong></td>
                     <td data-label="Documento">{record.documento}</td>
                     <td data-label="Matrícula">{record.matricula || 'Não informada'}</td>
                     <td data-label="Secretaria">{record.organization_name || 'Não informada'}</td>
                     <td data-label="Contato">{record.contato || '-'}</td>
                     <td data-label="E-mail">{record.email || '-'}</td>
-                    <td data-label="CNH">{record.cnh_categoria} {record.cnh_validade ? `| validade ${formatDate(record.cnh_validade)}` : ''}</td>
+                    <td data-label="CNH"><div className="driver-license-detail"><span>Nº {record.cnh_numero || 'Não informado'}</span><span>Categoria {record.cnh_categoria} · Validade {formatDate(record.cnh_validade)}</span></div></td>
                     <td data-label="Alerta CNH">
-                      {cnhAlert ? <StatusChip tone={cnhAlert.tone}>{cnhAlert.label}</StatusChip> : '-'}
+                      {cnhAlerts.length ? <div className="driver-license-status">{cnhAlerts.map((alert) => <StatusChip key={alert.code} tone={alert.tone}>{alert.label}</StatusChip>)}</div> : '-'}
                     </td>
                     <td data-label="Status"><StatusChip tone={record.ativo ? 'success' : 'neutral'}>{record.ativo ? 'ATIVO' : 'INATIVO'}</StatusChip></td>
                     {canManageDriverActions ? (
@@ -349,7 +368,7 @@ export default function DriversPage() {
                         </div>
                       </td>
                     ) : null}
-                  </tr>
+                  </ResponsiveRecord>
                   )
                 })
               )}
@@ -362,11 +381,13 @@ export default function DriversPage() {
 
       <Modal
         open={isModalOpen}
-        title={editingRecord ? 'Editar condutor' : 'Novo condutor'}
+        title={openingEdit ? 'Carregando condutor' : editingRecord ? 'Editar condutor' : 'Novo condutor'}
         description="Agrupe os dados em blocos simples para manter o cadastro mais limpo e escalável."
         onClose={closeModal}
+        canClose={!submitting}
+        initialFocusRef={regularizingCnh && !openingEdit ? cnhNumberRef : undefined}
       >
-        <form onSubmit={handleSubmit} className="stack">
+        {openingEdit ? <p role="status">Carregando o cadastro do condutor…</p> : <form onSubmit={handleSubmit} className="stack">
           {error ? <div className="alert alert-error" role="alert">{error}</div> : null}
           <AccordionSection title="Dados básicos" subtitle="Identificação e contato" open>
             <div className="form-grid modal-form-grid">
@@ -404,8 +425,12 @@ export default function DriversPage() {
             </div>
           </AccordionSection>
 
-          <AccordionSection title="CNH" subtitle="Categoria e vencimento">
+          <AccordionSection title="CNH" subtitle="Número, categoria e vencimento" open={regularizingCnh || !editingRecord}>
             <div className="form-grid modal-form-grid">
+              <div className="form-field">
+                <label htmlFor="driver-license-number">Número da CNH</label>
+                <input ref={cnhNumberRef} id="driver-license-number" type="text" inputMode="numeric" autoComplete="off" maxLength={30} className="app-input" value={form.cnh_numero} onChange={(event) => setForm({ ...form, cnh_numero: event.target.value })} />
+              </div>
               <div className="form-field">
                 <label htmlFor="driver-license">Categoria</label>
                 <select id="driver-license" className="app-select" value={form.cnh_categoria} onChange={(event) => setForm({ ...form, cnh_categoria: event.target.value })}>
@@ -421,9 +446,9 @@ export default function DriversPage() {
 
           <div className="actions-inline modal-actions">
             <button className="app-button" type="submit" disabled={submitting}>{submitting ? 'Salvando...' : editingRecord ? 'Atualizar condutor' : 'Cadastrar condutor'}</button>
-            <button className="ghost-button" type="button" onClick={closeModal}>Cancelar</button>
+            <button className="ghost-button" type="button" disabled={submitting} onClick={closeModal}>Cancelar</button>
           </div>
-        </form>
+        </form>}
       </Modal>
     </div>
   )

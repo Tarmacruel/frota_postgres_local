@@ -4,7 +4,7 @@ import ClaimForm from '../components/ClaimForm'
 import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
-import { ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
+import { MobileFilters, ResponsiveRecord, ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 import { claimsAPI } from '../api/claims'
 import { vehiclesAPI } from '../api/vehicles'
 import { useAuth } from '../context/AuthContext'
@@ -28,7 +28,7 @@ function formatMoney(value) {
 function vehicleOption(vehicle) {
   const location = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
   return {
-    value: vehicle.id,
+    value: vehicle.id, tags: vehicle.tags || [],
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
     description: `${vehicle.ownership_type} | ${location}`,
     keywords: [vehicle.plate, vehicle.brand, vehicle.model, location].join(' '),
@@ -172,7 +172,8 @@ export default function ClaimsPage() {
         <div className="toolbar-row">
           <div className="filter-inline">
             <input className="app-input" placeholder="Buscar por descrição, local, BO ou matrícula" value={search} onChange={(event) => setSearch(event.target.value)} />
-            <SearchableSelect
+            <MobileFilters activeCount={[organizationFilter, vehicleFilter, statusFilter !== 'TODOS', typeFilter !== 'TODOS'].filter(Boolean).length}>
+          <SearchableSelect
               value={organizationFilter}
               onChange={setOrganizationFilter}
               options={[{ value: '', label: 'Todas as secretarias' }, ...organizationOptions]}
@@ -182,7 +183,7 @@ export default function ClaimsPage() {
             <SearchableSelect
               value={vehicleFilter}
               onChange={setVehicleFilter}
-              options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(vehicleOption)]}
+              options={[{ value: '', label: 'Todos os veículos' }, ...vehicles.map(vehicleOption)]} onOpen={loadVehicles}
               placeholder="Filtrar veículo"
               searchPlaceholder="Buscar veículo"
             />
@@ -192,6 +193,7 @@ export default function ClaimsPage() {
             <select className="app-select" value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)}>
               {typeOptions.map((option) => <option key={option} value={option}>{option}</option>)}
             </select>
+          </MobileFilters>
           </div>
         </div>
       </div>
@@ -228,7 +230,7 @@ export default function ClaimsPage() {
                 <tr><td colSpan={8}><div className="empty-state">Nenhum sinistro encontrado para os filtros aplicados.</div></td></tr>
               ) : (
                 records.map((record) => (
-                  <tr key={record.id}>
+                  <ResponsiveRecord key={record.id} label={`sinistro ${record.vehicle_plate}`} identityLabel="Veículo" summaryLabels={["Data", "Tipo"]}>
                     <td data-label="Veículo">
                       <div className="operation-vehicle-identity">
                         <VehicleThumbnail vehicleType={record.vehicle_type} plate={record.vehicle_plate} />
@@ -253,7 +255,7 @@ export default function ClaimsPage() {
                         ]}
                       /> : <span className="muted">-</span>}
                     </td>
-                  </tr>
+                  </ResponsiveRecord>
                 ))
               )}
             </tbody>
@@ -271,7 +273,7 @@ export default function ClaimsPage() {
         canClose={!claimFormBusy}
       >
         <ClaimForm
-          vehicles={vehicles}
+          vehicles={vehicles} onVehicleOptionsOpen={loadVehicles}
           initialData={editingRecord}
           onClose={() => setIsModalOpen(false)}
           onSuccess={async (message) => {

@@ -90,7 +90,11 @@ class VehicleUpdate(PrimeCardFields):
         return normalized
 
 
+from app.schemas.vehicle_tag import VehicleTagMarkOut
+
+
 class VehicleOut(BaseModel):
+    tags: list[VehicleTagMarkOut] = []
     model_config = ConfigDict(from_attributes=True)
 
     id: UUID

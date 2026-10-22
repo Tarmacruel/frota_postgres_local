@@ -29,14 +29,14 @@ function buildInitialState(initialData, vehicles) {
 function buildVehicleOption(vehicle) {
   const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
   return {
-    value: vehicle.id,
+    value: vehicle.id, tags: vehicle.tags || [],
     label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`,
     description: `${vehicle.ownership_type === 'LOCADO' ? 'Locado' : 'Próprio'} | ${locationLabel}`,
     keywords: [vehicle.plate, vehicle.brand, vehicle.model, vehicle.chassis_number, locationLabel].filter(Boolean).join(' '),
   }
 }
 
-export default function MaintenanceForm({ vehicles, initialData = null, onClose, onSuccess }) {
+export default function MaintenanceForm({ vehicles, initialData = null, onClose, onSuccess, onVehicleOptionsOpen }) {
   const isEdit = Boolean(initialData?.id)
   const [form, setForm] = useState(() => buildInitialState(initialData, vehicles))
   const [submitting, setSubmitting] = useState(false)
@@ -94,7 +94,7 @@ export default function MaintenanceForm({ vehicles, initialData = null, onClose,
       <div className="form-field">
         <label>Veículo</label>
         <SearchableSelect
-          value={form.vehicle_id}
+          value={form.vehicle_id} onOpen={onVehicleOptionsOpen}
           onChange={(value) => setForm({ ...form, vehicle_id: value })}
           options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(buildVehicleOption)}
           placeholder="Selecione o veículo"

@@ -4,6 +4,7 @@ import { officialBrand } from '../constants/officialBrand'
 import { useAuth } from '../context/AuthContext'
 import { AppIcon, getInitials } from './AppIcon'
 import SearchOverlay from './SearchOverlay'
+import VehicleTagsGuide from './VehicleTagsGuide'
 import Modal from './Modal'
 import { adminNotificationsAPI } from '../api/adminNotifications'
 import { documentSignaturesAPI } from '../api/documentSignatures'
@@ -31,9 +32,13 @@ export default function Layout() {
   const mainRef = useRef(null)
   const navRef = useRef(null)
   const navTriggerRef = useRef(null)
+  const navReturnFocusRef = useRef(null)
+  const accountRef = useRef(null)
+  const accountTriggerRef = useRef(null)
   const fuelSupplyOrdersBatchGuideUserRef = useRef(null)
 
   const [navOpen, setNavOpen] = useState(false)
+  const [accountOpen, setAccountOpen] = useState(false)
   const [searchOpen, setSearchOpen] = useState(false)
   const [sidebarCompact, setSidebarCompact] = useState(() => readStorage(SIDEBAR_STORAGE_KEY, '0') === '1')
   const [darkMode, setDarkMode] = useState(() => readStorage(THEME_STORAGE_KEY, 'light') === 'dark')
@@ -50,6 +55,7 @@ export default function Layout() {
   const [fuelSupplyOrdersBatchGuideOpen, setFuelSupplyOrdersBatchGuideOpen] = useState(false)
   const [fuelSupplyOrdersBatchGuideAcknowledging, setFuelSupplyOrdersBatchGuideAcknowledging] = useState(false)
   const [fuelSupplyOrdersBatchGuideError, setFuelSupplyOrdersBatchGuideError] = useState('')
+  const [fuelSupplyOrdersBatchGuideChecked, setFuelSupplyOrdersBatchGuideChecked] = useState(false)
 
   useEffect(() => {
     if (typeof document === 'undefined') return undefined
@@ -132,6 +138,9 @@ export default function Layout() {
   )
   const fuelSuppliesItem = navSections.flatMap((section) => section.items).find((item) => item.to === '/abastecimentos')
   if (fuelSuppliesItem && canCreate('fuel_supply_orders')) {
+    // Keep room for Menu, which exposes every permitted module on a phone.
+    const driversIndex = mobileTabs.findIndex((item) => item.to === '/condutores')
+    if (driversIndex >= 0) mobileTabs.splice(driversIndex, 1)
     mobileTabs.push({
       ...fuelSuppliesItem,
       to: '/abastecimentos?acao=nova-ordem',
@@ -140,6 +149,7 @@ export default function Layout() {
       isAction: true,
     })
   }
+  const mobileMenuActive = !mobileTabs.some((item) => !item.isAction && (item.to === '/' ? location.pathname === '/' : location.pathname === item.to || location.pathname.startsWith(`${item.to}/`)))
 
   const currentItem =
     navSections
@@ -149,12 +159,29 @@ export default function Layout() {
 
   useEffect(() => {
     setNavOpen(false)
+    setAccountOpen(false)
   }, [location.pathname])
+
+  useEffect(() => {
+    if (!accountOpen) return undefined
+    function closeAccount(event) {
+      if (event.type === 'keydown' && event.key !== 'Escape') return
+      if (event.type !== 'keydown' && (accountRef.current?.contains(event.target) || accountTriggerRef.current?.contains(event.target))) return
+      setAccountOpen(false)
+      if (event.type === 'keydown') accountTriggerRef.current?.focus()
+    }
+    document.addEventListener('pointerdown', closeAccount)
+    document.addEventListener('keydown', closeAccount)
+    return () => {
+      document.removeEventListener('pointerdown', closeAccount)
+      document.removeEventListener('keydown', closeAccount)
+    }
+  }, [accountOpen])
 
   useEffect(() => {
     if (!navOpen || window.innerWidth >= 1180) return undefined
     const sidebar = navRef.current
-    const trigger = navTriggerRef.current
+    const trigger = navReturnFocusRef.current || navTriggerRef.current
     const previousOverflow = document.body.style.overflow
     const choices = () => Array.from(sidebar.querySelectorAll('a[href], button:not(:disabled)'))
       .filter((element) => getComputedStyle(element).display !== 'none' && getComputedStyle(element).visibility !== 'hidden')
@@ -269,6 +296,8 @@ export default function Layout() {
           fuelSupplyOrdersBatchGuideUserRef.current = user.id
           setFuelSupplyOrdersBatchGuideOpen(false)
         }
+      } finally {
+        if (mounted) setFuelSupplyOrdersBatchGuideChecked(true)
       }
     }
 
@@ -456,6 +485,7 @@ export default function Layout() {
 
   return (
     <div className={`app-shell${sidebarCompact ? ' sidebar-compact' : ''}`}>
+      <VehicleTagsGuide key={user?.id} userId={user?.id} enabled={!accessBlocked && (!canCreateFuelSupplyOrders || fuelSupplyOrdersBatchGuideChecked)} />
       <SearchOverlay open={!accessBlocked && searchOpen} onClose={() => setSearchOpen(false)} onSelect={(result) => navigate(result.route)} />
 
       <button type="button" className={`sidebar-scrim${navOpen ? ' is-visible' : ''}`} aria-label="Fechar navegação" onClick={() => setNavOpen(false)} />
@@ -509,7 +539,7 @@ export default function Layout() {
       <div className="content-shell">
         <header className="app-topbar">
           <div className="topbar-leading">
-            <button ref={navTriggerRef} type="button" className="icon-button mobile-only" aria-label={navOpen ? 'Fechar navegação' : 'Abrir navegação'} aria-expanded={navOpen} aria-controls="app-navigation" onClick={() => setNavOpen((current) => !current)}>
+            <button ref={navTriggerRef} type="button" className="icon-button mobile-only" aria-label={navOpen ? 'Fechar navegação' : 'Abrir navegação'} aria-expanded={navOpen} aria-controls="app-navigation" onClick={(event) => { navReturnFocusRef.current = event.currentTarget; setNavOpen((current) => !current) }}>
               <AppIcon name="menu" className="app-icon" />
             </button>
 
@@ -537,7 +567,9 @@ export default function Layout() {
             </button>
 
 
-            <div className="topbar-system-actions" aria-label="Ações do sistema">
+            <button ref={accountTriggerRef} type="button" className="mobile-account-trigger" aria-label="Abrir ações da conta" aria-expanded={accountOpen} aria-controls="mobile-account-actions" onClick={() => setAccountOpen(!accountOpen)}>{getInitials(user?.name)}</button>
+            <div ref={accountRef} id="mobile-account-actions" className={`topbar-system-actions${accountOpen ? ' is-open' : ''}`} aria-label="Ações do sistema" onClick={(event) => { if (event.target.closest('button')) setAccountOpen(false) }}>
+              {!accessBlocked ? <button type="button" className="icon-button theme-button" data-tour="vehicle-tags-help" aria-label="Rever tour das etiquetas" title="Como usar etiquetas" onClick={() => window.dispatchEvent(new Event('vehicle-tags-guide:replay'))}><AppIcon name="catalog" className="app-icon" /></button> : null}
               {isAdmin && !accessBlocked ? (
                 <button
                   type="button"
@@ -600,6 +632,7 @@ export default function Layout() {
           }
           return <NavLink key={item.to} to={item.to} end={item.to === '/'} aria-label={item.mobileAriaLabel ?? item.label} className={({ isActive }) => `mobile-bottom-link${isActive ? ' active' : ''}`}>{content}</NavLink>
         })}
+        <button type="button" className={`mobile-bottom-link mobile-menu-trigger${navOpen || mobileMenuActive ? ' active' : ''}`} aria-label="Todos os módulos" aria-expanded={navOpen} aria-controls="app-navigation" onClick={(event) => { navReturnFocusRef.current = event.currentTarget; setNavOpen((current) => !current) }}><AppIcon name="menu" className="app-icon" /><span>Menu</span></button>
       </nav>
 
       <Modal open={notificationsOpen} title="Central de notificações" description="Ocorrências administrativas de divergência de quilometragem entre posses." onClose={() => setNotificationsOpen(false)}>

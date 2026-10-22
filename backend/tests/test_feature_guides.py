@@ -25,6 +25,7 @@ from app.repositories.user_feature_acknowledgement_repository import (
 from app.repositories.user_repository import UserRepository
 from app.services.feature_guide_service import (
     FUEL_SUPPLY_ORDERS_BATCH_FEATURE_KEY,
+    VEHICLE_TAGS_FEATURE_KEY,
     FeatureGuideService,
 )
 
@@ -230,3 +231,56 @@ async def test_feature_guide_endpoints_require_fuel_order_creation_permission(cl
     finally:
         app.dependency_overrides.pop(get_current_user_ready, None)
         app.dependency_overrides.pop(get_db_session, None)
+
+
+@pytest.mark.asyncio
+async def test_vehicle_tags_guide_is_personal_and_available_to_readers(client, monkeypatch):
+    states = {}
+    calls = []
+
+    class FakeGuideService:
+        def __init__(self, _db):
+            pass
+
+        async def get_state(self, *, user_id, feature_key):
+            calls.append((user_id, feature_key))
+            return {"feature_key": feature_key, "acknowledged": (user_id, feature_key) in states, "acknowledged_at": states.get((user_id, feature_key))}
+
+        async def acknowledge(self, *, user_id, feature_key):
+            states.setdefault((user_id, feature_key), datetime.now(timezone.utc))
+            return await self.get_state(user_id=user_id, feature_key=feature_key)
+
+    current = [SimpleNamespace(id=uuid4(), role=UserRole.PADRAO)]
+    first_id = current[0].id
+
+    async def user_override():
+        return current[0]
+
+    async def db_override():
+        yield SimpleNamespace()
+
+    monkeypatch.setattr(auth_routes, "FeatureGuideService", FakeGuideService)
+    app.dependency_overrides[get_current_user_ready] = user_override
+    app.dependency_overrides[get_db_session] = db_override
+    path = "/api/auth/feature-guides/vehicle-tags-v1"
+    try:
+        before = await client.get(path)
+        assert before.status_code == 200 and before.json()["acknowledged"] is False
+        first = await client.post(path + "/acknowledge", json={"user_id": str(uuid4())})
+        second = await client.post(path + "/acknowledge")
+        assert first.status_code == 200
+        assert first.json() == second.json()
+        assert calls[-1] == (first_id, VEHICLE_TAGS_FEATURE_KEY)
+        assert (await client.get(path)).json()["acknowledged"] is True
+        current[0] = SimpleNamespace(id=uuid4(), role=UserRole.PADRAO)
+        assert (await client.get(path)).json()["acknowledged"] is False
+    finally:
+        app.dependency_overrides.pop(get_current_user_ready, None)
+        app.dependency_overrides.pop(get_db_session, None)
+
+
+@pytest.mark.asyncio
+async def test_vehicle_tags_guide_requires_authenticated_user(client):
+    path = "/api/auth/feature-guides/vehicle-tags-v1"
+    assert (await client.get(path)).status_code == 401
+    assert (await client.post(path + "/acknowledge")).status_code == 401
