@@ -84,7 +84,7 @@ async def test_shared_markers_keep_authors_and_vehicle_state_and_deduplicate(dat
     await service.apply(vehicle_id, VehicleTagApply(tag_id=b.id), carlos)
     tags = (await service.batch([vehicle_id], ana))[vehicle_id]
     assert len(tags) == 2 and {t['owner_name'] for t in tags} == {'Ana', 'Carlos'}
-    assert tags[0]['note'] == 'Conferir cabine'
+    assert next(t for t in tags if t['owner_name'] == 'Ana')['note'] == 'Conferir cabine'
     await db.refresh(v)
     assert before == (v.status, v.updated_at)
     assert sum(call.kwargs['action'] == 'TAG_APPLY' for call in audit.await_args_list) == 2

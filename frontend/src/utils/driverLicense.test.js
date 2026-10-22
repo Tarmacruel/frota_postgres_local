@@ -26,4 +26,8 @@ describe('pendências da CNH por dia de calendário', () => {
     expect(getCnhAlert({ ...complete, cnh_validade: '2026-11-20' }, today)[0].label).toBe('Vence em 30 dias')
     expect(getCnhAlert({ ...complete, cnh_validade: '2027-10-21' }, today)).toEqual([])
   })
+  it('não oculta vencimento próximo quando o número ainda falta', () => {
+    expect(getCnhAlert({ cnh_validade: '2026-11-20' }, today).map((item) => item.code)).toEqual(['missing_number', 'expiring'])
+    expect(getCnhAlert({ cnh_validade: '2026-10-20' }, today).map((item) => item.code)).toEqual(['missing_number', 'expired'])
+  })
 })

@@ -34,8 +34,7 @@ export function getCnhIssues(driver, now = new Date()) {
 
 export function getCnhAlert(driver, now = new Date()) {
   const issues = getCnhIssues(driver, now)
-  if (issues.length) return issues
   const days = getCnhDaysLeft(driver?.cnh_validade, now)
-  if (days !== null && days <= 60) return [{ code: 'expiring', label: days === 0 ? 'Vence hoje' : `Vence em ${days} dias`, tone: days <= 30 ? 'danger' : 'warning' }]
-  return []
+  if (days !== null && days >= 0 && days <= 60) return [...issues, { code: 'expiring', label: days === 0 ? 'Vence hoje' : `Vence em ${days} dias`, tone: days <= 30 ? 'danger' : 'warning' }]
+  return issues
 }

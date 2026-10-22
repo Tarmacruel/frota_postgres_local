@@ -7,10 +7,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.organization_scope import ensure_organization_access, production_scope_is_empty
 from app.models.driver import Driver
 from app.models.user import User
-from app.repositories.driver_repository import DriverRepository
+from app.repositories.driver_repository import DriverRepository, driver_reference_date
 from app.repositories.master_data_repository import MasterDataRepository
 from app.schemas.common import PaginatedResponse, build_pagination
-from app.schemas.driver import DriverCreate, DriverUpdate
+from app.schemas.driver import DriverCnhStatus, DriverCreate, DriverSummary, DriverUpdate
 from app.services.audit_service import AuditService
 
 DRIVER_IMPORT_FIELDS = (
@@ -41,17 +41,26 @@ class DriverService:
         active_only: bool | None = None,
         organization_id: UUID | None = None,
         current_user: User | None = None,
-    ) -> PaginatedResponse[dict]:
+        cnh_status: DriverCnhStatus | None = None,
+        with_summary: bool = False,
+    ) -> PaginatedResponse[dict] | dict:
         if production_scope_is_empty(current_user):
+            if with_summary:
+                return {"data": [], "pagination": build_pagination(page, limit, 0), "summary": DriverSummary(reference_date=driver_reference_date())}
             return PaginatedResponse[dict](data=[], pagination=build_pagination(page, limit, 0))
 
-        items, total = await self.drivers.list_paginated(
+        result = await self.drivers.list_paginated(
             page=page,
             limit=limit,
             search=search,
             active_only=active_only,
             organization_id=organization_id,
+            **({"cnh_status": cnh_status} if cnh_status is not None else {}),
+            **({"with_summary": True} if with_summary else {}),
         )
+        items, total = result[:2]
+        if with_summary:
+            return {"data": [self._serialize(item) for item in items], "pagination": build_pagination(page, limit, total), "summary": result[2]}
         return PaginatedResponse[dict](data=[self._serialize(item) for item in items], pagination=build_pagination(page, limit, total))
 
     async def list_active(
