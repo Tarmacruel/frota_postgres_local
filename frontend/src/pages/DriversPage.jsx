@@ -11,8 +11,17 @@ import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 import { DRIVER_LICENSE_CATEGORY_OPTIONS } from '../constants/driverCategories'
 import { ResponsiveRecord, MobileFilters, ActionMenu, PageHeader, StatusChip } from '../components/ui'
-import { formatCnhDate, getCnhAlert, getCnhDaysLeft } from '../utils/driverLicense'
+import { formatCnhDate, getCnhAlert } from '../utils/driverLicense'
 import '../components/DriverLicenseNotice.css'
+import './DriversPage.css'
+
+const CNH_FILTERS = [
+  { value: '', key: 'total', label: 'Condutores no filtro', help: 'Todos os condutores da busca, status e secretaria selecionados.' },
+  { value: 'expired', key: 'expired', label: 'CNHs vencidas', help: 'Validade anterior à data de hoje.' },
+  { value: 'expiring_30', key: 'expiring_30', label: 'CNHs em até 30 dias', help: 'Vencem entre hoje e os próximos 30 dias, inclusive.' },
+  { value: 'expiring_60', key: 'expiring_60', label: 'CNHs em até 60 dias', help: 'Vencem entre hoje e os próximos 60 dias; inclui as de até 30 dias.' },
+  { value: 'missing', key: 'missing', label: 'CNHs não informadas', help: 'Número ou validade da CNH não informados. Cada condutor é contado uma vez.' },
+]
 
 const initialForm = {
   nome_completo: '',
@@ -31,10 +40,6 @@ function formatDate(value) {
   return formatCnhDate(value)
 }
 
-function getDaysToExpire(cnhDate) {
-  return getCnhDaysLeft(cnhDate)
-}
-
 export default function DriversPage() {
   const [searchParams, setSearchParams] = useSearchParams()
   const editId = searchParams.get('editar')
@@ -50,6 +55,9 @@ export default function DriversPage() {
   const [search, setSearch] = useState('')
   const [activeFilter, setActiveFilter] = useState('ATIVOS')
   const [organizationFilter, setOrganizationFilter] = useState('TODAS')
+  const [cnhFilter, setCnhFilter] = useState('')
+  const [summary, setSummary] = useState(null)
+  const listRequestRef = useRef(0)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
@@ -79,9 +87,11 @@ export default function DriversPage() {
     { header: 'Status', value: (item) => (item.ativo ? 'ATIVO' : 'INATIVO') },
   ]
 
-  async function loadDrivers(page = pagination.page) {
+  const loadDrivers = useCallback(async (page = 1) => {
+    const request = ++listRequestRef.current
     try {
       setLoading(true)
+      setSummary(null)
       setError('')
       const { data } = await driversAPI.list({
         page,
@@ -89,19 +99,29 @@ export default function DriversPage() {
         search: search || undefined,
         active: activeFilter === 'TODOS' ? undefined : activeFilter === 'ATIVOS',
         organization_id: organizationFilter === 'TODAS' ? undefined : organizationFilter,
+        cnh_status: cnhFilter || undefined,
       })
+      if (request !== listRequestRef.current) return
       setRecords(data.data)
       setPagination(data.pagination)
+      setSummary(data.summary || null)
     } catch (err) {
+      if (request !== listRequestRef.current) return
+      setRecords([])
+      setSummary(null)
+      setPagination({ page: 1, pages: 1, total: 0, limit: 10 })
       setError(getApiErrorMessage(err, 'Não foi possível carregar os condutores.'))
     } finally {
-      setLoading(false)
+      if (request === listRequestRef.current) setLoading(false)
     }
-  }
+  }, [search, activeFilter, organizationFilter, cnhFilter])
 
   useEffect(() => {
     loadDrivers(1)
-  }, [search, activeFilter, organizationFilter])
+    return () => { listRequestRef.current += 1 }
+  }, [loadDrivers])
+
+  const selectedCnhFilter = CNH_FILTERS.find((filter) => filter.value === cnhFilter)
 
   function openCreateModal() {
     setError('')
@@ -225,6 +245,7 @@ export default function DriversPage() {
               : organizations.find((organization) => organization.id === organizationFilter)?.name || organizationFilter,
         },
         ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
+        ...(cnhFilter ? [{ label: 'CNH', value: selectedCnhFilter.label }] : []),
       ],
     })
   }
@@ -246,6 +267,8 @@ export default function DriversPage() {
               : organizations.find((organization) => organization.id === organizationFilter)?.name || organizationFilter,
         },
         ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
+        ...(cnhFilter ? [{ label: 'CNH', value: selectedCnhFilter.label }] : []),
+        { label: 'Abrangência', value: 'Página atual' },
       ],
     })
   }
@@ -258,8 +281,8 @@ export default function DriversPage() {
         actions={(
           <>
           {canCreateDriver ? <button className="app-button" type="button" onClick={openCreateModal}>Novo condutor</button> : null}
-          <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
-          <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>
+          <button className="secondary-button" type="button" disabled={loading || !records.length} onClick={handlePreviewPdf}>Pré-visualizar PDF</button>
+          <button className="ghost-button" type="button" disabled={loading || !records.length} onClick={handleExportXlsx}>Exportar XLSX</button>
           </>
         )}
       />
@@ -268,7 +291,7 @@ export default function DriversPage() {
         <div className="toolbar-row">
           <div className="status-pills">
             {['ATIVOS', 'TODOS', 'INATIVOS'].map((option) => (
-              <button key={option} type="button" className={`status-pill${activeFilter === option ? ' active' : ''}`} onClick={() => setActiveFilter(option)}>
+              <button key={option} type="button" aria-pressed={activeFilter === option} className={`status-pill${activeFilter === option ? ' active' : ''}`} onClick={() => setActiveFilter(option)}>
                 {option}
               </button>
             ))}
@@ -276,7 +299,7 @@ export default function DriversPage() {
           <div className="filter-inline">
             <input className="app-input" placeholder="Buscar por nome, matrícula, documento ou secretaria" value={search} onChange={(event) => setSearch(event.target.value)} />
             <MobileFilters activeCount={organizationFilter !== 'TODAS' ? 1 : 0}>
-            <select className="app-select" value={organizationFilter} onChange={(event) => setOrganizationFilter(event.target.value)}>
+            <select aria-label="Filtrar por secretaria" className="app-select" value={organizationFilter} onChange={(event) => setOrganizationFilter(event.target.value)}>
               <option value="TODAS">Todas as secretarias</option>
               {organizations.map((organization) => (
                 <option key={organization.id} value={organization.id}>{organization.name}</option>
@@ -287,30 +310,14 @@ export default function DriversPage() {
         </div>
       </div>
 
-      <div className="panel-metrics">
-        <div className="metric-inline">
-          <strong>{pagination.total}</strong>
-          <span>condutores no filtro</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{records.filter((item) => { const days = getDaysToExpire(item.cnh_validade); return days !== null && days < 0 }).length}</strong>
-          <span>CNHs vencidas</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{records.filter((item) => {
-            const days = getDaysToExpire(item.cnh_validade)
-            return days !== null && days >= 0 && days <= 30
-          }).length}</strong>
-          <span>CNHs em até 30 dias</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{records.filter((item) => {
-            const days = getDaysToExpire(item.cnh_validade)
-            return days !== null && days > 30 && days <= 60
-          }).length}</strong>
-          <span>CNHs em até 60 dias</span>
-        </div>
+      <div className="driver-kpis" role="group" aria-label="Indicadores e filtros de CNH" aria-busy={loading}>
+        {CNH_FILTERS.map((filter) => <button key={filter.key} type="button" className="driver-kpi" title={filter.help} aria-label={filter.label} aria-pressed={cnhFilter === filter.value} disabled={loading || !summary} onClick={() => setCnhFilter(cnhFilter === filter.value ? '' : filter.value)}>
+          <strong>{summary?.[filter.key] ?? '—'}</strong><span>{filter.label}</span>
+          {cnhFilter === filter.value ? <span className="driver-kpi__selected">Selecionado</span> : null}
+        </button>)}
       </div>
+      <p className="driver-kpi-help">Totais de todos os condutores da busca, status e secretaria selecionados. Até 60 dias inclui até 30. Não informadas: sem número ou validade.</p>
+      {cnhFilter ? <div className="driver-kpi-result" role="status"><span>{loading ? 'Atualizando resultados…' : `${pagination.total} condutor(es) · ${selectedCnhFilter.label}`}</span><button type="button" className="ghost-button" onClick={() => setCnhFilter('')}>Limpar filtro de CNH</button></div> : null}
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {editId && canEditDriver && error && !isModalOpen ? <button type="button" className="ghost-button" onClick={() => setEditRetry((value) => value + 1)}>Tentar abrir cadastro novamente</button> : null}
@@ -377,7 +384,7 @@ export default function DriversPage() {
         </div>
       </div>
 
-      <Pagination currentPage={pagination.page} totalPages={pagination.pages} onPageChange={loadDrivers} />
+      <Pagination currentPage={pagination.page} totalPages={pagination.pages} onPageChange={(page) => { if (!loading) loadDrivers(page) }} />
 
       <Modal
         open={isModalOpen}

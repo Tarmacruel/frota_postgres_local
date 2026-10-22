@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from datetime import date, datetime
+from enum import Enum
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 from app.models.driver import DriverLicenseCategory
@@ -155,5 +156,21 @@ class DriverOut(BaseModel):
     updated_at: datetime
 
 
+class DriverCnhStatus(str, Enum):
+    EXPIRED = "expired"
+    EXPIRING_30 = "expiring_30"
+    EXPIRING_60 = "expiring_60"
+    MISSING = "missing"
+
+
+class DriverSummary(BaseModel):
+    total: int = 0
+    expired: int = 0
+    expiring_30: int = 0
+    expiring_60: int = 0
+    missing: int = 0
+    reference_date: date
+
+
 class DriverListResponse(PaginatedResponse[DriverOut]):
-    pass
+    summary: DriverSummary

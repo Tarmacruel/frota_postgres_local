@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from uuid import UUID
+from datetime import date, datetime, timedelta
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -8,6 +9,21 @@ from app.models.claim import Claim
 from app.models.driver import Driver
 from app.models.master_data import Organization
 from app.models.possession import VehiclePossession
+from app.core.official_identity import INSTITUTIONAL_TIMEZONE
+from app.schemas.driver import DriverCnhStatus
+
+
+def driver_reference_date() -> date:
+    return datetime.now(INSTITUTIONAL_TIMEZONE).date()
+
+
+def cnh_predicates(today: date):
+    return {
+        DriverCnhStatus.EXPIRED: Driver.cnh_validade < today,
+        DriverCnhStatus.EXPIRING_30: Driver.cnh_validade.between(today, today + timedelta(days=30)),
+        DriverCnhStatus.EXPIRING_60: Driver.cnh_validade.between(today, today + timedelta(days=60)),
+        DriverCnhStatus.MISSING: or_(func.trim(func.coalesce(Driver.cnh_numero, "")) == "", Driver.cnh_validade.is_(None)),
+    }
 
 
 class DriverRepository:
@@ -33,31 +49,35 @@ class DriverRepository:
         search: str | None = None,
         active_only: bool | None = None,
         organization_id: UUID | None = None,
-    ) -> tuple[list[Driver], int]:
+        cnh_status: DriverCnhStatus | None = None,
+        with_summary: bool = False,
+        reference_date: date | None = None,
+    ):
         stmt = select(Driver).options(joinedload(Driver.organization)).outerjoin(Organization, Organization.id == Driver.organization_id)
-        count_stmt = select(func.count(Driver.id)).outerjoin(Organization, Organization.id == Driver.organization_id)
-
-        if active_only is True:
-            stmt = stmt.where(Driver.ativo.is_(True))
-            count_stmt = count_stmt.where(Driver.ativo.is_(True))
-        elif active_only is False:
-            stmt = stmt.where(Driver.ativo.is_(False))
-            count_stmt = count_stmt.where(Driver.ativo.is_(False))
-
+        filters = []
+        if active_only is not None:
+            filters.append(Driver.ativo.is_(active_only))
         if organization_id:
-            stmt = stmt.where(Driver.organization_id == organization_id)
-            count_stmt = count_stmt.where(Driver.organization_id == organization_id)
-
+            filters.append(Driver.organization_id == organization_id)
         if search:
             term = f"%{search.strip()}%"
-            filter_clause = or_(Driver.nome_completo.ilike(term), Driver.documento.ilike(term), Driver.matricula.ilike(term), Organization.name.ilike(term))
-            stmt = stmt.where(filter_clause)
-            count_stmt = count_stmt.where(filter_clause)
-
-        stmt = stmt.order_by(Driver.ativo.desc(), Driver.nome_completo.asc(), Driver.created_at.desc()).offset((page - 1) * limit).limit(limit)
+            filters.append(or_(Driver.nome_completo.ilike(term), Driver.documento.ilike(term), Driver.matricula.ilike(term), Organization.name.ilike(term)))
+        today = reference_date or driver_reference_date()
+        predicates = cnh_predicates(today)
+        summary = None
+        if with_summary:
+            summary_stmt = select(func.count(Driver.id).label("total"), *[
+                func.count(Driver.id).filter(predicate).label(key.value) for key, predicate in predicates.items()
+            ]).outerjoin(Organization, Organization.id == Driver.organization_id).where(*filters)
+            summary = dict((await self.db.execute(summary_stmt)).mappings().one())
+            summary["reference_date"] = today
+        if cnh_status is not None:
+            filters.append(predicates[DriverCnhStatus(cnh_status)])
+        count_stmt = select(func.count(Driver.id)).outerjoin(Organization, Organization.id == Driver.organization_id).where(*filters)
         total = int((await self.db.execute(count_stmt)).scalar_one())
+        stmt = stmt.where(*filters).order_by(Driver.ativo.desc(), Driver.nome_completo.asc(), Driver.created_at.desc(), Driver.id.asc()).offset((page - 1) * limit).limit(limit)
         items = list((await self.db.execute(stmt)).scalars().all())
-        return items, total
+        return (items, total, summary) if with_summary else (items, total)
 
     async def list_active(self, *, search: str | None = None, limit: int = 1000, organization_id: UUID | None = None) -> list[Driver]:
         stmt = (
