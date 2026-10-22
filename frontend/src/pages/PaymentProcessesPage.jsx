@@ -18,6 +18,7 @@ import {
 } from 'recharts'
 import { paymentContractsAPI, paymentProcessesAPI, paymentSuppliersAPI } from '../api/paymentProcesses'
 import Modal from '../components/Modal'
+import ProcessReconciliation from '../components/contracts/ProcessReconciliation'
 import Pagination from '../components/Pagination'
 import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
@@ -233,7 +234,7 @@ function isOverdueProcess(row) {
   return due < today
 }
 
-export default function PaymentProcessesPage() {
+export default function PaymentProcessesPage({ embedded = false, initialView = 'processes', initialContractId = '', initialProcessId = '' }) {
   const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
   const [alertDetails, setAlertDetails] = useState(null)
   const [alertDetailsLoading, setAlertDetailsLoading] = useState(false)
@@ -255,7 +256,7 @@ export default function PaymentProcessesPage() {
   const { organizations } = useMasterDataCatalog({ organizationsOnly: true })
   const canManage = canEdit('payment_processes')
   const canDeleteProcesses = canDeleteModule('payment_processes')
-  const [activeView, setActiveView] = useState('processes')
+  const [activeView, setActiveView] = useState(initialView)
   const [detailTab, setDetailTab] = useState('summary')
   const [records, setRecords] = useState([])
   const [selectedProcess, setSelectedProcess] = useState(null)
@@ -264,7 +265,7 @@ export default function PaymentProcessesPage() {
   const [suppliers, setSuppliers] = useState([])
   const [contracts, setContracts] = useState([])
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0, limit: PAGE_SIZE })
-  const [filters, setFilters] = useState({ kind: '', stage: '', organization_id: '', supplier_id: '', contract_id: '', competence_month: '', due_from: '', due_to: '', search: '' })
+  const [filters, setFilters] = useState({ kind: '', stage: '', organization_id: '', supplier_id: '', contract_id: initialContractId, competence_month: '', due_from: '', due_to: '', search: '' })
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
@@ -348,6 +349,15 @@ export default function PaymentProcessesPage() {
     setChecklistDraft((selectedProcess?.checklist || []).map((item) => ({ ...item })))
   }, [selectedProcess?.id])
 
+  useEffect(() => {
+    if (!initialProcessId) return undefined
+    let active = true
+    paymentProcessesAPI.getById(initialProcessId).then(({ data }) => {
+      if (active) { setSelectedProcess(data); setDetailTab('summary') }
+    }).catch((err) => { if (active) setError(getApiErrorMessage(err, 'Não foi possível abrir o processo.')) })
+    return () => { active = false }
+  }, [initialProcessId])
+
   async function loadCatalogs() {
     try {
       const [supplierResponse, contractResponse] = await Promise.all([
@@ -381,7 +391,7 @@ export default function PaymentProcessesPage() {
       const nextRecords = data.data || []
       setRecords(nextRecords)
       setPagination(data.pagination || { page, pages: 1, total: 0, limit: PAGE_SIZE })
-      if (selectedProcess && !nextRecords.some((record) => record.id === selectedProcess.id)) {
+      if (selectedProcess && !initialProcessId && !nextRecords.some((record) => record.id === selectedProcess.id)) {
         setSelectedProcess(null)
       }
     } catch (err) {
@@ -780,7 +790,7 @@ export default function PaymentProcessesPage() {
   return (
     <div className="page-shell payment-process-page payment-workflow-page management-page management-page--payments">
       <PageHeader
-        title="Processos de pagamento"
+        title={embedded ? 'Faturas e pagamentos' : 'Processos de pagamento'}
         description="Workflow financeiro de combustíveis e manutenção por fatura, contrato, etapa e pendência."
         actions={<>
           {canManage ? <button className="app-button" type="button" onClick={openCreateProcess}>Novo processo</button> : null}
@@ -799,7 +809,7 @@ export default function PaymentProcessesPage() {
           { value: 'contractManagement', label: 'Gestão do contrato' },
           { value: 'contracts', label: 'Contratos' },
           { value: 'suppliers', label: 'Fornecedores' },
-        ].map((tab) => (
+        ].filter((tab) => !embedded || ['processes', 'imports', 'contractManagement'].includes(tab.value)).map((tab) => (
           <button key={tab.value} type="button" aria-pressed={activeView === tab.value} className={`status-pill ${activeView === tab.value ? 'active' : ''}`} onClick={() => setActiveView(tab.value)}>
             {tab.label}
           </button>
@@ -961,6 +971,7 @@ export default function PaymentProcessesPage() {
 
       {activeView === 'contractManagement' ? (
         <ContractManagementView
+          initialContractId={initialContractId}
           contracts={contracts}
           suppliers={suppliers}
         />
@@ -1223,6 +1234,7 @@ function ProcessDetail({
 
         {detailTab === 'finance' ? (
           <div className="payment-detail-grid">
+            {canManage ? <ProcessReconciliation key={process.id} process={process} /> : null}
             <Info label="Valor" value={formatCurrency(process.amount)} />
             <Info label="Saldo importado" value={formatCurrency(process.contract_balance)} />
             <Info label="Empenho" value={`${process.commitment_number || '-'} . ${formatDate(process.commitment_date)}`} />
@@ -1357,9 +1369,9 @@ function ImportsView({
   )
 }
 
-function ContractManagementView({ contracts, suppliers }) {
+function ContractManagementView({ contracts, suppliers, initialContractId = '' }) {
   const [filters, setFilters] = useState({ supplier_id: '', kind: '', status: '', search: '', horizon_months: 6 })
-  const [selectedContractId, setSelectedContractId] = useState('')
+  const [selectedContractId, setSelectedContractId] = useState(initialContractId)
   const [summary, setSummary] = useState(null)
   const [detail, setDetail] = useState(null)
   const [loadingSummary, setLoadingSummary] = useState(false)

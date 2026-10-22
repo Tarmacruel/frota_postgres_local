@@ -15,6 +15,8 @@ from app.repositories.vehicle_repository import VehicleRepository
 from app.schemas.common import build_pagination
 from app.schemas.maintenance import MaintenanceCreate, MaintenanceListResponse, MaintenanceUpdate
 from app.services.audit_service import AuditService
+from app.core.config import settings
+from app.services.contract_balance_service import ContractBalanceService, funding_fields
 
 
 class MaintenanceService:
@@ -86,6 +88,8 @@ class MaintenanceService:
         return MaintenanceListResponse(data=[self._serialize(record) for record in records], pagination=build_pagination(page, limit, total), summary=summary)
 
     async def create(self, data: MaintenanceCreate, current_user: User) -> dict:
+        if settings.CONTRACT_BALANCE_ENABLED:
+            raise HTTPException(409, 'Emita um pedido de manutenção com contrato, oficina e orçamento antes de iniciar o serviço')
         vehicle = await self._ensure_vehicle_exists(data.vehicle_id, current_user=current_user)
 
         record = MaintenanceRecord(
@@ -132,6 +136,7 @@ class MaintenanceService:
         await attribute_operation(self.db, record, current_user)
 
         payload = data.model_dump(exclude_unset=True)
+        reason = payload.pop('reason', None)
         previous_values = {
             "service_description": record.service_description,
             "parts_replaced": record.parts_replaced,
@@ -139,11 +144,21 @@ class MaintenanceService:
             "end_date": record.end_date.isoformat() if record.end_date else None,
         }
         next_end_date = payload["end_date"] if "end_date" in payload else record.end_date
+        if settings.CONTRACT_BALANCE_ENABLED and record.contract_reservation_id:
+            if payload.get('total_cost', record.total_cost) != record.total_cost and len((reason or '').strip()) < 10:
+                raise HTTPException(422, 'Justifique a alteração do custo da manutenção (mínimo 10 caracteres)')
+            if record.end_date is None:
+                raise HTTPException(409, 'Conclua o pedido de manutenção para registrar o custo real')
+            if next_end_date is None:
+                raise HTTPException(409, 'Uma execução financeira concluída não pode voltar a ficar aberta')
         if next_end_date and next_end_date < record.start_date:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Data final nao pode ser anterior a data inicial")
 
         for field, value in payload.items():
             setattr(record, field, value)
+        if settings.CONTRACT_BALANCE_ENABLED and record.contract_reservation_id:
+            await ContractBalanceService(self.db).rectify_operation('MAINTENANCE', record.id,
+                amount=record.total_cost, actor=current_user, reason=reason or 'Retificação dos dados da manutenção concluída', occurred_at=record.end_date)
 
         try:
             await self.audit.record(
@@ -154,6 +169,7 @@ class MaintenanceService:
                 entity_label=f"{record.vehicle.plate if record.vehicle else record.vehicle_id} - {record.service_description[:60]}",
                 details={
                     "before": previous_values,
+                    "reason": reason,
                     "after": {
                         "service_description": record.service_description,
                         "parts_replaced": record.parts_replaced,
@@ -177,6 +193,8 @@ class MaintenanceService:
 
         await ensure_record_visible(self.db, record, current_user)
         await attribute_operation(self.db, record, current_user)
+        if settings.CONTRACT_BALANCE_ENABLED and record.contract_reservation_id:
+            raise HTTPException(409, 'Manutenção com efeito financeiro não pode ser apagada. Utilize a retificação.')
 
         try:
             await self.audit.record(
@@ -216,6 +234,7 @@ class MaintenanceService:
 
     def _serialize(self, record: MaintenanceRecord) -> dict:
         return {
+            **funding_fields(record),
             "id": record.id,
             "vehicle_loan_id": getattr(record, "vehicle_loan_id", None),
             "responsible_organization_id": getattr(record, "responsible_organization_id", None),

@@ -4,6 +4,8 @@ import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
 import useFuelSupplyOrderForm from '../hooks/useFuelSupplyOrderForm'
+import useContractFunding from '../hooks/useContractFunding'
+import ContractFundingFields from './contracts/ContractFundingFields'
 
 function buildVehicleOption(vehicle) {
   const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
@@ -29,14 +31,16 @@ function buildDefaultDeadline() {
   return toDateTimeLocalValue(deadline.toISOString())
 }
 
-export default function FuelSupplyOrderCreateForm({ vehicles = [], onVehicleOptionsOpen, organizations = [], fuelStations = [], onClose, onSuccess }) {
+export default function FuelSupplyOrderCreateForm({ vehicles = [], onVehicleOptionsOpen, organizations = [], fuelStations = [], initialContractId = '', onClose, onSuccess }) {
   const [form, setForm] = useFuelSupplyOrderForm(() => ({
     vehicle_id: '',
+    fuel_station_id: initialContractId ? '' : undefined,
     expires_at: buildDefaultDeadline(),
     requested_liters: '30',
     notes: '',
   }), organizations, fuelStations)
   const [error, setError] = useState('')
+  const funding = useContractFunding({ stationId: form.fuel_station_id, liters: form.requested_liters, initialContractId })
   const [submitting, setSubmitting] = useState(false)
 
   const submitLabel = useMemo(() => (submitting ? 'Criando ordem...' : 'Criar ordem'), [submitting])
@@ -44,6 +48,7 @@ export default function FuelSupplyOrderCreateForm({ vehicles = [], onVehicleOpti
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
+    if (!funding.ready) { setError(funding.error || 'Confira o contrato, o combustível e a reserva antes de emitir.'); return }
 
     if (!form.vehicle_id) {
       setError('Selecione um veículo para emitir a ordem.')
@@ -68,6 +73,7 @@ export default function FuelSupplyOrderCreateForm({ vehicles = [], onVehicleOpti
     try {
       setSubmitting(true)
       const payload = {
+        ...funding.payload,
         vehicle_id: form.vehicle_id,
         expires_at: new Date(form.expires_at).toISOString(),
         fuel_station_id: form.fuel_station_id,
@@ -164,8 +170,9 @@ export default function FuelSupplyOrderCreateForm({ vehicles = [], onVehicleOpti
         />
       </div>
 
+      <ContractFundingFields funding={funding} />
       <div className="actions-inline modal-actions">
-        <button className="app-button" type="submit" disabled={submitting}>
+        <button className="app-button" type="submit" disabled={submitting || !funding.ready}>
           {submitLabel}
         </button>
         <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>

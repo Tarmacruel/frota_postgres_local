@@ -7,10 +7,11 @@ from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, Num
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
+from app.models.contract_balance import ContractFundingMixin
 from app.models.operational_responsibility import LoanAttributionMixin
 
 
-class FuelSupply(LoanAttributionMixin, Base):
+class FuelSupply(ContractFundingMixin, LoanAttributionMixin, Base):
     __tablename__ = "fuel_supplies"
     __table_args__ = (
         Index("idx_fuel_supplies_vehicle", "vehicle_id"),
@@ -23,6 +24,7 @@ class FuelSupply(LoanAttributionMixin, Base):
     )
 
     id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), primary_key=True, server_default=text("gen_random_uuid()"))
+    request_key: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True, unique=True)
     vehicle_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("vehicles.id", ondelete="CASCADE"), nullable=False)
     driver_id: Mapped[UUID | None] = mapped_column(
         PGUUID(as_uuid=True), ForeignKey("drivers.id", ondelete="SET NULL"), nullable=True

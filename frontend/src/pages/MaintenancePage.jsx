@@ -4,6 +4,8 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import MaintenanceForm from '../components/MaintenanceForm'
+import MaintenanceOrdersPanel from '../components/contracts/MaintenanceOrdersPanel'
+import { useContractControl } from '../hooks/useContractFunding'
 import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
 import api from '../api/client'
@@ -43,6 +45,7 @@ function buildVehicleOption(vehicle) {
 }
 
 export default function MaintenancePage() {
+  const contractMode = useContractControl()
   const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
   useEffect(() => { setCurrentPage(1) }, [indicator])
 
@@ -71,6 +74,13 @@ export default function MaintenancePage() {
   const listRequest = useRef(0)
   const focusRecordId = searchParams.get('focus')
   const { organizations } = useMasterDataCatalog({ organizationsOnly: true })
+  useEffect(() => {
+    if (searchParams.get('action') !== 'create') return
+    if (canCreateMaintenance) setIsModalOpen(true)
+    const next = new URLSearchParams(searchParams)
+    next.delete('action')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, setSearchParams, canCreateMaintenance])
 
   const organizationFilterOptions = useMemo(() => {
     return [
@@ -295,7 +305,7 @@ export default function MaintenancePage() {
           <>
           {canCreateMaintenance ? (
             <button className="app-button" type="button" onClick={() => setIsModalOpen(true)}>
-              Nova manutenção
+              {contractMode.enabled ? 'Novo pedido de manutenção' : 'Nova manutenção'}
             </button>
           ) : null}
           <button className="secondary-button" type="button" onClick={handleExportPdf}>Pré-visualizar PDF</button>
@@ -304,6 +314,7 @@ export default function MaintenancePage() {
         )}
       />
 
+      {contractMode.enabled && !contractMode.error ? <MaintenanceOrdersPanel vehicles={vehicles} onVehicleOptionsOpen={loadVehicles} refreshKey={feedback} onChange={() => loadRecords()} /> : null}
       <div className="toolbar-card operation-toolbar">
         <div className="toolbar-row">
           <div className="status-pills">
@@ -439,11 +450,12 @@ export default function MaintenancePage() {
 
       <Modal
         open={isModalOpen}
-        title={editingRecord ? 'Atualizar manutenção' : 'Nova manutenção'}
-        description="Registre serviços, custo e conclusão para manter o histórico mecânico confiável."
+        title={editingRecord ? 'Atualizar manutenção' : contractMode.enabled ? 'Novo pedido de manutenção' : 'Nova manutenção'}
+        description={!editingRecord && contractMode.enabled ? 'Autorize o serviço com contrato, oficina e orçamento. O valor ficará reservado até a conclusão.' : 'Registre serviços, custo e conclusão para manter o histórico mecânico confiável.'}
         onClose={closeModal}
       >
         <MaintenanceForm
+          initialContractId={searchParams.get('contract_id') || ''}
           onVehicleOptionsOpen={loadVehicles}
           vehicles={vehicles}
           initialData={editingRecord}

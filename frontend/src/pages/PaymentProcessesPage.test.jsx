@@ -47,3 +47,5 @@ it('mantém o detalhamento fechado quando a resposta dos alertas chega depois de
   await act(async () => resolve([{ id: 'alert', alerts: ['Pendência de teste'] }]))
   expect(screen.queryByRole('dialog', { name: 'Alertas gerais dos processos' })).not.toBeInTheDocument()
 })
+
+vi.mock('../api/contractControl', () => ({ contractControlAPI: { config: async () => ({ data: { enabled: false } }) }, maintenanceOrdersAPI: {} }))

@@ -110,7 +110,7 @@ export default function Layout() {
         managementItems.push({ to: '/postos', label: 'Postos', description: 'Credenciados', icon: 'catalog' })
       }
       if (canView('payment_processes')) {
-        managementItems.push({ to: '/processos-pagamento', label: 'Processos de pagamento', description: 'Pagamentos', icon: 'catalog' })
+        managementItems.push({ to: '/processos-pagamento', label: 'Contratos e saldos', description: 'Contratos e pagamentos', icon: 'catalog' })
       }
       if (canView('analytics')) {
         managementItems.push({ to: '/analytics', label: 'Análises', description: 'BI', icon: 'dashboard' })

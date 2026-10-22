@@ -56,6 +56,7 @@ class Settings(BaseSettings):
         "*.localhost",
     ]
     APP_ENV: str = "development"
+    CONTRACT_BALANCE_ENABLED: bool = False
     ENABLE_LEGACY_FUEL_SUPPLY_CREATE: bool = False
     CERTIFICATE_SIGNING_ENABLED: bool = False
     CANONICAL_DOCUMENT_ARTIFACTS_ENABLED: bool = False

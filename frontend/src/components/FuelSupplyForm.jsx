@@ -1,5 +1,7 @@
 import { useMemo, useRef, useState } from 'react'
 import SearchableSelect from './SearchableSelect'
+import useContractFunding from '../hooks/useContractFunding'
+import ContractFundingFields from './contracts/ContractFundingFields'
 import { fuelSuppliesAPI } from '../api/fuelSupplies'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
@@ -55,6 +57,8 @@ export default function FuelSupplyForm({ vehicles, onVehicleOptionsOpen, drivers
     notes: '',
   })
   const [receiptFile, setReceiptFile] = useState(null)
+  const funding = useContractFunding({ stationId: form.fuel_station_id, liters: form.liters,
+    fuelType: resolveOptionValue(form.fuel_type, form.fuel_type_other) })
   const [receiptError, setReceiptError] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -122,6 +126,10 @@ export default function FuelSupplyForm({ vehicles, onVehicleOptionsOpen, drivers
       setSubmitting(true)
       setError('')
       const payload = new FormData()
+      if (funding.enabled !== false) {
+        if (!funding.ready) throw new Error('Confira o contrato e o saldo disponível antes de registrar.')
+        for (const field of ['contract_id', 'contract_provider_id', 'expected_price_id', 'request_key']) payload.append(field, funding.payload[field])
+      }
       payload.append('vehicle_id', form.vehicle_id)
       if (form.driver_id) payload.append('driver_id', form.driver_id)
       if (form.organization_id) payload.append('organization_id', form.organization_id)
@@ -240,8 +248,9 @@ export default function FuelSupplyForm({ vehicles, onVehicleOptionsOpen, drivers
         <textarea className="app-textarea" rows="3" value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} />
       </div>
 
+      <ContractFundingFields funding={funding} externalFuelType />
       <div className="actions-inline modal-actions">
-        <button className="app-button" type="submit" disabled={submitting}>{submitLabel}</button>
+        <button className="app-button" type="submit" disabled={submitting || !funding.ready}>{submitLabel}</button>
         <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>
       </div>
     </form>

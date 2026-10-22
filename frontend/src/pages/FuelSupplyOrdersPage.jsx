@@ -1,5 +1,7 @@
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
+import { useContractControl } from '../hooks/useContractFunding'
+import FuelOrderFundingForm from '../components/contracts/FuelOrderFundingForm'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
@@ -74,7 +76,9 @@ export default function FuelSupplyOrdersPage() {
 
   const [searchParams, setSearchParams] = useSearchParams()
   const focusedOrderId = searchParams.get('focus')
-  const { canEdit } = useAuth()
+  const { canEdit, isAdmin, isProduction } = useAuth()
+  const control = useContractControl()
+  const [fundingOrder, setFundingOrder] = useState(null)
   const canConfirmOrder = canEdit('fuel_supply_orders')
   const { organizations } = useMasterDataCatalog({ organizationsOnly: true })
   const [orders, setOrders] = useState([])
@@ -260,7 +264,10 @@ export default function FuelSupplyOrdersPage() {
                     <td data-label="Litros previstos">{formatNumber(order.requested_liters)}</td>
                     <td data-label="Ações">
                       <div className="operation-row-actions">
-                        {canConfirmOrder ? <button className="app-button" type="button" onClick={() => setSelectedOrder(order)}>Confirmar abastecimento</button> : null}
+                        {control.enabled && !order.contract_reservation_id ? (isAdmin || isProduction) && canConfirmOrder
+                          ? <button className="app-button" type="button" onClick={() => setFundingOrder(order)}>Vincular contrato e reservar</button>
+                          : <span className="muted">Aguarda vínculo contratual e reserva pela equipe emissora.</span>
+                          : canConfirmOrder ? <button className="app-button" type="button" onClick={() => setSelectedOrder(order)}>Confirmar abastecimento</button> : null}
                         <ActionMenu
                           label={`Mais ações da ordem ${formatOrderNumber(order)}`}
                           items={[
@@ -295,6 +302,10 @@ export default function FuelSupplyOrdersPage() {
             }}
           />
         ) : null}
+      </Modal>
+
+      <Modal open={Boolean(fundingOrder)} onClose={() => setFundingOrder(null)} title="Vincular contrato e reservar">
+        {fundingOrder ? <FuelOrderFundingForm order={fundingOrder} onClose={() => setFundingOrder(null)} onSuccess={(message) => { setFeedback(message); loadOrders() }} /> : null}
       </Modal>
 
       <Modal

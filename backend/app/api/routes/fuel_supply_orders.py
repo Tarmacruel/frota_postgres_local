@@ -24,6 +24,8 @@ from app.schemas.fuel_supply import (
     FuelSupplyOrderPublicOut,
 )
 from app.services.fuel_supply_order_service import FuelSupplyOrderService
+from app.schemas.contract_balance import FuelOrderFunding
+from app.api.routes.contract_control import enabled
 
 router = APIRouter(prefix="/api/fuel-supply-orders", tags=["FuelSupplyOrders"])
 public_router = APIRouter(prefix="/api/public/fuel-supply-orders", tags=["PublicFuelSupplyOrders"])
@@ -72,6 +74,12 @@ async def create_fuel_supply_orders_batch(
     current_user: User = Depends(require_permission("fuel_supply_orders", "create")),
 ):
     return await FuelSupplyOrderService(db).create_batch(data, current_user)
+
+
+@router.post('/{order_id}/funding', response_model=FuelSupplyOrderOut, dependencies=[Depends(enabled)])
+async def fund_legacy_order(order_id: UUID, data: FuelOrderFunding, db: AsyncSession = Depends(get_db_session),
+                            user: User = Depends(require_permission('fuel_supply_orders', 'edit'))):
+    return await FuelSupplyOrderService(db).adopt_funding(order_id, data, user)
 
 
 @router.get("", response_model=FuelSupplyOrderListResponse)

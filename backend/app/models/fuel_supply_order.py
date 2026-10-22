@@ -8,6 +8,7 @@ from sqlalchemy import DateTime, Enum, ForeignKey, Index, Numeric, String, Text,
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
+from app.models.contract_balance import ContractFundingMixin
 from app.models.operational_responsibility import LoanAttributionMixin
 
 
@@ -18,7 +19,7 @@ class FuelSupplyOrderStatus(str, enum.Enum):
     EXPIRED = "EXPIRED"
 
 
-class FuelSupplyOrder(LoanAttributionMixin, Base):
+class FuelSupplyOrder(ContractFundingMixin, LoanAttributionMixin, Base):
     __tablename__ = "fuel_supply_orders"
     __table_args__ = (
         Index("idx_fuel_supply_orders_status", "status"),
@@ -60,6 +61,9 @@ class FuelSupplyOrder(LoanAttributionMixin, Base):
     )
 
     requested_liters: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
+    requested_fuel_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    request_key: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True, unique=True)
+    batch_request_key: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True, index=True)
     max_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     requester_contact: Mapped[str | None] = mapped_column(String(50), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)

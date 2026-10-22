@@ -1,8 +1,11 @@
 from __future__ import annotations
 
 from datetime import datetime, timezone
+from decimal import Decimal
+from types import SimpleNamespace
 from pathlib import Path
-from uuid import UUID, uuid4
+from uuid import UUID, uuid4, uuid5
+from sqlalchemy import select, text
 from fastapi import HTTPException, UploadFile, status
 from sqlalchemy.exc import IntegrityError
 from app.services.operational_scope import attribute_operation, ensure_record_visible
@@ -27,6 +30,7 @@ from app.schemas.fuel_supply import (
     FuelSupplyOrderDeadlineUpdate,
 )
 from app.services.audit_service import AuditService
+from app.services.contract_balance_service import ContractBalanceService, fuel_key, TZ
 from app.services.document_signature_service import DocumentSignatureService, SOURCE_FUEL_SUPPLY_ORDER
 from app.models.document_signature import DigitalDocumentType
 
@@ -76,8 +80,21 @@ class FuelSupplyOrderService:
         )
 
     async def create_order(self, data: FuelSupplyOrderCreate, current_user: User) -> dict:
+        if settings.CONTRACT_BALANCE_ENABLED:
+            self._require_funding_payload(data)
+            await self._lock_request(data.request_key)
         self._ensure_order_deadline(data.expires_at)
         await lock_vehicle_handoff(self.db, data.vehicle_id)
+        if settings.CONTRACT_BALANCE_ENABLED:
+            prior = await self.db.scalar(select(FuelSupplyOrder).where(FuelSupplyOrder.request_key == data.request_key))
+            if prior:
+                await self._ensure_order_visible_to_user(prior, current_user)
+                if (prior.vehicle_id, prior.contract_id, prior.contract_provider_id, prior.fuel_station_id,
+                        prior.requested_liters, prior.requested_fuel_type, prior.expires_at) != (
+                        data.vehicle_id, data.contract_id, data.contract_provider_id, data.fuel_station_id,
+                        Decimal(str(data.requested_liters)), fuel_key(data.requested_fuel_type), data.expires_at):
+                    raise HTTPException(409, 'Esta identificação já foi usada em outro pedido')
+                return await self.get_order(prior.id, current_user=current_user)
         vehicle = await self._get_visible_vehicle(data.vehicle_id, current_user)
         order_organization_id = await self._validate_order_context(
             organization_id=data.organization_id,
@@ -96,11 +113,14 @@ class FuelSupplyOrderService:
             requested_liters=data.requested_liters,
             notes=data.notes,
             status=FuelSupplyOrderStatus.OPEN,
+            request_key=data.request_key if settings.CONTRACT_BALANCE_ENABLED else None,
         )
 
         try:
             await attribute_operation(self.db, order, current_user, new=True)
             await self.orders.create(order)
+            if settings.CONTRACT_BALANCE_ENABLED:
+                await self._fund_order(order, data, current_user)
             loaded_order = await self.orders.get_by_id(order.id)
             if not loaded_order:
                 raise HTTPException(
@@ -123,6 +143,20 @@ class FuelSupplyOrderService:
         return await self.get_order(order.id, current_user=current_user)
 
     async def create_batch(self, data: FuelSupplyOrderBatchCreate, current_user: User) -> dict:
+        if settings.CONTRACT_BALANCE_ENABLED:
+            self._require_funding_payload(data, batch=True)
+            await self._lock_request(data.request_key)
+            prior = (await self.db.scalars(select(FuelSupplyOrder).where(FuelSupplyOrder.batch_request_key == data.request_key))).all()
+            if prior:
+                for row in prior:
+                    await self._ensure_order_visible_to_user(row, current_user)
+                actual = {(row.vehicle_id, row.requested_liters) for row in prior}
+                expected = {(item.vehicle_id, Decimal(str(item.requested_liters))) for item in data.items}
+                if actual != expected or any(row.contract_id != data.contract_id or row.contract_provider_id != data.contract_provider_id
+                    or row.fuel_station_id != data.fuel_station_id or row.expires_at != data.expires_at
+                    or row.requested_fuel_type != fuel_key(data.requested_fuel_type) for row in prior):
+                    raise HTTPException(409, 'Esta identificação já foi usada em outro lote')
+                return {'created_count': len(prior), 'orders': [await self.get_order(row.id, current_user=current_user) for row in prior]}
         self._ensure_batch_items_are_valid(data)
         self._ensure_order_deadline(data.expires_at)
         order_organization_id = await self._validate_order_context(
@@ -155,9 +189,13 @@ class FuelSupplyOrderService:
                     requested_liters=item.requested_liters,
                     notes=data.notes,
                     status=FuelSupplyOrderStatus.OPEN,
+                    request_key=uuid5(data.request_key, str(item.vehicle_id)) if settings.CONTRACT_BALANCE_ENABLED else None,
+                    batch_request_key=data.request_key if settings.CONTRACT_BALANCE_ENABLED else None,
                 )
                 await attribute_operation(self.db, order, current_user, new=True)
                 await self.orders.create(order)
+                if settings.CONTRACT_BALANCE_ENABLED:
+                    await self._fund_order(order, data, current_user)
                 created_orders.append((order, vehicle))
 
             for order, vehicle in created_orders:
@@ -229,6 +267,8 @@ class FuelSupplyOrderService:
 
         await self._ensure_order_visible_to_user(order, current_user)
         await attribute_operation(self.db, order, current_user)
+        if settings.CONTRACT_BALANCE_ENABLED:
+            await self._lock_funded_order(order)
         if order.status == FuelSupplyOrderStatus.COMPLETED:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem já confirmada")
         if order.status == FuelSupplyOrderStatus.CANCELLED:
@@ -241,6 +281,8 @@ class FuelSupplyOrderService:
         now = datetime.now(timezone.utc)
         if now > order.expires_at:
             order.status = FuelSupplyOrderStatus.EXPIRED
+            if settings.CONTRACT_BALANCE_ENABLED:
+                await ContractBalanceService(self.db).release(order.contract_reservation_id, actor=current_user, reason='Ordem expirada')
             await self.audit.record(
                 actor=current_user,
                 action="ORDER_EXPIRED",
@@ -265,6 +307,8 @@ class FuelSupplyOrderService:
             await self._ensure_station_access(current_user=current_user, order=order)
 
         receipt_payload = await self._read_and_validate_receipt(receipt)
+        if settings.CONTRACT_BALANCE_ENABLED and fuel_key(data.fuel_type) != fuel_key(order.requested_fuel_type):
+            raise HTTPException(409, 'Combustível diferente do autorizado no pedido')
         supplied_at = data.supplied_at or now
 
         previous_supply = await self.supplies.get_latest_for_vehicle(order.vehicle_id, before_supply_at=supplied_at)
@@ -312,11 +356,18 @@ class FuelSupplyOrderService:
             if supply.organization_id != order.organization_id:
                 raise HTTPException(409, 'A data do abastecimento pertence a outra secretaria')
             await self.supplies.create(supply)
+            if settings.CONTRACT_BALANCE_ENABLED:
+                supply.contract_id, supply.contract_provider_id = order.contract_id, order.contract_provider_id
+                supply.contract_reservation_id = order.contract_reservation_id
+                await ContractBalanceService(self.db).settle(order.contract_reservation_id,
+                    source_type='FUEL_SUPPLY', source_id=supply.id, amount=supply.total_amount,
+                    occurred_at=supplied_at, actor=current_user)
             relative_receipt_path, stored_receipt_path = self._build_receipt_storage_paths(supply.id, receipt_payload["mime_type"])
             self._store_file(stored_receipt_path, receipt_payload["content"])
             supply.receipt_path = relative_receipt_path
 
             order.status = FuelSupplyOrderStatus.COMPLETED
+            order.supply = supply
             order.confirmed_at = now
             order.confirmed_by_user_id = current_user.id
 
@@ -363,6 +414,8 @@ class FuelSupplyOrderService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Ordem de abastecimento não encontrada")
         await self._ensure_order_visible_to_user(order, current_user)
         await attribute_operation(self.db, order, current_user)
+        if settings.CONTRACT_BALANCE_ENABLED and order.contract_id:
+            await self._lock_funded_order(order)
         if order.status == FuelSupplyOrderStatus.COMPLETED:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem já confirmada")
         if order.status == FuelSupplyOrderStatus.CANCELLED:
@@ -371,10 +424,15 @@ class FuelSupplyOrderService:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem expirada")
         if datetime.now(timezone.utc) > order.expires_at:
             order.status = FuelSupplyOrderStatus.EXPIRED
+            if settings.CONTRACT_BALANCE_ENABLED:
+                await ContractBalanceService(self.db).release(order.contract_reservation_id, actor=current_user, reason='Ordem expirada')
             await self.db.commit()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Ordem expirada")
 
         order.status = FuelSupplyOrderStatus.CANCELLED
+        if settings.CONTRACT_BALANCE_ENABLED:
+            await ContractBalanceService(self.db).release(order.contract_reservation_id, actor=current_user,
+                                                          reason=payload.reason or 'Ordem cancelada')
 
         await DocumentSignatureService(self.db).mark_source_documents_superseded(
             source_type=SOURCE_FUEL_SUPPLY_ORDER,
@@ -421,6 +479,21 @@ class FuelSupplyOrderService:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="O novo prazo deve estar no futuro")
 
         was_expired = order.status == FuelSupplyOrderStatus.EXPIRED or order.expires_at <= now
+        if settings.CONTRACT_BALANCE_ENABLED:
+            await self._lock_funded_order(order)
+            if order.status in {FuelSupplyOrderStatus.COMPLETED, FuelSupplyOrderStatus.CANCELLED}:
+                raise HTTPException(409, 'A ordem foi concluída ou cancelada durante a consulta')
+            was_expired = order.status == FuelSupplyOrderStatus.EXPIRED or order.expires_at <= now
+            contract = await ContractBalanceService(self.db).contract(order.contract_id)
+            if contract.status != 'ACTIVE' or not contract.valid_from or not contract.valid_until or not (contract.valid_from <= now.astimezone(TZ).date() <= contract.valid_until):
+                raise HTTPException(409, 'Contrato inativo ou fora da vigência; regularize antes de prorrogar')
+            if contract.valid_until and payload.expires_at.astimezone(TZ).date() > contract.valid_until:
+                raise HTTPException(409, 'O novo prazo ultrapassa a vigência do contrato')
+            if was_expired:
+                await ContractBalanceService(self.db).release(order.contract_reservation_id, actor=current_user, reason='Reabertura de ordem expirada')
+                await self._fund_order(order, SimpleNamespace(contract_id=order.contract_id,
+                    contract_provider_id=order.contract_provider_id, requested_fuel_type=order.requested_fuel_type,
+                    expected_price_id=None), current_user)
         if not was_expired and payload.expires_at <= order.expires_at:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -454,9 +527,71 @@ class FuelSupplyOrderService:
         return await self.get_order(order.id, current_user=current_user)
 
     async def _expire_overdue_orders(self) -> None:
+        released = await ContractBalanceService(self.db).release_expired() if settings.CONTRACT_BALANCE_ENABLED else False
         expired = await self.orders.expire_overdue(reference_time=datetime.now(timezone.utc))
-        if expired:
+        if expired or released:
             await self.db.commit()
+
+    @staticmethod
+    def _require_funding_payload(data, *, batch=False):
+        if not all((data.contract_id, data.contract_provider_id, data.requested_fuel_type, data.request_key, data.expected_price_id)):
+            raise HTTPException(422, 'Selecione contrato, prestador, combustível e confira a prévia financeira antes de emitir')
+        quantities = [item.requested_liters for item in data.items] if batch else [data.requested_liters]
+        if any(not quantity or quantity <= 0 for quantity in quantities):
+            raise HTTPException(422, 'Informe os litros previstos de todos os veículos')
+
+    async def _lock_request(self, key):
+        if self.db.get_bind().dialect.name == 'postgresql':
+            signed = (key.int & ((1 << 64)-1))-(1 << 63)
+            await self.db.execute(text('SELECT pg_advisory_xact_lock(:request_key)'), {'request_key': signed})
+
+    async def _fund_order(self, order, data, actor):
+        service = ContractBalanceService(self.db)
+        contract = await service.contract(data.contract_id)
+        if contract.valid_until and order.expires_at.astimezone(TZ).date() > contract.valid_until:
+            raise HTTPException(409, 'O prazo do pedido não pode ultrapassar a vigência do contrato')
+        reservation = await service.reserve(contract_id=data.contract_id, provider_id=data.contract_provider_id,
+            source_type='FUEL_ORDER', source_id=order.id, vehicle_id=order.vehicle_id,
+            organization_id=order.organization_id, actor=actor, fuel_type=data.requested_fuel_type,
+            liters=order.requested_liters, expected_price_id=data.expected_price_id, station_id=order.fuel_station_id)
+        order.contract_id, order.contract_provider_id = data.contract_id, data.contract_provider_id
+        order.contract_reservation_id, order.max_amount = reservation.id, reservation.amount
+        order.requested_fuel_type = reservation.fuel_type
+        await self.db.flush()
+
+    async def _lock_funded_order(self, order):
+        if not order.contract_id or not order.contract_reservation_id:
+            raise HTTPException(409, 'Pedido legado sem reserva. Vincule o contrato e confira o orçamento antes de utilizar.')
+        await lock_vehicle_handoff(self.db, order.vehicle_id)
+        await ContractBalanceService(self.db).contract(order.contract_id, lock=True)
+        await self.db.refresh(order, attribute_names=['status', 'expires_at', 'confirmed_at', 'confirmed_by_user_id'], with_for_update=True)
+
+    async def adopt_funding(self, order_id, data, actor):
+        self._ensure_operational_adjustment_role(actor)
+        order = await self.orders.get_by_id(order_id)
+        if not order:
+            raise HTTPException(404, 'Ordem não encontrada')
+        await self._ensure_order_visible_to_user(order, actor)
+        await attribute_operation(self.db, order, actor)
+        if order.status in {FuelSupplyOrderStatus.COMPLETED, FuelSupplyOrderStatus.CANCELLED}:
+            raise HTTPException(409, 'Somente pedidos abertos ou expirados podem receber reserva')
+        if order.contract_reservation_id:
+            if order.contract_id == data.contract_id and order.contract_provider_id == data.contract_provider_id:
+                return await self.get_order(order.id, current_user=actor)
+            raise HTTPException(409, 'Pedido já vinculado; cancele e emita outro para trocar de contrato')
+        deadline = data.expires_at or order.expires_at
+        self._ensure_order_deadline(deadline)
+        if deadline != order.expires_at and not data.justification:
+            raise HTTPException(422, 'Justifique a alteração do prazo da ordem')
+        previous_deadline = order.expires_at
+        order.expires_at, order.status = deadline, FuelSupplyOrderStatus.OPEN
+        order.requested_liters = data.requested_liters
+        await self._fund_order(order, data, actor)
+        await self.audit.record(actor=actor, action='ORDER_FUNDED', entity_type='FUEL_SUPPLY_ORDER',
+            entity_id=order.id, entity_label=str(order.id), details={'contract_id': str(order.contract_id),
+                'previous_deadline': previous_deadline, 'new_deadline': deadline, 'reason': data.justification})
+        await self.db.commit()
+        return await self.get_order(order.id, current_user=actor)
 
     async def _ensure_order_visible_to_user(self, order: FuelSupplyOrder, current_user: User) -> None:
         await ensure_record_visible(self.db, order, current_user)
@@ -681,6 +816,10 @@ class FuelSupplyOrderService:
 
     async def _serialize_order_with_signatures(self, item: FuelSupplyOrder) -> dict:
         payload = self._serialize_order(item)
+        if settings.CONTRACT_BALANCE_ENABLED:
+            payload.update(contract_id=item.contract_id, contract_provider_id=item.contract_provider_id,
+                contract_reservation_id=item.contract_reservation_id, requested_fuel_type=item.requested_fuel_type,
+                contract_funding=await ContractBalanceService(self.db).funding(item.contract_reservation_id))
         payload["signature_summary"] = await DocumentSignatureService(self.db).get_summary_for_source(
             DigitalDocumentType.FUEL_SUPPLY_ORDER,
             item.id,

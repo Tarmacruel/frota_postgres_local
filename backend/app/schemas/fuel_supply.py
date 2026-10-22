@@ -5,9 +5,14 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from app.models.fuel_supply_order import FuelSupplyOrderStatus
 from app.schemas.common import PaginatedResponse
+from app.schemas.contract_balance import FundingFields
 
 
 class FuelSupplyCreate(BaseModel):
+    contract_id: UUID | None = None
+    contract_provider_id: UUID | None = None
+    expected_price_id: UUID | None = None
+    request_key: UUID | None = None
     vehicle_id: UUID
     driver_id: UUID | None = None
     organization_id: UUID | None = None
@@ -55,7 +60,7 @@ class FuelSupplyFilter(BaseModel):
     only_anomalies: bool | None = None
 
 
-class FuelSupplyOut(BaseModel):
+class FuelSupplyOut(FundingFields):
     model_config = ConfigDict(from_attributes=True)
 
     vehicle_loan_id: UUID | None = None
@@ -114,6 +119,11 @@ class FuelAnomalyReportItem(BaseModel):
 
 
 class FuelSupplyOrderCreate(BaseModel):
+    contract_id: UUID | None = None
+    contract_provider_id: UUID | None = None
+    requested_fuel_type: str | None = Field(default=None, max_length=80)
+    expected_price_id: UUID | None = None
+    request_key: UUID | None = None
     vehicle_id: UUID
     organization_id: UUID | None = None
     fuel_station_id: UUID
@@ -136,6 +146,11 @@ class FuelSupplyOrderBatchItem(BaseModel):
 
 
 class FuelSupplyOrderBatchCreate(BaseModel):
+    contract_id: UUID | None = None
+    contract_provider_id: UUID | None = None
+    requested_fuel_type: str | None = Field(default=None, max_length=80)
+    expected_price_id: UUID | None = None
+    request_key: UUID | None = None
     items: list[FuelSupplyOrderBatchItem] = Field(min_length=2)
     organization_id: UUID | None = None
     fuel_station_id: UUID
@@ -265,7 +280,7 @@ class FuelSupplyOrderDeadlineUpdate(BaseModel):
         return normalized
 
 
-class FuelSupplyOrderOut(BaseModel):
+class FuelSupplyOrderOut(FundingFields):
     model_config = ConfigDict(from_attributes=True)
 
     vehicle_loan_id: UUID | None = None

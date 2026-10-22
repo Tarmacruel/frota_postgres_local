@@ -1,5 +1,6 @@
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
+import { useContractControl } from '../hooks/useContractFunding'
 import { Link } from 'react-router-dom'
 import FuelSupplyOrderCancelForm from '../components/FuelSupplyOrderCancelForm'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -130,6 +131,7 @@ export default function FuelSuppliesPage() {
   useEffect(() => { setCurrentOrdersPage(1) }, [orderIndicator])
   const [searchParams, setSearchParams] = useSearchParams()
   const { canCreate, canEdit, canView, isAdmin, isProduction } = useAuth()
+  const control = useContractControl()
   const canViewOrders = canView('fuel_supply_orders')
   const canCreateOrder = canCreate('fuel_supply_orders')
   const canEditOrder = canEdit('fuel_supply_orders')
@@ -166,7 +168,7 @@ export default function FuelSuppliesPage() {
   const [cancellingOrder, setCancellingOrder] = useState(false)
 
   useEffect(() => {
-    const action = searchParams.get('acao')
+    const action = searchParams.get('acao') || (searchParams.get('action') === 'create' ? 'nova-ordem' : '')
     if (!['nova-ordem', 'nova-ordem-lote'].includes(action)) return
     const shouldStartBatchTour = action === 'nova-ordem-lote' && searchParams.get('guia') === '1'
 
@@ -178,6 +180,7 @@ export default function FuelSuppliesPage() {
 
     const nextSearchParams = new URLSearchParams(searchParams)
     nextSearchParams.delete('acao')
+    nextSearchParams.delete('action')
     if (shouldStartBatchTour) nextSearchParams.delete('guia')
     setSearchParams(nextSearchParams, { replace: true })
   }, [canCreateOrder, searchParams, setSearchParams])
@@ -659,7 +662,7 @@ export default function FuelSuppliesPage() {
                         items={[
                           { key: 'public-link', label: 'Copiar link público', onClick: () => handleCopyPublicLink(order) },
                           { key: 'pdf', label: 'Baixar PDF', onClick: () => handleDownloadOrderDocument(order) },
-                          canAdjustOrderDeadline && ['OPEN', 'EXPIRED'].includes(order.status) ? { key: 'deadline', label: order.status === 'EXPIRED' ? 'Reabrir prazo' : 'Prorrogar prazo', onClick: () => setOrderToAdjust(order) } : null,
+                          canAdjustOrderDeadline && ['OPEN', 'EXPIRED'].includes(order.status) ? { key: 'deadline', label: control.enabled && !order.contract_reservation_id ? 'Vincular contrato e reservar' : order.status === 'EXPIRED' ? 'Reabrir prazo' : 'Prorrogar prazo', onClick: () => setOrderToAdjust(order) } : null,
                           order.status === 'OPEN' && canEditOrder ? { key: 'cancel', label: 'Cancelar ordem', tone: 'danger', onClick: () => handleCancelOrder(order) } : null,
                         ]}
                       />
@@ -770,6 +773,7 @@ export default function FuelSuppliesPage() {
 
       <Modal open={isOrderModalOpen && canCreateOrder} onClose={() => setIsOrderModalOpen(false)} title="Nova ordem de abastecimento" description="Emita a ordem para um posto credenciado executar o abastecimento.">
         <FuelSupplyOrderCreateForm
+          initialContractId={searchParams.get('contract_id') || ''}
           vehicles={vehicles} onVehicleOptionsOpen={refreshVehicleOptions}
           organizations={organizations}
           fuelStations={fuelStations}
@@ -841,7 +845,7 @@ export default function FuelSuppliesPage() {
       <Modal
         open={Boolean(orderToAdjust) && canAdjustOrderDeadline}
         onClose={() => setOrderToAdjust(null)}
-        title={orderToAdjust?.status === 'EXPIRED' ? 'Reabrir prazo da ordem' : 'Prorrogar prazo da ordem'}
+        title={control.enabled && !orderToAdjust?.contract_reservation_id ? 'Vincular contrato e reservar' : orderToAdjust?.status === 'EXPIRED' ? 'Reabrir prazo da ordem' : 'Prorrogar prazo da ordem'}
         description="Defina um novo prazo e informe a justificativa obrigatória para a auditoria."
       >
         {orderToAdjust ? (

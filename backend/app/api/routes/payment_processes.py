@@ -323,7 +323,7 @@ async def get_payment_contract_management(
     db: AsyncSession = Depends(get_db_session),
     _current_user: User = Depends(require_permission("payment_processes", "view")),
 ):
-    return await PaymentProcessService(db).contract_management(contract_id, horizon_months=horizon_months)
+    return await PaymentProcessService(db).contract_management(contract_id, horizon_months=horizon_months, current_user=_current_user)
 
 
 @contract_router.post("", response_model=PaymentContractOut, status_code=status.HTTP_201_CREATED)

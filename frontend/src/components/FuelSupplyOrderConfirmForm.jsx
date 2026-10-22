@@ -3,6 +3,7 @@ import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
 import { ADDITIVE_TYPE_OPTIONS, FUEL_TYPE_OPTIONS, resolveOptionValue } from '../utils/fuelSupplyDetails'
+import { formatContractMoney as brl } from '../utils/contractBalance'
 
 const MAX_RECEIPT_SIZE_BYTES = 8 * 1024 * 1024
 const ALLOWED_RECEIPT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
@@ -12,8 +13,8 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
     odometer_km: order?.suggested_odometer_km || '',
     liters: order?.requested_liters || '',
     total_amount: '',
-    fuel_type: '',
-    fuel_type_other: '',
+    fuel_type: order?.requested_fuel_type ? FUEL_TYPE_OPTIONS.find((t) => t.toUpperCase() === order.requested_fuel_type.toUpperCase()) || 'Outro' : '',
+    fuel_type_other: order?.requested_fuel_type || '',
     supplied_at: toDateTimeLocalValue(new Date().toISOString()),
     additive_enabled: false,
     additive_type: '',
@@ -122,6 +123,7 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
 
   return (
     <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
+      {order?.contract_funding ? <p className="alert alert-info modal-field-span">Contrato {order.contract_funding.contract_number} · reserva {brl(order.contract_funding.reserved_amount)}. Informe o valor real do comprovante para ajustar o saldo.</p> : null}
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
 
       <div className="form-field">

@@ -5,6 +5,7 @@ from decimal import Decimal
 from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from app.schemas.common import PaginatedResponse
+from app.schemas.contract_balance import FundingFields
 
 
 class MaintenanceCreate(BaseModel):
@@ -39,6 +40,7 @@ class MaintenanceCreate(BaseModel):
 
 
 class MaintenanceUpdate(BaseModel):
+    reason: str | None = Field(default=None, min_length=10, max_length=2000)
     end_date: datetime | None = None
     service_description: str | None = Field(default=None, min_length=10, max_length=2000)
     parts_replaced: str | None = Field(default=None, max_length=1000)
@@ -63,7 +65,7 @@ class MaintenanceUpdate(BaseModel):
         return normalized or None
 
 
-class MaintenanceOut(BaseModel):
+class MaintenanceOut(FundingFields):
     model_config = ConfigDict(from_attributes=True)
 
     responsible_organization_id: UUID | None = None

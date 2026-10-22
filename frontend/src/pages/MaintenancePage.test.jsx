@@ -96,3 +96,5 @@ it('busca todos os lotes filtrados somente ao pedir o PDF', async () => {
   expect(previewRowsToPdf.mock.calls[0][0].rows).toHaveLength(101)
   expect(maintenanceAPI.listPaginated).toHaveBeenCalledWith(expect.objectContaining({ page: 2, limit: 100 }))
 })
+
+vi.mock('../api/contractControl', () => ({ contractControlAPI: { config: async () => ({ data: { enabled: false } }) }, maintenanceOrdersAPI: {} }))

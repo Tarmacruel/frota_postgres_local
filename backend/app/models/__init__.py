@@ -1,6 +1,7 @@
 from app.models.admin_notification import AdminNotification
 from app.models.analytics_alert import AnalyticsAlertCase, AnalyticsAlertEvent, AnalyticsAlertRequest
 from app.models.audit_log import AuditLog
+from app.models.contract_balance import ContractControl, ContractProvider, ContractFuelPrice, ContractReservation, ContractOperation, ContractMovement, ContractReconciliation, MaintenanceOrder
 from app.models.justification_suggestion import JustificationSuggestion
 from app.models.claim import Claim, ClaimStatus, ClaimType
 from app.models.claim_attachment import ClaimAttachment

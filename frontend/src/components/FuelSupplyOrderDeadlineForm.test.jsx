@@ -11,7 +11,7 @@ beforeEach(() => { vi.resetAllMocks(); fuelSupplyOrdersAPI.updateDeadline.mockRe
 it.each(['EXPIRED', 'OPEN'])('sugere ajuste de prazo e preserva o contrato da operação (%s)', async (status) => {
   const onSuccess = vi.fn()
   render(<FuelSupplyOrderDeadlineForm order={{ id: 'order-1', status, expires_at: new Date(Date.now() + (status === 'EXPIRED' ? -1 : 1) * 86400000).toISOString() }} onSuccess={onSuccess} />)
-  expect(screen.getByLabelText('Justificativa')).toBeRequired()
+  expect(await screen.findByLabelText('Justificativa')).toBeRequired()
   expect(screen.getByLabelText('Justificativa')).toHaveValue('')
   await waitFor(() => expect(screen.getByRole('button', { name: 'Ver modelos', exact: true })).toBeEnabled())
   fireEvent.click(screen.getByRole('button', { name: 'Ver modelos', exact: true }))
@@ -23,3 +23,5 @@ it.each(['EXPIRED', 'OPEN'])('sugere ajuste de prazo e preserva o contrato da op
   await waitFor(() => expect(onSuccess).toHaveBeenCalledOnce())
   expect(fuelSupplyOrdersAPI.updateDeadline).toHaveBeenCalledWith('order-1', expect.objectContaining({ reason }))
 })
+
+vi.mock('../api/contractControl', () => ({ contractControlAPI: { config: async () => ({ data: { enabled: false } }) }, maintenanceOrdersAPI: {} }))

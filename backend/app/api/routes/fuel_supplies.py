@@ -40,9 +40,15 @@ def parse_create_form(
     additive_quantity_liters: float | None = Form(default=None),
     fuel_station: str | None = Form(default=None),
     notes: str | None = Form(default=None),
+    contract_id: UUID | None = Form(default=None),
+    contract_provider_id: UUID | None = Form(default=None),
+    expected_price_id: UUID | None = Form(default=None),
+    request_key: UUID | None = Form(default=None),
 ) -> FuelSupplyCreate:
     try:
         return FuelSupplyCreate(
+            contract_id=contract_id, contract_provider_id=contract_provider_id,
+            expected_price_id=expected_price_id, request_key=request_key,
             vehicle_id=vehicle_id,
             driver_id=driver_id,
             organization_id=organization_id,
