@@ -39,6 +39,28 @@ def fuel_key(value):
     return ' '.join(str(value or '').split()).upper()
 
 
+def price_state(price, instant=None):
+    instant = instant or utcnow()
+    start = price.valid_from.replace(tzinfo=timezone.utc) if not price.valid_from.tzinfo else price.valid_from
+    end = price.valid_until
+    if end and not end.tzinfo:
+        end = end.replace(tzinfo=timezone.utc)
+    if price.deleted_at:
+        return 'DELETED'
+    if end and end <= start:
+        return 'REPLACED'
+    if end and end <= instant:
+        return 'EXPIRED'
+    return 'SCHEDULED' if start > instant else 'CURRENT'
+
+
+def price_snapshot(price):
+    return dict(id=str(price.id), provider_id=str(price.provider_id), fuel_type=price.fuel_type,
+                unit_price=str(price.unit_price), valid_from=price.valid_from.isoformat(),
+                valid_until=price.valid_until.isoformat() if price.valid_until else None,
+                deleted_at=price.deleted_at.isoformat() if price.deleted_at else None)
+
+
 def funding_fields(record):
     from app.core.config import settings
     if not settings.CONTRACT_BALANCE_ENABLED:
@@ -105,6 +127,7 @@ class ContractBalanceService:
             price_count = await self.db.scalar(select(func.count()).select_from(ContractFuelPrice)
                 .join(ContractProvider, ContractProvider.id == ContractFuelPrice.provider_id).where(
                     ContractProvider.contract_id == contract.id, ContractProvider.active.is_(True),
+                    ContractFuelPrice.deleted_at.is_(None),
                     ContractFuelPrice.valid_from <= instant,
                     or_(ContractFuelPrice.valid_until.is_(None), ContractFuelPrice.valid_until > instant)))
             if not price_count:
@@ -201,11 +224,15 @@ class ContractBalanceService:
             raise HTTPException(422, 'Informe o combustível')
         later = await self.db.scalar(select(ContractFuelPrice.id).where(
             ContractFuelPrice.provider_id == provider.id, ContractFuelPrice.fuel_type == key,
+            ContractFuelPrice.deleted_at.is_(None),
+            or_(ContractFuelPrice.valid_until.is_(None), ContractFuelPrice.valid_until > ContractFuelPrice.valid_from),
             ContractFuelPrice.valid_from >= start).limit(1))
         if later:
             raise HTTPException(409, 'Já existe um preço com início igual ou posterior. Use uma nova vigência.')
         current = (await self.db.scalars(select(ContractFuelPrice).where(
             ContractFuelPrice.provider_id == provider.id, ContractFuelPrice.fuel_type == key,
+            ContractFuelPrice.deleted_at.is_(None),
+            or_(ContractFuelPrice.valid_until.is_(None), ContractFuelPrice.valid_until > ContractFuelPrice.valid_from),
             or_(ContractFuelPrice.valid_until.is_(None), ContractFuelPrice.valid_until > start)))).all()
         for price in current:
             price.valid_until = start
@@ -217,6 +244,94 @@ class ContractBalanceService:
                                 entity_id=contract_id, entity_label=contract.number,
                                 details={'price_id': str(row.id), 'fuel_type': key, 'unit_price': str(data.unit_price)})
         return row
+
+    async def _locked_price(self, contract_id, price_id):
+        contract = await self.contract(contract_id, lock=True)
+        row = await self.db.scalar(select(ContractFuelPrice)
+            .join(ContractProvider, ContractProvider.id == ContractFuelPrice.provider_id)
+            .where(ContractFuelPrice.id == price_id, ContractProvider.contract_id == contract_id)
+            .execution_options(populate_existing=True))
+        if not row:
+            raise HTTPException(404, 'Preço não encontrado neste contrato')
+        return contract, row
+
+    async def _price_predecessor(self, row):
+        return await self.db.scalar(select(ContractFuelPrice).where(
+            ContractFuelPrice.provider_id == row.provider_id, ContractFuelPrice.fuel_type == row.fuel_type,
+            ContractFuelPrice.id != row.id, ContractFuelPrice.deleted_at.is_(None),
+            ContractFuelPrice.valid_from < row.valid_from,
+            or_(ContractFuelPrice.valid_until.is_(None), ContractFuelPrice.valid_until > ContractFuelPrice.valid_from))
+            .order_by(ContractFuelPrice.valid_from.desc()).limit(1))
+
+    async def update_price(self, contract_id, price_id, data, actor):
+        contract, row = await self._locked_price(contract_id, price_id)
+        instant = utcnow()
+        state = price_state(row, instant)
+        if state not in {'CURRENT', 'SCHEDULED'}:
+            raise HTTPException(409, 'Este preço já foi encerrado, substituído ou excluído. Atualize a lista de preços.')
+        start = row.valid_from if row.valid_from.tzinfo else row.valid_from.replace(tzinfo=timezone.utc)
+        end = row.valid_until
+        if end and not end.tzinfo:
+            end = end.replace(tzinfo=timezone.utc)
+        effective = data.valid_from or (start if state == 'SCHEDULED' else instant)
+        if not effective.tzinfo:
+            raise HTTPException(422, 'Informe o fuso horário do início do preço')
+        if data.valid_from and effective < instant:
+            raise HTTPException(422, 'A nova vigência não pode começar no passado; deixe em branco para aplicar agora')
+        if end and effective >= end:
+            raise HTTPException(409, 'A nova vigência deve começar antes do próximo preço agendado')
+        if data.unit_price == row.unit_price and (data.valid_from is None or effective == start):
+            return row
+        before = price_snapshot(row)
+        predecessor_change = None
+        if state == 'SCHEDULED':
+            predecessor = await self._price_predecessor(row)
+            if predecessor:
+                prev_start = predecessor.valid_from
+                if not prev_start.tzinfo:
+                    prev_start = prev_start.replace(tzinfo=timezone.utc)
+                prev_end = predecessor.valid_until
+                if prev_end and not prev_end.tzinfo:
+                    prev_end = prev_end.replace(tzinfo=timezone.utc)
+                if effective <= prev_start or (prev_end != start and (prev_end is None or effective < prev_end)):
+                    raise HTTPException(409, 'A nova vigência conflita com outro preço deste posto e combustível')
+                if prev_end == start:
+                    predecessor_change = dict(before=price_snapshot(predecessor))
+                    predecessor.valid_until = effective
+                    predecessor_change['after'] = price_snapshot(predecessor)
+            # An empty interval retains the superseded scheduled version without offering it to orders.
+            row.valid_until = start
+        else:
+            row.valid_until = effective
+        replacement = ContractFuelPrice(provider_id=row.provider_id, fuel_type=row.fuel_type,
+            unit_price=data.unit_price, valid_from=effective, valid_until=end, created_by=actor.id)
+        self.db.add(replacement)
+        await self.db.flush()
+        await self.audit.record(actor=actor, action='UPDATE_FUEL_PRICE', entity_type='PAYMENT_CONTRACT',
+            entity_id=contract_id, entity_label=contract.number,
+            details={'before': before, 'after': price_snapshot(replacement),
+                     'predecessor': predecessor_change})
+        return replacement
+
+    async def delete_price(self, contract_id, price_id, actor):
+        contract, row = await self._locked_price(contract_id, price_id)
+        if row.deleted_at:
+            return {'id': row.id, 'deleted_at': row.deleted_at}
+        instant = utcnow()
+        before = price_snapshot(row)
+        predecessor_change = None
+        if price_state(row, instant) == 'SCHEDULED':
+            predecessor = await self._price_predecessor(row)
+            if predecessor and predecessor.valid_until == row.valid_from:
+                predecessor_change = dict(before=price_snapshot(predecessor))
+                predecessor.valid_until = row.valid_until
+                predecessor_change['after'] = price_snapshot(predecessor)
+        row.deleted_at = instant
+        await self.db.flush()
+        await self.audit.record(actor=actor, action='DELETE_FUEL_PRICE', entity_type='PAYMENT_CONTRACT',
+            entity_id=contract_id, entity_label=contract.number,
+            details={'before': before, 'after': price_snapshot(row), 'predecessor': predecessor_change})
+        return {'id': row.id, 'deleted_at': row.deleted_at}
 
     async def quote(self, contract_id, provider_id, fuel_type, liters, *, item_liters=None):
         contract = await self.contract(contract_id)
@@ -231,6 +346,7 @@ class ContractBalanceService:
         instant = utcnow()
         price = await self.db.scalar(select(ContractFuelPrice).where(
             ContractFuelPrice.provider_id == provider_id, ContractFuelPrice.fuel_type == fuel_key(fuel_type),
+            ContractFuelPrice.deleted_at.is_(None),
             ContractFuelPrice.valid_from <= instant,
             or_(ContractFuelPrice.valid_until.is_(None), ContractFuelPrice.valid_until > instant)
         ).order_by(ContractFuelPrice.valid_from.desc()).limit(1))
@@ -469,15 +585,21 @@ class ContractBalanceService:
         return [dict(id=p.id, contract_id=p.contract_id, supplier_id=p.supplier_id, name=name,
                      fuel_station_id=p.fuel_station_id, station_name=station, active=p.active) for p, name, station in rows]
 
-    async def prices(self, contract_id):
-        rows = (await self.db.execute(select(ContractFuelPrice, PaymentSupplier.name, FuelStation.name.label('station_name'))
+    async def prices(self, contract_id, *, include_deleted=False):
+        query = (select(ContractFuelPrice, PaymentSupplier.name, FuelStation.name.label('station_name'))
             .join(ContractProvider, ContractProvider.id == ContractFuelPrice.provider_id)
             .join(PaymentSupplier, PaymentSupplier.id == ContractProvider.supplier_id)
             .outerjoin(FuelStation, FuelStation.id == ContractProvider.fuel_station_id)
             .where(ContractProvider.contract_id == contract_id)
-            .order_by(ContractFuelPrice.valid_from.desc()))).all()
+            .order_by(ContractFuelPrice.valid_from.desc(), ContractFuelPrice.created_at.desc()))
+        if not include_deleted:
+            query = query.where(ContractFuelPrice.deleted_at.is_(None),
+                or_(ContractFuelPrice.valid_until.is_(None), ContractFuelPrice.valid_until > ContractFuelPrice.valid_from))
+        rows = (await self.db.execute(query)).all()
+        instant = utcnow()
         return [dict(id=p.id, provider_id=p.provider_id, provider_name=name, station_name=station,
-                     fuel_type=p.fuel_type, unit_price=p.unit_price, valid_from=p.valid_from, valid_until=p.valid_until)
+                     fuel_type=p.fuel_type, unit_price=p.unit_price, valid_from=p.valid_from, valid_until=p.valid_until,
+                     deleted_at=p.deleted_at, status=price_state(p, instant))
                 for p, name, station in rows]
 
     async def eligible(self, *, kind, station_id=None):

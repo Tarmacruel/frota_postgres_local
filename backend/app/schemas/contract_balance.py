@@ -37,6 +37,11 @@ class PriceCreate(BaseModel):
     valid_from: datetime | None = None
 
 
+class PriceUpdate(BaseModel):
+    unit_price: Decimal = Field(gt=0, max_digits=14, decimal_places=6)
+    valid_from: datetime | None = None
+
+
 class ContractQuote(BaseModel):
     provider_id: UUID
     fuel_type: str

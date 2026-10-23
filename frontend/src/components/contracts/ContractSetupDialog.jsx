@@ -7,7 +7,7 @@ import { FUEL_TYPE_OPTIONS } from '../../utils/fuelSupplyDetails'
 import Modal from '../Modal'
 
 const titles = { contract: 'Cadastrar contrato', edit: 'Editar contrato', opening: 'Confirmar saldo inicial',
-  provider: 'Vincular prestador à rede', price: 'Cadastrar preço de combustível', adjust: 'Ajustar saldo contratual',
+  provider: 'Vincular prestador à rede', price: 'Cadastrar preço de combustível', priceEdit: 'Editar preço de combustível', priceDelete: 'Excluir preço de combustível', adjust: 'Ajustar saldo contratual',
   amend: 'Registrar aditivo', resolve: 'Regularizar divergência', supplier: 'Cadastrar prestador', supplierEdit: 'Editar prestador' }
 
 export default function ContractSetupDialog({ dialog, suppliers, stations, providers, onClose, onSuccess }) {
@@ -16,7 +16,7 @@ export default function ContractSetupDialog({ dialog, suppliers, stations, provi
     number: c.number || '', supplier_id: c.supplier_id || '', kind: c.kind || 'FUEL', status: c.status || 'ACTIVE',
     valid_from: c.valid_from || '', valid_until: c.valid_until || '', value_initial: c.value_initial ?? '', value_updated: c.value_updated ?? '',
     notes: dialog.supplier?.notes || c.notes || '', contract_type: c.contract_type || '', object_description: c.object_description || '', balance: c.suggested_opening_balance ?? '', opening_date: toDateTimeLocalValue(new Date().toISOString()).slice(0, 10),
-    justification: '', fuel_station_id: '', provider_id: '', fuel_type: 'Diesel S10', unit_price: '', price_from: '',
+    justification: '', fuel_station_id: '', provider_id: '', fuel_type: 'Diesel S10', unit_price: dialog.price?.unit_price ?? '', price_from: '',
     amount: '', document_reference: '', amendment_number: '', value_delta: '', signed_at: '', amendment_until: '',
     name: dialog.supplier?.name || '', cnpj: dialog.supplier?.cnpj || '', active: dialog.supplier?.active ?? true,
   }))
@@ -46,6 +46,9 @@ export default function ContractSetupDialog({ dialog, suppliers, stations, provi
       if (type === 'provider') result = await contractControlAPI.provider(c.id, { supplier_id: form.supplier_id, fuel_station_id: c.kind === 'FUEL' ? form.fuel_station_id : null })
       if (type === 'price') result = await contractControlAPI.price(c.id, { provider_id: form.provider_id, fuel_type: form.fuel_type,
         unit_price: form.unit_price, valid_from: form.price_from ? new Date(form.price_from).toISOString() : null })
+      if (type === 'priceEdit') result = await contractControlAPI.updatePrice(c.id, dialog.price.id, {
+        unit_price: form.unit_price, valid_from: form.price_from ? new Date(form.price_from).toISOString() : null })
+      if (type === 'priceDelete') result = await contractControlAPI.deletePrice(c.id, dialog.price.id)
       if (type === 'adjust') result = await contractControlAPI.adjust(c.id, { amount: form.amount, request_key: dialog.requestKey,
         justification: form.justification, document_reference: form.document_reference })
       if (type === 'resolve') result = await contractControlAPI.resolve(c.id, { justification: form.justification })
@@ -88,6 +91,13 @@ export default function ContractSetupDialog({ dialog, suppliers, stations, provi
         {input('unit_price', 'Preço por litro (R$)', { type: 'number', min: '.000001', step: '.000001' })}
         {input('price_from', 'Vigente a partir de (opcional)', { type: 'datetime-local', required: false })}
         <p className="muted contract-form__wide">Em branco, o novo preço começa agora. Pedidos já emitidos mantêm o preço e a reserva originais.</p></> : null}
+      {['priceEdit', 'priceDelete'].includes(type) ? <p className="contract-form__wide"><strong>{dialog.price.station_name || dialog.price.provider_name}</strong><br />{dialog.price.fuel_type} · preço atual {Number(dialog.price.unit_price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4, maximumFractionDigits: 6 })}</p> : null}
+      {type === 'priceEdit' ? <>
+        {input('unit_price', 'Preço por litro (R$)', { type: 'number', min: '.000001', step: '.000001' })}
+        {input('price_from', 'Nova vigência a partir de (opcional)', { type: 'datetime-local', required: false })}
+        <p className="muted contract-form__wide">A edição cria uma nova versão. Em branco, começa agora ou mantém o início de um preço agendado. Pedidos já emitidos mantêm o preço e a reserva originais.</p>
+      </> : null}
+      {type === 'priceDelete' ? <p className="contract-form__wide">Confirma a exclusão deste preço? Ele deixará de ser oferecido em novos pedidos. As reservas e os abastecimentos anteriores serão preservados, e o registro continuará disponível no histórico.</p> : null}
       {type === 'adjust' ? <>{input('amount', 'Valor do ajuste (R$)', { type: 'number', step: '.01' })}{input('document_reference', 'Documento ou referência')}
         <p className="muted contract-form__wide">Valor positivo acrescenta saldo; negativo reduz. O lançamento ficará no extrato.</p>{reason}</> : null}
       {type === 'amend' ? <>{input('amendment_number', 'Número do aditivo')}{input('signed_at', 'Assinatura do aditivo', { type: 'date', required: false })}
@@ -97,7 +107,7 @@ export default function ContractSetupDialog({ dialog, suppliers, stations, provi
       {['supplier', 'supplierEdit'].includes(type) ? <>{input('name', 'Nome ou razão social')}{input('cnpj', 'CNPJ', { required: false })}
         <label>Ativo<select className="app-select" value={String(form.active)} onChange={(e) => update('active', e.target.value === 'true')}><option value="true">Sim</option><option value="false">Não</option></select></label>
         <label className="contract-form__wide">Observações<textarea className="app-textarea" value={form.notes} onChange={(e) => update('notes', e.target.value)} /></label></> : null}
-      <div className="actions-inline"><button className="ghost-button" type="button" disabled={saving} onClick={onClose}>Voltar</button><button className="app-button" disabled={saving}>{saving ? 'Salvando…' : type === 'opening' ? 'Confirmar abertura do saldo' : 'Salvar'}</button></div>
+      <div className="actions-inline"><button className="ghost-button" type="button" disabled={saving} onClick={onClose}>Voltar</button><button className={type === 'priceDelete' ? 'mini-button danger' : 'app-button'} disabled={saving}>{saving ? 'Salvando…' : type === 'opening' ? 'Confirmar abertura do saldo' : type === 'priceDelete' ? 'Confirmar exclusão' : 'Salvar'}</button></div>
     </form>
   </Modal>
 }

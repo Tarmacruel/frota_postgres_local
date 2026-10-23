@@ -19,7 +19,7 @@ from app.models.user import User
 from app.schemas.contract_balance import (
     BalanceAdjustment, ContractOpening, ContractQuote, Justified, MaintenanceOrderCancel,
     MaintenanceOrderComplete, MaintenanceOrderCreate, MaintenanceOrderStart,
-    PriceCreate, ProviderCreate, ReconcileProcess,
+    PriceCreate, PriceUpdate, ProviderCreate, ReconcileProcess,
 )
 from app.services.contract_balance_service import ContractBalanceService, TZ, utcnow
 from app.services.maintenance_order_service import MaintenanceOrderService
@@ -120,7 +120,7 @@ async def detail(contract_id: UUID, db: AsyncSession = Depends(get_db_session), 
     service = ContractBalanceService(db)
     await service.release_expired(contract_id=contract_id)
     contract = await PaymentProcessService(db).get_contract(contract_id)
-    result = dict(contract=contract, providers=await service.providers(contract_id), prices=await service.prices(contract_id))
+    result = dict(contract=contract, providers=await service.providers(contract_id), prices=await service.prices(contract_id, include_deleted=True))
     await db.commit()
     return result
 
@@ -153,6 +153,18 @@ async def set_provider(contract_id: UUID, provider_id: UUID, active: bool = Quer
 @router.post('/contracts/{contract_id}/prices', dependencies=[Depends(enabled)], status_code=201)
 async def add_price(contract_id: UUID, data: PriceCreate, db: AsyncSession = Depends(get_db_session), user: User = Depends(financial_edit)):
     return await write(db, ContractBalanceService(db).add_price(contract_id, data, user))
+
+
+@router.patch('/contracts/{contract_id}/prices/{price_id}', dependencies=[Depends(enabled)])
+async def update_price(contract_id: UUID, price_id: UUID, data: PriceUpdate,
+                       db: AsyncSession = Depends(get_db_session), user: User = Depends(financial_edit)):
+    return await write(db, ContractBalanceService(db).update_price(contract_id, price_id, data, user))
+
+
+@router.delete('/contracts/{contract_id}/prices/{price_id}', dependencies=[Depends(enabled)])
+async def delete_price(contract_id: UUID, price_id: UUID,
+                       db: AsyncSession = Depends(get_db_session), user: User = Depends(financial_edit)):
+    return await write(db, ContractBalanceService(db).delete_price(contract_id, price_id, user))
 
 
 @router.post('/contracts/{contract_id}/quote', dependencies=[Depends(enabled)])

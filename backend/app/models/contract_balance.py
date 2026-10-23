@@ -67,6 +67,7 @@ class ContractFuelPrice(Base):
     valid_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
     created_by: Mapped[UUID] = mapped_column(ForeignKey('users.id', ondelete='RESTRICT'))
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=now)
+    deleted_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class ContractReservation(Base):

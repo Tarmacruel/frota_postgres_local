@@ -21,13 +21,13 @@ from app.core.config import settings
 from app.db.base import Base
 from app.models import Organization, User, UserRole, Vehicle
 from app.models.audit_log import AuditLog
-from app.models.contract_balance import ContractControl, ContractMovement, ContractReservation, MaintenanceOrder
+from app.models.contract_balance import ContractControl, ContractFuelPrice, ContractMovement, ContractReservation, MaintenanceOrder
 from app.models.fuel_station import FuelStation
 from app.models.fuel_supply_order import FuelSupplyOrder
 from app.models.maintenance import MaintenanceRecord
 from app.models.payment_process import PaymentContract, PaymentSupplier
 from app.schemas.contract_balance import ContractOpening, MaintenanceOrderComplete, MaintenanceOrderCreate, MaintenanceOrderStart, PriceCreate, ProviderCreate
-from app.schemas.contract_balance import FuelOrderFunding
+from app.schemas.contract_balance import FuelOrderFunding, PriceUpdate
 from app.schemas.fuel_supply import FuelSupplyOrderBatchCreate, FuelSupplyOrderCreate, FuelSupplyOrderDeadlineUpdate
 from app.schemas.fuel_supply import FuelSupplyOrderCancel, FuelSupplyOrderConfirm, FuelSupplyRectify
 from app.services.contract_balance_service import ContractBalanceService
@@ -84,6 +84,172 @@ def order_payload(c, *, request_key=None, liters=3):
         expires_at=datetime.now(timezone.utc)+timedelta(hours=24), requested_liters=liters,
         contract_id=c.contract.id, contract_provider_id=c.provider.id,
         requested_fuel_type='DIESEL S10', expected_price_id=c.price.id, request_key=request_key or uuid4())
+
+
+@pytest.mark.asyncio
+async def test_price_edit_preserves_reservations_and_rejects_stale_preview(pg):
+    c = pg
+    order = await FuelSupplyOrderService(c.db).create_order(order_payload(c), c.actor)
+    replacement = await c.service.update_price(c.contract.id, c.price.id, PriceUpdate(unit_price='12.123456'), c.actor)
+    await c.db.commit()
+    reservation = await c.db.scalar(select(ContractReservation).where(ContractReservation.source_id == order['id']))
+    assert reservation.price_id == c.price.id and reservation.unit_price == 10 and reservation.amount == 30
+    assert (await c.service.balances(c.contract.id))['available_balance'] == 70
+    assert c.price.unit_price == 10 and replacement.id != c.price.id
+    quote = await c.service.quote(c.contract.id, c.provider.id, 'DIESEL S10', 3)
+    assert quote['price_id'] == replacement.id and quote['reserve_amount'] == Decimal('36.37')
+    with pytest.raises(HTTPException) as stale:
+        await FuelSupplyOrderService(c.db).create_order(order_payload(c), c.actor)
+    assert stale.value.status_code == 409 and 'preço mudou' in stale.value.detail
+    assert (await c.service.balances(c.contract.id))['available_balance'] == 70
+
+
+@pytest.mark.asyncio
+async def test_price_delete_blocks_new_orders_but_existing_order_can_be_completed(pg, tmp_path, monkeypatch):
+    from PIL import Image
+    c = pg
+    monkeypatch.setattr(settings, 'STORAGE_DIR', tmp_path)
+    order = await FuelSupplyOrderService(c.db).create_order(order_payload(c), c.actor)
+    await c.service.delete_price(c.contract.id, c.price.id, c.actor)
+    await c.service.delete_price(c.contract.id, c.price.id, c.actor)
+    await c.db.commit()
+    assert await c.db.get(ContractFuelPrice, c.price.id) is not None
+    assert (await c.service.prices(c.contract.id)) == []
+    assert (await c.service.prices(c.contract.id, include_deleted=True))[0]['status'] == 'DELETED'
+    assert (await c.service.eligible(kind='FUEL', station_id=c.station.id)) == []
+    with pytest.raises(HTTPException):
+        await c.service.quote(c.contract.id, c.provider.id, 'DIESEL S10', 3)
+    assert await c.db.scalar(select(func.count()).select_from(AuditLog).where(
+        AuditLog.entity_id == c.contract.id, AuditLog.action == 'DELETE_FUEL_PRICE')) == 1
+    image = BytesIO()
+    Image.new('RGB', (2, 2), color='white').save(image, 'PNG')
+    image.seek(0)
+    done = await FuelSupplyOrderService(c.db).confirm_order(order['id'], FuelSupplyOrderConfirm(
+        odometer_km=100, liters=3, total_amount=25, fuel_type='DIESEL S10'),
+        UploadFile(filename='teste.png', file=image, headers=Headers({'content-type': 'image/png'})), c.actor)
+    assert done['status'].value == 'COMPLETED'
+    assert (await c.service.balances(c.contract.id))['available_balance'] == 75
+    assert (await c.service.balances(c.contract.id))['reserved_amount'] == 0
+
+
+@pytest.mark.asyncio
+async def test_scheduled_price_edit_and_delete_preserve_the_surrounding_timeline(pg, monkeypatch):
+    from app.services import contract_balance_service as module
+    c = pg
+    instant = datetime.now(timezone.utc)
+    first_date, next_date, new_date = (instant+timedelta(days=n) for n in [7, 14, 10])
+    scheduled = await c.service.add_price(c.contract.id, PriceCreate(provider_id=c.provider.id,
+        fuel_type='DIESEL S10', unit_price=20, valid_from=first_date), c.actor)
+    following = await c.service.add_price(c.contract.id, PriceCreate(provider_id=c.provider.id,
+        fuel_type='DIESEL S10', unit_price=30, valid_from=next_date), c.actor)
+    edited = await c.service.update_price(c.contract.id, scheduled.id,
+        PriceUpdate(unit_price=22, valid_from=new_date), c.actor)
+    assert edited.id != scheduled.id and edited.valid_until == next_date
+    assert scheduled.valid_until == scheduled.valid_from and scheduled.unit_price == 20
+    assert c.price.valid_until == new_date and c.price.unit_price == 10
+    monkeypatch.setattr(module, 'utcnow', lambda: instant+timedelta(days=8))
+    assert (await c.service.quote(c.contract.id, c.provider.id, 'DIESEL S10', 1))['unit_price'] == 10
+    monkeypatch.setattr(module, 'utcnow', lambda: instant+timedelta(days=11))
+    assert (await c.service.quote(c.contract.id, c.provider.id, 'DIESEL S10', 1))['unit_price'] == 22
+    monkeypatch.setattr(module, 'utcnow', lambda: instant)
+    await c.service.delete_price(c.contract.id, edited.id, c.actor)
+    assert c.price.valid_until == next_date
+    monkeypatch.setattr(module, 'utcnow', lambda: instant+timedelta(days=11))
+    assert (await c.service.quote(c.contract.id, c.provider.id, 'DIESEL S10', 1))['unit_price'] == 10
+    monkeypatch.setattr(module, 'utcnow', lambda: instant+timedelta(days=15))
+    assert (await c.service.quote(c.contract.id, c.provider.id, 'DIESEL S10', 1))['price_id'] == following.id
+    history = await c.service.prices(c.contract.id, include_deleted=True)
+    assert next(p for p in history if p['id'] == scheduled.id)['status'] == 'REPLACED'
+    assert all(p['id'] not in {scheduled.id, edited.id} for p in await c.service.prices(c.contract.id))
+
+
+@pytest.mark.asyncio
+async def test_price_delete_never_reactivates_a_removed_predecessor(pg, monkeypatch):
+    from app.services import contract_balance_service as module
+    c = pg
+    future = datetime.now(timezone.utc)+timedelta(days=7)
+    scheduled = await c.service.add_price(c.contract.id, PriceCreate(provider_id=c.provider.id,
+        fuel_type='DIESEL S10', unit_price=20, valid_from=future), c.actor)
+    await c.service.delete_price(c.contract.id, c.price.id, c.actor)
+    await c.service.delete_price(c.contract.id, scheduled.id, c.actor)
+    monkeypatch.setattr(module, 'utcnow', lambda: future+timedelta(days=1))
+    with pytest.raises(HTTPException):
+        await c.service.quote(c.contract.id, c.provider.id, 'DIESEL S10', 1)
+    assert not await c.service.prices(c.contract.id)
+
+
+@pytest.mark.asyncio
+async def test_current_price_edit_keeps_the_next_scheduled_price_and_rejects_backdating(pg):
+    c = pg
+    future = datetime.now(timezone.utc)+timedelta(days=7)
+    await c.service.add_price(c.contract.id, PriceCreate(provider_id=c.provider.id,
+        fuel_type='DIESEL S10', unit_price=20, valid_from=future), c.actor)
+    with pytest.raises(HTTPException):
+        await c.service.update_price(c.contract.id, c.price.id,
+            PriceUpdate(unit_price=12, valid_from=datetime.now(timezone.utc)-timedelta(days=1)), c.actor)
+    with pytest.raises(HTTPException):
+        await c.service.update_price(c.contract.id, c.price.id, PriceUpdate(unit_price=12, valid_from=future), c.actor)
+    replacement = await c.service.update_price(c.contract.id, c.price.id, PriceUpdate(unit_price=12), c.actor)
+    assert replacement.valid_until == future and replacement.unit_price == 12
+    assert c.price.unit_price == 10
+    with pytest.raises(HTTPException):
+        await c.service.update_price(c.contract.id, c.price.id, PriceUpdate(unit_price=13), c.actor)
+
+
+@pytest.mark.asyncio
+async def test_two_edits_of_the_same_price_create_only_one_version(pg):
+    c = pg
+    async def edit(value):
+        async with AsyncSession(c.engine, expire_on_commit=False) as db:
+            try:
+                row = await ContractBalanceService(db).update_price(c.contract.id, c.price.id,
+                    PriceUpdate(unit_price=value), c.actor)
+                await db.commit()
+                return row.id
+            except HTTPException as error:
+                await db.rollback()
+                return error
+    outcomes = await asyncio.gather(edit(11), edit(12))
+    assert sum(not isinstance(outcome, HTTPException) for outcome in outcomes) == 1
+    assert next(outcome for outcome in outcomes if isinstance(outcome, HTTPException)).status_code == 409
+    prices = await c.service.prices(c.contract.id)
+    assert len(prices) == 2 and sum(p['status'] == 'CURRENT' for p in prices) == 1
+    assert (await c.service.balances(c.contract.id))['available_balance'] == 100
+
+
+@pytest.mark.asyncio
+async def test_price_mutation_api_enforces_permissions_contract_and_precision(pg):
+    from app.main import app
+    from app.api.deps import get_current_user_ready
+    from app.db.session import get_db_session
+    from httpx import ASGITransport, AsyncClient
+    c = pg
+    actor = SimpleNamespace(id=c.actor.id, role=UserRole.POSTO, organization_id=None)
+    async def session():
+        async with AsyncSession(c.engine, expire_on_commit=False) as db:
+            yield db
+    app.dependency_overrides[get_db_session] = session
+    app.dependency_overrides[get_current_user_ready] = lambda: actor
+    endpoint = f'/api/contract-control/contracts/{c.contract.id}/prices/{c.price.id}'
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+            assert (await client.patch(endpoint, json={'unit_price': '11'})).status_code == 403
+            assert (await client.delete(endpoint)).status_code == 403
+            app.dependency_overrides[get_current_user_ready] = lambda: c.actor
+            assert (await client.patch(endpoint, json={'unit_price': '0'})).status_code == 422
+            assert (await client.patch(endpoint, json={'unit_price': '11.1234567'})).status_code == 422
+            foreign = endpoint.replace(str(c.contract.id), str(uuid4()))
+            assert (await client.patch(foreign, json={'unit_price': '11'})).status_code == 404
+            assert (await client.delete(foreign)).status_code == 404
+            updated = await client.patch(endpoint, json={'unit_price': '11.123456'})
+            assert updated.status_code == 200, updated.text
+            replacement_id = updated.json()['id']
+            assert replacement_id != str(c.price.id)
+            assert (await client.delete(endpoint.rsplit('/', 1)[0]+'/'+replacement_id)).status_code == 200
+            detail = (await client.get(f'/api/contract-control/contracts/{c.contract.id}')).json()
+            assert any(p['id'] == replacement_id and p['status'] == 'DELETED' for p in detail['prices'])
+    finally:
+        app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio

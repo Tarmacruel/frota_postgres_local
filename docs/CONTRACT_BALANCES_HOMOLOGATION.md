@@ -10,6 +10,14 @@ Entrega funcional autorizada em 22/10/2026. Rota preservada: `/processos-pagamen
 4. Confira o saldo livre e a data de abertura. O valor sugerido é apenas referência histórica; a confirmação e a justificativa são obrigatórias. A abertura não pode ser sobrescrita.
 5. Mudanças posteriores de limite e vigência usam aditivos numerados; correções de saldo usam ajustes com documento e justificativa.
 
+### Editar e excluir preços por posto e combustível
+
+Na tabela **Preços por posto e combustível**, editores financeiros podem usar **Editar** e **Excluir**. O posto e o combustível identificam a série de preços. Editar cria uma nova versão do valor por litro; o início opcional aplica a mudança agora ou em data futura. Um preço agendado mantém seu início quando esse campo fica vazio. Versões encerradas não são reescritas: use Novo preço para uma nova vigência.
+
+Excluir pede confirmação, retira a versão dos novos pedidos e conserva seu registro/auditoria. **Mostrar histórico de preços** inclui versões encerradas, substituídas e excluídas. Excluir um preço vigente não reativa automaticamente um preço antigo. Ao excluir um agendamento, seu predecessor ainda válido pode continuar até o próximo agendamento; preços já excluídos nunca são reativados.
+
+Essas ações não alteram o saldo nem recalculam reservas existentes. A ordem já emitida mantém preço, combustível previsto e valor reservado e pode ser concluída normalmente pelo valor real. Se uma prévia de emissão ficar antiga após uma edição, o servidor pede uma nova conferência do preço. Operadores sem permissão de edição financeira continuam somente com a consulta permitida por seu perfil.
+
 Contratos copiados da produção permanecem pendentes. Nenhum vínculo é inferido por nome e nenhuma despesa anterior à abertura é descontada novamente. O histórico financeiro continua em Faturas e pagamentos > Histórico e projeções.
 
 ## Operações
