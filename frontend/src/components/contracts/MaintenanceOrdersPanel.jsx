@@ -10,6 +10,7 @@ import IndicatorBar from '../ui/IndicatorBar'
 import ContractFundingFields from './ContractFundingFields'
 import { formatContractMoney as brl } from '../../utils/contractBalance'
 import ContractReturnBanner from './ContractReturnBanner'
+import MaintenanceOrderActionDialog from './MaintenanceOrderActionDialog'
 
 const states = { AUTHORIZED: 'Autorizadas', IN_PROGRESS: 'Em execução', COMPLETED: 'Concluídas', CANCELLED: 'Canceladas' }
 
@@ -51,8 +52,6 @@ export default function MaintenanceOrdersPanel({ contractId = '', returnTo = '',
   const [feedback, setFeedback] = useState('')
   const [dialog, setDialog] = useState(null)
   const [vehicles, setVehicles] = useState(suppliedVehicles || [])
-  const [saving, setSaving] = useState(false)
-  const [form, setForm] = useState({ total_cost: '', parts_replaced: '', justification: '', end_date: '' })
   const listRequest = useRef(0)
   const load = useCallback(async () => {
     const request = ++listRequest.current
@@ -71,18 +70,7 @@ export default function MaintenanceOrdersPanel({ contractId = '', returnTo = '',
     } catch (err) { setError(getApiErrorMessage(err, 'Não foi possível consultar os veículos.')) }
   }
   function showAction(row, action) {
-    setForm({ total_cost: '', parts_replaced: '', justification: '', end_date: '' })
     setDialog({ row, action })
-  }
-  async function act(event) {
-    event.preventDefault(); setSaving(true); setError('')
-    try {
-      if (dialog.action === 'start') await maintenanceOrdersAPI.start(dialog.row.id)
-      if (dialog.action === 'cancel') await maintenanceOrdersAPI.cancel(dialog.row.id, { justification: form.justification })
-      if (dialog.action === 'complete') await maintenanceOrdersAPI.complete(dialog.row.id, { total_cost: form.total_cost, parts_replaced: form.parts_replaced || null, end_date: form.end_date ? new Date(form.end_date).toISOString() : null })
-      setDialog(null); setFeedback('Pedido atualizado. O saldo do contrato foi recalculado.'); await load(); onChange?.()
-    } catch (err) { setError(getApiErrorMessage(err, 'Não foi possível atualizar o pedido.')) }
-    finally { setSaving(false) }
   }
   const metadata = { items: [{ key: 'total', label: 'Pedidos', value: Object.values(list.counts || {}).reduce((a, b) => a+Number(b), 0) },
     ...Object.entries(states).map(([key, label]) => ({ key, label, value: list.counts?.[key] || 0, tone: key === 'AUTHORIZED' ? 'warning' : 'neutral' }))] }
@@ -98,17 +86,10 @@ export default function MaintenanceOrdersPanel({ contractId = '', returnTo = '',
         {canEdit('maintenance') && ['AUTHORIZED', 'IN_PROGRESS'].includes(row.status) ? <button className="app-button" onClick={() => showAction(row, 'complete')}>Concluir</button> : null}</div>
     </article>)}{!loading && !list.data.length ? <p className="contract-empty">Nenhum pedido neste filtro.</p> : null}</div>
     {list.pages > 1 ? <div className="actions-inline"><button className="ghost-button" disabled={page <= 1} onClick={() => setPage(page-1)}>Anterior</button><span>Página {page} de {list.pages}</span><button className="ghost-button" disabled={page >= list.pages} onClick={() => setPage(page+1)}>Próxima</button></div> : null}
-    <Modal open={Boolean(dialog)} title={dialog?.action === 'create' ? 'Autorizar manutenção' : dialog?.action === 'complete' ? 'Concluir manutenção' : dialog?.action === 'cancel' ? 'Cancelar pedido' : 'Iniciar manutenção'} onClose={() => setDialog(null)} canClose={!saving}>
+    <Modal open={dialog?.action === 'create'} title="Autorizar manutenção" onClose={() => setDialog(null)}>
       {error ? <div className="alert alert-error" role="alert">{error}</div> : null}
-      {dialog?.action === 'create' ? <MaintenanceOrderForm vehicles={vehicles} onVehicleOptionsOpen={onVehicleOptionsOpen} initialContractId={contractId} returnTo={returnTo} onClose={() => setDialog(null)} onSuccess={(message) => { setFeedback(message); load(); onChange?.() }} /> : dialog ? <form className="contract-form" onSubmit={act}>
-        <p className="contract-form__wide">{dialog.row.vehicle_plate} · {dialog.row.provider_name}<br />{dialog.row.service_description}</p>
-        {dialog.action === 'complete' ? <><label>Custo real (R$)<input className="app-input" aria-label="Custo real" type="number" min="0" step=".01" value={form.total_cost} onChange={(e) => setForm({ ...form, total_cost: e.target.value })} required /></label>
-          <label>Conclusão (em branco: agora)<input className="app-input" type="datetime-local" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></label>
-          <label className="contract-form__wide">Peças e observações<textarea className="app-textarea" value={form.parts_replaced} onChange={(e) => setForm({ ...form, parts_replaced: e.target.value })} /></label>
-          <p className="muted contract-form__wide">Informe o valor do serviço realizado. A sobra da reserva será liberada; excedentes serão registrados e sinalizados.</p></> : null}
-        {dialog.action === 'cancel' ? <label className="contract-form__wide">Justificativa<textarea className="app-textarea" minLength={10} required value={form.justification} onChange={(e) => setForm({ ...form, justification: e.target.value })} /></label> : null}
-        <div className="actions-inline"><button type="button" className="ghost-button" onClick={() => setDialog(null)} disabled={saving}>Voltar</button><button className="app-button" disabled={saving}>{saving ? 'Salvando…' : 'Confirmar'}</button></div>
-      </form> : null}
+      {dialog?.action === 'create' ? <MaintenanceOrderForm vehicles={vehicles} onVehicleOptionsOpen={onVehicleOptionsOpen} initialContractId={contractId} returnTo={returnTo} onClose={() => setDialog(null)} onSuccess={(message) => { setFeedback(message); load(); onChange?.() }} /> : null}
     </Modal>
+    {dialog?.row ? <MaintenanceOrderActionDialog key={`${dialog.row.id}:${dialog.action}`} row={dialog.row} action={dialog.action} onClose={() => setDialog(null)} onSuccess={(message) => { setFeedback(message); load(); onChange?.() }} /> : null}
   </section>
 }

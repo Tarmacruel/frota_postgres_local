@@ -1322,6 +1322,15 @@ body.internal-app-active .operation-page .operation-table-card {
 .operation-page--maintenance .operation-table th:last-child,
 .operation-page--maintenance .operation-table td:last-child { width: 76px; }
 
+@media (min-width: 721px) {
+  .maintenance-unified > .interactive-kpis .interactive-kpis__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .maintenance-unified .interactive-kpi:not([aria-pressed='true']) .interactive-kpi__label { grid-column: 1 / -1; }
+  .maintenance-unified .interactive-kpi[data-unit='BRL'] .interactive-kpi__value { font-size: clamp(16px, 1.2vw, 22px); white-space: nowrap; }
+}
+@media (min-width: 1280px) {
+  .maintenance-unified > .interactive-kpis .interactive-kpis__grid { grid-template-columns: repeat(7, minmax(0, 1fr)) minmax(160px, 1.4fr); }
+}
+
 .operation-module { gap: var(--ui-space-4); }
 .operation-page--loans .operation-table { min-width: 850px; }
 .operation-page--loans .operation-table th:first-child,
