@@ -8,6 +8,7 @@ import './styles/analytics-evolution.css'
 import './styles/fuel-alerts.css'
 import './styles/mobile-experience.css'
 import './styles/navigation.css'
+import './styles/kpi-tones.css'
 
 const savedTheme = window.localStorage.getItem('frota-theme') === 'dark' ? 'dark' : 'light'
 document.documentElement.dataset.theme = savedTheme

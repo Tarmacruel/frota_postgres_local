@@ -11,12 +11,12 @@ export default function IndicatorBar({ state, loading = false, error = '', label
       <div className="interactive-kpis__grid">
         {items.map((item) => {
           const active = item.key === state.selected
-          return <button key={item.key} type="button" className="interactive-kpi" data-tone={item.tone}
+          return <button key={item.key} type="button" className="interactive-kpi" data-tone={item.key === 'total' ? 'neutral' : item.tone} data-unit={item.unit}
             aria-pressed={active} disabled={loading} onClick={() => state.select(item.key)}
             title={item.description || `Filtrar ${item.label.toLowerCase()}`}>
             <span className="interactive-kpi__label">{item.label}</span>
             <strong className="interactive-kpi__value">{loading || error ? '—' : formatIndicator(item.value, item.unit)}</strong>
-            <span className="interactive-kpi__action">{active ? 'Selecionado' : item.unit === 'BRL' || item.unit === 'L' ? 'Ver composição' : 'Ver registros'}<AppIcon name={active ? 'check' : 'chevron-right'} className="app-icon" /></span>
+            {active ? <AppIcon name="check" className="app-icon interactive-kpi__selected" /> : null}
           </button>
         })}
       </div>
