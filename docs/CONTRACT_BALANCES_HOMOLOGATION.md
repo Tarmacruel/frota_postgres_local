@@ -4,6 +4,18 @@ Entrega funcional autorizada em 22/10/2026. Rota preservada: `/processos-pagamen
 
 ## Preparação pelo gestor
 
+### Operação diária e retorno ao contrato
+
+A página inicia em **Contratos**, com quatro indicadores: Disponível, Reservado, Consumido e A pagar em faturas. Os filtros compactos destacam configuração pendente, divergência, saldo baixo e vencimento próximo. Os totais representam a busca e os filtros gerais; a cobertura informa quantos contratos têm saldo confirmado. Saldo desconhecido continua como traço.
+
+Selecione **Abrir** na tabela para consultar o painel lateral. No celular, o painel ocupa a tela inteira. As abas **Resumo**, **Movimentações**, **Faturas** e **Configuração** mantêm o mesmo contrato. Configuração reúne cadastro, rede, preços, abertura e aditivos; ajustes e demais ações também estão em Mais ações. Nenhuma abertura de saldo é confirmada ao apenas visitar a tela.
+
+**Novo pedido** abre Abastecimentos ou Manutenções com o contrato de origem. O abastecimento oferece seus postos vinculados, preenchendo quando há apenas um; a manutenção mantém o contrato e suas oficinas. Falhas de preço, saldo ou elegibilidade preservam os campos. **Voltar ao contrato** mantém os filtros e a aba e consulta a posição atual. Em Abastecimentos, **Operação geral** permite sair desse contexto para acessar a emissão em lote e as demais operações habituais.
+
+Em Movimentações, **Sem conciliação** filtra serviços ainda não vinculados. **Selecionar fatura** abre a gestão financeira do contrato, sem vínculo automático. **Abrir processo** acessa a fatura já vinculada. Em Faturas, busca, etapa e contrato ficam visíveis; os outros campos ficam em Filtros, e importação/projeções permanecem em Ferramentas financeiras. Pagamento e conciliação invalidam a consulta anterior dos saldos para atualizar o acompanhamento ao voltar.
+
+### Configuração inicial
+
 1. Confira empresa contratada, objeto (abastecimento ou manutenção) e início/fim da vigência.
 2. Em Rede executante, vincule cada posto/oficina ao contrato. A empresa executante pode ser diferente da contratada. Postos continuam com seu cadastro operacional próprio.
 3. Para abastecimento, cadastre preço por posto e combustível, com até seis casas decimais e início de vigência. Nova versão encerra a anterior; pedidos emitidos guardam o preço original.

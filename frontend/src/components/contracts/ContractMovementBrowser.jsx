@@ -4,14 +4,14 @@ import { useMasterDataCatalog } from '../../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../../utils/exportData'
 import { formatContractMoney as brl } from '../../utils/contractBalance'
+import useContractFilters from '../../hooks/useContractFilters'
 
 const movementLabels = { OPENING: 'Abertura', RESERVE: 'Reserva', RELEASE: 'Liberação', CONSUMPTION: 'Consumo realizado',
   CONSUMPTION_ADJUSTMENT: 'Retificação de consumo', CREDIT: 'Acréscimo', DEBIT: 'Redução', INVOICE_ADJUSTMENT: 'Diferença de fatura', DIVERGENCE_RESOLVED: 'Divergência regularizada' }
 
 export default function ContractMovementBrowser({ contract, providers = [], revision, initialType = '' }) {
   const { organizations } = useMasterDataCatalog({ organizationsOnly: true })
-  const [filters, setFilters] = useState({ status: initialType, organization_id: '', provider_id: '', start: '', end: '' })
-  const [page, setPage] = useState(1)
+  const { filters, page, setPage, update } = useContractFilters('ledger', { status: initialType, organization_id: '', provider_id: '', start: '', end: '' })
   const [result, setResult] = useState({ data: [], total: 0, pages: 0 })
   const [loading, setLoading] = useState(true)
   const [exporting, setExporting] = useState(false)
@@ -28,7 +28,6 @@ export default function ContractMovementBrowser({ contract, providers = [], revi
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [contractId, filters, start, end, page, revision])
-  function update(name, value) { setFilters((s) => ({ ...s, [name]: value })); setPage(1) }
   const columns = [
     { header: 'Data', value: (r) => new Date(r.created_at).toLocaleString('pt-BR') },
     { header: 'Movimentação', value: (r) => movementLabels[r.movement_type] || r.movement_type },

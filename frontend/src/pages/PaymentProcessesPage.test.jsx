@@ -49,3 +49,18 @@ it('mantém o detalhamento fechado quando a resposta dos alertas chega depois de
 })
 
 vi.mock('../api/contractControl', () => ({ contractControlAPI: { config: async () => ({ data: { enabled: false } }) }, maintenanceOrdersAPI: {} }))
+
+it('mantém somente busca, etapa e contrato visíveis no modo embutido, preservando os filtros e ferramentas', async () => {
+  render(<MemoryRouter><PaymentProcessesPage embedded initialContractId="contract" /></MemoryRouter>)
+  await screen.findByText('QA-001')
+  expect(screen.queryByRole('heading', { name: 'Faturas e pagamentos' })).not.toBeInTheDocument()
+  expect(screen.getByRole('searchbox', { name: 'Busca' })).toBeVisible()
+  expect(screen.getByRole('combobox', { name: 'Etapa' })).toBeVisible()
+  expect(screen.getByRole('combobox', { name: 'Contrato' })).toBeVisible()
+  expect(screen.getByLabelText('Tipo').closest('details')).not.toHaveAttribute('open')
+  fireEvent.click(screen.getByText('Filtros', { exact: true }))
+  expect(screen.getByRole('combobox', { name: 'Tipo' })).toBeVisible()
+  fireEvent.click(screen.getByText('Ferramentas financeiras'))
+  expect(screen.getByRole('button', { name: 'Importação', exact: true })).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Gestão do contrato', exact: true })).toBeVisible()
+})

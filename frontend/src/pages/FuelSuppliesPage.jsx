@@ -1,4 +1,5 @@
 import IndicatorBar from '../components/ui/IndicatorBar'
+import ContractReturnBanner from '../components/contracts/ContractReturnBanner'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import { useContractControl } from '../hooks/useContractFunding'
 import { Link } from 'react-router-dom'
@@ -520,12 +521,14 @@ export default function FuelSuppliesPage() {
         description="Emita ordens para os postos vinculados e acompanhe o histórico confirmado com comprovantes e alertas de consumo."
         actions={<>
           {canCreateOrder ? <button className="app-button" type="button" onClick={() => setIsOrderModalOpen(true)}>Nova ordem</button> : null}
-          {canCreateOrder ? <button className="secondary-button" data-tour="fuel-batch-create" type="button" onClick={() => setIsBatchOrderModalOpen(true)}>Nova ordem em lote</button> : null}
-          {canCreateOrder ? <button className="ghost-button" type="button" onClick={openBatchOrderTour}>Ver guia rápido</button> : null}
+          {canCreateOrder && !searchParams.get('contract_id') ? <button className="secondary-button" data-tour="fuel-batch-create" type="button" onClick={() => setIsBatchOrderModalOpen(true)}>Nova ordem em lote</button> : null}
+          {canCreateOrder && !searchParams.get('contract_id') ? <button className="ghost-button" type="button" onClick={openBatchOrderTour}>Ver guia rápido</button> : null}
+          {searchParams.get('contract_id') ? <Link className="secondary-button" to="/abastecimentos">Operação geral</Link> : null}
           <button className="ghost-button" type="button" onClick={() => { loadOrders(); loadRecords() }}>Atualizar painel</button>
         </>}
       />
 
+      <ContractReturnBanner returnTo={searchParams.get('return_to')} />
       <p className="interactive-kpis__context"><Link to="/postos?indicator=active">Consultar os {fuelStations.length} postos ativos</Link></p>
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
@@ -774,6 +777,7 @@ export default function FuelSuppliesPage() {
       <Modal open={isOrderModalOpen && canCreateOrder} onClose={() => setIsOrderModalOpen(false)} title="Nova ordem de abastecimento" description="Emita a ordem para um posto credenciado executar o abastecimento.">
         <FuelSupplyOrderCreateForm
           initialContractId={searchParams.get('contract_id') || ''}
+          returnTo={searchParams.get('return_to') || ''}
           vehicles={vehicles} onVehicleOptionsOpen={refreshVehicleOptions}
           organizations={organizations}
           fuelStations={fuelStations}

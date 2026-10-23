@@ -5,7 +5,7 @@ import { getApiErrorMessage } from '../../utils/apiError'
 import Modal from '../Modal'
 import { formatContractMoney as brl } from '../../utils/contractBalance'
 
-export default function ProcessReconciliation({ process }) {
+export default function ProcessReconciliation({ process, onChange }) {
   const mode = useContractControl()
   const [open, setOpen] = useState(false)
   const [loading, setLoading] = useState(false)
@@ -40,6 +40,7 @@ export default function ProcessReconciliation({ process }) {
     try {
       await contractControlAPI.reconcile(process.id, { operation_ids: selected, justification: reason || null })
       setOpen(false); setFeedback('Conciliação salva. Operações já consumidas não foram descontadas novamente.')
+      onChange?.()
     } catch (err) { setError(getApiErrorMessage(err, 'Não foi possível conciliar a fatura.')) }
     finally { setSaving(false) }
   }

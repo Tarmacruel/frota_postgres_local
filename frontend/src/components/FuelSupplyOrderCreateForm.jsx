@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import SearchableSelect from './SearchableSelect'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -6,6 +6,8 @@ import { toDateTimeLocalValue } from '../utils/datetime'
 import useFuelSupplyOrderForm from '../hooks/useFuelSupplyOrderForm'
 import useContractFunding from '../hooks/useContractFunding'
 import ContractFundingFields from './contracts/ContractFundingFields'
+import ContractReturnBanner from './contracts/ContractReturnBanner'
+import { contractControlAPI } from '../api/contractControl'
 
 function buildVehicleOption(vehicle) {
   const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
@@ -31,24 +33,45 @@ function buildDefaultDeadline() {
   return toDateTimeLocalValue(deadline.toISOString())
 }
 
-export default function FuelSupplyOrderCreateForm({ vehicles = [], onVehicleOptionsOpen, organizations = [], fuelStations = [], initialContractId = '', onClose, onSuccess }) {
+export default function FuelSupplyOrderCreateForm({ vehicles = [], onVehicleOptionsOpen, organizations = [], fuelStations = [], initialContractId = '', returnTo = '', onClose, onSuccess }) {
+  const [context, setContext] = useState({ id: '', contract: null, loading: false, error: '' })
+  const [contextRevision, setContextRevision] = useState(0)
+  const contextStations = useMemo(() => initialContractId
+    ? fuelStations.filter((station) => context.id === initialContractId && context.contract?.providers?.some((provider) => provider.fuel_station_id === station.id && provider.active !== false))
+    : fuelStations, [initialContractId, context, fuelStations])
   const [form, setForm] = useFuelSupplyOrderForm(() => ({
     vehicle_id: '',
-    fuel_station_id: initialContractId ? '' : undefined,
+    fuel_station_id: undefined,
     expires_at: buildDefaultDeadline(),
     requested_liters: '30',
     notes: '',
-  }), organizations, fuelStations)
+  }), organizations, contextStations, { autoSelectFirstStation: !initialContractId })
   const [error, setError] = useState('')
   const funding = useContractFunding({ stationId: form.fuel_station_id, liters: form.requested_liters, initialContractId })
   const [submitting, setSubmitting] = useState(false)
+  useEffect(() => {
+    if (!initialContractId || funding.enabled !== true) return undefined
+    let active = true
+    setContext({ id: initialContractId, contract: null, loading: true, error: '' })
+    contractControlAPI.eligible({ kind: 'FUEL' }).then(({ data }) => {
+      if (!active) return
+      const contract = data.find((row) => row.id === initialContractId)
+      setContext({ id: initialContractId, contract, loading: false, error: contract ? '' : 'O contrato de origem não está liberado. Volte ao contrato para conferir as pendências.' })
+    }).catch((err) => { if (active) setContext({ id: initialContractId, contract: null, loading: false, error: getApiErrorMessage(err, 'Não foi possível consultar os postos do contrato.') }) })
+    return () => { active = false }
+  }, [initialContractId, funding.enabled, contextRevision])
+  const contextual = Boolean(initialContractId && funding.enabled !== false)
+  const contextLoading = contextual && (context.id !== initialContractId || context.loading)
+  const contextError = contextual && context.id === initialContractId ? context.error : ''
+  const stationOptions = funding.enabled === false ? fuelStations : contextStations
+  const ready = funding.ready && !contextLoading && !contextError && (!contextual || stationOptions.some((station) => station.id === form.fuel_station_id))
 
   const submitLabel = useMemo(() => (submitting ? 'Criando ordem...' : 'Criar ordem'), [submitting])
 
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
-    if (!funding.ready) { setError(funding.error || 'Confira o contrato, o combustível e a reserva antes de emitir.'); return }
+    if (!ready) { setError(contextError || funding.error || 'Confira o contrato, o combustível e a reserva antes de emitir.'); return }
 
     if (!form.vehicle_id) {
       setError('Selecione um veículo para emitir a ordem.')
@@ -97,7 +120,11 @@ export default function FuelSupplyOrderCreateForm({ vehicles = [], onVehicleOpti
 
   return (
     <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
-      {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
+      <ContractReturnBanner returnTo={returnTo} compact saving={submitting} />
+      {contextLoading ? <p className="modal-field-span" role="status">Consultando os postos do contrato…</p> : null}
+      {contextError ? <div className="alert alert-error modal-field-span" role="alert">{contextError}<button className="ghost-button" type="button" onClick={() => setContextRevision((value) => value + 1)}>Tentar novamente</button></div> : null}
+      {contextual && context.contract ? <p className="modal-field-span muted">Contrato {context.contract.number} · {context.contract.supplier_name || 'Postos vinculados ao contrato selecionado'}</p> : null}
+      {error ? <div className="alert alert-error modal-field-span" role="alert">{error}{funding.enabled ? <button className="ghost-button" type="button" onClick={funding.refresh}>Atualizar saldo e preço</button> : null}</div> : null}
 
       <div className="form-field">
         <label>Veículo</label>
@@ -116,7 +143,7 @@ export default function FuelSupplyOrderCreateForm({ vehicles = [], onVehicleOpti
         <SearchableSelect
           value={form.fuel_station_id}
           onChange={(value) => setForm((current) => ({ ...current, fuel_station_id: value }))}
-          options={fuelStations.map(buildFuelStationOption)}
+          options={stationOptions.map(buildFuelStationOption)}
           placeholder="Selecione o posto"
           searchPlaceholder="Buscar posto"
           ariaLabel="Posto"
@@ -172,7 +199,7 @@ export default function FuelSupplyOrderCreateForm({ vehicles = [], onVehicleOpti
 
       <ContractFundingFields funding={funding} />
       <div className="actions-inline modal-actions">
-        <button className="app-button" type="submit" disabled={submitting || !funding.ready}>
+        <button className="app-button" type="submit" disabled={submitting || !ready}>
           {submitLabel}
         </button>
         <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>

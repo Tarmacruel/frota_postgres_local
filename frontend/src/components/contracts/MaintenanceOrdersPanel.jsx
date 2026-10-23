@@ -9,10 +9,11 @@ import SearchableSelect from '../SearchableSelect'
 import IndicatorBar from '../ui/IndicatorBar'
 import ContractFundingFields from './ContractFundingFields'
 import { formatContractMoney as brl } from '../../utils/contractBalance'
+import ContractReturnBanner from './ContractReturnBanner'
 
 const states = { AUTHORIZED: 'Autorizadas', IN_PROGRESS: 'Em execução', COMPLETED: 'Concluídas', CANCELLED: 'Canceladas' }
 
-export function MaintenanceOrderForm({ vehicles = [], onVehicleOptionsOpen, initialContractId = '', onClose, onSuccess }) {
+export function MaintenanceOrderForm({ vehicles = [], onVehicleOptionsOpen, initialContractId = '', returnTo = '', onClose, onSuccess }) {
   const [form, setForm] = useState({ vehicle_id: '', estimated_cost: '', service_description: '' })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
@@ -28,7 +29,8 @@ export function MaintenanceOrderForm({ vehicles = [], onVehicleOptionsOpen, init
     finally { setSaving(false) }
   }
   return <form className="contract-form" onSubmit={submit}>
-    {error ? <div className="alert alert-error contract-form__wide" role="alert">{error}</div> : null}
+    <ContractReturnBanner returnTo={returnTo} compact saving={saving} />
+    {error ? <div className="alert alert-error contract-form__wide" role="alert">{error}<button className="ghost-button" type="button" onClick={funding.refresh}>Atualizar saldo</button></div> : null}
     <label>Veículo<SearchableSelect value={form.vehicle_id} onOpen={onVehicleOptionsOpen} ariaLabel="Veículo para manutenção"
       onChange={(vehicle_id) => setForm((s) => ({ ...s, vehicle_id }))} placeholder="Selecione o veículo"
       options={vehicles.filter((v) => v.can_operate_vehicle !== false).map((v) => ({ value: v.id, label: `${v.plate} · ${v.brand || ''} ${v.model || ''}`, tags: v.tags || [] }))} /></label>
@@ -39,7 +41,7 @@ export function MaintenanceOrderForm({ vehicles = [], onVehicleOptionsOpen, init
   </form>
 }
 
-export default function MaintenanceOrdersPanel({ contractId = '', vehicles: suppliedVehicles, onVehicleOptionsOpen, onChange, refreshKey }) {
+export default function MaintenanceOrdersPanel({ contractId = '', returnTo = '', hideCreate = false, vehicles: suppliedVehicles, onVehicleOptionsOpen, onChange, refreshKey }) {
   const { canCreate, canEdit } = useAuth()
   const [list, setList] = useState({ data: [], counts: {}, total: 0, pages: 0 })
   const [status, setStatus] = useState('total')
@@ -86,7 +88,7 @@ export default function MaintenanceOrdersPanel({ contractId = '', vehicles: supp
     ...Object.entries(states).map(([key, label]) => ({ key, label, value: list.counts?.[key] || 0, tone: key === 'AUTHORIZED' ? 'warning' : 'neutral' }))] }
   return <section className="contract-order-panel" aria-label="Pedidos de manutenção">
     <div className="contract-order-panel__heading"><div><h3>Pedidos de manutenção</h3><span className="muted">A autorização reserva o orçamento. O veículo só entra em execução ao iniciar o serviço.</span></div>
-      {canCreate('maintenance') ? <button className="app-button" onClick={showCreate}>Novo pedido</button> : null}</div>
+      {!hideCreate && canCreate('maintenance') ? <button className="app-button" onClick={showCreate}>Novo pedido</button> : null}</div>
     {error && !dialog ? <div className="alert alert-error" role="alert">{error}</div> : null}
     {feedback ? <div className="alert alert-success" role="status">{feedback}</div> : null}
     <IndicatorBar state={{ selected: status, metadata, select: (value) => { setStatus(value); setPage(1) } }} loading={loading} error={error} resultCount={list.total} />
@@ -98,7 +100,7 @@ export default function MaintenanceOrdersPanel({ contractId = '', vehicles: supp
     {list.pages > 1 ? <div className="actions-inline"><button className="ghost-button" disabled={page <= 1} onClick={() => setPage(page-1)}>Anterior</button><span>Página {page} de {list.pages}</span><button className="ghost-button" disabled={page >= list.pages} onClick={() => setPage(page+1)}>Próxima</button></div> : null}
     <Modal open={Boolean(dialog)} title={dialog?.action === 'create' ? 'Autorizar manutenção' : dialog?.action === 'complete' ? 'Concluir manutenção' : dialog?.action === 'cancel' ? 'Cancelar pedido' : 'Iniciar manutenção'} onClose={() => setDialog(null)} canClose={!saving}>
       {error ? <div className="alert alert-error" role="alert">{error}</div> : null}
-      {dialog?.action === 'create' ? <MaintenanceOrderForm vehicles={vehicles} onVehicleOptionsOpen={onVehicleOptionsOpen} initialContractId={contractId} onClose={() => setDialog(null)} onSuccess={(message) => { setFeedback(message); load(); onChange?.() }} /> : dialog ? <form className="contract-form" onSubmit={act}>
+      {dialog?.action === 'create' ? <MaintenanceOrderForm vehicles={vehicles} onVehicleOptionsOpen={onVehicleOptionsOpen} initialContractId={contractId} returnTo={returnTo} onClose={() => setDialog(null)} onSuccess={(message) => { setFeedback(message); load(); onChange?.() }} /> : dialog ? <form className="contract-form" onSubmit={act}>
         <p className="contract-form__wide">{dialog.row.vehicle_plate} · {dialog.row.provider_name}<br />{dialog.row.service_description}</p>
         {dialog.action === 'complete' ? <><label>Custo real (R$)<input className="app-input" aria-label="Custo real" type="number" min="0" step=".01" value={form.total_cost} onChange={(e) => setForm({ ...form, total_cost: e.target.value })} required /></label>
           <label>Conclusão (em branco: agora)<input className="app-input" type="datetime-local" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></label>

@@ -22,14 +22,14 @@ beforeEach(() => {
   contractControlAPI.quote.mockResolvedValue({ data: quote })
 })
 
-it('usa o contrato do posto mesmo quando o link de origem aponta para outro contrato', async () => {
+it('bloqueia um posto de outro contrato quando o pedido parte de um contrato definido', async () => {
   const { result } = renderHook(() => useContractFunding({ stationId: 'individual', liters: 30, initialContractId: 'rede' }))
-  await waitFor(() => expect(result.current.ready).toBe(true))
-  expect(result.current.payload.contract_id).toBe('contract-individual')
-  expect(result.current.payload.contract_provider_id).toBe('provider-individual')
+  await waitFor(() => expect(result.current.error).toMatch(/não pertence ao contrato de origem/))
+  expect(result.current.ready).toBe(false)
+  expect(result.current.payload).toEqual({})
   render(<ContractFundingFields funding={result.current} />)
-  expect(screen.getByText('Contrato individual')).toBeInTheDocument()
-  expect(screen.getByText('Posto individual')).toBeInTheDocument()
+  expect(screen.queryByText('Contrato individual')).not.toBeInTheDocument()
+  expect(screen.queryByText('Posto individual')).not.toBeInTheDocument()
   expect(screen.queryByLabelText('Contrato para reserva')).not.toBeInTheDocument()
   expect(screen.queryByLabelText('Prestador para reserva')).not.toBeInTheDocument()
 })

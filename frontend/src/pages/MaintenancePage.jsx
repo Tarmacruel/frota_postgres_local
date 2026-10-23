@@ -1,4 +1,5 @@
 import IndicatorBar from '../components/ui/IndicatorBar'
+import ContractReturnBanner from '../components/contracts/ContractReturnBanner'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -314,7 +315,8 @@ export default function MaintenancePage() {
         )}
       />
 
-      {contractMode.enabled && !contractMode.error ? <MaintenanceOrdersPanel vehicles={vehicles} onVehicleOptionsOpen={loadVehicles} refreshKey={feedback} onChange={() => loadRecords()} /> : null}
+      <ContractReturnBanner returnTo={searchParams.get('return_to')} />
+      {contractMode.enabled && !contractMode.error ? <MaintenanceOrdersPanel contractId={searchParams.get('contract_id') || ''} returnTo={searchParams.get('return_to') || ''} vehicles={vehicles} onVehicleOptionsOpen={loadVehicles} refreshKey={feedback} onChange={() => loadRecords()} /> : null}
       <div className="toolbar-card operation-toolbar">
         <div className="toolbar-row">
           <div className="status-pills">
@@ -456,6 +458,7 @@ export default function MaintenancePage() {
       >
         <MaintenanceForm
           initialContractId={searchParams.get('contract_id') || ''}
+          returnTo={searchParams.get('return_to') || ''}
           onVehicleOptionsOpen={loadVehicles}
           vehicles={vehicles}
           initialData={editingRecord}

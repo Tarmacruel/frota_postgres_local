@@ -234,7 +234,7 @@ function isOverdueProcess(row) {
   return due < today
 }
 
-export default function PaymentProcessesPage({ embedded = false, initialView = 'processes', initialContractId = '', initialProcessId = '' }) {
+export default function PaymentProcessesPage({ embedded = false, initialView = 'processes', initialContractId = '', initialProcessId = '', onContractChange, onViewChange, onDataChange }) {
   const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
   const [alertDetails, setAlertDetails] = useState(null)
   const [alertDetailsLoading, setAlertDetailsLoading] = useState(false)
@@ -257,6 +257,7 @@ export default function PaymentProcessesPage({ embedded = false, initialView = '
   const canManage = canEdit('payment_processes')
   const canDeleteProcesses = canDeleteModule('payment_processes')
   const [activeView, setActiveView] = useState(initialView)
+  useEffect(() => { setActiveView(initialView) }, [initialView])
   const [detailTab, setDetailTab] = useState('summary')
   const [records, setRecords] = useState([])
   const [selectedProcess, setSelectedProcess] = useState(null)
@@ -266,6 +267,7 @@ export default function PaymentProcessesPage({ embedded = false, initialView = '
   const [contracts, setContracts] = useState([])
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0, limit: PAGE_SIZE })
   const [filters, setFilters] = useState({ kind: '', stage: '', organization_id: '', supplier_id: '', contract_id: initialContractId, competence_month: '', due_from: '', due_to: '', search: '' })
+  useEffect(() => { setFilters((current) => current.contract_id === initialContractId ? current : { ...current, contract_id: initialContractId }); setPagination((current) => ({ ...current, page: 1 })) }, [initialContractId])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
@@ -404,6 +406,7 @@ export default function PaymentProcessesPage({ embedded = false, initialView = '
   }
 
   async function refreshAll({ keepSelected = true } = {}) {
+    onDataChange?.()
     await Promise.all([loadCatalogs(), loadDashboard(), loadRecords(pagination.page)])
     if (keepSelected && selectedProcess?.id) {
       await openProcess(selectedProcess.id)
@@ -421,11 +424,13 @@ export default function PaymentProcessesPage({ embedded = false, initialView = '
   function updateFilter(next) {
     setPagination((current) => ({ ...current, page: 1 }))
     setFilters((current) => ({ ...current, ...next }))
+    if (embedded && 'contract_id' in next) onContractChange?.(next.contract_id)
   }
 
   function resetFilters() {
     setPagination((current) => ({ ...current, page: 1 }))
     setFilters({ kind: '', stage: '', organization_id: '', supplier_id: '', contract_id: '', competence_month: '', due_from: '', due_to: '', search: '' })
+    if (embedded) onContractChange?.('')
   }
 
   function buildReportMetrics(rows) {
@@ -786,35 +791,38 @@ export default function PaymentProcessesPage({ embedded = false, initialView = '
 
   const visibleContracts = filters.supplier_id ? contracts.filter((contract) => contract.supplier_id === filters.supplier_id) : contracts
   const closeProcessDetail = useCallback(() => setSelectedProcess(null), [])
+  const financialActions = <>
+    {canManage ? <button className="app-button" type="button" onClick={openCreateProcess}>Novo processo</button> : null}
+    <button type="button" className="secondary-button" onClick={previewPdfReport} disabled={reporting}>{reporting ? 'Gerando PDF...' : 'Relatório PDF'}</button>
+    <button type="button" className="secondary-button" onClick={exportCurrent}>Exportar XLSX</button>
+  </>
+  const financialModes = <section className="payment-workflow-tabs management-tabs" aria-label="Modos do módulo">
+    {[
+      { value: 'processes', label: 'Processos' }, { value: 'imports', label: 'Importação' },
+      { value: 'contractManagement', label: 'Gestão do contrato' }, { value: 'contracts', label: 'Contratos' }, { value: 'suppliers', label: 'Fornecedores' },
+    ].filter((item) => !embedded || ['processes', 'imports', 'contractManagement'].includes(item.value)).map((item) => <button key={item.value} type="button" aria-pressed={activeView === item.value} className={`status-pill ${activeView === item.value ? 'active' : ''}`} onClick={() => { setActiveView(item.value); if (embedded) onViewChange?.(item.value) }}>{item.label}</button>)}
+  </section>
+  const additionalFilters = <>
+    <Field label="Tipo"><select className="app-select" value={filters.kind} onChange={(event) => updateFilter({ kind: event.target.value })}>{kindOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}</select></Field>
+    <Field label="Secretaria"><select className="app-select" value={filters.organization_id} onChange={(event) => updateFilter({ organization_id: event.target.value })}><option value="">Todas</option>{organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}</select></Field>
+    <Field label="Fornecedor"><select className="app-select" value={filters.supplier_id} onChange={(event) => updateFilter({ supplier_id: event.target.value, contract_id: '' })}><option value="">Todos</option>{suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}</select></Field>
+    <Field label="Competência"><input className="app-input" type="month" value={filters.competence_month} onChange={(event) => updateFilter({ competence_month: event.target.value })} /></Field>
+    <Field label="Vencimento inicial"><input className="app-input" type="date" value={filters.due_from} onChange={(event) => updateFilter({ due_from: event.target.value })} /></Field>
+    <Field label="Vencimento final"><input className="app-input" type="date" value={filters.due_to} onChange={(event) => updateFilter({ due_to: event.target.value })} /></Field>
+  </>
 
   return (
     <div className="page-shell payment-process-page payment-workflow-page management-page management-page--payments">
-      <PageHeader
-        title={embedded ? 'Faturas e pagamentos' : 'Processos de pagamento'}
+      {embedded ? <div className="actions-inline contract-financial-actions">{financialActions}</div> : <PageHeader
+        title="Processos de pagamento"
         description="Workflow financeiro de combustíveis e manutenção por fatura, contrato, etapa e pendência."
-        actions={<>
-          {canManage ? <button className="app-button" type="button" onClick={openCreateProcess}>Novo processo</button> : null}
-          <button type="button" className="secondary-button" onClick={previewPdfReport} disabled={reporting}>{reporting ? 'Gerando PDF...' : 'Relatório PDF'}</button>
-          <button type="button" className="secondary-button" onClick={exportCurrent}>Exportar XLSX</button>
-        </>}
-      />
+        actions={financialActions}
+      />}
 
       {error ? <div className="alert alert-error">{error}</div> : null}
       {feedback ? <div className="alert alert-success">{feedback}</div> : null}
 
-      <section className="payment-workflow-tabs management-tabs" aria-label="Modos do módulo">
-        {[
-          { value: 'processes', label: 'Processos' },
-          { value: 'imports', label: 'Importacao' },
-          { value: 'contractManagement', label: 'Gestão do contrato' },
-          { value: 'contracts', label: 'Contratos' },
-          { value: 'suppliers', label: 'Fornecedores' },
-        ].filter((tab) => !embedded || ['processes', 'imports', 'contractManagement'].includes(tab.value)).map((tab) => (
-          <button key={tab.value} type="button" aria-pressed={activeView === tab.value} className={`status-pill ${activeView === tab.value ? 'active' : ''}`} onClick={() => setActiveView(tab.value)}>
-            {tab.label}
-          </button>
-        ))}
-      </section>
+      {embedded ? <details className="contract-financial-tools"><summary>Ferramentas financeiras{activeView !== 'processes' ? activeView === 'imports' ? ' · Importação' : ' · Gestão do contrato' : ''}</summary>{financialModes}</details> : financialModes}
 
       {activeView === 'processes' ? (
         <>
@@ -826,27 +834,13 @@ export default function PaymentProcessesPage({ embedded = false, initialView = '
           </Modal>
 
           <section className="toolbar-card payment-process-panel payment-filter-panel">
-            <div className="payment-process-filter-stack payment-workflow-filter-grid">
-              <Field label="Tipo">
-                <select className="app-select" value={filters.kind} onChange={(event) => updateFilter({ kind: event.target.value })}>
-                  {kindOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
+            <div className={`payment-process-filter-stack payment-workflow-filter-grid${embedded ? ' contract-financial-filter-primary' : ''}`}>
+              <Field label="Busca">
+                <input className="app-input" type="search" value={filters.search} onChange={(event) => updateFilter({ search: event.target.value })} placeholder="Processo, NF, fornecedor..." />
               </Field>
               <Field label="Etapa">
                 <select className="app-select" value={filters.stage} onChange={(event) => updateFilter({ stage: event.target.value })}>
                   {stageOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-              </Field>
-              <Field label="Secretaria">
-                <select className="app-select" value={filters.organization_id} onChange={(event) => updateFilter({ organization_id: event.target.value })}>
-                  <option value="">Todas</option>
-                  {organizations.map((organization) => <option key={organization.id} value={organization.id}>{organization.name}</option>)}
-                </select>
-              </Field>
-              <Field label="Fornecedor">
-                <select className="app-select" value={filters.supplier_id} onChange={(event) => updateFilter({ supplier_id: event.target.value, contract_id: '' })}>
-                  <option value="">Todos</option>
-                  {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
                 </select>
               </Field>
               <Field label="Contrato">
@@ -855,18 +849,7 @@ export default function PaymentProcessesPage({ embedded = false, initialView = '
                   {visibleContracts.map((contract) => <option key={contract.id} value={contract.id}>{contract.number}</option>)}
                 </select>
               </Field>
-              <Field label="Competência">
-                <input className="app-input" type="month" value={filters.competence_month} onChange={(event) => updateFilter({ competence_month: event.target.value })} />
-              </Field>
-              <Field label="Vencimento inicial">
-                <input className="app-input" type="date" value={filters.due_from} onChange={(event) => updateFilter({ due_from: event.target.value })} />
-              </Field>
-              <Field label="Vencimento final">
-                <input className="app-input" type="date" value={filters.due_to} onChange={(event) => updateFilter({ due_to: event.target.value })} />
-              </Field>
-              <Field label="Busca">
-                <input className="app-input" type="search" value={filters.search} onChange={(event) => updateFilter({ search: event.target.value })} placeholder="Processo, NF, fornecedor..." />
-              </Field>
+              {embedded ? <details className="contract-financial-filters"><summary>Filtros{[filters.kind, filters.organization_id, filters.supplier_id, filters.competence_month, filters.due_from, filters.due_to].filter(Boolean).length ? ' · filtros adicionais ativos' : ''}</summary><div className="contract-financial-filters__fields">{additionalFilters}</div></details> : additionalFilters}
               <div className="payment-process-actions payment-workflow-filter-actions">
                 <button type="button" className="ghost-button" onClick={resetFilters}>Limpar</button>
               </div>
@@ -932,6 +915,7 @@ export default function PaymentProcessesPage({ embedded = false, initialView = '
             canDelete={canDeleteProcesses}
             onDelete={openDeleteProcess}
             onClose={closeProcessDetail}
+            onReconcile={onDataChange}
           />
         </>
       ) : null}
@@ -972,6 +956,7 @@ export default function PaymentProcessesPage({ embedded = false, initialView = '
       {activeView === 'contractManagement' ? (
         <ContractManagementView
           initialContractId={initialContractId}
+          onContractChange={embedded ? onContractChange : undefined}
           contracts={contracts}
           suppliers={suppliers}
         />
@@ -1160,6 +1145,7 @@ function ProcessDetail({
   onEdit,
   onDelete,
   onClose,
+  onReconcile,
 }) {
   const dialogRef = useDialogFocus(Boolean(process), onClose)
 
@@ -1234,7 +1220,7 @@ function ProcessDetail({
 
         {detailTab === 'finance' ? (
           <div className="payment-detail-grid">
-            {canManage ? <ProcessReconciliation key={process.id} process={process} /> : null}
+            {canManage ? <ProcessReconciliation key={process.id} process={process} onChange={onReconcile} /> : null}
             <Info label="Valor" value={formatCurrency(process.amount)} />
             <Info label="Saldo importado" value={formatCurrency(process.contract_balance)} />
             <Info label="Empenho" value={`${process.commitment_number || '-'} . ${formatDate(process.commitment_date)}`} />
@@ -1369,9 +1355,11 @@ function ImportsView({
   )
 }
 
-function ContractManagementView({ contracts, suppliers, initialContractId = '' }) {
+function ContractManagementView({ contracts, suppliers, initialContractId = '', onContractChange }) {
   const [filters, setFilters] = useState({ supplier_id: '', kind: '', status: '', search: '', horizon_months: 6 })
   const [selectedContractId, setSelectedContractId] = useState(initialContractId)
+  useEffect(() => { setSelectedContractId(initialContractId) }, [initialContractId])
+  function selectContract(id) { setSelectedContractId(id); onContractChange?.(id) }
   const [summary, setSummary] = useState(null)
   const [detail, setDetail] = useState(null)
   const [loadingSummary, setLoadingSummary] = useState(false)
@@ -1529,7 +1517,7 @@ function ContractManagementView({ contracts, suppliers, initialContractId = '' }
                 type="button"
                 className={`payment-management-rank-row ${selectedContractId === item.contract_id ? 'is-selected' : ''}`}
                 aria-pressed={selectedContractId === item.contract_id}
-                onClick={() => setSelectedContractId(item.contract_id)}
+                onClick={() => selectContract(item.contract_id)}
               >
                 <span>
                   <strong>{item.contract_number}</strong>
@@ -1546,7 +1534,7 @@ function ContractManagementView({ contracts, suppliers, initialContractId = '' }
         <div className="payment-management-main">
           <div className="toolbar-card payment-process-panel payment-management-contract-selector">
             <Field label="Contrato analisado">
-              <select className="app-select" value={selectedContractId} onChange={(event) => setSelectedContractId(event.target.value)}>
+              <select className="app-select" value={selectedContractId} onChange={(event) => selectContract(event.target.value)}>
                 {filteredContracts.map((contract) => (
                   <option key={contract.id} value={contract.id}>{contract.number} - {contract.supplier_name || '-'}</option>
                 ))}
