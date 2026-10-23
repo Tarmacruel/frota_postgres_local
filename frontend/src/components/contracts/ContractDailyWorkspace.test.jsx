@@ -224,10 +224,14 @@ it('consulta serviços sem conciliação no servidor e oferece seleção explíc
   mount('/processos-pagamento?contract_id=a&operations_start=2026-10-01', <ContractCommitmentsBrowser contract={opened} mode="operations" />)
   fireEvent.click(await screen.findByRole('checkbox', { name: 'Sem conciliação' }))
   await waitFor(() => expect(contractControlAPI.operations).toHaveBeenLastCalledWith('a', expect.objectContaining({ unbilled: true, start: expect.any(String), page: 1 })))
-  const target = new URL((await screen.findByRole('link', { name: 'Selecionar fatura' })).getAttribute('href'), 'https://local.test')
+  const target = new URL((await screen.findByRole('link', { name: 'Selecionar fatura existente' })).getAttribute('href'), 'https://local.test')
   expect(target.searchParams.get('contract_id')).toBe('a')
   expect(target.searchParams.get('view')).toBe('payments')
   expect(target.searchParams.get('operations_unbilled')).toBe('1')
+  const draft = new URL(screen.getByRole('link', { name: 'Criar processo', exact: true }).getAttribute('href'), 'https://local.test')
+  expect(draft.searchParams.get('contract_id')).toBe('a')
+  expect(draft.searchParams.get('new_process_operation')).toBe('op')
+  expect(draft.searchParams.has('focus_process')).toBe(false)
 })
 
 it('carrega faturas do contrato escolhido e abre o processo sem conciliar automaticamente', async () => {

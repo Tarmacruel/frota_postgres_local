@@ -19,6 +19,9 @@ import {
 import { paymentContractsAPI, paymentProcessesAPI, paymentSuppliersAPI } from '../api/paymentProcesses'
 import Modal from '../components/Modal'
 import ProcessReconciliation from '../components/contracts/ProcessReconciliation'
+import PaymentProcessDialog from '../components/payments/PaymentProcessDialog'
+import { ActionMenu } from '../components/ui'
+import '../styles/payment-workspace.css'
 import Pagination from '../components/Pagination'
 import { useAuth } from '../context/AuthContext'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
@@ -74,32 +77,6 @@ const referenceLabels = {
   OTHER: 'Outro',
 }
 
-const emptyProcessForm = {
-  process_number: '',
-  kind: 'FUEL',
-  stage: 'ASSEMBLY',
-  supplier_id: '',
-  contract_id: '',
-  organization_id: '',
-  unit_name: '',
-  invoice_number: '',
-  billing_number: '',
-  issue_date: '',
-  competence_month: '',
-  due_date: '',
-  amount: '',
-  commitment_number: '',
-  commitment_date: '',
-  liquidation_number: '',
-  liquidation_date: '',
-  payment_order_number: '',
-  payment_order_date: '',
-  paid_at: '',
-  stage_owner: '',
-  location: '',
-  notes: '',
-}
-
 const emptyContractForm = {
   supplier_id: '',
   number: '',
@@ -132,6 +109,7 @@ function downloadUrl(url) {
 }
 
 function formatCurrency(value) {
+  if (value === null || value === undefined || value === '') return '—'
   const number = Number(value)
   if (!Number.isFinite(number)) return '-'
   return currencyFormatter.format(number)
@@ -175,11 +153,6 @@ function toLocalDateStart(value) {
 function toDateInput(value) {
   if (!value) return ''
   return String(value).slice(0, 10)
-}
-
-function toMonthInput(value) {
-  if (!value) return ''
-  return String(value).slice(0, 7)
 }
 
 function toApiMonth(value) {
@@ -234,7 +207,7 @@ function isOverdueProcess(row) {
   return due < today
 }
 
-export default function PaymentProcessesPage({ embedded = false, initialView = 'processes', initialContractId = '', initialProcessId = '', onContractChange, onViewChange, onDataChange }) {
+export default function PaymentProcessesPage({ embedded = false, initialView = 'processes', initialContractId = '', initialProcessId = '', initialOperationId = '', onDraftConsumed, onContractChange, onViewChange, onDataChange }) {
   const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
   const [alertDetails, setAlertDetails] = useState(null)
   const [alertDetailsLoading, setAlertDetailsLoading] = useState(false)
@@ -275,10 +248,7 @@ export default function PaymentProcessesPage({ embedded = false, initialView = '
   const [uploading, setUploading] = useState(false)
   const [importResult, setImportResult] = useState(null)
   const [reporting, setReporting] = useState(false)
-  const [processModalOpen, setProcessModalOpen] = useState(false)
-  const [processForm, setProcessForm] = useState(emptyProcessForm)
-  const [editingProcessId, setEditingProcessId] = useState('')
-  const [savingProcess, setSavingProcess] = useState(false)
+  const [processDialog, setProcessDialog] = useState(null)
   const [deleteProcessModalOpen, setDeleteProcessModalOpen] = useState(false)
   const [deleteProcessTarget, setDeleteProcessTarget] = useState(null)
   const [deleteProcessReason, setDeleteProcessReason] = useState('')
@@ -515,9 +485,24 @@ export default function PaymentProcessesPage({ embedded = false, initialView = '
   }
 
   function openCreateProcess() {
-    setProcessForm(emptyProcessForm)
-    setEditingProcessId('')
-    setProcessModalOpen(true)
+    setProcessDialog({ contractId: filters.contract_id })
+  }
+
+  useEffect(() => {
+    if (initialOperationId && initialContractId && canManage) setProcessDialog({ contractId: initialContractId, operationId: initialOperationId })
+  }, [initialOperationId, initialContractId, canManage])
+
+  function closeProcessDialog() {
+    setProcessDialog(null)
+    onDraftConsumed?.()
+  }
+
+  async function processSaved(process, { pending = false, reconciled = false } = {}) {
+    closeProcessDialog()
+    setFeedback(pending ? 'Processo salvo. A conciliação permanece pendente na aba Financeiro.' : reconciled ? 'Processo criado e serviços conciliados. O consumo já registrado foi preservado.' : 'Processo salvo.')
+    await refreshAll({ keepSelected: false })
+    setSelectedProcess(process)
+    setDetailTab(pending ? 'finance' : 'summary')
   }
 
   function openCreateContract() {
@@ -533,68 +518,7 @@ export default function PaymentProcessesPage({ embedded = false, initialView = '
   }
 
   function openEditProcess(record) {
-    setEditingProcessId(record.id)
-    setProcessForm({
-      process_number: record.process_number || '',
-      kind: record.kind || 'FUEL',
-      stage: record.stage || 'ASSEMBLY',
-      supplier_id: record.supplier_id || '',
-      contract_id: record.contract_id || '',
-      organization_id: record.organization_id || '',
-      unit_name: record.unit_name || '',
-      invoice_number: record.invoice_number || '',
-      billing_number: record.billing_number || '',
-      issue_date: toDateInput(record.issue_date),
-      competence_month: toMonthInput(record.competence_month),
-      due_date: toDateInput(record.due_date),
-      amount: record.amount ?? '',
-      commitment_number: record.commitment_number || '',
-      commitment_date: toDateInput(record.commitment_date),
-      liquidation_number: record.liquidation_number || '',
-      liquidation_date: toDateInput(record.liquidation_date),
-      payment_order_number: record.payment_order_number || '',
-      payment_order_date: toDateInput(record.payment_order_date),
-      paid_at: toDateInput(record.paid_at),
-      stage_owner: record.stage_owner || '',
-      location: record.location || '',
-      notes: record.notes || '',
-    })
-    setProcessModalOpen(true)
-  }
-
-  async function saveProcess(event) {
-    event.preventDefault()
-    setSavingProcess(true)
-    setError('')
-    const { stage: _stage, ...processPayload } = processForm
-    const payload = cleanPayload({
-      ...processPayload,
-      stage: editingProcessId ? undefined : 'ASSEMBLY',
-      competence_month: toApiMonth(processForm.competence_month),
-      amount: decimalOrNull(processForm.amount),
-      organization_id: processForm.organization_id || null,
-      supplier_id: processForm.supplier_id || null,
-      contract_id: processForm.contract_id || null,
-    })
-    try {
-      let savedProcess = null
-      if (editingProcessId) {
-        const { data } = await paymentProcessesAPI.update(editingProcessId, payload)
-        savedProcess = data
-      } else {
-        const { data } = await paymentProcessesAPI.create(payload)
-        savedProcess = data
-      }
-      setProcessModalOpen(false)
-      setEditingProcessId('')
-      setFeedback('Processo salvo.')
-      await refreshAll({ keepSelected: false })
-      setSelectedProcess(savedProcess)
-    } catch (err) {
-      setError(getApiErrorMessage(err, 'Não foi possível salvar o processo.'))
-    } finally {
-      setSavingProcess(false)
-    }
+    setProcessDialog({ record })
   }
 
   async function advanceStage(nextStage) {
@@ -976,102 +900,7 @@ export default function PaymentProcessesPage({ embedded = false, initialView = '
         />
       ) : null}
 
-      <Modal
-        open={processModalOpen}
-        title={editingProcessId ? 'Editar processo' : 'Novo processo'}
-        description="Registre a fatura/NF que será acompanhada no fluxo financeiro."
-        onClose={() => setProcessModalOpen(false)}
-      >
-        <form className="payment-process-form payment-structured-form" onSubmit={saveProcess}>
-          <FormSection title="Identificação">
-            <div className="payment-form-grid">
-              <Field label="Processo">
-                <input className="app-input" value={processForm.process_number} onChange={(event) => setProcessForm((current) => ({ ...current, process_number: event.target.value }))} required />
-              </Field>
-              <Field label="Tipo">
-                <select className="app-select" value={processForm.kind} onChange={(event) => setProcessForm((current) => ({ ...current, kind: event.target.value }))}>
-                  {kindOptions.filter((option) => option.value).map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
-                </select>
-              </Field>
-              <Field label="Fornecedor">
-                <select className="app-select" value={processForm.supplier_id} onChange={(event) => setProcessForm((current) => ({ ...current, supplier_id: event.target.value, contract_id: '' }))}>
-                  <option value="">Selecione</option>
-                  {suppliers.map((supplier) => <option key={supplier.id} value={supplier.id}>{supplier.name}</option>)}
-                </select>
-              </Field>
-              <Field label="Contrato">
-                <select className="app-select" value={processForm.contract_id} onChange={(event) => setProcessForm((current) => ({ ...current, contract_id: event.target.value }))}>
-                  <option value="">Selecione</option>
-                  {contracts.filter((contract) => !processForm.supplier_id || contract.supplier_id === processForm.supplier_id).map((contract) => (
-                    <option key={contract.id} value={contract.id}>{contract.number}</option>
-                  ))}
-                </select>
-              </Field>
-              <Field label="Unidade">
-                <input className="app-input" value={processForm.unit_name} onChange={(event) => setProcessForm((current) => ({ ...current, unit_name: event.target.value }))} />
-              </Field>
-            </div>
-          </FormSection>
-
-          <FormSection title="Documento fiscal">
-            <div className="payment-form-grid">
-              <Field label="NF">
-                <input className="app-input" value={processForm.invoice_number} onChange={(event) => setProcessForm((current) => ({ ...current, invoice_number: event.target.value }))} />
-              </Field>
-              <Field label="Fatura">
-                <input className="app-input" value={processForm.billing_number} onChange={(event) => setProcessForm((current) => ({ ...current, billing_number: event.target.value }))} />
-              </Field>
-              <Field label="Emissão">
-                <input className="app-input" type="date" value={processForm.issue_date} onChange={(event) => setProcessForm((current) => ({ ...current, issue_date: event.target.value }))} />
-              </Field>
-              <Field label="Competência">
-                <input className="app-input" type="month" value={processForm.competence_month} onChange={(event) => setProcessForm((current) => ({ ...current, competence_month: event.target.value }))} />
-              </Field>
-              <Field label="Vencimento">
-                <input className="app-input" type="date" value={processForm.due_date} onChange={(event) => setProcessForm((current) => ({ ...current, due_date: event.target.value }))} />
-              </Field>
-              <Field label="Valor">
-                <input className="app-input" type="number" step="0.01" value={processForm.amount} onChange={(event) => setProcessForm((current) => ({ ...current, amount: event.target.value }))} />
-              </Field>
-            </div>
-          </FormSection>
-
-          <FormSection title="Execucao financeira">
-            <div className="payment-form-grid">
-              <Field label="Empenho">
-                <input className="app-input" value={processForm.commitment_number} onChange={(event) => setProcessForm((current) => ({ ...current, commitment_number: event.target.value }))} />
-              </Field>
-              <Field label="Liquidação">
-                <input className="app-input" value={processForm.liquidation_number} onChange={(event) => setProcessForm((current) => ({ ...current, liquidation_number: event.target.value }))} />
-              </Field>
-              <Field label="Ordem pagamento">
-                <input className="app-input" value={processForm.payment_order_number} onChange={(event) => setProcessForm((current) => ({ ...current, payment_order_number: event.target.value }))} />
-              </Field>
-              <Field label="Pago em">
-                <input className="app-input" type="date" value={processForm.paid_at} onChange={(event) => setProcessForm((current) => ({ ...current, paid_at: event.target.value }))} />
-              </Field>
-            </div>
-          </FormSection>
-
-          <FormSection title="Observações">
-            <div className="payment-form-grid two">
-              <Field label="Responsável">
-                <input className="app-input" value={processForm.stage_owner} onChange={(event) => setProcessForm((current) => ({ ...current, stage_owner: event.target.value }))} />
-              </Field>
-              <Field label="Localização">
-                <input className="app-input" value={processForm.location} onChange={(event) => setProcessForm((current) => ({ ...current, location: event.target.value }))} />
-              </Field>
-            </div>
-            <Field label="Notas">
-              <textarea className="app-textarea" value={processForm.notes} onChange={(event) => setProcessForm((current) => ({ ...current, notes: event.target.value }))} />
-            </Field>
-          </FormSection>
-
-          <div className="actions-inline modal-actions">
-            <button className="app-button" type="submit" disabled={savingProcess || !canManage}>{savingProcess ? 'Salvando...' : 'Salvar processo'}</button>
-          </div>
-        </form>
-      </Modal>
+      {processDialog ? <PaymentProcessDialog key={`${processDialog.record?.id || 'new'}:${processDialog.contractId || ''}:${processDialog.operationId || ''}`} {...processDialog} contracts={contracts} suppliers={suppliers} organizations={organizations} user={user} onClose={closeProcessDialog} onSaved={processSaved} /> : null}
 
       <Modal
         open={deleteProcessModalOpen}
@@ -1147,53 +976,20 @@ function ProcessDetail({
   onClose,
   onReconcile,
 }) {
-  const dialogRef = useDialogFocus(Boolean(process), onClose)
-
   if (!process) {
     return null
   }
 
   return (
-    <div className="payment-detail-drawer-backdrop" role="presentation" onMouseDown={onClose}>
-      <aside ref={dialogRef} tabIndex={-1}
-        className="toolbar-card payment-process-panel payment-detail-panel payment-detail-drawer"
-        role="dialog"
-        aria-modal="true"
-        aria-labelledby="payment-detail-title"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <div className="payment-detail-header">
-          <div>
-            <span className="muted">{kindLabel(process.kind)}</span>
-            <h2 id="payment-detail-title" className="section-title">{process.process_number}</h2>
-          </div>
-          <div className="payment-detail-header-actions">
-            <span className={`status-badge status-${statusTone(process.stage)}`}>{process.stage_label || stageLabel(process.stage)}</span>
-            <button type="button" className="icon-button payment-detail-close" aria-label="Fechar detalhe do processo" onClick={onClose}>
-              &times;
-            </button>
-          </div>
-        </div>
-
-        {process.alerts?.length ? (
-          <div className="payment-alert-list">
-            {process.alerts.slice(0, 4).map((alert) => <span key={alert}>{alert}</span>)}
-          </div>
-        ) : <div className="alert alert-info">Sem alertas calculados para a etapa atual.</div>}
-
-        <div className="payment-detail-tabs">
-          {[
-            { value: 'summary', label: 'Resumo' },
-            { value: 'finance', label: 'Financeiro' },
-            { value: 'checklist', label: 'Checklist' },
-            { value: 'history', label: 'Histórico' },
-          ].map((tab) => (
-            <button key={tab.value} type="button" className={`status-pill ${detailTab === tab.value ? 'active' : ''}`} onClick={() => setDetailTab(tab.value)}>
-              {tab.label}
-            </button>
-          ))}
-        </div>
-
+    <Modal open title={process.process_number} onClose={onClose} className="payment-inspector" backdropClassName="payment-inspector-backdrop">
+        <div className="payment-inspector__identity"><span>{kindLabel(process.kind)} · {process.contract_number ? `Contrato ${process.contract_number}` : 'Contrato não informado'}</span><span className={`status-badge status-${statusTone(process.stage)}`}>{process.stage_label || stageLabel(process.stage)}</span></div>
+        <div className="payment-inspector__position"><div><span>Valor do processo</span><strong>{process.amount == null ? 'Não informado' : formatCurrency(process.amount)}</strong><small>{process.supplier_name || 'Fornecedor não informado'}</small></div><div><span>Vencimento</span><strong className="payment-inspector__due">{process.due_date ? formatDate(process.due_date) : 'A informar'}</strong>{process.competence_month ? <small>Competência {formatMonthLabel(process.competence_month)}</small> : null}</div></div>
+        {canManage || canDelete ? <div className="payment-inspector__actions">{canManage ? <button className="secondary-button" type="button" onClick={() => onEdit(process)}>Editar dados</button> : null}{canDelete ? <ActionMenu label="Mais ações do processo" items={[{ label: 'Excluir processo', danger: true, onClick: () => onDelete(process) }]} /> : null}</div> : null}
+        {process.alerts?.length ? <details className="payment-inspector__alerts"><summary>{process.alerts.length} pendência(s) para conferir</summary><ul>{process.alerts.map((alert) => <li key={alert}>{alert}</li>)}</ul></details> : null}
+        <nav className="payment-inspector__tabs" aria-label="Detalhes do processo">{[
+          { value: 'summary', label: 'Resumo' }, { value: 'finance', label: 'Financeiro' },
+          { value: 'checklist', label: 'Checklist' }, { value: 'history', label: 'Histórico' },
+        ].map((tab) => <button key={tab.value} type="button" aria-pressed={detailTab === tab.value} onClick={() => setDetailTab(tab.value)}>{tab.label}{tab.value === 'checklist' ? <small>{checklistDraft.filter((item) => item.status !== 'PENDING').length}/{checklistDraft.length}</small> : null}</button>)}</nav>
         {detailTab === 'summary' ? (
           <div className="payment-detail-grid">
             <Info label="Fornecedor" value={process.supplier_name} />
@@ -1204,17 +1000,15 @@ function ProcessDetail({
             <Info label="Vencimento" value={formatDate(process.due_date)} />
             <Info label="Localização" value={process.location} />
             <Info label="Responsável" value={process.stage_owner} />
+            {process.notes ? <div className="payment-inspector__notes"><span>Observações</span><p>{process.notes}</p></div> : null}
             {process.references?.length ? (
               <div className="payment-reference-list">
                 {process.references.map((reference) => (
-                  <span key={reference.id}>{referenceLabels[reference.reference_type] || reference.reference_type}: {reference.label}</span>
+                  <details key={reference.id}><summary>{referenceLabels[reference.reference_type] || reference.reference_type}: {reference.label}</summary>{reference.description ? <p>{reference.description}</p> : <p>Referência: {reference.external_id || reference.label}</p>}</details>
                 ))}
               </div>
             ) : null}
-            <div className="actions-inline">
-              {canManage ? <button className="secondary-button" type="button" onClick={() => onEdit(process)}>Editar dados</button> : null}
-              {canDelete ? <button className="mini-button danger payment-process-delete-action" type="button" onClick={() => onDelete(process)}>Excluir processo</button> : null}
-            </div>
+
           </div>
         ) : null}
 
@@ -1233,7 +1027,7 @@ function ProcessDetail({
                   <span>Status atual</span>
                   <strong>{process.stage_label || stageLabel(process.stage)}</strong>
                 </div>
-                <Field label="Comentario">
+                <Field label="Comentário">
                   <textarea className="app-textarea" rows="3" value={stageComment} onChange={(event) => setStageComment(event.target.value)} />
                 </Field>
                 <div className="payment-status-button-grid" aria-label="Atualizar etapa do processo">
@@ -1262,10 +1056,10 @@ function ProcessDetail({
                   <strong>{item.item_label}</strong>
                   <span>{stageLabel(item.stage)}</span>
                 </div>
-                <select className="app-select" value={item.status} onChange={(event) => updateChecklistDraft(index, { status: event.target.value })} disabled={!canManage}>
+                <select aria-label={`Situação: ${item.item_label}`} className="app-select" value={item.status} onChange={(event) => updateChecklistDraft(index, { status: event.target.value })} disabled={!canManage}>
                   {checklistStatusOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
                 </select>
-                <input className="app-input" value={item.notes || ''} onChange={(event) => updateChecklistDraft(index, { notes: event.target.value })} placeholder="Observação" disabled={!canManage} />
+                <input aria-label={`Observação: ${item.item_label}`} className="app-input" value={item.notes || ''} onChange={(event) => updateChecklistDraft(index, { notes: event.target.value })} placeholder="Observação" disabled={!canManage} />
               </div>
             ))}
             {canManage ? <button className="app-button" type="button" onClick={saveChecklist}>Salvar checklist</button> : null}
@@ -1281,11 +1075,10 @@ function ProcessDetail({
                 {event.comment ? <p>{event.comment}</p> : null}
                 {event.alerts?.length ? <small>{event.alerts.length} alerta(s) registrados</small> : null}
               </div>
-            )) : <div className="empty-state">Nenhuma transicao registrada.</div>}
+            )) : <div className="empty-state">Nenhuma transição registrada.</div>}
           </div>
         ) : null}
-      </aside>
-    </div>
+    </Modal>
   )
 }
 

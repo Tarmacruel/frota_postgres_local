@@ -6,8 +6,10 @@ import { getApiErrorMessage } from '../../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../../utils/exportData'
 import { formatContractMoney as brl } from '../../utils/contractBalance'
 import useContractFilters from '../../hooks/useContractFilters'
+import { useAuth } from '../../context/AuthContext'
 
 export default function ContractCommitmentsBrowser({ contract, mode, providers = [], revision }) {
+  const { canEdit } = useAuth()
   const { organizations } = useMasterDataCatalog({ organizationsOnly: true })
   const { filters, page, setPage, update, params } = useContractFilters(mode, { vehicle_search: '', organization_id: '', provider_id: '', start: '', end: '', unbilled: '' })
   const [list, setList] = useState({ data: [], total: 0, pages: 0 })
@@ -29,12 +31,14 @@ export default function ContractCommitmentsBrowser({ contract, mode, providers =
       .finally(() => { if (active) setLoading(false) })
     return () => { active = false }
   }, [contractId, reserved, queryKey, page, revision])
-  function invoicePath(processId) {
+  function invoicePath(processId, operationId) {
     const next = new URLSearchParams(params)
     next.set('view', 'payments'); next.set('contract_id', contractId); next.set('financial_view', 'processes')
     next.delete('indicator')
     if (processId) next.set('focus_process', processId)
     else next.delete('focus_process')
+    if (operationId) next.set('new_process_operation', operationId)
+    else next.delete('new_process_operation')
     return `/processos-pagamento?${next}`
   }
   async function report(pdf) {
@@ -67,7 +71,7 @@ export default function ContractCommitmentsBrowser({ contract, mode, providers =
     <p className="muted">{list.total} registro(s) no filtro. O saldo do contrato é compartilhado; os detalhes respeitam seu acesso às secretarias.</p>
     {error ? <div className="alert alert-error" role="alert">{error}</div> : null}
     {loading ? <p role="status">Carregando composição…</p> : <div className="table-wrap"><table className="data-table contract-table"><thead><tr><th>Data / origem</th><th>Veículo / secretaria</th><th>Prestador</th><th>{reserved ? 'Reserva' : 'Consumo real'}</th><th>{reserved ? 'Previsão' : 'Fatura'}</th></tr></thead><tbody>
-      {list.data.map((r) => <tr key={r.id}><td data-label="Data / origem">{new Date(r.occurred_at).toLocaleString('pt-BR')}<small>{r.source_type.includes('FUEL') ? 'Abastecimento' : 'Manutenção'} · {r.source_id.slice(0, 8)}</small></td><td data-label="Veículo / secretaria">{r.vehicle_plate || '—'}<small>{r.organization_name || 'Sem secretaria'}</small></td><td data-label="Prestador">{r.provider_name || '—'}</td><td data-label={reserved ? 'Reserva' : 'Consumo real'}>{brl(r.amount)}</td><td data-label={reserved ? 'Previsão' : 'Fatura'}>{reserved ? r.liters ? `${r.liters} L · ${r.fuel_type}` : 'Orçamento de manutenção' : r.invoice_process_id ? <Link to={invoicePath(r.invoice_process_id)}>Abrir processo</Link> : <><small>Aguardando conciliação</small><Link to={invoicePath()}>Selecionar fatura</Link></>}</td></tr>)}
+      {list.data.map((r) => <tr key={r.id}><td data-label="Data / origem">{new Date(r.occurred_at).toLocaleString('pt-BR')}<small>{r.source_type.includes('FUEL') ? 'Abastecimento' : 'Manutenção'} · {r.source_id.slice(0, 8)}</small></td><td data-label="Veículo / secretaria">{r.vehicle_plate || '—'}<small>{r.organization_name || 'Sem secretaria'}</small></td><td data-label="Prestador">{r.provider_name || '—'}</td><td data-label={reserved ? 'Reserva' : 'Consumo real'}>{brl(r.amount)}</td><td data-label={reserved ? 'Previsão' : 'Fatura'}>{reserved ? r.liters ? `${r.liters} L · ${r.fuel_type}` : 'Orçamento de manutenção' : r.invoice_process_id ? <Link to={invoicePath(r.invoice_process_id)}>Abrir processo</Link> : <><small>Aguardando conciliação</small><div className="payment-operation-actions">{canEdit('payment_processes') ? <Link to={invoicePath(null, r.id)}>Criar processo</Link> : null}<Link to={invoicePath()}>Selecionar fatura existente</Link></div></>}</td></tr>)}
       {!list.data.length ? <tr><td colSpan={5} className="contract-empty">Nenhum registro neste filtro.</td></tr> : null}</tbody></table></div>}
     {list.pages > 1 ? <div className="actions-inline"><button className="ghost-button" disabled={page <= 1} onClick={() => setPage(page-1)}>Anterior</button><span>Página {page} de {list.pages}</span><button className="ghost-button" disabled={page >= list.pages} onClick={() => setPage(page+1)}>Próxima</button></div> : null}
   </section>

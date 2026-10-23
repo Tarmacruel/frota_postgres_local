@@ -75,3 +75,14 @@ Rollback funcional rápido: desabilitar a flag somente na `.env` de HML e reinic
 `scripts/run-contract-postgres-tests.py` cria e remove um banco descartável estritamente no cluster5441. Exercita concorrência pelo último saldo, repetição concorrente de emissão, lote atômico, expiração/reabertura, imutabilidade, manutenção, comprovante/retificação, cancelamento, projeção por vínculos exatos, acesso por secretaria, APIs e aditivo idempotente. Testes unitários cobrem ainda arredondamento, preço versionado, conciliação, divergência e abertura.
 
 `scripts/homologation/test_refresh_failure.py` faz restore/migration real em staging e injeta falha antes da ativação, comprovando preservação dos fingerprints e saúde da HML. É um teste manual opt-in; não faz parte de pytest. A publicação de 22/10 também executa a rotina completa com schemas diferentes. Evidências e screenshots ficam no backup privado da entrega.
+## Criação assistida de processos — 23/10/2026
+
+Em **Serviços realizados**, use **Criar processo** na operação desejada. O formulário abre no contrato correto e com o serviço selecionado. Para reunir mais operações na mesma fatura, marque os demais serviços sem conciliação; a seleção é mantida ao mudar de página ou filtro. Também é possível começar por **Faturas e pagamentos → Novo processo** e escolher o contrato.
+
+Ao continuar, confira os dados reaproveitados (empresa contratada, tipo, secretaria por ID da origem, competência e total). Em **Serviços desta fatura**, consulte as descrições, datas, veículo, prestador e combustível/litros disponíveis. Informe o número do processo e os dados fiscais que ainda faltam. **Identificação**, **Execução financeira** e **Responsável e observações** permitem revisar ou completar o cadastro, sem preencher novamente o que já consta.
+
+**Salvar e conciliar** cria o processo em Montagem e vincula as operações selecionadas pela conciliação existente. O consumo realizado não é descontado novamente. Diferença entre valor fiscal e serviços exige justificativa e confirmação de ajuste. Nenhum pagamento é executado automaticamente. Se apenas a conciliação falhar, tente novamente no mesmo processo ou abra o processo salvo e conclua pela aba Financeiro. Se a criação ficar sem resposta por falha de conexão/servidor, confira a fila antes de abrir outro cadastro.
+
+Para faturas históricas/sem operações disponíveis, escolha **Preenchimento manual**. Dados fiscais ausentes não são inventados; competência e secretaria só são propostas quando as origens permitem identificação unívoca. Serviços de secretarias diferentes não são atribuídos por aproximação de nome. As permissões e validações do servidor continuam prevalecendo.
+
+O painel do processo concentra valor, vencimento e etapa no cabeçalho; Resumo, Financeiro, Checklist e Histórico permanecem disponíveis. No celular, edição e detalhes ocupam a tela inteira. Recarregue a página para utilizar a versão publicada.
