@@ -42,7 +42,7 @@
 .contract-funding label { display: grid; gap: 6px; min-width: 0; }
 .contract-funding__summary { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 10px 16px; margin: 0; }
 .contract-funding__summary dt { color: var(--ui-text-muted); font-size: 12px; }
-.contract-funding__summary dd { margin: 5px 0 0; font-weight: 700; }
+.contract-funding__summary dd { margin: 5px 0 0; font-weight: 700; overflow-wrap: anywhere; }
 .contract-table td { vertical-align: top; overflow-wrap: anywhere; }
 .contract-table td small { display: block; color: var(--ui-text-muted); margin-top: 4px; }
 .contract-empty { padding: 32px 16px; color: var(--ui-text-muted); text-align: center; background: var(--ui-surface-subtle); }

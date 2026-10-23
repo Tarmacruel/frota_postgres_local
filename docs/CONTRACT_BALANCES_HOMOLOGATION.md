@@ -22,6 +22,10 @@ Contratos copiados da produção permanecem pendentes. Nenhum vínculo é inferi
 
 ## Operações
 
+**Contrato exclusivo por posto:** um posto possui apenas um vínculo ativo, seja com contrato individual ou com contrato de rede credenciada. Um posto vinculado ao individual não pode ser incluído em outro contrato da rede. O cadastro de vínculo identifica e desabilita postos já utilizados; o servidor e o banco também impedem duplicação ou reativação conflitante. Para mudar, desative o vínculo anterior e cadastre/reative o novo. Vínculos, preços e reservas anteriores permanecem no histórico; uma ordem já reservada continua vinculada ao contrato original.
+
+Na emissão de abastecimento, selecionar o posto determina automaticamente contrato e executante, sem oferecer outro contrato para escolha. Trocar o posto limpa a consulta e a prévia anteriores. Um posto sem contrato elegível exige conferência do vínculo exclusivo, vigência, preços e saldo inicial; nenhum vínculo é deduzido pelo nome. A escolha de contratos/oficinas no fluxo de manutenção permanece disponível.
+
 **Abastecimento:** escolha posto, contrato, combustível e litros previstos. A prévia mostra preço, reserva e disponível após emissão; um único contrato elegível é selecionado automaticamente. Em lotes, todos os veículos devem ter quantidade, o orçamento considera cada ordem e a gravação é atômica. Servidor recalcula os valores e bloqueia saldo insuficiente. Ordens antigas recebem a ação Vincular contrato e reservar; postos aguardam a equipe emissora regularizar o vínculo.
 
 Confirmação registra comprovante, combustível, litros e valor efetivamente abastecidos. É possível solicitar gasolina comum e confirmar etanol ou gasolina aditivada quando houver substituição no posto. A tela preserva a solicitação original e avisa sobre a troca; não exige nova emissão ou aprovação. Observações podem explicar a indisponibilidade. O preço original continua documentando a reserva, sem recálculo retroativo ou exigência de preço cadastrado para o substituto. A auditoria registra combustível e litros solicitados/realizados e valor real.

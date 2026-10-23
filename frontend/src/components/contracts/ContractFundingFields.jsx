@@ -10,16 +10,23 @@ export default function ContractFundingFields({ funding, externalFuelType = fals
     <legend>Reserva no contrato</legend>
     {funding.error ? <div className="alert alert-error" role="alert">{funding.error}<button type="button" className="ghost-button" onClick={funding.refresh}>Tentar novamente</button></div> : null}
     {funding.enabled === null ? <p role="status">Conferindo controle contratual…</p> : <>
-      {funding.kind === 'FUEL' && !funding.stationId ? <p>Selecione o posto para consultar seus contratos.</p> : <>
-        <label>Contrato<select className="app-select" aria-label="Contrato para reserva" value={funding.contract?.id || ''} onChange={(e) => funding.selectContract(e.target.value)} required>
+      {funding.kind === 'FUEL' && !funding.stationId ? <p>Selecione o posto para identificar seu contrato.</p> : <>
+        {funding.kind === 'FUEL' ? <>
+          {funding.contract && funding.provider ? <dl className="contract-funding__summary modal-field-span" aria-label="Contrato definido pelo posto">
+            <div><dt>Contrato do posto</dt><dd>{funding.contract.number}</dd></div>
+            <div><dt>Posto executante</dt><dd>{funding.provider.station_name || funding.provider.name}</dd></div>
+          </dl> : funding.loading ? <p role="status">Conferindo o contrato do posto…</p> : null}
+        </> : <label>Contrato<select className="app-select" aria-label="Contrato para reserva" value={funding.contract?.id || ''} onChange={(e) => funding.selectContract(e.target.value)} required>
           <option value="">Selecione o contrato</option>{funding.contracts.map((c) => <option key={c.id} value={c.id}>{c.number} · disponível {formatContractMoney(c.available_balance)}</option>)}
-        </select></label>
-        {!funding.contracts.length && !funding.loading && !funding.error ? <p role="status">Nenhum contrato liberado para este serviço. A gestão precisa conferir vigência, rede, preços e saldo inicial.</p> : null}
+        </select></label>}
+        {!funding.contracts.length && !funding.loading && !funding.error ? <p role="status">{funding.kind === 'FUEL'
+          ? 'Este posto não possui contrato liberado. A gestão precisa conferir o vínculo exclusivo, a vigência, os preços e o saldo inicial.'
+          : 'Nenhum contrato liberado para este serviço. A gestão precisa conferir vigência, rede e saldo inicial.'}</p> : null}
       </>}
       {funding.contract ? <>
-        <label>Prestador executante<select className="app-select" aria-label="Prestador para reserva" value={funding.provider?.id || ''} onChange={(e) => funding.selectProvider(e.target.value)} required>
+        {funding.kind !== 'FUEL' ? <label>Prestador executante<select className="app-select" aria-label="Prestador para reserva" value={funding.provider?.id || ''} onChange={(e) => funding.selectProvider(e.target.value)} required>
           <option value="">Selecione o prestador</option>{funding.providers.map((p) => <option key={p.id} value={p.id}>{p.station_name || p.name}</option>)}
-        </select></label>
+        </select></label> : null}
         {funding.kind === 'FUEL' && !externalFuelType ? <label>Combustível solicitado<select className="app-select" aria-label="Combustível solicitado" value={funding.fuelType} onChange={(e) => funding.selectFuel(e.target.value)} required>
           <option value="">Selecione o combustível</option>{funding.fuels.map((f) => <option key={f} value={f}>{f}</option>)}
         </select></label> : null}

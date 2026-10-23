@@ -7,7 +7,7 @@ import { FUEL_TYPE_OPTIONS } from '../../utils/fuelSupplyDetails'
 import Modal from '../Modal'
 
 const titles = { contract: 'Cadastrar contrato', edit: 'Editar contrato', opening: 'Confirmar saldo inicial',
-  provider: 'Vincular prestador à rede', price: 'Cadastrar preço de combustível', priceEdit: 'Editar preço de combustível', priceDelete: 'Excluir preço de combustível', adjust: 'Ajustar saldo contratual',
+  provider: 'Vincular prestador ao contrato', price: 'Cadastrar preço de combustível', priceEdit: 'Editar preço de combustível', priceDelete: 'Excluir preço de combustível', adjust: 'Ajustar saldo contratual',
   amend: 'Registrar aditivo', resolve: 'Regularizar divergência', supplier: 'Cadastrar prestador', supplierEdit: 'Editar prestador' }
 
 export default function ContractSetupDialog({ dialog, suppliers, stations, providers, onClose, onSuccess }) {
@@ -28,7 +28,7 @@ export default function ContractSetupDialog({ dialog, suppliers, stations, provi
     <input className="app-input" name={name} aria-label={label} value={form[name]} onChange={(e) => update(name, e.target.value)}
       required={options.required !== false} type={options.type || 'text'} step={options.step} min={options.min} maxLength={options.maxLength || 255} readOnly={options.readOnly} /></label>
   const select = (name, label, options) => <label key={name}>{label}<select className="app-select" aria-label={label} required disabled={type === 'edit' && c.control_opened && ['supplier_id','kind'].includes(name)} value={form[name]} onChange={(e) => update(name, e.target.value)}>
-    <option value="">Selecione</option>{options.map(([value, title]) => <option key={value} value={value}>{title}</option>)}</select></label>
+    <option value="">Selecione</option>{options.map(([value, title, disabled]) => <option key={value} value={value} disabled={disabled}>{title}</option>)}</select></label>
   const reason = <label className="contract-form__wide">Justificativa<textarea className="app-textarea" aria-label="Justificativa" minLength={10} maxLength={4000} required value={form.justification} onChange={(e) => update('justification', e.target.value)} /></label>
   async function submit(event) {
     event.preventDefault(); setSaving(true); setError('')
@@ -84,7 +84,9 @@ export default function ContractSetupDialog({ dialog, suppliers, stations, provi
         {input('balance', 'Saldo inicial conferido (R$)', { type: 'number', min: '0', step: '.01' })}
         {input('opening_date', 'Data de início do controle', { type: 'date' })}{reason}</> : null}
       {type === 'provider' ? <>{select('supplier_id', 'Prestador executante', suppliers.filter((s) => s.active).map((s) => [s.id, `${s.name}${s.cnpj ? ' · '+s.cnpj : ''}`]))}
-        {c.kind === 'FUEL' ? select('fuel_station_id', 'Posto da rede', stations.filter((s) => s.active).map((s) => [s.id, s.name])) : null}
+        {c.kind === 'FUEL' ? <>{select('fuel_station_id', 'Posto executante', stations.filter((s) => s.active).map((s) => [s.id,
+          `${s.name}${s.active_contract_id ? ` · vinculado ao contrato ${s.active_contract_number}` : ''}`, Boolean(s.active_contract_id)]))}
+          <p className="muted contract-form__wide">Cada posto pertence a um único contrato ativo, individual ou de rede credenciada. Para mudar de contrato, desative o vínculo anterior. Os vínculos antigos permanecem no histórico.</p></> : null}
         <p className="muted contract-form__wide">O prestador executante pode ser diferente da empresa contratada. Cadastre a empresa em Prestadores caso ainda não exista.</p></> : null}
       {type === 'price' ? <>{select('provider_id', 'Posto executante', providers.filter((p) => p.active && p.fuel_station_id).map((p) => [p.id, p.station_name || p.name]))}
         {select('fuel_type', 'Combustível', FUEL_TYPE_OPTIONS.filter((t) => t !== 'Outro').map((t) => [t, t]))}

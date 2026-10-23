@@ -5,7 +5,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, select
+from sqlalchemy import and_, func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import get_current_user_ready, require_permission
@@ -14,7 +14,7 @@ from app.core.organization_scope import production_scope_is_empty
 from app.db.session import get_db_session
 from app.models.contract_balance import ContractProvider
 from app.models.fuel_station import FuelStation
-from app.models.payment_process import PaymentProcessKind
+from app.models.payment_process import PaymentContract, PaymentProcessKind
 from app.models.user import User
 from app.schemas.contract_balance import (
     BalanceAdjustment, ContractOpening, ContractQuote, Justified, MaintenanceOrderCancel,
@@ -53,8 +53,11 @@ async def config(_user: User = Depends(get_current_user_ready)):
 
 @router.get('/catalog', dependencies=[Depends(enabled)])
 async def catalog(db: AsyncSession = Depends(get_db_session), _user: User = Depends(financial_view)):
-    stations = (await db.execute(select(FuelStation.id, FuelStation.name, FuelStation.cnpj, FuelStation.active)
-                                 .order_by(FuelStation.name))).mappings().all()
+    stations = (await db.execute(select(FuelStation.id, FuelStation.name, FuelStation.cnpj, FuelStation.active,
+        ContractProvider.contract_id.label('active_contract_id'), PaymentContract.number.label('active_contract_number'))
+        .outerjoin(ContractProvider, and_(ContractProvider.fuel_station_id == FuelStation.id, ContractProvider.active.is_(True)))
+        .outerjoin(PaymentContract, PaymentContract.id == ContractProvider.contract_id)
+        .order_by(FuelStation.name))).mappings().all()
     return {'stations': [dict(s) for s in stations]}
 
 
@@ -138,16 +141,7 @@ async def add_provider(contract_id: UUID, data: ProviderCreate, db: AsyncSession
 @router.patch('/contracts/{contract_id}/providers/{provider_id}', dependencies=[Depends(enabled)])
 async def set_provider(contract_id: UUID, provider_id: UUID, active: bool = Query(),
                        db: AsyncSession = Depends(get_db_session), user: User = Depends(financial_edit)):
-    service = ContractBalanceService(db)
-    await service.contract(contract_id, lock=True)
-    provider = await db.get(ContractProvider, provider_id)
-    if not provider or provider.contract_id != contract_id:
-        raise HTTPException(404, 'Vínculo não encontrado')
-    provider.active = active
-    await service.audit.record(actor=user, action='UPDATE_PROVIDER_LINK', entity_type='PAYMENT_CONTRACT',
-        entity_id=contract_id, entity_label=str(contract_id), details={'provider_id': str(provider_id), 'active': active})
-    await db.commit()
-    return {'id': provider_id, 'active': active}
+    return await write(db, ContractBalanceService(db).set_provider_active(contract_id, provider_id, active, user))
 
 
 @router.post('/contracts/{contract_id}/prices', dependencies=[Depends(enabled)], status_code=201)
