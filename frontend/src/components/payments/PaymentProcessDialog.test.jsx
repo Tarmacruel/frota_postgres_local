@@ -139,6 +139,18 @@ describe('criação assistida de processo', () => {
     expect(screen.getByRole('button', { name: 'Salvar e conciliar' })).toBeDisabled()
     expect(paymentProcessesAPI.create).toHaveBeenCalledTimes(1)
   })
+  it('preserva o rascunho e evita repetir criação após HTTP 500 sem atribuir a falha à conexão', async () => {
+    paymentProcessesAPI.create.mockRejectedValue({ response: { status: 500, data: { detail: 'Erro interno do servidor (referência: teste)' } } })
+    mount(); await choose(); number('1234')
+    fireEvent.change(screen.getByLabelText('Número da NF'), { target: { value: '1234' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Salvar e conciliar' }))
+    expect(await screen.findByText(/Não foi possível confirmar a criação/)).toBeInTheDocument()
+    expect(screen.getByLabelText('Número do processo')).toHaveValue('1234')
+    expect(screen.getByLabelText('Número da NF')).toHaveValue('1234')
+    expect(screen.getByRole('button', { name: 'Salvar e conciliar' })).toBeDisabled()
+    expect(paymentProcessesAPI.create).toHaveBeenCalledTimes(1)
+    expect(contractControlAPI.reconcile).not.toHaveBeenCalled()
+  })
   it('não sobrepõe a secretaria com aproximação de nome quando falta acesso à origem', async () => {
     fuelSuppliesAPI.getById.mockRejectedValue({ response: { status: 403 } })
     mount(); await choose()

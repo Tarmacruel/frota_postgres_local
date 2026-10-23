@@ -95,6 +95,107 @@ async def another_contract(c, prefix='REDE'):
 
 
 @pytest.mark.asyncio
+@pytest.mark.parametrize('kind,with_services', [('FUEL', False), ('FUEL', True), ('MAINTENANCE', True)])
+async def test_payment_process_api_creates_collections_and_reconciles_without_double_consumption(pg, kind, with_services):
+    """Exercise the real POST/ORM flush that frontend API mocks cannot cover."""
+    from app.main import app
+    from app.api.deps import get_current_user_ready
+    from app.db.session import get_db_session
+    from app.models.contract_balance import ContractOperation
+    from app.models.payment_process import PaymentProcess
+    from app.services.payment_process_service import CHECKLIST_DEFAULTS
+    from httpx import ASGITransport, AsyncClient
+    c = pg
+    if kind == 'MAINTENANCE':
+        c.contract.kind = kind
+        c.provider.fuel_station_id = None
+        await c.db.flush()
+    operation_ids, references = [], []
+    if with_services:
+        for index, amount in enumerate([25, 12, 30]):
+            reservation = await c.service.reserve(contract_id=c.contract.id, provider_id=c.provider.id,
+                source_type='FUEL_ORDER' if kind == 'FUEL' else 'MAINTENANCE_ORDER', source_id=uuid4(),
+                vehicle_id=c.vehicle.id, organization_id=None, actor=c.actor, amount=30,
+                fuel_type='DIESEL S10', liters=3)
+            source_id = uuid4()
+            await c.service.settle(reservation.id, source_type='FUEL_SUPPLY' if kind == 'FUEL' else 'MAINTENANCE',
+                source_id=source_id, amount=amount, occurred_at=datetime.now(timezone.utc), actor=c.actor)
+            operation = await c.db.scalar(select(ContractOperation).where(ContractOperation.source_id == source_id))
+            operation_ids.append(str(operation.id))
+            references.append(dict(reference_type='FUEL_SUPPLY' if kind == 'FUEL' else 'MAINTENANCE',
+                external_id=str(source_id), label=f'Serviço fictício {index+1}', description='Origem conferida no teste isolado'))
+    await c.db.commit()
+    balance_before = await c.service.balances(c.contract.id)
+    movements_before = await c.db.scalar(select(func.count()).select_from(ContractMovement).where(ContractMovement.contract_id == c.contract.id))
+    process_number = 'API-CREATE-'+uuid4().hex[:8].upper()
+    payload = dict(process_number=process_number, kind=kind, stage='ASSEMBLY', contract_id=str(c.contract.id),
+        supplier_id=str(c.supplier.id), amount='67.00', invoice_number='NF-TESTE', billing_number='FATURA-TESTE',
+        issue_date=date.today().isoformat(), due_date=date.today().isoformat(),
+        competence_month=date.today().replace(day=1).isoformat(), references=references)
+
+    async def session():
+        async with AsyncSession(c.engine, expire_on_commit=False) as db:
+            yield db
+    app.dependency_overrides[get_db_session] = session
+    app.dependency_overrides[get_current_user_ready] = lambda: c.actor
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+            created = await client.post('/api/payment-processes', json=payload)
+            assert created.status_code == 201, created.text
+            record = created.json()
+            assert record['process_number'] == process_number and record['stage'] == 'ASSEMBLY'
+            assert record['invoice_number'] == 'NF-TESTE' and record['billing_number'] == 'FATURA-TESTE'
+            assert Decimal(str(record['amount'])) == Decimal('67')
+            assert {r['external_id'] for r in record['references']} == {r['external_id'] for r in references}
+            assert len(record['checklist']) == sum(len(items) for items in CHECKLIST_DEFAULTS.values())
+            assert all(item['status'] == 'PENDING' for item in record['checklist'])
+            endpoint = '/api/payment-processes/'+record['id']
+            assert (await client.get(endpoint)).status_code == 200
+            updated = await client.put(endpoint, json={'notes': 'Cadastro real conferido no teste descartável'})
+            assert updated.status_code == 200, updated.text
+            assert len(updated.json()['references']) == len(references)
+            assert len(updated.json()['checklist']) == len(record['checklist'])
+            if with_services:
+                reconcile = '/api/contract-control/processes/'+record['id']+'/reconciliation'
+                for _ in range(2):
+                    response = await client.post(reconcile, json={'operation_ids': operation_ids})
+                    assert response.status_code == 200, response.text
+                    assert set(response.json()['operation_ids']) == set(operation_ids)
+                    assert Decimal(str(response.json()['difference'])) == 0
+            deleted = await client.request('DELETE', endpoint, json={'reason': 'Cadastro fictício no banco descartável'})
+            assert deleted.status_code == (409 if with_services else 200), deleted.text
+    finally:
+        app.dependency_overrides.clear()
+    assert await c.db.scalar(select(func.count()).select_from(PaymentProcess).where(PaymentProcess.process_number == process_number)) == int(with_services)
+    assert await c.service.balances(c.contract.id) == balance_before
+    assert await c.db.scalar(select(func.count()).select_from(ContractMovement).where(ContractMovement.contract_id == c.contract.id)) == movements_before
+
+
+@pytest.mark.asyncio
+async def test_payment_process_import_initializes_checklist_after_real_flush(pg):
+    from app.models.payment_process import PaymentProcess
+    from app.services.payment_process_service import CHECKLIST_DEFAULTS, PaymentProcessService
+    from openpyxl import Workbook
+    c = pg
+    number = 'IMPORT-API-'+uuid4().hex[:8].upper()
+    workbook = Workbook()
+    sheet = workbook.active
+    sheet.append(['Número do Processo', 'Status', 'Unidade', 'Emissão NF', 'Valor', 'Tipo Processo'])
+    sheet.append([number, 'MONTAGEM', 'Unidade fictícia', date.today(), 25, 'Combustíveis'])
+    output = BytesIO()
+    workbook.save(output)
+    service = PaymentProcessService(c.db)
+    for expected_created, expected_updated in [(1, 0), (0, 1)]:
+        result = await service.import_xlsx(UploadFile(filename='teste-isolado.xlsx', file=BytesIO(output.getvalue())), c.actor)
+        assert (result['created'], result['updated'], result['errors']) == (expected_created, expected_updated, 0)
+    process = await c.db.scalar(select(PaymentProcess).where(PaymentProcess.process_number == number))
+    saved = await service.get(process.id, current_user=c.actor)
+    assert len(saved['checklist']) == sum(len(items) for items in CHECKLIST_DEFAULTS.values())
+    assert saved['references'] == []
+    assert await c.db.scalar(select(func.count()).select_from(PaymentProcess).where(PaymentProcess.process_number == number)) == 1
+
+
+@pytest.mark.asyncio
 async def test_station_cannot_join_network_while_linked_to_an_individual_contract(pg):
     c = pg
     network = await another_contract(c)

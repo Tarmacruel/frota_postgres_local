@@ -163,7 +163,7 @@ export default function PaymentProcessDialog({ record, contractId = '', operatio
     {!record ? <ol className="payment-composer__steps" aria-label="Etapas do cadastro"><li aria-current={step === 'source' ? 'step' : undefined}><span>1</span>Origem e serviços</li><li aria-current={step === 'invoice' ? 'step' : undefined}><span>2</span>Dados da fatura</li></ol> : <p className="payment-composer__intro">Atualize os dados deste processo. A etapa e as operações conciliadas permanecem acessíveis no acompanhamento.</p>}
     {error ? <div ref={errorRef} tabIndex={-1} className="alert alert-error" role="alert">{error}</div> : null}
     {created ? <div className="alert alert-warning" role="status"><strong>Processo {created.process_number} já foi criado.</strong><p>A conciliação ainda precisa ser confirmada. Tentar novamente usa este mesmo processo.</p></div> : null}
-    {uncertain ? <div className="alert alert-warning" role="status">A conexão foi interrompida durante a criação. Confira a fila de processos antes de iniciar outro cadastro.</div> : null}
+    {uncertain ? <div className="alert alert-warning" role="status">Não foi possível confirmar a criação. Confira a fila de processos antes de iniciar outro cadastro.</div> : null}
     <form ref={formRef} className="payment-composer__form" onSubmit={save}>
       <fieldset className="payment-composer__fields" disabled={saving || Boolean(created) || uncertain}>
         {step === 'source' ? <>

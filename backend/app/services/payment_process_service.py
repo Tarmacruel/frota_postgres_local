@@ -230,6 +230,10 @@ class PaymentProcessService:
         now = datetime.now(timezone.utc)
         record = PaymentProcess(
             import_key=self._manual_import_key(payload),
+            # Keep new collections loaded across flush: implicit lazy I/O is
+            # unavailable when synchronous helpers run on an AsyncSession.
+            references=[],
+            checklist_items=[],
             created_by_user_id=current_user.id,
             updated_by_user_id=current_user.id,
             created_at=now,
@@ -266,7 +270,7 @@ class PaymentProcessService:
         if settings.CONTRACT_BALANCE_ENABLED and record.contract_id:
             locked_contract_id = record.contract_id
             await ContractBalanceService(self.db).contract(locked_contract_id, lock=True)
-            await self.db.refresh(record, with_for_update=True)
+            await self.db.refresh(record, with_for_update={"of": PaymentProcess})
             if record.contract_id != locked_contract_id:
                 raise HTTPException(409, 'Contrato alterado durante a edição; atualize a consulta')
             self._ensure_process_visible(record, current_user)
@@ -317,7 +321,7 @@ class PaymentProcessService:
         if settings.CONTRACT_BALANCE_ENABLED and record.contract_id:
             locked_contract_id = record.contract_id
             await ContractBalanceService(self.db).contract(locked_contract_id, lock=True)
-            await self.db.refresh(record, with_for_update=True)
+            await self.db.refresh(record, with_for_update={"of": PaymentProcess})
             if record.contract_id != locked_contract_id:
                 raise HTTPException(409, 'Contrato alterado durante a edição; atualize a consulta')
             self._ensure_process_visible(record, current_user)
@@ -825,7 +829,7 @@ class PaymentProcessService:
                     action = "UPDATE"
                     record = existing
                 else:
-                    record = PaymentProcess(import_key=import_key)
+                    record = PaymentProcess(import_key=import_key, references=[], checklist_items=[])
                     self._fill_model(record, data, current_user=current_user, now=now, filename=filename, sheet=parsed["sheet"], import_key=import_key)
                     await self.repository.create(record)
                     created += 1
