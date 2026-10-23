@@ -97,12 +97,13 @@
 body.internal-app-active .contract-inspector-backdrop.modal-backdrop { padding: 0; align-items: stretch; justify-content: flex-end; }
 body.internal-app-active .contract-inspector-backdrop .contract-inspector.modal-shell { width: min(860px, calc(100vw - 48px)); max-width: none; height: 100dvh; max-height: 100dvh; border-radius: 14px 0 0 14px; padding: 0; margin: 0; background: var(--ui-surface); color: var(--ui-text); display: flex; flex-direction: column; overflow: hidden; animation: contract-inspector-in 160ms ease-out; }
 body.internal-app-active .contract-inspector > .modal-header { flex: 0 0 auto; margin: 0; padding: 18px 22px; border-bottom: 1px solid var(--ui-border); background: var(--ui-surface); }
-body.internal-app-active .contract-inspector > .modal-body { padding: 18px 22px 28px; min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; align-content: start; }
+/* Long ledger tables must scroll the body, never compress its navigation row. */
+body.internal-app-active .contract-inspector > .modal-body { padding: 18px 22px 28px; min-height: 0; flex: 1; overflow-y: auto; overscroll-behavior: contain; align-content: start; grid-auto-rows: max-content; }
 .contract-inspector__identity { display: flex; align-items: start; justify-content: space-between; gap: 16px; }
 .contract-inspector__identity span { font-size: 12px; color: var(--ui-text-muted); }
 .contract-inspector__identity p { margin: 4px 0 16px; font-weight: 600; }
 .contract-inspector__actions { display: flex; align-items: center; flex-wrap: wrap; gap: 8px; margin-bottom: 16px; }
-.contract-inspector__tabs { display: flex; gap: 4px; position: sticky; top: -18px; z-index: 2; background: var(--ui-surface); border-bottom: 1px solid var(--ui-border); margin-bottom: 18px; overflow-x: auto; }
+.contract-inspector__tabs { display: flex; gap: 4px; min-height: 44px; position: sticky; top: -18px; z-index: 2; background: var(--ui-surface); border-bottom: 1px solid var(--ui-border); margin-bottom: 18px; overflow-x: auto; }
 .contract-inspector__tabs button { background: transparent; color: var(--ui-text-muted); padding: 12px 15px; border: 0; border-bottom: 2px solid transparent; cursor: pointer; font: inherit; font-size: 13px; white-space: nowrap; }
 .contract-inspector__tabs button[aria-pressed='true'] { border-color: var(--ui-info-text); color: var(--ui-info-text); font-weight: 700; }
 .contract-position { min-width: 0; }
