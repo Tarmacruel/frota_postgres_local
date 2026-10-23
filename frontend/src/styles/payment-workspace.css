@@ -83,7 +83,8 @@ body.internal-app-active .payment-inspector-backdrop.modal-backdrop { padding: 0
 body.internal-app-active .payment-inspector-backdrop .payment-inspector.modal-shell { width: min(680px, calc(100vw - 48px)); max-width: none; height: 100dvh; max-height: 100dvh; margin: 0; padding: 0; border-radius: 14px 0 0 14px; background: var(--ui-surface); color: var(--ui-text); display: flex; flex-direction: column; overflow: hidden; animation: payment-inspector-in 170ms ease-out; }
 body.internal-app-active .payment-inspector.modal-shell > .modal-header { margin: 0; padding: 20px 24px; border-bottom: 1px solid var(--ui-border-soft); background: var(--ui-surface); flex: 0 0 auto; gap: 16px; }
 body.internal-app-active .payment-inspector.modal-shell > .modal-header .section-title { font-size: 18px; overflow-wrap: anywhere; }
-body.internal-app-active .payment-inspector.modal-shell > .modal-body { flex: 1; min-height: 0; display: grid; align-content: start; gap: 18px; padding: 18px 24px 32px; overflow-y: auto; overscroll-behavior: contain; }
+/* Long finance/checklist content must scroll without collapsing the tab row. */
+body.internal-app-active .payment-inspector.modal-shell > .modal-body { flex: 1; min-height: 0; display: grid; align-content: start; grid-auto-rows: max-content; gap: 18px; padding: 18px 24px 32px; overflow-y: auto; overscroll-behavior: contain; }
 .payment-inspector__identity { display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 8px; font-size: 12px; color: var(--ui-text-muted); }
 .payment-inspector__position { display: flex; align-items: start; justify-content: space-between; gap: 20px; padding-bottom: 18px; border-bottom: 1px solid var(--ui-border-soft); }
 .payment-inspector__position > div { display: grid; gap: 6px; min-width: 0; }
@@ -94,7 +95,7 @@ body.internal-app-active .payment-inspector.modal-shell > .modal-body { flex: 1;
 .payment-inspector__alerts { margin: 0; padding: 10px 12px; border-left: 3px solid var(--ui-warning-text); background: var(--ui-surface-subtle); color: var(--ui-warning-text); font-size: 12px; }
 .payment-inspector__alerts summary { cursor: pointer; }
 .payment-inspector__alerts ul { padding-left: 18px; margin: 12px 0 0; display: grid; gap: 6px; }
-.payment-inspector__tabs { display: flex; gap: 4px; position: sticky; top: -18px; z-index: 2; margin-bottom: 2px; border-bottom: 1px solid var(--ui-border); background: var(--ui-surface); overflow-x: auto; flex-shrink: 0; }
+.payment-inspector__tabs { display: flex; gap: 4px; min-height: 44px; position: sticky; top: -18px; z-index: 2; margin-bottom: 2px; border-bottom: 1px solid var(--ui-border); background: var(--ui-surface); overflow-x: auto; flex-shrink: 0; }
 .payment-inspector__tabs button { display: flex; align-items: center; gap: 5px; border: 0; border-bottom: 2px solid transparent; background: transparent; padding: 12px 14px; color: var(--ui-text-muted); font: inherit; font-size: 13px; cursor: pointer; white-space: nowrap; }
 .payment-inspector__tabs button[aria-pressed='true'] { color: var(--ui-info-text); border-bottom-color: var(--ui-info-text); font-weight: 600; }
 .payment-inspector__tabs small { font-size: 11px; font-weight: 400; }
