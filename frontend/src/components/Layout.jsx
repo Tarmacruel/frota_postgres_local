@@ -3,6 +3,7 @@ import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-do
 import { officialBrand } from '../constants/officialBrand'
 import { useAuth } from '../context/AuthContext'
 import { AppIcon, getInitials } from './AppIcon'
+import ModuleIcon from './ModuleIcon'
 import SearchOverlay from './SearchOverlay'
 import VehicleTagsGuide from './VehicleTagsGuide'
 import Modal from './Modal'
@@ -68,21 +69,21 @@ export default function Layout() {
       {
         title: 'Visão geral',
         items: [
-          { to: '/', label: 'Início', description: 'Resumo', icon: 'dashboard' },
+          { to: '/', label: 'Início', description: 'Resumo', icon: 'home' },
         ],
       },
       {
         title: 'Operacional',
         items: [
-          { to: '/vehicles', label: 'Veículos', description: 'Frota', icon: 'vehicles' },
-          { to: '/emprestimos', label: 'Empréstimos', description: 'Entre secretarias', icon: 'vehicles' },
-          { to: '/posses', label: 'Posses', description: 'Responsáveis', icon: 'drivers' },
-          { to: '/condutores', label: 'Condutores', mobileLabel: 'Condut.', description: 'Motoristas', icon: 'users' },
-          { to: '/manutencoes', label: 'Manutenções', description: 'Custos', icon: 'maintenance' },
-          { to: '/sinistros', label: 'Sinistros', description: 'Ocorrências', icon: 'audit' },
-          { to: '/multas', label: 'Multas', description: 'Autos', icon: 'catalog' },
-          ...(canView('fuel_supplies') ? [{ to: '/abastecimentos', label: 'Abastecimentos', description: 'Consumo', icon: 'maintenance' }] : []),
-          ...(canView('fuel_supply_orders') ? [{ to: '/ordens-abastecimento', label: 'Ordens abertas', description: 'Pendentes', icon: 'maintenance' }] : []),
+          { to: '/vehicles', label: 'Veículos', description: 'Frota', icon: 'fleet' },
+          { to: '/emprestimos', label: 'Empréstimos', description: 'Entre secretarias', icon: 'loans' },
+          { to: '/posses', label: 'Posses', description: 'Responsáveis', icon: 'keys' },
+          { to: '/condutores', label: 'Condutores', mobileLabel: 'Condut.', description: 'Motoristas', icon: 'driver' },
+          { to: '/manutencoes', label: 'Manutenções', description: 'Custos', icon: 'wrench' },
+          { to: '/sinistros', label: 'Sinistros', description: 'Ocorrências', icon: 'incident' },
+          { to: '/multas', label: 'Multas', description: 'Autos', icon: 'ticket' },
+          ...(canView('fuel_supplies') ? [{ to: '/abastecimentos', label: 'Abastecimentos', description: 'Consumo', icon: 'fuel' }] : []),
+          ...(canView('fuel_supply_orders') ? [{ to: '/ordens-abastecimento', label: 'Ordens abertas', description: 'Pendentes', icon: 'orders' }] : []),
         ],
       },
     ]
@@ -104,23 +105,23 @@ export default function Layout() {
     if (isAdmin || canView('master_data') || canView('fuel_stations') || canView('payment_processes') || canView('analytics') || canView('data_imports')) {
       const managementItems = []
       if (canView('master_data')) {
-        managementItems.push({ to: '/cadastros', label: 'Cadastros', description: 'Lotação', icon: 'catalog' })
+        managementItems.push({ to: '/cadastros', label: 'Cadastros', description: 'Lotação', icon: 'registry' })
       }
       if (canView('fuel_stations')) {
-        managementItems.push({ to: '/postos', label: 'Postos', description: 'Credenciados', icon: 'catalog' })
+        managementItems.push({ to: '/postos', label: 'Postos', description: 'Credenciados', icon: 'station' })
       }
       if (canView('payment_processes')) {
-        managementItems.push({ to: '/processos-pagamento', label: 'Contratos e saldos', description: 'Contratos e pagamentos', icon: 'catalog' })
+        managementItems.push({ to: '/processos-pagamento', label: 'Contratos e saldos', description: 'Contratos e pagamentos', icon: 'contract' })
       }
       if (canView('analytics')) {
-        managementItems.push({ to: '/analytics', label: 'Análises', description: 'BI', icon: 'dashboard' })
+        managementItems.push({ to: '/analytics', label: 'Análises', description: 'BI', icon: 'chart' })
       }
       if (canView('data_imports')) {
-        managementItems.push({ to: '/importacao-dados', label: 'Importar/Exportar', description: 'Importação', icon: 'catalog' })
+        managementItems.push({ to: '/importacao-dados', label: 'Importar/Exportar', description: 'Importação', icon: 'transfer' })
       }
       if (isAdmin) {
         managementItems.push(
-          { to: '/users', label: 'Usuários', description: 'Perfis', icon: 'users' },
+          { to: '/users', label: 'Usuários', description: 'Perfis', icon: 'access' },
           { to: '/auditoria', label: 'Auditoria', description: 'Logs', icon: 'audit' },
         )
       }
@@ -467,18 +468,19 @@ export default function Layout() {
         key={item.to}
         to={item.to}
         end={item.to === '/'}
-        title={pendingDescription || item.description}
+        title={sidebarCompact ? `${item.label}${pendingDescription ? ` · ${pendingDescription}` : ''}` : pendingDescription || item.description}
         aria-label={`${item.label}. ${item.description}${pendingDescription ? `. ${pendingDescription}` : ''}`}
         data-tooltip={item.description}
         className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
       >
         <span className="nav-icon" aria-hidden="true">
-          <AppIcon name={item.icon} className="app-icon" />
+          <ModuleIcon name={item.icon} />
         </span>
         <span className="nav-text">
           <span className="nav-label">{item.label}</span>
         </span>
         {item.to === '/emprestimos' && pendingLoans > 0 && <span className="loan-nav-badge" aria-hidden="true">{pendingLoans > 99 ? '99+' : pendingLoans}</span>}
+        <AppIcon name="chevron-right" className="nav-link__chevron" />
       </NavLink>
     )
   }
@@ -504,6 +506,7 @@ export default function Layout() {
           <button type="button" className="icon-button desktop-only" aria-label={sidebarCompact ? 'Expandir menu lateral' : 'Rebater menu lateral'} onClick={() => setSidebarCompact((current) => !current)}>
             <AppIcon name={sidebarCompact ? 'panel-open' : 'panel-close'} className="app-icon" />
           </button>
+          <button type="button" className="icon-button sidebar-close mobile-only" aria-label="Fechar menu lateral" onClick={() => setNavOpen(false)}><AppIcon name="close" className="app-icon" /></button>
         </div>
 
         <div className="sidebar-scroll">
@@ -543,6 +546,7 @@ export default function Layout() {
               <AppIcon name="menu" className="app-icon" />
             </button>
 
+            <span className="topbar-module-mark" aria-hidden="true"><ModuleIcon name={currentItem?.icon} /></span>
             <div className="topbar-route">
               <span className="topbar-kicker">Frota PMTF . acompanhamento operacional</span>
               <h1 className="page-title topbar-route-title">{currentItem?.label || 'Início'}</h1>
@@ -623,7 +627,7 @@ export default function Layout() {
         {mobileTabs.map((item) => {
           const content = (
             <>
-              <AppIcon name={item.icon} className="app-icon" />
+              <ModuleIcon name={item.isAction ? 'create-order' : item.icon} />
               <span>{item.mobileLabel ?? item.label}</span>
             </>
           )
