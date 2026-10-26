@@ -112,7 +112,8 @@ async def overview(kind: PaymentProcessKind | None = None, search: str | None = 
         'pending_setup': lambda c: not c.get('control_opened') or not c['provider_count'] or not c.get('valid_from') or not c.get('valid_until'),
         'reserved': lambda c: c.get('reserved_amount', 0) > 0,
         'consumed': lambda c: c.get('consumed_since_opening', 0) != 0,
-        'low_balance': lambda c: c.get('control_opened') and c['available_balance'] <= c['opening_balance']*Decimal('.10'),
+        'low_balance': lambda c: c.get('control_opened') and c['available_balance'] <= (
+            c['contractual_balance'] + c['consumed_since_opening'])*Decimal('.10'),
         'expires_30': lambda c: c.get('valid_until') and today <= c['valid_until'] <= today+timedelta(days=30),
         'divergence': lambda c: c.get('divergence_open'),
     }
