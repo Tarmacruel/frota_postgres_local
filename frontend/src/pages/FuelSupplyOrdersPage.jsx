@@ -1,3 +1,4 @@
+import { hasContractFunding } from '../utils/contractBalance'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import { useContractControl } from '../hooks/useContractFunding'
@@ -264,7 +265,7 @@ export default function FuelSupplyOrdersPage() {
                     <td data-label="Litros previstos">{formatNumber(order.requested_liters)}</td>
                     <td data-label="Ações">
                       <div className="operation-row-actions">
-                        {control.enabled && !order.contract_reservation_id ? (isAdmin || isProduction) && canConfirmOrder
+                        {control.enabled && !hasContractFunding(order) ? (isAdmin || isProduction) && canConfirmOrder
                           ? <button className="app-button" type="button" onClick={() => setFundingOrder(order)}>Vincular contrato e reservar</button>
                           : <span className="muted">Aguarda vínculo contratual e reserva pela equipe emissora.</span>
                           : canConfirmOrder ? <button className="app-button" type="button" onClick={() => setSelectedOrder(order)}>Confirmar abastecimento</button> : null}

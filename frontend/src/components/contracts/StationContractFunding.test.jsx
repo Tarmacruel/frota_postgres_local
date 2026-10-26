@@ -4,9 +4,10 @@ import { contractControlAPI } from '../../api/contractControl'
 import useContractFunding from '../../hooks/useContractFunding'
 import ContractFundingFields from './ContractFundingFields'
 import ContractSetupDialog from './ContractSetupDialog'
+import { paymentContractsAPI } from '../../api/paymentProcesses'
 
 vi.mock('../../api/contractControl', () => ({ contractControlAPI: { config: vi.fn(), eligible: vi.fn(), quote: vi.fn(), provider: vi.fn() } }))
-vi.mock('../../api/paymentProcesses', () => ({ paymentContractsAPI: {}, paymentSuppliersAPI: {} }))
+vi.mock('../../api/paymentProcesses', () => ({ paymentContractsAPI: { update: vi.fn() }, paymentSuppliersAPI: {} }))
 
 const contractFor = (station, id = `contract-${station}`) => ({
   id, number: `Contrato ${station}`, kind: 'FUEL', available_balance: '1000',
@@ -20,6 +21,34 @@ beforeEach(() => {
   contractControlAPI.config.mockResolvedValue({ data: { enabled: true } })
   contractControlAPI.eligible.mockImplementation(async ({ fuel_station_id }) => ({ data: [contractFor(fuel_station_id)] }))
   contractControlAPI.quote.mockResolvedValue({ data: quote })
+})
+
+it('libera pedido de rede por valor sem preços nem reserva e envia o combustível solicitado', async () => {
+  contractControlAPI.eligible.mockResolvedValue({ data: [{ ...contractFor('posto'), fuel_pricing_mode: 'NETWORK_VALUE', prices: [] }] })
+  contractControlAPI.quote.mockResolvedValue({ data: { price_id: null, unit_price: null, reserve_amount: '0',
+    sufficient: true, available_balance: '1000', available_after: '1000', funding_mode: 'NETWORK_VALUE' } })
+  const { result } = renderHook(() => useContractFunding({ stationId: 'posto', liters: 30 }))
+  await waitFor(() => expect(result.current.networkValue).toBe(true))
+  expect(result.current.ready).toBe(false)
+  act(() => result.current.selectFuel('Diesel S10'))
+  await waitFor(() => expect(result.current.ready).toBe(true))
+  expect(result.current.payload).toMatchObject({ contract_id: 'contract-posto', expected_price_id: null, requested_fuel_type: 'Diesel S10' })
+  render(<ContractFundingFields funding={result.current} />)
+  expect(screen.getByText(/este pedido não reserva saldo/)).toBeInTheDocument()
+  expect(screen.queryByText('Preço cadastrado / litro')).not.toBeInTheDocument()
+  expect(screen.queryByText('Valor a reservar')).not.toBeInTheDocument()
+})
+
+it('permite definir a modalidade por valor mesmo depois da abertura sem alterar o saldo', async () => {
+  paymentContractsAPI.update.mockResolvedValue({ data: {} })
+  const c = { id: 'contract', number: 'TEST-01', supplier_id: 'supplier', kind: 'FUEL', status: 'ACTIVE',
+    valid_from: '2026-01-01', valid_until: '2027-01-01', control_opened: true, value_updated: '1000' }
+  render(<ContractSetupDialog dialog={{ type: 'edit', contract: c }} suppliers={[{ id: 'supplier', name: 'Empresa', active: true }]}
+    stations={[]} providers={[]} onClose={() => {}} onSuccess={() => {}} />)
+  fireEvent.change(screen.getByLabelText('Controle do abastecimento'), { target: { value: 'NETWORK_VALUE' } })
+  expect(screen.getByText(/Somente o total real confirmado/)).toBeInTheDocument()
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+  await waitFor(() => expect(paymentContractsAPI.update).toHaveBeenCalledWith('contract', expect.objectContaining({ fuel_pricing_mode: 'NETWORK_VALUE', value_updated: '1000' })))
 })
 
 it('bloqueia um posto de outro contrato quando o pedido parte de um contrato definido', async () => {
