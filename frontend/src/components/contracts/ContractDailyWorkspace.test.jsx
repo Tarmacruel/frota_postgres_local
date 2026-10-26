@@ -13,6 +13,8 @@ import { fuelSupplyOrdersAPI } from '../../api/fuelSupplyOrders'
 import { contractOrderPath, safeContractReturn } from '../../utils/contractNavigation'
 
 const access = vi.hoisted(() => ({ edit: true, create: true }))
+const environment = vi.hoisted(() => ({ isHomologation: false }))
+vi.mock('../../config/environment', async (importOriginal) => ({ ...await importOriginal(), appEnvironment: environment }))
 vi.mock('../../context/AuthContext', () => ({ useAuth: () => ({ user: {}, canEdit: () => access.edit, canCreate: () => access.create, canView: () => true }) }))
 vi.mock('../../hooks/useMasterDataCatalog', () => ({ useMasterDataCatalog: () => ({ organizations: [] }) }))
 vi.mock('../../pages/PaymentProcessesPage', () => ({ default: ({ initialContractId, initialProcessId, onDataChange }) => <><p>Faturas: {initialContractId} {initialProcessId}</p><button onClick={onDataChange}>Simular atualização financeira</button></> }))
@@ -38,6 +40,7 @@ function mount(path = '/processos-pagamento', children = <ContractBalancesPage /
 }
 beforeEach(() => {
   vi.clearAllMocks(); access.edit = true; access.create = true
+  environment.isHomologation = false
   sessionStorage.clear()
   vi.spyOn(window, 'scrollTo').mockImplementation(() => {})
   contractControlAPI.config.mockResolvedValue({ data: { enabled: true } })
@@ -54,6 +57,15 @@ beforeEach(() => {
   fuelSupplyOrdersAPI.create.mockResolvedValue({ data: { id: 'order' } })
 })
 afterEach(() => vi.useRealTimers())
+
+it.each([true, false])('restringe o aviso da cópia das 06h ao ambiente de homologação: %s', async (homologation) => {
+  environment.isHomologation = homologation
+  mount()
+  await screen.findByRole('button', { name: 'Abrir contrato TESTE-A' })
+  const notice = screen.queryByText(/Homologação: a cópia das 06h/)
+  if (homologation) expect(notice).toBeInTheDocument()
+  else expect(notice).not.toBeInTheDocument()
+})
 
 describe('retorno interno do contrato', () => {
   it.each(['https://evil.example/processos-pagamento', '//evil.example', '/vehicles', '/processos-pagamento/../../users', '/processos-pagamento\\evil'])('rejeita um destino fora do módulo: %s', (value) => expect(safeContractReturn(value)).toBe(''))

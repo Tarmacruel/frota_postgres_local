@@ -12,6 +12,7 @@ import ContractSetupDialog from '../components/contracts/ContractSetupDialog'
 import ContractInspector, { ContractMovementContent, ContractPosition, ContractState } from '../components/contracts/ContractInspector'
 import { formatContractMoney as brl, contractDate, contractKinds } from '../utils/contractBalance'
 import PaymentProcessesPage from './PaymentProcessesPage'
+import { appEnvironment } from '../config/environment'
 import '../styles/contracts-balances.css'
 
 const views = [['contracts', 'Contratos'], ['movements', 'Pedidos e movimentações'], ['payments', 'Faturas e pagamentos'], ['suppliers', 'Prestadores']]
@@ -169,7 +170,7 @@ function ContractWorkspace() {
     {view === 'suppliers' ? <section className="contract-detail"><div className="contract-order-panel__heading"><div><h3>Empresas e prestadores executantes</h3><p className="muted">Os vínculos de postos e oficinas são definidos na configuração de cada contrato.</p></div>{manage ? <button className="app-button" onClick={() => show('supplier')}>Novo prestador</button> : null}</div>
       <div className="table-wrap"><table className="data-table contract-table"><thead><tr><th>Nome / razão social</th><th>CNPJ</th><th>Situação</th><th>Ações</th></tr></thead><tbody>{catalog.suppliers.map((supplier) => <tr key={supplier.id}><td data-label="Nome / razão social">{supplier.name}</td><td data-label="CNPJ">{supplier.cnpj || 'Não informado'}</td><td data-label="Situação">{supplier.active ? 'Ativo' : 'Inativo'}</td><td data-label="Ações">{manage ? <button className="ghost-button" onClick={() => show('supplierEdit', { supplier })}>Editar</button> : null}</td></tr>)}</tbody></table></div>
     </section> : null}
-    <p className="contract-hml-note">Homologação: a cópia das 06h reinicia os cadastros e os pedidos exclusivos dos testes.</p>
+    {appEnvironment.isHomologation ? <p className="contract-hml-note">Homologação: a cópia das 06h reinicia os cadastros e os pedidos exclusivos dos testes.</p> : null}
     <ContractInspector open={view === 'contracts' && Boolean(selectedId)} detail={currentDetail} row={row} loading={detailLoading || (!currentDetail && !detailError)} error={detailError} tab={tab} onTab={(value) => update({ contract_tab: value })} onClose={closeInspector}
       onShow={show} onPayments={payments} onMovements={movements} movementMode={movementMode} onMovementMode={(mode) => update({ movement_mode: mode })}
       manage={manage} canCreateOrder={c ? canCreate(c.kind === 'FUEL' ? 'fuel_supply_orders' : 'maintenance') : false} canViewMaintenance={canView('maintenance')} orderPath={orderPath} onOrder={onOrder} onProviderToggle={toggleProvider} revision={revision} returnFocusRef={returnFocusRef} onRefresh={refresh} />
