@@ -54,7 +54,7 @@ class FuelOrderFunding(BaseModel):
     contract_provider_id: UUID
     requested_fuel_type: str = Field(min_length=1, max_length=80)
     requested_liters: Decimal = Field(gt=0, max_digits=10, decimal_places=3)
-    expected_price_id: UUID
+    expected_price_id: UUID | None = None
     expires_at: datetime | None = None
     justification: str | None = Field(default=None, min_length=10, max_length=1000)
 
@@ -101,6 +101,7 @@ class MaintenanceOrderCancel(Justified):
 
 
 class FundingFields(BaseModel):
+    contract_funding_mode: str | None = None
     contract_id: UUID | None = None
     contract_provider_id: UUID | None = None
     contract_reservation_id: UUID | None = None

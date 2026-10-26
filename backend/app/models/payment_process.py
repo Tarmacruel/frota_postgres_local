@@ -5,7 +5,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
 
-from sqlalchemy import Boolean, Date, DateTime, Enum, ForeignKey, Index, Numeric, String, Text, UniqueConstraint, text
+from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKey, Index, Numeric, String, Text, UniqueConstraint, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
@@ -74,6 +74,7 @@ class PaymentSupplier(Base):
 class PaymentContract(Base):
     __tablename__ = "payment_contracts"
     __table_args__ = (
+        CheckConstraint("fuel_pricing_mode IN ('FIXED_PRICE', 'NETWORK_VALUE')", name='ck_contract_fuel_pricing_mode'),
         UniqueConstraint("supplier_id", "number", name="uq_payment_contract_supplier_number"),
         Index("idx_payment_contracts_supplier", "supplier_id"),
         Index("idx_payment_contracts_number", "number"),
@@ -85,6 +86,7 @@ class PaymentContract(Base):
     supplier_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), ForeignKey("payment_suppliers.id", ondelete="RESTRICT"), nullable=False)
     number: Mapped[str] = mapped_column(String(80), nullable=False)
     kind: Mapped[PaymentProcessKind | None] = mapped_column(Enum(PaymentProcessKind, name="payment_process_kind"), nullable=True)
+    fuel_pricing_mode: Mapped[str] = mapped_column(String(20), nullable=False, default='FIXED_PRICE', server_default=text("'FIXED_PRICE'"))
     contract_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
     object_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     valid_from: Mapped[date | None] = mapped_column(Date(), nullable=True)

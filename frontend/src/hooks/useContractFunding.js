@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { contractControlAPI } from '../api/contractControl'
 import { getApiErrorMessage } from '../utils/apiError'
+import { FUEL_TYPE_OPTIONS } from '../utils/fuelSupplyDetails'
 
 export function useContractControl() {
   const [state, setState] = useState({ enabled: null, error: '' })
@@ -49,9 +50,10 @@ export default function useContractFunding({ kind = 'FUEL', stationId = '', lite
   const conflict = initialContractId && kind === 'FUEL' && scopedContracts.length && !currentContracts.length
     ? 'O posto selecionado não pertence ao contrato de origem.' : kind === 'FUEL' && contract && providers.length !== 1
     ? 'O posto possui um vínculo inconsistente neste contrato. Solicite a conferência à gestão.' : ''
-  const fuels = useMemo(() => [...new Set((contract?.prices || []).filter((p) => p.provider_id === provider?.id
+  const networkValue = kind === 'FUEL' && contract?.fuel_pricing_mode === 'NETWORK_VALUE'
+  const fuels = useMemo(() => networkValue ? FUEL_TYPE_OPTIONS.filter((type) => type !== 'Outro') : [...new Set((contract?.prices || []).filter((p) => p.provider_id === provider?.id
     && new Date(p.valid_from).getTime() <= Date.now() && (!p.valid_until || new Date(p.valid_until).getTime() > Date.now()))
-    .map((p) => p.fuel_type))], [contract, provider])
+    .map((p) => p.fuel_type))], [contract, provider, networkValue])
   const selectedFuel = fuelType !== undefined ? fuelType : fuels.includes(selection.fuel) ? selection.fuel : fuels.length === 1 ? fuels[0] : ''
   const contractId = contract?.id
   const providerId = provider?.id
@@ -85,7 +87,7 @@ export default function useContractFunding({ kind = 'FUEL', stationId = '', lite
     && contract && provider && enough && (kind !== 'FUEL' || (!previewPending && quote && !previewError))))
   return {
     ...mode, contracts: currentContracts, contract, providers, provider, fuels, lockedContract: Boolean(initialContractId),
-    fuelType: selectedFuel, kind, stationId, quote, estimatedCost,
+    fuelType: selectedFuel, kind, stationId, quote, estimatedCost, networkValue,
     loading: mode.enabled === null || catalogPending || previewPending,
     error: mode.error || catalogError || conflict || previewError, ready,
     selectContract: (value) => setSelection({ scope, contract: value, provider: '', fuel: '' }),
