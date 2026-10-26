@@ -1,3 +1,4 @@
+import MoneyInput from './MoneyInput'
 import JustificationField from './JustificationField'
 import { useState } from 'react'
 import { claimsAPI } from '../api/claims'
@@ -178,7 +179,7 @@ export default function ClaimForm({
 
       <div className="form-field">
         <label htmlFor="claim-value">Valor estimado</label>
-        <input id="claim-value" type="number" min="0" step="0.01" className="app-input" value={form.valor_estimado} onChange={(event) => setForm({ ...form, valor_estimado: event.target.value })} />
+        <MoneyInput id="claim-value" type="number" min="0" step="0.01" className="app-input" value={form.valor_estimado} onChange={(event) => setForm({ ...form, valor_estimado: event.target.value })} />
       </div>
 
       <div className="form-field modal-field-span">

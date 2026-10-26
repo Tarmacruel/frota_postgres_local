@@ -1,3 +1,4 @@
+import MoneyInput from '../components/MoneyInput'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -405,7 +406,7 @@ export default function FinesPage() {
           <div className="form-field"><label>Data infração</label><input type="date" className="app-input" value={form.infraction_date} onChange={(e) => setForm({ ...form, infraction_date: e.target.value })} required /></div>
           <div className="form-field"><label>Hora</label><input type="time" className="app-input" value={form.infraction_time} onChange={(e) => setForm({ ...form, infraction_time: e.target.value })} /></div>
           <div className="form-field"><label>Vencimento</label><input type="date" className="app-input" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></div>
-          <div className="form-field"><label>Valor</label><input type="number" min="0" step="0.01" className="app-input" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></div>
+          <div className="form-field"><label>Valor</label><MoneyInput type="number" min="0" step="0.01" className="app-input" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></div>
           <div className="form-field"><label>Local</label><input className="app-input" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
           <div className="form-field"><label>Status</label><select className="app-select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{statusOptions.filter((o) => o !== 'TODOS').map((o) => <option key={o} value={o}>{o}</option>)}</select></div>
           <div className="form-field"><label>C.I.</label><input className="app-input" value={form.communication_number} onChange={(e) => setForm({ ...form, communication_number: e.target.value })} /></div>

@@ -1,3 +1,4 @@
+import MoneyInput from '../components/MoneyInput'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import JustificationField from '../components/JustificationField'
@@ -1650,7 +1651,7 @@ function ContractsView({
                       <Field label="Tipo"><input className="app-input" value={amendmentForm.amendment_type} onChange={(event) => setAmendmentForm((current) => ({ ...current, amendment_type: event.target.value }))} /></Field>
                       <Field label="Número"><input className="app-input" value={amendmentForm.number} onChange={(event) => setAmendmentForm((current) => ({ ...current, number: event.target.value }))} /></Field>
                       <Field label="Assinatura"><input className="app-input" type="date" value={amendmentForm.signed_at} onChange={(event) => setAmendmentForm((current) => ({ ...current, signed_at: event.target.value }))} /></Field>
-                      <Field label="Delta valor"><input className="app-input" type="number" step="0.01" value={amendmentForm.value_delta} onChange={(event) => setAmendmentForm((current) => ({ ...current, value_delta: event.target.value }))} /></Field>
+                      <Field label="Delta valor"><MoneyInput allowNegative className="app-input" type="number" step="0.01" value={amendmentForm.value_delta} onChange={(event) => setAmendmentForm((current) => ({ ...current, value_delta: event.target.value }))} /></Field>
                       <Field label="Nova vigência"><input className="app-input" type="date" value={amendmentForm.valid_until} onChange={(event) => setAmendmentForm((current) => ({ ...current, valid_until: event.target.value }))} /></Field>
                     </div>
                     <Field label="Observação">
@@ -1754,13 +1755,13 @@ function ContractFormDrawer({
                 <input className="app-input" type="date" value={contractForm.valid_until} onChange={(event) => setContractForm((current) => ({ ...current, valid_until: event.target.value }))} disabled={!canManage} />
               </Field>
               <Field label="Valor inicial">
-                <input className="app-input" type="number" step="0.01" value={contractForm.value_initial} onChange={(event) => setContractForm((current) => ({ ...current, value_initial: event.target.value }))} disabled={!canManage} />
+                <MoneyInput className="app-input" type="number" step="0.01" value={contractForm.value_initial} onChange={(event) => setContractForm((current) => ({ ...current, value_initial: event.target.value }))} disabled={!canManage} />
               </Field>
               <Field label="Valor atualizado">
-                <input className="app-input" type="number" step="0.01" value={contractForm.value_updated} onChange={(event) => setContractForm((current) => ({ ...current, value_updated: event.target.value }))} disabled={!canManage} />
+                <MoneyInput className="app-input" type="number" step="0.01" value={contractForm.value_updated} onChange={(event) => setContractForm((current) => ({ ...current, value_updated: event.target.value }))} disabled={!canManage} />
               </Field>
               <Field label="Saldo importado (legado)">
-                <input
+                <MoneyInput
                   className="app-input"
                   type="number"
                   step="0.01"

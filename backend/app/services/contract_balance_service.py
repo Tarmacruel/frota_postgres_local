@@ -581,6 +581,35 @@ class ContractBalanceService:
         await self.flag_overdraw(contract_id, 'Ajuste deixou o saldo disponível negativo')
         return row
 
+    async def correct_balance(self, contract_id, data, actor):
+        await self.contract(contract_id, lock=True)
+        target = money(data.target_available_balance)
+        expected = money(data.expected_available_balance)
+        key = f'balance-correction:{data.request_key}'
+        existing = await self.db.scalar(select(ContractMovement).where(ContractMovement.event_key == key))
+        if existing:
+            details = existing.details or {}
+            if (existing.contract_id != contract_id or details.get('available_after') != str(target)
+                    or details.get('available_before') != str(expected)):
+                raise HTTPException(409, 'Esta identificação já foi usada para outra correção')
+            return existing
+        balance = await self.balances(contract_id)
+        if not balance['control_opened']:
+            raise HTTPException(409, 'Confirme o saldo inicial antes de corrigir')
+        if balance['available_balance'] != expected:
+            raise HTTPException(409, 'O saldo mudou desde a conferência. Atualize o contrato e confira novamente a correção.')
+        delta = target - expected
+        if not delta:
+            raise HTTPException(422, 'O valor informado já é o saldo disponível atual')
+        return await self.movement(event_key=key, contract_id=contract_id,
+            movement_type='BALANCE_CORRECTION', actor=actor, balance_delta=delta,
+            source_type='BALANCE_CORRECTION', source_id=data.request_key, justification=data.justification,
+            details={'available_before': str(expected), 'available_after': str(target),
+                     'contractual_before': str(balance['contractual_balance']),
+                     'contractual_after': str(balance['contractual_balance'] + delta),
+                     'reserved_amount': str(balance['reserved_amount']),
+                     'consumed_since_opening': str(balance['consumed_since_opening'])})
+
     async def resolve_divergence(self, contract_id, reason, actor):
         await self.contract(contract_id, lock=True)
         control = await self.db.get(ContractControl, contract_id)
