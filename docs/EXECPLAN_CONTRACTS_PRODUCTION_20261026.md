@@ -23,11 +23,13 @@ Não copiar dados HML para produção, confirmar saldos, criar preços/vínculos
 4. [x] PR75 para main com três checks aprovados, merge15204a5; árvore idêntica ao candidatoe11ad39.
 5. [x] Pausa breve do watchdog/API8000, backup final e fingerprints, fast-forward, migrations e validação dos dados antes de reabrir.
 6. [x] Habilitado exclusivamente CONTRACT_BALANCE_ENABLED=true; demais parâmetros preservados.
-7. [x] API e frontend ativos, watchdog reativado.19 endpoints/12 filtros conferidos em produção com transações somente leitura, nove assets públicos e duas APIs saudáveis. QA visual em andamento.
-8. [ ] Registrar resultado, pendências de configuração e evidências.
+7. [x] API e frontend ativos, watchdog reativado.19 endpoints/12 filtros conferidos em produção com transações somente leitura, nove assets públicos e duas APIs saudáveis. QA visual concluída.
+8. [x] Resultado, pendências de configuração, capturas e evidências registrados. Ajuste incremental do aviso HML publicado pela PR76, main263ebee, sem novo reinício da API.
 
 ## Validação visual
-KPIs/ícones, contratos e dados pendentes, abas de processo, telas de abastecimento/manutenção, desktop e celular nos dois temas. Apenas consulta/abertura/cancelamento de formulários, sem gravação operacional. Preservar guia HML do usuário.
+Conferidos em produção: menu/ícones, KPIs da página inicial e de contratos, cobertura dos saldos, dois contratos pendentes de configuração, painel contratual, faturas históricas e quatro abas do processo. Desktop1369x745 claro e celular390x844 escuro, sem overflow horizontal; abas com altura44px/45px e nenhum erro no console. Tema claro e viewport original restaurados; guia de produção deixada na lista limpa de contratos, preservando a guia HML do usuário.
+
+A lista de ordens de abastecimento não foi aberta para QA no banco oficial, pois sua consulta pode expirar ordens antigas. Esse fluxo foi validado em cópia descartável da produção. Nenhum pedido, preço, saldo, processo, conciliação ou etapa financeira foi gravado em produção para teste. Os fluxos operacionais completos já haviam sido exercitados na homologação e nas suítes automatizadas.
 
 ## Testes e build
 Backend padrão com flag financeiro desabilitado nos fakes; suíte financeira em PostgreSQL descartável com flag habilitado. Frontend completo/lint e build production em candidato isolado. CI backend-tests/frontend-tests/container-smoke obrigatório. Cópia do dump real somente para banco descartável do cluster5441; migrar e comparar hashes das colunas anteriores, verificar novas colunas nulas e novas tabelas vazias.
@@ -37,7 +39,9 @@ Publicação principal concluída de09:32:10 a09:32:32(Brasília), PR75, main152
 
 Gates locais:698 backend/143 pulados,474 frontend/75 arquivos,34 PostgreSQL real, lint0 erros/39 avisos anteriores, build production e três checks CI aprovados. Ensaio adicional sobre cópia descartável validou20 endpoints/13 filtros (incluindo expiração de ordens somente na cópia). Probes pós-publicação em produção estritamente somente leitura passaram para19 endpoints/12 filtros; dois contratos pendentes de configuração. Proteção bloqueou uma primeira tentativa antes de parar a API por referência origin/main ainda antiga no clone de produção; após fetch no clone correto, árvore conferida e ativação concluída.
 
-Na QA foi observado aviso da cópia HML06h sem condicional no rodapé de Contratos e saldos. Ajuste incremental usa o marcador de ambiente centralizado, mantém aviso em HML e omite em produção, com dois testes de regressão. Publicar primeiro HML e, após checks obrigatórios, somente frontend de produção, sem novo reinício/migration.
+Na QA foi observado aviso da cópia HML06h sem condicional no rodapé de Contratos e saldos. Ajuste incremental usa o marcador de ambiente centralizado, mantém aviso em HML e omite em produção, com dois testes de regressão. Publicado primeiro em HML e depois em produção pela PR76/merge263ebee, com476 testes frontend, lint/build e os três checks obrigatórios aprovados. Publicação apenas do frontend, PID da API preservado, sem novo reinício/migration. Conferência final comprovou ausência de faixa e aviso HML na produção, nove assets públicos iguais ao build, configurações preservadas, duas APIs saudáveis e cinco rotas protegidas para anônimos.
+
+Evidências privadas: publication.json registra a publicação principal; frontend-notice/publication.json registra a atualização incremental; final-verification.json registra o estado final em263ebee. Capturas production-contracts-final.png e production-payment-mobile-dark.png no diretório de backup. Watchdog habilitado; tarefa HML06h habilitada, última execução com resultado0 e próxima prevista para27/10/2026 às06h. Nenhuma nova restauração HML executada nesta publicação. O verificador de migrations da rotina reconhece0059 como origem e destino, sem pendências.
 
 ## Pendências / decisões
 Contratos de produção continuam pendentes de rede/preços/vigência e abertura de saldo conferida pelo gestor. Não transportar configurações fictícias da homologação nem deduzir valores por nomes. Pedidos herdados precisam vínculo/reserva explícitos. Rotina06h segue destinada exclusivamente à HML; após a promoção os schemas ficam alinhados.
