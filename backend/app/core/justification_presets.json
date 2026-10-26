@@ -107,6 +107,23 @@
       "text": "Retificação do motivo da proposta para esclarecer a finalidade do empréstimo entre secretarias."
     }
   ],
+  "order_funding": [
+    {
+      "id": "legacy",
+      "label": "Vincular ordem anterior",
+      "text": "Vinculação da ordem emitida antes do controle contratual ao contrato selecionado, com atualização do prazo para utilização."
+    },
+    {
+      "id": "schedule",
+      "label": "Reprogramar abastecimento",
+      "text": "Vinculação da ordem ao contrato selecionado e ajuste do prazo em razão da reprogramação do abastecimento do veículo."
+    },
+    {
+      "id": "network",
+      "label": "Rede credenciada por valor",
+      "text": "Vinculação da ordem à rede credenciada por valor, com prazo atualizado, sem reserva prévia e com desconto do valor real após a confirmação do abastecimento."
+    }
+  ],
   "order_reopen": [
     {
       "id": "confirmation",
