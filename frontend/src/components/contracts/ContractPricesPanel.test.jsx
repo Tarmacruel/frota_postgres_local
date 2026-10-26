@@ -65,7 +65,7 @@ it('retira versões substituídas do catálogo e orienta consultar o histórico'
 
 it('preenche o preço e salva a nova versão mantendo posto e combustível', async () => {
   const callbacks = dialog('priceEdit')
-  expect(screen.getByLabelText('Preço por litro (R$)')).toHaveValue(6.145)
+  expect(screen.getByLabelText('Preço por litro (R$)')).toHaveValue('R$ 6,145000')
   expect(screen.getByText('Posto Teste')).toBeInTheDocument()
   expect(screen.queryByRole('combobox')).not.toBeInTheDocument()
   fireEvent.change(screen.getByLabelText('Preço por litro (R$)'), { target: { value: '6.234567' } })

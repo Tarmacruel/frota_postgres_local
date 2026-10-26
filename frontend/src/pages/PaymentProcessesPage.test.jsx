@@ -28,7 +28,7 @@ it('sugere motivo de exclusão sem excluir até a confirmação obrigatória', a
   fireEvent.click(await screen.findByText('QA-001'))
   fireEvent.click(await screen.findByRole('button', { name: 'Mais ações do processo', exact: true }))
   fireEvent.click(await screen.findByRole('menuitem', { name: 'Excluir processo', exact: true }))
-  const input = screen.getByLabelText('Justificativa da exclusão')
+  const input = await screen.findByLabelText('Justificativa da exclusão')
   expect(input).toBeRequired()
   const modal = input.closest('[role="dialog"]')
   expect(within(modal).getByRole('button', { name: 'Excluir processo', exact: true })).toBeDisabled()

@@ -6,7 +6,7 @@ import { exportRowsToXlsx, previewRowsToPdf } from '../../utils/exportData'
 import { formatContractMoney as brl } from '../../utils/contractBalance'
 import useContractFilters from '../../hooks/useContractFilters'
 
-const movementLabels = { OPENING: 'Abertura', RESERVE: 'Reserva', RELEASE: 'Liberação', CONSUMPTION: 'Consumo realizado',
+const movementLabels = { BALANCE_CORRECTION: 'Correção de saldo', OPENING: 'Abertura', RESERVE: 'Reserva', RELEASE: 'Liberação', CONSUMPTION: 'Consumo realizado',
   CONSUMPTION_ADJUSTMENT: 'Retificação de consumo', CREDIT: 'Acréscimo', DEBIT: 'Redução', INVOICE_ADJUSTMENT: 'Diferença de fatura', DIVERGENCE_RESOLVED: 'Divergência regularizada' }
 
 export default function ContractMovementBrowser({ contract, providers = [], revision, initialType = '' }) {

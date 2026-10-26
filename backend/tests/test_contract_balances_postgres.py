@@ -27,7 +27,7 @@ from app.models.fuel_supply_order import FuelSupplyOrder
 from app.models.maintenance import MaintenanceRecord
 from app.models.payment_process import PaymentContract, PaymentSupplier
 from app.schemas.contract_balance import ContractOpening, MaintenanceOrderComplete, MaintenanceOrderCreate, MaintenanceOrderStart, PriceCreate, ProviderCreate
-from app.schemas.contract_balance import FuelOrderFunding, PriceUpdate
+from app.schemas.contract_balance import BalanceCorrection, FuelOrderFunding, PriceUpdate
 from app.schemas.fuel_supply import FuelSupplyOrderBatchCreate, FuelSupplyOrderCreate, FuelSupplyOrderDeadlineUpdate
 from app.schemas.fuel_supply import FuelSupplyOrderCancel, FuelSupplyOrderConfirm, FuelSupplyRectify
 from app.services.contract_balance_service import ContractBalanceService
@@ -92,6 +92,89 @@ async def another_contract(c, prefix='REDE'):
     c.db.add(contract)
     await c.db.commit()
     return contract
+
+
+@pytest.mark.asyncio
+async def test_concurrent_balance_corrections_only_apply_one_current_preview(pg):
+    c = pg
+    go = asyncio.Event()
+    async def correct(target):
+        async with AsyncSession(c.engine, expire_on_commit=False) as db:
+            await go.wait()
+            try:
+                result = await ContractBalanceService(db).correct_balance(c.contract.id,
+                    BalanceCorrection(target_available_balance=target, expected_available_balance=100,
+                        request_key=uuid4(), justification='Correção conferida pelo gestor'), c.actor)
+                await db.commit()
+                return result.id
+            except HTTPException as error:
+                await db.rollback()
+                return error.status_code
+    tasks = [asyncio.create_task(correct(80)), asyncio.create_task(correct(90))]
+    go.set()
+    result = await asyncio.gather(*tasks)
+    assert result.count(409) == 1
+    assert (await c.service.balances(c.contract.id))['available_balance'] in {80, 90}
+
+
+@pytest.mark.asyncio
+async def test_balance_correction_api_permissions_decimal_validation_and_retry(pg):
+    from app.main import app
+    from app.api.deps import get_current_user_ready
+    from app.db.session import get_db_session
+    from httpx import ASGITransport, AsyncClient
+    c = pg
+    async def session():
+        async with AsyncSession(c.engine, expire_on_commit=False) as db:
+            yield db
+    app.dependency_overrides[get_db_session] = session
+    app.dependency_overrides[get_current_user_ready] = lambda: SimpleNamespace(id=c.actor.id, role=UserRole.POSTO, organization_id=None)
+    endpoint = f'/api/contract-control/contracts/{c.contract.id}/balance-correction'
+    payload = dict(target_available_balance='6835452.50', expected_available_balance='100.00',
+        request_key=str(uuid4()), justification='Correção de digitação solicitada pelo gestor')
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+            assert (await client.post(endpoint, json=payload)).status_code == 403
+            app.dependency_overrides[get_current_user_ready] = lambda: c.actor
+            for invalid in ['-1', '1.001', 'R$ 6.835.452,50']:
+                assert (await client.post(endpoint, json={**payload, 'target_available_balance': invalid})).status_code == 422
+            response = await client.post(endpoint, json=payload)
+            assert response.status_code == 200, response.text
+            assert (await client.post(endpoint, json=payload)).json()['id'] == response.json()['id']
+            balance = await c.service.balances(c.contract.id)
+            assert balance['available_balance'] == Decimal('6835452.50')
+            assert balance['reserved_amount'] == 0 and balance['consumed_since_opening'] == 0
+            assert await c.db.scalar(select(func.count()).select_from(ContractMovement).where(
+                ContractMovement.contract_id == c.contract.id, ContractMovement.movement_type == 'BALANCE_CORRECTION')) == 1
+    finally:
+        app.dependency_overrides.clear()
+
+
+@pytest.mark.asyncio
+async def test_low_balance_uses_corrected_budget_and_still_counts_reservations(pg):
+    from app.main import app
+    from app.api.deps import get_current_user_ready
+    from app.db.session import get_db_session
+    from httpx import ASGITransport, AsyncClient
+    c = pg
+    await c.service.correct_balance(c.contract.id, BalanceCorrection(target_available_balance=5,
+        expected_available_balance=100, request_key=uuid4(), justification='Correção da digitação do saldo'), c.actor)
+    await c.db.commit()
+    async def session():
+        async with AsyncSession(c.engine, expire_on_commit=False) as db:
+            yield db
+    app.dependency_overrides[get_db_session] = session
+    app.dependency_overrides[get_current_user_ready] = lambda: c.actor
+    try:
+        async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
+            response = await client.get('/api/contract-control/contracts', params={'search': c.contract.number})
+            assert response.status_code == 200, response.text
+            assert response.json()['indicators']['low_balance'] == 0
+            await FuelSupplyOrderService(c.db).create_order(order_payload(c).model_copy(update={'requested_liters': Decimal('.46')}), c.actor)
+            response = await client.get('/api/contract-control/contracts', params={'search': c.contract.number})
+            assert response.json()['indicators']['low_balance'] == 1
+    finally:
+        app.dependency_overrides.clear()
 
 
 @pytest.mark.asyncio

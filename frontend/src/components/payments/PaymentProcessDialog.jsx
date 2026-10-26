@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Modal from '../Modal'
+import MoneyInput from '../MoneyInput'
 import { contractControlAPI } from '../../api/contractControl'
 import { paymentProcessesAPI } from '../../api/paymentProcesses'
 import { fuelSuppliesAPI } from '../../api/fuelSupplies'
@@ -156,7 +157,8 @@ export default function PaymentProcessDialog({ record, contractId = '', operatio
     } finally { busy.current = false; if (mounted.current) setSaving(false) }
   }
   function input(key, label, type = 'text', props = {}) {
-    return <Field label={label}><input ref={key === 'process_number' ? invoiceRef : undefined} className="app-input" type={type} value={form[key]} onChange={(event) => change(key, event.target.value)} {...props} /></Field>
+    const Input = key === 'amount' ? MoneyInput : 'input'
+    return <Field label={label}><Input ref={key === 'process_number' ? invoiceRef : undefined} className="app-input" type={type} value={form[key]} onChange={(event) => change(key, event.target.value)} {...props} /></Field>
   }
 
   return <Modal open title={record ? 'Editar processo' : 'Novo processo de pagamento'} onClose={close} canClose={!saving} className="payment-composer" backdropClassName="payment-composer-backdrop">

@@ -1,3 +1,4 @@
+import MoneyInput from './MoneyInput'
 import { useMemo, useRef, useState } from 'react'
 import SearchableSelect from './SearchableSelect'
 import useContractFunding from '../hooks/useContractFunding'
@@ -186,7 +187,7 @@ export default function FuelSupplyForm({ vehicles, onVehicleOptionsOpen, drivers
       </div>
       <div className="form-field">
         <label>Valor total abastecido (R$)</label>
-        <input type="number" min="0" step="0.01" className="app-input" value={form.total_amount} onChange={(event) => setForm({ ...form, total_amount: event.target.value })} required />
+        <MoneyInput type="number" min="0" step="0.01" className="app-input" value={form.total_amount} onChange={(event) => setForm({ ...form, total_amount: event.target.value })} required />
       </div>
       <div className="form-field">
         <label>Tipo de combustível</label>

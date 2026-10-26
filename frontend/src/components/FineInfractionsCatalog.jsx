@@ -1,3 +1,4 @@
+import MoneyInput from './MoneyInput'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Pagination from './Pagination'
 import { finesAPI } from '../api/fines'
@@ -168,7 +169,7 @@ export default function FineInfractionsCatalog() {
         </div>
         <div className="form-field">
           <label htmlFor="fine-infraction-amount">Valor padrão</label>
-          <input id="fine-infraction-amount" type="number" min="0" step="0.01" inputMode="decimal" className="app-input" value={form.default_amount} onChange={(event) => setForm({ ...form, default_amount: event.target.value })} />
+          <MoneyInput id="fine-infraction-amount" type="number" min="0" step="0.01" inputMode="decimal" className="app-input" value={form.default_amount} onChange={(event) => setForm({ ...form, default_amount: event.target.value })} />
         </div>
         <div className="form-field">
           <label htmlFor="fine-infraction-points">Pontos</label>
