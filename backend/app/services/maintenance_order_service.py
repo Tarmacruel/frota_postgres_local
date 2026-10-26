@@ -60,6 +60,10 @@ class MaintenanceOrderService:
                     existing.service_description) != (data.vehicle_id, data.contract_id, data.provider_id,
                     money(data.estimated_cost), data.service_description):
                 raise HTTPException(409, 'Esta identificação já foi usada em outro pedido')
+            from app.core.config import settings
+            if settings.CONTRACT_QUANTITY_ENABLED:
+                from app.services.contract_item_service import ContractItemService
+                await ContractItemService(self.db).assert_replay(existing.reservation_id, data.item_lines)
             return await self.serialize(existing)
         if not await self.db.get(Vehicle, data.vehicle_id):
             raise HTTPException(404, 'Veículo não encontrado')
@@ -71,7 +75,7 @@ class MaintenanceOrderService:
         await self.db.flush()
         reservation = await self.balance.reserve(contract_id=order.contract_id, provider_id=order.provider_id,
             source_type='MAINTENANCE_ORDER', source_id=order.id, amount=order.estimated_cost,
-            vehicle_id=order.vehicle_id, organization_id=order.responsible_organization_id, actor=actor)
+            vehicle_id=order.vehicle_id, organization_id=order.responsible_organization_id, actor=actor, item_lines=data.item_lines)
         order.reservation_id = reservation.id
         await self.db.flush()
         return await self.serialize(order)
@@ -105,6 +109,13 @@ class MaintenanceOrderService:
             result = await self.serialize(order)
             if result['total_cost'] != money(data.total_cost):
                 raise HTTPException(409, 'Pedido concluído. Utilize a retificação do registro para alterar o custo.')
+            from app.core.config import settings
+            if settings.CONTRACT_QUANTITY_ENABLED and data.item_lines is not None:
+                from app.models.contract_balance import ContractOperation
+                from app.services.contract_item_service import ContractItemService
+                operation = await self.db.scalar(select(ContractOperation).where(ContractOperation.reservation_id == order.reservation_id))
+                if operation and operation.item_revision:
+                    await ContractItemService(self.db).realize(operation, data.item_lines, actor)
             return result
         if order.status == 'CANCELLED':
             raise HTTPException(409, 'Pedido cancelado')
@@ -119,7 +130,7 @@ class MaintenanceOrderService:
             raise HTTPException(422, 'Conclusão anterior ao início da manutenção')
         record.end_date, record.total_cost, record.parts_replaced = end, money(data.total_cost), data.parts_replaced
         await self.balance.settle(order.reservation_id, source_type='MAINTENANCE', source_id=record.id,
-                                  amount=record.total_cost, occurred_at=end, actor=actor)
+                                  amount=record.total_cost, occurred_at=end, actor=actor, item_lines=data.item_lines)
         order.status = 'COMPLETED'
         await self.balance.audit.record(actor=actor, action='MAINTENANCE_COMPLETED', entity_type='MAINTENANCE_ORDER',
             entity_id=order.id, entity_label=order.service_description[:100], details={'total_cost': str(record.total_cost)})

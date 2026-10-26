@@ -4,6 +4,8 @@ import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
 import { ADDITIVE_TYPE_OPTIONS, FUEL_TYPE_OPTIONS, resolveOptionValue } from '../utils/fuelSupplyDetails'
 import { formatContractMoney as brl } from '../utils/contractBalance'
+import useFuelItemAllocation from '../hooks/useFuelItemAllocation'
+import FuelItemAllocationFields from './contracts/FuelItemAllocationFields'
 
 const MAX_RECEIPT_SIZE_BYTES = 8 * 1024 * 1024
 const ALLOWED_RECEIPT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
@@ -31,6 +33,7 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
   const receiptRef = useRef(null)
   const fuelType = resolveOptionValue(form.fuel_type, form.fuel_type_other)
   const fuelChanged = Boolean(order?.requested_fuel_type && fuelType && fuelKey(fuelType) !== fuelKey(order.requested_fuel_type))
+  const allocation=useFuelItemAllocation({funding:order?.contract_funding,contractId:order?.contract_id,providerId:order?.contract_provider_id,fuelType,liters:form.liters,totalAmount:form.total_amount,additiveType:form.additive_enabled?resolveOptionValue(form.additive_type,form.additive_type_other):'',additiveLiters:form.additive_enabled?form.additive_quantity_liters:''})
 
   const submitLabel = useMemo(() => (submitting ? 'Confirmando...' : 'Confirmar abastecimento'), [submitting])
 
@@ -63,6 +66,7 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
   async function handleSubmit(event) {
     event.preventDefault()
     setError('')
+    if(allocation.error){setError(allocation.error);return}
 
     const additiveType = form.additive_enabled ? resolveOptionValue(form.additive_type, form.additive_type_other) : ''
 
@@ -102,6 +106,7 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
     try {
       setSubmitting(true)
       const payload = new FormData()
+      if(allocation.lines)payload.append('item_lines',JSON.stringify(allocation.lines))
       payload.append('odometer_km', String(Number(form.odometer_km)))
       payload.append('liters', String(Number(form.liters)))
       payload.append('total_amount', String(Number(form.total_amount)))
@@ -221,6 +226,7 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
         <textarea id={`${formId}-notes`} className="app-textarea" rows="3" value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} />
       </div>
 
+      <FuelItemAllocationFields allocation={allocation}/>
       <div className="actions-inline modal-actions">
         <button className="app-button" type="submit" disabled={submitting}>{submitLabel}</button>
         <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>

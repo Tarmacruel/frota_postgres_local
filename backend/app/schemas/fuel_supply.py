@@ -6,9 +6,11 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 from app.models.fuel_supply_order import FuelSupplyOrderStatus
 from app.schemas.common import PaginatedResponse
 from app.schemas.contract_balance import FundingFields
+from app.schemas.contract_item import ItemOrderLine
 
 
 class FuelSupplyCreate(BaseModel):
+    item_lines: list[ItemOrderLine] | None = Field(default=None, max_length=100)
     contract_id: UUID | None = None
     contract_provider_id: UUID | None = None
     expected_price_id: UUID | None = None
@@ -119,6 +121,7 @@ class FuelAnomalyReportItem(BaseModel):
 
 
 class FuelSupplyOrderCreate(BaseModel):
+    item_lines: list[ItemOrderLine] | None = Field(default=None, max_length=100)
     contract_id: UUID | None = None
     contract_provider_id: UUID | None = None
     requested_fuel_type: str | None = Field(default=None, max_length=80)
@@ -141,6 +144,7 @@ class FuelSupplyOrderCreate(BaseModel):
 
 
 class FuelSupplyOrderBatchItem(BaseModel):
+    item_lines: list[ItemOrderLine] | None = Field(default=None, max_length=100)
     vehicle_id: UUID
     requested_liters: float | None = Field(default=None, gt=0)
 
@@ -174,6 +178,7 @@ class FuelSupplyOrderBatchCreate(BaseModel):
 
 
 class FuelSupplyOrderConfirm(BaseModel):
+    item_lines: list[ItemOrderLine] | None = Field(default=None, max_length=100)
     supplied_at: datetime | None = None
     odometer_km: float = Field(gt=0)
     liters: float = Field(gt=0)
@@ -220,6 +225,7 @@ class FuelSupplyOrderCancel(BaseModel):
 
 
 class FuelSupplyRectify(BaseModel):
+    item_lines: list[ItemOrderLine] | None = Field(default=None, max_length=100)
     supplied_at: datetime
     odometer_km: float = Field(gt=0)
     liters: float = Field(gt=0)
@@ -261,6 +267,7 @@ class FuelSupplyRectify(BaseModel):
 
 
 class FuelSupplyOrderDeadlineUpdate(BaseModel):
+    item_lines: list[ItemOrderLine] | None = Field(default=None, max_length=100)
     expires_at: datetime
     reason: str = Field(min_length=10, max_length=1000)
 

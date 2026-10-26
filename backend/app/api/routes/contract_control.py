@@ -48,7 +48,7 @@ async def write(db, operation):
 
 @router.get('/config')
 async def config(_user: User = Depends(get_current_user_ready)):
-    return {'enabled': settings.CONTRACT_BALANCE_ENABLED, 'currency': 'BRL', 'shared_balance': True}
+    return {'enabled': settings.CONTRACT_BALANCE_ENABLED, 'quantity_enabled': settings.CONTRACT_QUANTITY_ENABLED, 'currency': 'BRL', 'shared_balance': True}
 
 
 @router.get('/catalog', dependencies=[Depends(enabled)])
@@ -58,7 +58,16 @@ async def catalog(db: AsyncSession = Depends(get_db_session), _user: User = Depe
         .outerjoin(ContractProvider, and_(ContractProvider.fuel_station_id == FuelStation.id, ContractProvider.active.is_(True)))
         .outerjoin(PaymentContract, PaymentContract.id == ContractProvider.contract_id)
         .order_by(FuelStation.name))).mappings().all()
-    return {'stations': [dict(s) for s in stations]}
+    catalog_stations = {}
+    for station in stations:
+        entry = catalog_stations.setdefault(station['id'], {**dict(station), 'active_contracts': []})
+        if station['active_contract_id']:
+            entry['active_contracts'].append({'id': station['active_contract_id'], 'number': station['active_contract_number']})
+    for entry in catalog_stations.values():
+        if len(entry['active_contracts']) != 1:
+            entry['active_contract_id'] = None
+            entry['active_contract_number'] = None
+    return {'stations': list(catalog_stations.values())}
 
 
 @router.get('/eligible', dependencies=[Depends(enabled)])
@@ -96,7 +105,7 @@ async def overview(kind: PaymentProcessKind | None = None, search: str | None = 
         'opened': lambda c: c.get('control_opened'),
         'paid': lambda c: c.get('paid_amount', 0) > 0,
         'pending': lambda c: c.get('pending_amount', 0) > 0,
-        'pending_setup': lambda c: not c.get('control_opened') or not c['provider_count'] or not c.get('valid_from') or not c.get('valid_until'),
+        'pending_setup': lambda c: not c.get('control_opened') or not c['provider_count'] or not c.get('valid_from') or not c.get('valid_until') or 'Itens e quantidades ainda não conferidos' in c.get('eligibility_errors', []),
         'reserved': lambda c: c.get('reserved_amount', 0) > 0,
         'consumed': lambda c: c.get('consumed_since_opening', 0) != 0,
         'low_balance': lambda c: c.get('control_opened') and c['available_balance'] <= c['opening_balance']*Decimal('.10'),
@@ -168,7 +177,7 @@ async def quote(contract_id: UUID, data: ContractQuote, db: AsyncSession = Depen
         raise HTTPException(403, 'Defina sua secretaria antes de emitir pedidos')
     service = ContractBalanceService(db)
     await service.release_expired(contract_id=contract_id)
-    result = await service.quote(contract_id, data.provider_id, data.fuel_type, data.liters, item_liters=data.item_liters)
+    result = await service.quote(contract_id, data.provider_id, data.fuel_type, data.liters, item_liters=data.item_liters, item_lines=data.item_lines)
     await db.commit()
     return result
 

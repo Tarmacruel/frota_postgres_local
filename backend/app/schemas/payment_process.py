@@ -72,6 +72,15 @@ class PaymentContractAmendmentOut(BaseModel):
     value_delta: Decimal | None
     valid_until: date | None
     notes: str | None
+    instrument_type: str | None = None
+    change_types: list[str] | None = None
+    effective_date: date | None = None
+    document_reference: str | None = None
+    price_financial_delta: Decimal | None = None
+    request_key: UUID | None = None
+    snapshot: dict | None = None
+    attachment: dict | None = None
+    corrects_amendment_id: UUID | None = None
     created_at: datetime
     updated_at: datetime
 

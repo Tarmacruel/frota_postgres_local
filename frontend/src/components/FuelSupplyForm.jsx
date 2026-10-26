@@ -2,6 +2,8 @@ import { useMemo, useRef, useState } from 'react'
 import SearchableSelect from './SearchableSelect'
 import useContractFunding from '../hooks/useContractFunding'
 import ContractFundingFields from './contracts/ContractFundingFields'
+import useFuelItemAllocation from '../hooks/useFuelItemAllocation'
+import FuelItemAllocationFields from './contracts/FuelItemAllocationFields'
 import { fuelSuppliesAPI } from '../api/fuelSupplies'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
@@ -58,7 +60,8 @@ export default function FuelSupplyForm({ vehicles, onVehicleOptionsOpen, drivers
   })
   const [receiptFile, setReceiptFile] = useState(null)
   const funding = useContractFunding({ stationId: form.fuel_station_id, liters: form.liters,
-    fuelType: resolveOptionValue(form.fuel_type, form.fuel_type_other) })
+    fuelType: resolveOptionValue(form.fuel_type, form.fuel_type_other), additiveType:form.additive_enabled?resolveOptionValue(form.additive_type,form.additive_type_other):'',additiveLiters:form.additive_quantity_liters })
+  const allocation=useFuelItemAllocation({funding:{item_lines:funding.quote?.item_lines},enabled:funding.quantityEnabled,contractId:funding.contract?.id,providerId:funding.provider?.id,fuelType:resolveOptionValue(form.fuel_type,form.fuel_type_other),liters:form.liters,totalAmount:form.total_amount,additiveType:form.additive_enabled?resolveOptionValue(form.additive_type,form.additive_type_other):'',additiveLiters:form.additive_enabled?form.additive_quantity_liters:''})
   const [receiptError, setReceiptError] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -126,6 +129,8 @@ export default function FuelSupplyForm({ vehicles, onVehicleOptionsOpen, drivers
       setSubmitting(true)
       setError('')
       const payload = new FormData()
+      if(allocation.error){setError(allocation.error);return}
+      if(allocation.lines)payload.append('item_lines',JSON.stringify(allocation.lines))
       if (funding.enabled !== false) {
         if (!funding.ready) throw new Error('Confira o contrato e o saldo disponível antes de registrar.')
         for (const field of ['contract_id', 'contract_provider_id', 'expected_price_id', 'request_key']) payload.append(field, funding.payload[field])
@@ -249,6 +254,7 @@ export default function FuelSupplyForm({ vehicles, onVehicleOptionsOpen, drivers
       </div>
 
       <ContractFundingFields funding={funding} externalFuelType />
+      <FuelItemAllocationFields allocation={allocation}/>
       <div className="actions-inline modal-actions">
         <button className="app-button" type="submit" disabled={submitting || !funding.ready}>{submitLabel}</button>
         <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>

@@ -94,6 +94,10 @@ class FuelSupplyOrderService:
                         data.vehicle_id, data.contract_id, data.contract_provider_id, data.fuel_station_id,
                         Decimal(str(data.requested_liters)), fuel_key(data.requested_fuel_type), data.expires_at):
                     raise HTTPException(409, 'Esta identificação já foi usada em outro pedido')
+                if settings.CONTRACT_QUANTITY_ENABLED:
+                    from app.services.contract_item_service import ContractItemService
+                    await ContractItemService(self.db).assert_replay(prior.contract_reservation_id, data.item_lines,
+                        fuel_type=data.requested_fuel_type, liters=data.requested_liters)
                 return await self.get_order(prior.id, current_user=current_user)
         vehicle = await self._get_visible_vehicle(data.vehicle_id, current_user)
         order_organization_id = await self._validate_order_context(
@@ -156,6 +160,12 @@ class FuelSupplyOrderService:
                     or row.fuel_station_id != data.fuel_station_id or row.expires_at != data.expires_at
                     or row.requested_fuel_type != fuel_key(data.requested_fuel_type) for row in prior):
                     raise HTTPException(409, 'Esta identificação já foi usada em outro lote')
+                if settings.CONTRACT_QUANTITY_ENABLED:
+                    from app.services.contract_item_service import ContractItemService
+                    for row in prior:
+                        entry = next(i for i in data.items if i.vehicle_id == row.vehicle_id)
+                        await ContractItemService(self.db).assert_replay(row.contract_reservation_id, entry.item_lines,
+                            fuel_type=data.requested_fuel_type, liters=entry.requested_liters)
                 return {'created_count': len(prior), 'orders': [await self.get_order(row.id, current_user=current_user) for row in prior]}
         self._ensure_batch_items_are_valid(data)
         self._ensure_order_deadline(data.expires_at)
@@ -195,7 +205,7 @@ class FuelSupplyOrderService:
                 await attribute_operation(self.db, order, current_user, new=True)
                 await self.orders.create(order)
                 if settings.CONTRACT_BALANCE_ENABLED:
-                    await self._fund_order(order, data, current_user)
+                    await self._fund_order(order, data, current_user, item_lines=item.item_lines)
                 created_orders.append((order, vehicle))
 
             for order, vehicle in created_orders:
@@ -360,7 +370,7 @@ class FuelSupplyOrderService:
                 supply.contract_reservation_id = order.contract_reservation_id
                 await ContractBalanceService(self.db).settle(order.contract_reservation_id,
                     source_type='FUEL_SUPPLY', source_id=supply.id, amount=supply.total_amount,
-                    occurred_at=supplied_at, actor=current_user)
+                    occurred_at=supplied_at, actor=current_user, item_lines=data.item_lines)
             relative_receipt_path, stored_receipt_path = self._build_receipt_storage_paths(supply.id, receipt_payload["mime_type"])
             self._store_file(stored_receipt_path, receipt_payload["content"])
             supply.receipt_path = relative_receipt_path
@@ -494,10 +504,15 @@ class FuelSupplyOrderService:
             if contract.valid_until and payload.expires_at.astimezone(TZ).date() > contract.valid_until:
                 raise HTTPException(409, 'O novo prazo ultrapassa a vigência do contrato')
             if was_expired:
+                lines = payload.item_lines
+                if settings.CONTRACT_QUANTITY_ENABLED and lines is None:
+                    from app.services.contract_item_service import ContractItemService
+                    previous_lines = await ContractItemService(self.db).reservation_lines(order.contract_reservation_id)
+                    lines = [dict(item_id=r['item_id'], quantity=r['quantity']) for r in previous_lines] or None
                 await ContractBalanceService(self.db).release(order.contract_reservation_id, actor=current_user, reason='Reabertura de ordem expirada')
                 await self._fund_order(order, SimpleNamespace(contract_id=order.contract_id,
                     contract_provider_id=order.contract_provider_id, requested_fuel_type=order.requested_fuel_type,
-                    expected_price_id=None), current_user)
+                    expected_price_id=None, item_lines=lines), current_user)
         if not was_expired and payload.expires_at <= order.expires_at:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -549,7 +564,7 @@ class FuelSupplyOrderService:
             signed = (key.int & ((1 << 64)-1))-(1 << 63)
             await self.db.execute(text('SELECT pg_advisory_xact_lock(:request_key)'), {'request_key': signed})
 
-    async def _fund_order(self, order, data, actor):
+    async def _fund_order(self, order, data, actor, item_lines=None):
         service = ContractBalanceService(self.db)
         contract = await service.contract(data.contract_id)
         if contract.valid_until and order.expires_at.astimezone(TZ).date() > contract.valid_until:
@@ -557,7 +572,8 @@ class FuelSupplyOrderService:
         reservation = await service.reserve(contract_id=data.contract_id, provider_id=data.contract_provider_id,
             source_type='FUEL_ORDER', source_id=order.id, vehicle_id=order.vehicle_id,
             organization_id=order.organization_id, actor=actor, fuel_type=data.requested_fuel_type,
-            liters=order.requested_liters, expected_price_id=data.expected_price_id, station_id=order.fuel_station_id)
+            liters=order.requested_liters, expected_price_id=data.expected_price_id, station_id=order.fuel_station_id,
+            item_lines=item_lines if item_lines is not None else getattr(data, 'item_lines', None))
         order.contract_id, order.contract_provider_id = data.contract_id, data.contract_provider_id
         order.contract_reservation_id, order.max_amount = reservation.id, reservation.amount
         order.requested_fuel_type = reservation.fuel_type

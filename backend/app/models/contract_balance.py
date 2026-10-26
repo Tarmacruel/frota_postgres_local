@@ -42,9 +42,6 @@ class ContractControl(Base):
 class ContractProvider(Base):
     __tablename__ = 'contract_providers'
     __table_args__ = (
-        Index('uq_contract_provider_active_station', 'fuel_station_id', unique=True,
-              postgresql_where=text('fuel_station_id IS NOT NULL AND active'),
-              sqlite_where=text('fuel_station_id IS NOT NULL AND active')),
         Index('uq_contract_provider_station', 'contract_id', 'fuel_station_id', unique=True,
               postgresql_where=text('fuel_station_id IS NOT NULL'), sqlite_where=text('fuel_station_id IS NOT NULL')),
         Index('uq_contract_provider_workshop', 'contract_id', 'supplier_id', unique=True,
@@ -98,6 +95,7 @@ class ContractReservation(Base):
 
 class ContractOperation(Base):
     __tablename__ = 'contract_operations'
+    item_revision: Mapped[int] = mapped_column(Integer, default=0, server_default=text('0'))
     __table_args__ = (UniqueConstraint('source_type', 'source_id', name='uq_contract_operation_source'),
                      CheckConstraint('amount >= 0', name='ck_contract_operation_nonnegative'))
     id: Mapped[UUID] = pk()

@@ -1,0 +1,52 @@
+.modal-shell.contract-amendment-editor,.modal-shell.contract-item-editor{width:min(1080px,calc(100vw - 40px));max-width:none;max-height:calc(100dvh - 36px)}
+.contract-amendment-editor>.modal-body,.contract-item-editor>.modal-body{display:block;overflow-y:auto;min-height:0}
+.contract-amendment-form{display:block!important;position:relative}
+.contract-editor-section{padding:20px 0;border-bottom:1px solid var(--ui-border,#d7e0ed)}
+.contract-editor-section:first-of-type{padding-top:0}
+.contract-editor-section>h3{font-size:16px;display:flex;gap:10px;align-items:center;margin:0 0 16px}
+.contract-editor-section>h3>span{font-size:12px;display:grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--ui-primary,#2563eb);color:#fff}
+.contract-editor-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:14px 20px}
+.contract-editor-grid>label,.contract-amendment-item label,.contract-editor-section>label{display:grid;gap:6px;font-size:13px;min-width:0}
+.contract-check{display:flex!important;align-items:center;gap:8px!important;cursor:pointer}
+.contract-check input{width:17px;height:17px;flex-shrink:0;accent-color:var(--ui-primary,#2563eb)}
+.contract-amendment-kinds{display:flex;flex-wrap:wrap;gap:12px 24px;margin-bottom:18px}
+.contract-amendment-item{padding:18px 0;border-bottom:1px solid var(--ui-border,#d7e0ed);animation:contract-item-reveal 140ms ease-out}
+.contract-amendment-item .contract-order-panel__heading small{display:block}
+.contract-amendment-providers{padding-top:8px}
+.contract-amendment-providers>div{display:grid;grid-template-columns:minmax(0,1fr) 190px;gap:16px;padding:8px 0;align-items:center}
+.contract-amendment-providers small{font-size:11px}
+.contract-amendment-impact{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 20px;margin:18px 0}
+.contract-amendment-impact>div{border-bottom:1px solid var(--ui-border,#d7e0ed);padding-bottom:10px}
+.contract-amendment-impact dt{font-size:12px;color:var(--ui-text-muted,#64748b)}
+.contract-amendment-impact dd{margin:4px 0 0;font-weight:700;font-variant-numeric:tabular-nums}
+.contract-amendment-total{display:flex;justify-content:space-between;gap:16px;padding:12px 0;font-weight:600}
+.contract-limit-memory{margin-top:16px;font-size:12px}
+.contract-limit-memory>div{display:grid;gap:4px;padding:10px 0;border-bottom:1px solid var(--ui-border,#d7e0ed)}
+.contract-editor-footer{position:sticky;bottom:-1px;z-index:2;display:flex;justify-content:flex-end;gap:10px;padding:14px 0;margin-top:12px;border-top:1px solid var(--ui-border,#d7e0ed);background:var(--ui-surface,#fff)}
+[data-theme=dark] .contract-editor-footer{background:var(--ui-surface,#0d192b)}
+.contract-item-lines{padding:12px 0;min-width:0}
+.contract-item-lines__row{display:grid;grid-template-columns:minmax(200px,2fr) minmax(100px,1fr) minmax(120px,1fr) auto auto;gap:10px;align-items:end;padding:12px 0;border-bottom:1px solid var(--ui-border,#d7e0ed)}
+.contract-item-lines__row label{display:grid;gap:6px;font-size:12px;min-width:0}
+.contract-item-lines__row .app-input,.contract-item-lines__row .app-select{width:100%;min-width:0}
+.contract-item-lines__total{white-space:nowrap;padding-bottom:8px;font-variant-numeric:tabular-nums}
+.contract-item-lines__description{grid-column:span 2}
+.contract-item-lines__sum{text-align:right;margin:12px 0 0}
+.contract-item-price-list{margin-top:12px}
+.contract-items-panel .contract-order-panel__heading{flex-wrap:wrap}
+.contract-items-panel td input{min-width:100px}
+@keyframes contract-item-reveal{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
+@media(max-width:700px){
+ .modal-shell.contract-amendment-editor,.modal-shell.contract-item-editor{width:100%;height:100dvh;max-height:100dvh;border-radius:0;margin:0}
+ .contract-editor-grid{grid-template-columns:1fr;gap:14px}
+ .contract-editor-grid .contract-form__wide{grid-column:auto}
+ .contract-editor-section{padding:18px 0}
+ .contract-amendment-providers>div{grid-template-columns:1fr;gap:8px}
+ .contract-item-lines__row{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .contract-item-lines__row>label:first-child{grid-column:1/-1}
+ .contract-item-lines__total{padding:8px 0}
+ .contract-item-lines__row>button{justify-self:end}
+ .contract-item-lines__description{grid-column:1/-1}
+ .contract-editor-footer>.app-button{flex:1}
+ .contract-amendment-impact{gap:12px}
+}
+@media(prefers-reduced-motion:reduce){.contract-amendment-item{animation:none}}

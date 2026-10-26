@@ -4,6 +4,8 @@ import { fuelSuppliesAPI } from '../api/fuelSupplies'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
 import { ADDITIVE_TYPE_OPTIONS, FUEL_TYPE_OPTIONS, resolveOptionValue } from '../utils/fuelSupplyDetails'
+import useFuelItemAllocation from '../hooks/useFuelItemAllocation'
+import FuelItemAllocationFields from './contracts/FuelItemAllocationFields'
 
 const MAX_RECEIPT_SIZE_BYTES = 8 * 1024 * 1024
 const ALLOWED_RECEIPT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
@@ -32,6 +34,7 @@ export default function FuelSupplyRectifyForm({ record, onClose, onSuccess }) {
     reason: '',
   })
   const [error, setError] = useState('')
+  const allocation=useFuelItemAllocation({funding:record?.contract_funding,contractId:record?.contract_id,providerId:record?.contract_provider_id,fuelType:resolveOptionValue(form.fuel_type,form.fuel_type_other),liters:form.liters,totalAmount:form.total_amount,additiveType:form.additive_enabled?resolveOptionValue(form.additive_type,form.additive_type_other):'',additiveLiters:form.additive_enabled?form.additive_quantity_liters:''})
   const [submitting, setSubmitting] = useState(false)
   const [receiptFile, setReceiptFile] = useState(null)
   const [receiptError, setReceiptError] = useState('')
@@ -94,6 +97,7 @@ export default function FuelSupplyRectifyForm({ record, onClose, onSuccess }) {
       submittingRef.current = true
       setSubmitting(true)
       const data = {
+        ...(allocation.lines?{item_lines:allocation.lines}:{}),
         supplied_at: new Date(form.supplied_at).toISOString(),
         odometer_km: Number(form.odometer_km),
         liters: Number(form.liters),
@@ -207,8 +211,9 @@ export default function FuelSupplyRectifyForm({ record, onClose, onSuccess }) {
         <small className="muted">A justificativa e os valores anterior e novo ficarão registrados na auditoria.</small>
       </div>
 
+      <FuelItemAllocationFields allocation={allocation}/>
       <div className="actions-inline modal-actions">
-        <button className="app-button" type="submit" disabled={submitting || Boolean(receiptError)}>{submitLabel}</button>
+        <button className="app-button" type="submit" disabled={submitting || Boolean(receiptError) || Boolean(allocation.error)}>{submitLabel}</button>
         <button className="ghost-button" type="button" onClick={onClose} disabled={submitting}>Cancelar</button>
       </div>
     </form>

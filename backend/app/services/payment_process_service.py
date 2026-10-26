@@ -637,6 +637,18 @@ class PaymentProcessService:
         return {"message": "Contrato cancelado"}
 
     async def create_contract_amendment(self, contract_id: UUID, data: PaymentContractAmendmentCreate, current_user: User) -> dict:
+        from app.schemas.contract_item import ItemAmendmentCreate
+        if isinstance(data, ItemAmendmentCreate):
+            from app.services.contract_amendment_service import ContractAmendmentService
+            try:
+                await ContractAmendmentService(self.db).confirm(contract_id, data, current_user)
+                await self.db.commit()
+                return await self.get_contract(contract_id)
+            except Exception:
+                await self.db.rollback()
+                raise
+        if settings.CONTRACT_QUANTITY_ENABLED:
+            raise HTTPException(422, 'Utilize o formulário de alteração por itens, com prévia e confirmação dos impactos')
         contract = await self.repository.get_contract(contract_id)
         if not contract:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
@@ -1760,6 +1772,15 @@ class PaymentProcessService:
                     "value_delta": amendment.value_delta,
                     "valid_until": amendment.valid_until,
                     "notes": amendment.notes,
+                    "instrument_type": amendment.instrument_type,
+                    "change_types": amendment.change_types,
+                    "effective_date": amendment.effective_date,
+                    "document_reference": amendment.document_reference,
+                    "price_financial_delta": amendment.price_financial_delta,
+                    "request_key": amendment.request_key,
+                    "snapshot": amendment.snapshot,
+                    "attachment": {k: v for k, v in amendment.attachment.items() if k not in {'path', 'actor_id'}} if amendment.attachment else None,
+                    "corrects_amendment_id": amendment.corrects_amendment_id,
                     "created_at": amendment.created_at,
                     "updated_at": amendment.updated_at,
                 }

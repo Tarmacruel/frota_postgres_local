@@ -9,11 +9,13 @@ import { contractOrderPath, rememberContractPosition, restoreContractPosition } 
 import PageHeader from '../components/ui/PageHeader'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import ContractSetupDialog from '../components/contracts/ContractSetupDialog'
+import ContractAmendmentEditor from '../components/contracts/ContractAmendmentEditor'
 import ContractInspector, { ContractMovementContent, ContractPosition, ContractState } from '../components/contracts/ContractInspector'
 import { formatContractMoney as brl, contractDate, contractKinds } from '../utils/contractBalance'
 import PaymentProcessesPage from './PaymentProcessesPage'
 import { appEnvironment } from '../config/environment'
 import '../styles/contracts-balances.css'
+import '../styles/contract-items.css'
 
 const views = [['contracts', 'Contratos'], ['movements', 'Pedidos e movimentações'], ['payments', 'Faturas e pagamentos'], ['suppliers', 'Prestadores']]
 const attention = [['pending_setup', 'Configuração pendente', 'warning'], ['divergence', 'Divergência', 'danger'], ['low_balance', 'Saldo até 10%', 'warning'], ['expires_30', 'Vencem em 30 dias', 'info']]
@@ -23,10 +25,10 @@ export default function ContractBalancesPage() {
   if (mode.enabled === null) return <p role="status">Carregando acompanhamento contratual…</p>
   if (mode.error) return <div className="alert alert-error" role="alert">{mode.error}</div>
   if (!mode.enabled) return <PaymentProcessesPage />
-  return <ContractWorkspace />
+  return <ContractWorkspace quantityEnabled={mode.quantityEnabled} />
 }
 
-function ContractWorkspace() {
+function ContractWorkspace({ quantityEnabled = false }) {
   const { canEdit, canCreate, canView } = useAuth()
   const manage = canEdit('payment_processes')
   const [params, setParams] = useSearchParams()
@@ -173,8 +175,8 @@ function ContractWorkspace() {
     {appEnvironment.isHomologation ? <p className="contract-hml-note">Homologação: a cópia das 06h reinicia os cadastros e os pedidos exclusivos dos testes.</p> : null}
     <ContractInspector open={view === 'contracts' && Boolean(selectedId)} detail={currentDetail} row={row} loading={detailLoading || (!currentDetail && !detailError)} error={detailError} tab={tab} onTab={(value) => update({ contract_tab: value })} onClose={closeInspector}
       onShow={show} onPayments={payments} onMovements={movements} movementMode={movementMode} onMovementMode={(mode) => update({ movement_mode: mode })}
-      manage={manage} canCreateOrder={c ? canCreate(c.kind === 'FUEL' ? 'fuel_supply_orders' : 'maintenance') : false} canViewMaintenance={canView('maintenance')} orderPath={orderPath} onOrder={onOrder} onProviderToggle={toggleProvider} revision={revision} returnFocusRef={returnFocusRef} onRefresh={refresh} />
-    {dialog ? <ContractSetupDialog key={`${dialog.type}:${dialog.price?.id || dialog.contract?.id || dialog.supplier?.id || 'new'}`} dialog={dialog} suppliers={catalog.suppliers} stations={catalog.stations} providers={detail?.providers || []} onClose={() => setDialog(null)} onSuccess={(result, type) => {
+      manage={manage} quantityEnabled={quantityEnabled} canCreateOrder={c ? canCreate(c.kind === 'FUEL' ? 'fuel_supply_orders' : 'maintenance') : false} canViewMaintenance={canView('maintenance')} orderPath={orderPath} onOrder={onOrder} onProviderToggle={toggleProvider} revision={revision} returnFocusRef={returnFocusRef} onRefresh={refresh} />
+    {dialog && quantityEnabled && dialog.type === 'amend' ? <ContractAmendmentEditor contract={dialog.contract} providers={detail?.providers || []} onClose={() => setDialog(null)} onSuccess={() => { setFeedback('Alteração registrada. Demonstrativo disponível no histórico.'); refresh() }} /> : dialog ? <ContractSetupDialog key={`${dialog.type}:${dialog.price?.id || dialog.contract?.id || dialog.supplier?.id || 'new'}`} dialog={dialog} suppliers={catalog.suppliers} stations={catalog.stations} providers={detail?.providers || []} onClose={() => setDialog(null)} onSuccess={(result, type) => {
       setFeedback(type === 'priceDelete' ? 'Preço excluído. Reservas e abastecimentos anteriores foram preservados.' : 'Dados salvos. O acompanhamento foi atualizado.'); refresh()
       if (type === 'contract') update({ contract_id: result.id, view: 'contracts', contract_tab: 'settings', contract_indicator: '' })
     }} /> : null}

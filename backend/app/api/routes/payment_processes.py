@@ -1,4 +1,5 @@
 from __future__ import annotations
+from app.schemas.contract_item import ItemAmendmentCreate
 
 from app.repositories.interactive_kpis import IndicatorRequest, indicator_context
 
@@ -357,7 +358,7 @@ async def delete_payment_contract(
 @contract_router.post("/{contract_id}/amendments", response_model=PaymentContractOut, status_code=status.HTTP_201_CREATED)
 async def create_payment_contract_amendment(
     contract_id: UUID,
-    data: PaymentContractAmendmentCreate,
+    data: ItemAmendmentCreate | PaymentContractAmendmentCreate,
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("payment_processes", "edit")),
 ):
