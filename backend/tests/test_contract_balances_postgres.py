@@ -45,6 +45,7 @@ async def pg(monkeypatch):
     assert parsed.host == '127.0.0.1' and parsed.port == 5441
     assert parsed.database.startswith('frota_contract_tests_')
     monkeypatch.setattr(settings, 'CONTRACT_BALANCE_ENABLED', True)
+    monkeypatch.setattr(settings, 'CONTRACT_QUANTITY_ENABLED', False)
     engine = create_async_engine(URL)
     async with engine.begin() as conn:
         await conn.execute(text('CREATE EXTENSION IF NOT EXISTS citext'))

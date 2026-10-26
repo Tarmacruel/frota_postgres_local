@@ -1,5 +1,7 @@
-.modal-shell.contract-amendment-editor,.modal-shell.contract-item-editor{width:min(1080px,calc(100vw - 40px));max-width:none;max-height:calc(100dvh - 36px)}
-.contract-amendment-editor>.modal-body,.contract-item-editor>.modal-body{display:block;overflow-y:auto;min-height:0}
+body.internal-app-active .modal-backdrop .modal-shell.contract-amendment-editor,body.internal-app-active .modal-backdrop .modal-shell.contract-item-editor{width:min(1080px,calc(100vw - 40px));max-width:none;max-height:calc(100dvh - 36px);display:flex;flex-direction:column;padding:0;border-radius:14px;overflow:hidden;background:var(--ui-surface,#fff);color:var(--ui-text,#172b4d)}
+body.internal-app-active .contract-amendment-editor>.modal-header,body.internal-app-active .contract-item-editor>.modal-header{padding:20px 24px;margin:0;flex-shrink:0;border-bottom:1px solid var(--ui-border,#d7e0ed);background:var(--ui-surface,#fff)}
+body.internal-app-active .contract-amendment-editor>.modal-body,body.internal-app-active .contract-item-editor>.modal-body{display:block;overflow-y:auto;min-height:0;padding:20px 24px;overscroll-behavior:contain}
+body.internal-app-active :is(.contract-amendment-editor,.contract-item-editor) :is(.app-input,.app-select,.app-textarea){width:100%;min-height:42px;border-radius:8px;background:var(--ui-surface,#fff);color:var(--ui-text,#172b4d);font-size:14px}
 .contract-amendment-form{display:block!important;position:relative}
 .contract-editor-section{padding:20px 0;border-bottom:1px solid var(--ui-border,#d7e0ed)}
 .contract-editor-section:first-of-type{padding-top:0}
@@ -36,7 +38,10 @@
 .contract-items-panel td input{min-width:100px}
 @keyframes contract-item-reveal{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:700px){
- .modal-shell.contract-amendment-editor,.modal-shell.contract-item-editor{width:100%;height:100dvh;max-height:100dvh;border-radius:0;margin:0}
+ body.internal-app-active .modal-backdrop:has(>:is(.contract-amendment-editor,.contract-item-editor)){padding:0;align-items:stretch;justify-items:stretch}
+ body.internal-app-active .modal-backdrop .modal-shell.contract-amendment-editor,body.internal-app-active .modal-backdrop .modal-shell.contract-item-editor{width:100%;height:100dvh;max-height:100dvh;border-radius:0;margin:0}
+ body.internal-app-active :is(.contract-amendment-editor,.contract-item-editor)>.modal-header,body.internal-app-active :is(.contract-amendment-editor,.contract-item-editor)>.modal-body{padding:16px}
+ body.internal-app-active :is(.contract-amendment-editor,.contract-item-editor) :is(.app-input,.app-select,.app-textarea){font-size:16px;min-height:48px}
  .contract-editor-grid{grid-template-columns:1fr;gap:14px}
  .contract-editor-grid .contract-form__wide{grid-column:auto}
  .contract-editor-section{padding:18px 0}

@@ -3,11 +3,11 @@ import { beforeEach, expect, it, vi } from 'vitest'
 import ContractAmendmentEditor, { ContractAmendmentReport } from './ContractAmendmentEditor'
 import { contractControlAPI } from '../../api/contractControl'
 import { paymentContractsAPI } from '../../api/paymentProcesses'
-import { exportRowsToXlsx, previewRowsToPdf } from '../../utils/exportData'
+import { exportRowsToXlsx, exportRowsToPdf, previewRowsToPdf } from '../../utils/exportData'
 
 vi.mock('../../api/contractControl',()=>({contractControlAPI:{items:vi.fn(),amendmentPreview:vi.fn(),amendmentAttachment:vi.fn()}}))
 vi.mock('../../api/paymentProcesses',()=>({paymentContractsAPI:{createAmendment:vi.fn()}}))
-vi.mock('../../utils/exportData',()=>({exportRowsToXlsx:vi.fn(),previewRowsToPdf:vi.fn()}))
+vi.mock('../../utils/exportData',()=>({exportRowsToXlsx:vi.fn(),exportRowsToPdf:vi.fn(),previewRowsToPdf:vi.fn()}))
 const contract={id:'contract',number:'TESTE-2026',valid_until:'2027-01-01',amendments:[]}
 const providers=[{id:'provider',name:'Posto fictício',active:true}]
 const item={id:'diesel',code:'DIESEL',original_number:'03',description:'Diesel S10',category:'FUEL',unit:'L',original_quantity:'100',reference_unit_price:'6.02',remaining:'50',active:true}
@@ -64,5 +64,9 @@ it('exporta a fotografia salva sem reenviar a confirmação e permite repetir a 
   fireEvent.click(screen.getByRole('button',{name:'Exportar XLSX'}))
   await waitFor(()=>expect(exportRowsToXlsx).toHaveBeenCalled())
   expect(exportRowsToXlsx.mock.calls[0][0].rows[0]).toMatchObject({original_number:'03',document_number:'001',after_price:'6.21'})
+  await waitFor(()=>expect(screen.getByRole('button',{name:'Baixar PDF'})).toBeEnabled())
+  fireEvent.click(screen.getByRole('button',{name:'Baixar PDF'}))
+  await waitFor(()=>expect(exportRowsToPdf).toHaveBeenCalled())
+  expect(exportRowsToPdf.mock.calls[0][0].columns.map((c)=>c.header)).toContain('Restante após')
   expect(paymentContractsAPI.createAmendment).not.toHaveBeenCalled()
 })

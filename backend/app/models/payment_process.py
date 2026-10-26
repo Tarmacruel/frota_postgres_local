@@ -86,6 +86,7 @@ class PaymentContract(Base):
     number: Mapped[str] = mapped_column(String(80), nullable=False)
     kind: Mapped[PaymentProcessKind | None] = mapped_column(Enum(PaymentProcessKind, name="payment_process_kind"), nullable=True)
     contract_type: Mapped[str | None] = mapped_column(String(120), nullable=True)
+    fuel_pricing_mode: Mapped[str] = mapped_column(String(20), nullable=False, default='FIXED_PRICE', server_default='FIXED_PRICE')
     object_description: Mapped[str | None] = mapped_column(Text, nullable=True)
     valid_from: Mapped[date | None] = mapped_column(Date(), nullable=True)
     valid_until: Mapped[date | None] = mapped_column(Date(), nullable=True)

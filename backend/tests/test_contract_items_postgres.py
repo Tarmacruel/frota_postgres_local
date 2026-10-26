@@ -2,6 +2,7 @@ from datetime import date, datetime, timezone
 from decimal import Decimal
 from uuid import uuid4
 import os
+import json
 import pytest
 import pytest_asyncio
 from sqlalchemy import func, select
@@ -362,3 +363,38 @@ async def test_document_examples_keep_other_items_and_total_fourth_term(pg,monke
     assert Decimal(row.snapshot['quantity_amount'])==Decimal('485743.75')
     assert all(Decimal(r['percent_after'])==25 for r in row.snapshot['limits'] if Decimal(r['after'])>0)
     assert row.snapshot['lines'][0]['original_number']=='02' and row.snapshot['lines'][0]['document_number']=='01'
+
+
+@pytest.mark.asyncio
+async def test_future_network_mode_cannot_accidentally_use_fixed_price_quantity_flow(stocked):
+    c=stocked
+    c.contract.fuel_pricing_mode='NETWORK_VALUE';await c.db.flush()
+    with pytest.raises(HTTPException) as error:await reserve(c,1)
+    assert error.value.status_code==409 and 'rede por valor' in error.value.detail
+    assert (await c.service.balances(c.contract.id))['available_balance']==1100
+    assert (await c.items.balances(c.contract.id))[c.stock['diesel'][0].id]['available']==10
+
+
+@pytest.mark.asyncio
+async def test_linked_correction_cannot_reverse_consumed_addition_and_keeps_snapshot(quant):
+    from app.models.fuel_supply import FuelSupply
+    c=quant;amendments=ContractAmendmentService(c.db)
+    async def confirm(payload):
+        payload.preview_token=(await amendments.preview(c.contract.id,payload,c.actor))['preview_token']
+        return await amendments.confirm(c.contract.id,payload,c.actor)
+    def payload(number,q,corrects=None):
+        return ItemAmendmentCreate(number=number,signed_at=date.today(),effective_date=date.today(),change_types=['QUANTITY'],
+            document_reference='TESTE-CORRECAO',notes='Correção vinculada fictícia e justificada',request_key=uuid4(),
+            declared_quantity_amount=Decimal(q)*10,corrects_amendment_id=corrects,lines=[AmendmentLine(item_id=c.item.id,added_quantity=q)])
+    original=await confirm(payload('QA-ACRESCIMO','10'));await c.db.commit()
+    original_snapshot=json.loads(json.dumps(original.snapshot))
+    held=await reserve(c,15)
+    supply=FuelSupply(id=uuid4(),vehicle_id=c.vehicle.id,fuel_station_id=c.station.id,supplied_at=datetime.now(timezone.utc),
+        odometer_km=100,liters=15,total_amount=150,fuel_type='DIESEL S10',receipt_path='teste.png',receipt_mime_type='image/png',receipt_size_bytes=1)
+    c.db.add(supply);await c.db.flush()
+    await c.service.settle(held.id,source_type='FUEL_SUPPLY',source_id=supply.id,amount=150,occurred_at=supply.supplied_at,actor=c.actor)
+    with pytest.raises(HTTPException):await amendments.preview(c.contract.id,payload('QA-INVALIDA','-10',original.id),c.actor)
+    correction=await confirm(payload('QA-CORRECAO','-5',original.id));await c.db.commit()
+    assert correction.corrects_amendment_id==original.id and original.snapshot==original_snapshot
+    assert (await c.items.balances(c.contract.id))[c.item.id]['available']==0
+    assert (await c.service.balances(c.contract.id))['available_balance']==0

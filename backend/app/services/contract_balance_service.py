@@ -103,6 +103,9 @@ class ContractBalanceService:
 
     async def errors(self, contract, *, require_open=True):
         errors = []
+        from app.core.config import settings
+        if require_open and settings.CONTRACT_QUANTITY_ENABLED and getattr(contract, 'fuel_pricing_mode', 'FIXED_PRICE') == 'NETWORK_VALUE':
+            errors.append('Contrato de rede por valor: a integração operacional dessa modalidade está em implantação na homologação; não configure preço por litro ou reserva quantitativa para contornar a pendência')
         today = utcnow().astimezone(TZ).date()
         if contract.status != PaymentContractStatus.ACTIVE:
             errors.append('Contrato não está ativo')
@@ -132,7 +135,6 @@ class ContractBalanceService:
                     or_(ContractFuelPrice.valid_until.is_(None), ContractFuelPrice.valid_until > instant)))
             if not price_count:
                 errors.append('Cadastre um preço vigente de combustível')
-        from app.core.config import settings
         if require_open and settings.CONTRACT_QUANTITY_ENABLED:
             from app.models.contract_item import ContractQuantityControl
             if not await self.db.get(ContractQuantityControl, contract.id):
