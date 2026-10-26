@@ -41,14 +41,14 @@ export default function useContractFunding({ kind = 'FUEL', stationId = '', lite
 
   const scopedContracts = mode.enabled === true && catalog.scope === scope && (kind !== 'FUEL' || stationId) ? contracts : []
   const currentContracts = initialContractId ? scopedContracts.filter((row) => row.id === initialContractId) : scopedContracts
-  const contract = kind === 'FUEL' ? (currentContracts.length === 1 ? currentContracts[0] : null)
-    : currentContracts.find((c) => c.id === (initialContractId || selection.contract)) || (!selection.contract && currentContracts.length === 1 ? currentContracts[0] : null)
+  const contract = currentContracts.find((c) => c.id === (initialContractId || (selection.scope === scope ? selection.contract : '')))
+    || (currentContracts.length === 1 ? currentContracts[0] : null)
   const providers = (contract?.providers || []).filter((p) => kind !== 'FUEL' || p.fuel_station_id === stationId)
   const provider = kind === 'FUEL' ? (providers.length === 1 ? providers[0] : null)
     : providers.find((p) => p.id === selection.provider) || (providers.length === 1 ? providers[0] : null)
   const conflict = initialContractId && kind === 'FUEL' && scopedContracts.length && !currentContracts.length
-    ? 'O posto selecionado não pertence ao contrato de origem.' : kind === 'FUEL' && (currentContracts.length > 1 || (contract && providers.length !== 1))
-    ? 'O posto possui um vínculo contratual inconsistente. A gestão precisa manter apenas um contrato ativo para este posto.' : ''
+    ? 'O posto selecionado não pertence ao contrato de origem.' : kind === 'FUEL' && contract && providers.length !== 1
+    ? 'O posto possui um vínculo inconsistente neste contrato. Solicite a conferência à gestão.' : ''
   const fuels = useMemo(() => [...new Set((contract?.prices || []).filter((p) => p.provider_id === provider?.id
     && new Date(p.valid_from).getTime() <= Date.now() && (!p.valid_until || new Date(p.valid_until).getTime() > Date.now()))
     .map((p) => p.fuel_type))], [contract, provider])
@@ -88,7 +88,7 @@ export default function useContractFunding({ kind = 'FUEL', stationId = '', lite
     fuelType: selectedFuel, kind, stationId, quote, estimatedCost,
     loading: mode.enabled === null || catalogPending || previewPending,
     error: mode.error || catalogError || conflict || previewError, ready,
-    selectContract: (value) => setSelection({ contract: value, provider: '', fuel: '' }),
+    selectContract: (value) => setSelection({ scope, contract: value, provider: '', fuel: '' }),
     selectProvider: (value) => setSelection((s) => ({ ...s, provider: value, fuel: '' })),
     selectFuel: (value) => setSelection((s) => ({ ...s, fuel: value })),
     refresh: () => { if (mode.error) mode.reload(); setRevision((r) => r+1) },

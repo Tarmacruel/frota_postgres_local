@@ -34,13 +34,34 @@ it('bloqueia um posto de outro contrato quando o pedido parte de um contrato def
   expect(screen.queryByLabelText('Prestador para reserva')).not.toBeInTheDocument()
 })
 
-it('bloqueia um catálogo inconsistente em vez de permitir escolher outro contrato', async () => {
+it('exige a escolha do contrato e recalcula a reserva ao trocar entre vínculos do mesmo posto', async () => {
   contractControlAPI.eligible.mockResolvedValue({ data: [contractFor('posto'), contractFor('posto', 'outra-rede')] })
   const { result } = renderHook(() => useContractFunding({ stationId: 'posto', liters: 30 }))
-  await waitFor(() => expect(result.current.error).toMatch(/apenas um contrato ativo/))
+  await waitFor(() => expect(result.current.contracts).toHaveLength(2))
+  expect(result.current.error).toBe('')
   expect(result.current.ready).toBe(false)
   expect(result.current.payload).toEqual({})
   expect(contractControlAPI.quote).not.toHaveBeenCalled()
+  const view = render(<ContractFundingFields funding={result.current} />)
+  fireEvent.change(screen.getByLabelText('Contrato para reserva'), { target: { value: 'outra-rede' } })
+  await waitFor(() => expect(result.current.ready).toBe(true))
+  expect(result.current.payload.contract_id).toBe('outra-rede')
+  act(() => result.current.selectContract('contract-posto'))
+  expect(result.current.ready).toBe(false)
+  expect(result.current.quote).toBeNull()
+  expect(result.current.payload).toEqual({})
+  await waitFor(() => expect(result.current.ready).toBe(true))
+  expect(result.current.payload.contract_id).toBe('contract-posto')
+  view.rerender(<ContractFundingFields funding={result.current} />)
+  expect(screen.getByLabelText('Contrato para reserva')).toHaveValue('contract-posto')
+})
+
+it('preserva o contrato de origem quando o posto pertence a vários contratos', async () => {
+  contractControlAPI.eligible.mockResolvedValue({ data: [contractFor('posto'), contractFor('posto', 'rede')] })
+  const { result } = renderHook(() => useContractFunding({ stationId: 'posto', liters: 30, initialContractId: 'rede' }))
+  await waitFor(() => expect(result.current.ready).toBe(true))
+  expect(result.current.payload.contract_id).toBe('rede')
+  expect(result.current.lockedContract).toBe(true)
 })
 
 it('limpa o vínculo ao trocar o posto e descarta a consulta antiga que chega atrasada', async () => {
@@ -95,11 +116,11 @@ it('mantém a escolha de contrato e oficina no fluxo de manutenção', () => {
   expect(selectProvider).toHaveBeenCalledWith('oficina')
 })
 
-it('identifica e desabilita postos já vinculados no cadastro de prestador', () => {
+it('permite posto de outro contrato e bloqueia somente duplicação no contrato atual', () => {
   render(<ContractSetupDialog dialog={{ type: 'provider', contract: { id: 'rede', kind: 'FUEL' } }} suppliers={[]}
     stations={[{ id: 'free', name: 'Posto livre', active: true }, { id: 'bound', name: 'Posto individual', active: true,
-      active_contract_id: 'individual', active_contract_number: 'IND-01' }]} providers={[]} onClose={() => {}} onSuccess={() => {}} />)
-  expect(screen.getByRole('option', { name: 'Posto individual · vinculado ao contrato IND-01' })).toBeDisabled()
-  expect(screen.getByRole('option', { name: 'Posto livre' })).toBeEnabled()
-  expect(screen.getByText(/Cada posto pertence a um único contrato ativo/)).toBeInTheDocument()
+      active_contract_id: 'individual', active_contract_number: 'IND-01' }]} providers={[{ fuel_station_id: 'free', active: false }]} onClose={() => {}} onSuccess={() => {}} />)
+  expect(screen.getByRole('option', { name: 'Posto individual' })).toBeEnabled()
+  expect(screen.getByRole('option', { name: 'Posto livre' })).toBeDisabled()
+  expect(screen.getByText(/O mesmo posto pode ser vinculado a vários contratos/)).toBeInTheDocument()
 })

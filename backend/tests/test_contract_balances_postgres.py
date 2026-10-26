@@ -196,16 +196,44 @@ async def test_payment_process_import_initializes_checklist_after_real_flush(pg)
 
 
 @pytest.mark.asyncio
-async def test_station_cannot_join_network_while_linked_to_an_individual_contract(pg):
+async def test_station_can_join_network_while_linked_to_an_individual_contract(pg):
     c = pg
     network = await another_contract(c)
-    with pytest.raises(HTTPException) as conflict:
-        await c.service.add_provider(network.id, ProviderCreate(supplier_id=c.supplier.id, fuel_station_id=c.station.id), c.actor)
-    assert conflict.value.status_code == 409 and c.contract.number in conflict.value.detail
-    assert 'individual ou de rede credenciada' in conflict.value.detail
+    await c.service.add_provider(network.id, ProviderCreate(supplier_id=c.supplier.id, fuel_station_id=c.station.id), c.actor)
     assert await c.db.scalar(select(func.count()).select_from(ContractProvider).where(
-        ContractProvider.fuel_station_id == c.station.id, ContractProvider.active.is_(True))) == 1
+        ContractProvider.fuel_station_id == c.station.id, ContractProvider.active.is_(True))) == 2
     await c.db.rollback()
+
+
+@pytest.mark.asyncio
+async def test_shared_station_keeps_contract_prices_reservations_and_balances_separate(pg):
+    c = pg
+    network = await another_contract(c)
+    provider = await c.service.add_provider(network.id, ProviderCreate(supplier_id=c.supplier.id, fuel_station_id=c.station.id), c.actor)
+    price = await c.service.add_price(network.id, PriceCreate(provider_id=provider.id, fuel_type='DIESEL S10',
+        unit_price=7, valid_from=datetime.now(timezone.utc)-timedelta(seconds=5)), c.actor)
+    await c.service.open_control(network.id, ContractOpening(balance=200, opening_date=date.today(),
+        justification='Saldo conferido do segundo contrato'), c.actor)
+    await c.db.commit()
+    eligible = await c.service.eligible(kind='FUEL', station_id=c.station.id)
+    assert {row['id'] for row in eligible} >= {c.contract.id, network.id}
+    assert (await c.service.quote(c.contract.id, c.provider.id, 'DIESEL S10', 3))['reserve_amount'] == 30
+    assert (await c.service.quote(network.id, provider.id, 'DIESEL S10', 3))['reserve_amount'] == 21
+    payload = order_payload(c).model_copy(update={'contract_id': network.id,
+        'contract_provider_id': provider.id, 'expected_price_id': price.id})
+    order = await FuelSupplyOrderService(c.db).create_order(payload, c.actor)
+    assert (await c.service.balances(network.id))['reserved_amount'] == 21
+    assert (await c.service.balances(network.id))['available_balance'] == 179
+    assert (await c.service.balances(c.contract.id))['reserved_amount'] == 0
+    assert (await c.service.balances(c.contract.id))['available_balance'] == 100
+    reservation = await c.db.scalar(select(ContractReservation).where(ContractReservation.source_id == order['id']))
+    assert reservation.contract_id == network.id and reservation.price_id == price.id
+    with pytest.raises(HTTPException) as wrong_contract:
+        await c.service.quote(c.contract.id, provider.id, 'DIESEL S10', 3)
+    assert wrong_contract.value.status_code == 409
+    with pytest.raises(HTTPException) as duplicate:
+        await c.service.add_provider(network.id, ProviderCreate(supplier_id=c.supplier.id, fuel_station_id=c.station.id), c.actor)
+    assert duplicate.value.status_code == 409
 
 
 @pytest.mark.asyncio
@@ -220,9 +248,7 @@ async def test_station_transfer_keeps_history_and_old_order_can_complete(pg, tmp
     await c.db.commit()
     assert replacement.id != c.provider.id
     assert (await c.service.providers(c.contract.id))[0]['active'] is False
-    with pytest.raises(HTTPException) as conflict:
-        await c.service.set_provider_active(c.contract.id, c.provider.id, True, c.actor)
-    assert conflict.value.status_code == 409
+    await c.service.set_provider_active(c.contract.id, c.provider.id, True, c.actor)
     assert (await c.service.balances(c.contract.id))['reserved_amount'] == 30
     receipt = BytesIO()
     Image.new('RGB', (2, 2), color='white').save(receipt, 'PNG')
@@ -236,7 +262,7 @@ async def test_station_transfer_keeps_history_and_old_order_can_complete(pg, tmp
 
 
 @pytest.mark.asyncio
-async def test_two_contracts_cannot_claim_the_same_station_concurrently(pg):
+async def test_two_contracts_can_link_the_same_station_concurrently(pg):
     c = pg
     first, second = await another_contract(c), await another_contract(c)
     station = FuelStation(id=uuid4(), name='Concorrencia '+str(uuid4()), address='Teste isolado', active=True)
@@ -257,25 +283,24 @@ async def test_two_contracts_cannot_claim_the_same_station_concurrently(pg):
     tasks = [asyncio.create_task(link(first.id)), asyncio.create_task(link(second.id))]
     go.set()
     results = await asyncio.gather(*tasks)
-    assert results.count(409) == 1
+    assert results.count(409) == 0
     assert await c.db.scalar(select(func.count()).select_from(ContractProvider).where(
-        ContractProvider.fuel_station_id == station.id, ContractProvider.active.is_(True))) == 1
+        ContractProvider.fuel_station_id == station.id, ContractProvider.active.is_(True))) == 2
 
 
 @pytest.mark.asyncio
-async def test_unique_index_protects_station_even_without_service_validation(pg):
+async def test_unique_index_protects_station_within_contract_without_service_validation(pg):
     c = pg
-    network = await another_contract(c)
     async with AsyncSession(c.engine) as db:
-        db.add(ContractProvider(contract_id=network.id, supplier_id=c.supplier.id, fuel_station_id=c.station.id))
+        db.add(ContractProvider(contract_id=c.contract.id, supplier_id=c.supplier.id, fuel_station_id=c.station.id))
         with pytest.raises(IntegrityError) as conflict:
             await db.flush()
-        assert 'uq_contract_provider_active_station' in str(conflict.value)
+        assert 'uq_contract_provider_station' in str(conflict.value)
         await db.rollback()
 
 
 @pytest.mark.asyncio
-async def test_provider_activation_api_permissions_and_catalog_exclusivity(pg):
+async def test_provider_activation_api_permissions_and_multi_contract_catalog(pg):
     from app.main import app
     from app.api.deps import get_current_user_ready
     from app.db.session import get_db_session
@@ -300,8 +325,13 @@ async def test_provider_activation_api_permissions_and_catalog_exclusivity(pg):
             linked = await client.post(f'/api/contract-control/contracts/{network.id}/providers',
                 json={'supplier_id': str(c.supplier.id), 'fuel_station_id': str(c.station.id)})
             assert linked.status_code == 201, linked.text
-            denied = await client.patch(endpoint, params={'active': True})
-            assert denied.status_code == 409 and network.number in denied.json()['detail']
+            reactivated = await client.patch(endpoint, params={'active': True})
+            assert reactivated.status_code == 200
+            stations = (await client.get('/api/contract-control/catalog')).json()['stations']
+            matches = [s for s in stations if s['id'] == str(c.station.id)]
+            assert len(matches) == 1
+            assert {row['id'] for row in matches[0]['active_contracts']} == {str(c.contract.id), str(network.id)}
+            assert matches[0]['active_contract_id'] is None
             foreign = endpoint.replace(str(c.contract.id), str(network.id))
             assert (await client.patch(foreign, params={'active': False})).status_code == 404
     finally:

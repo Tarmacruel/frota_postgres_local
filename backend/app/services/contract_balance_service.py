@@ -191,22 +191,13 @@ class ContractBalanceService:
                 raise HTTPException(409, 'Posto inativo')
         return provider
 
-    async def _claim_station(self, station_id, *, excluding_provider=None):
+    async def _validate_station(self, station_id):
         station = await self.db.scalar(select(FuelStation).where(FuelStation.id == station_id)
             .with_for_update().execution_options(populate_existing=True))
         if not station:
             raise HTTPException(404, 'Posto não encontrado')
         if not station.active:
             raise HTTPException(409, 'O posto está inativo')
-        query = select(PaymentContract.number).join(ContractProvider, ContractProvider.contract_id == PaymentContract.id).where(
-            ContractProvider.fuel_station_id == station_id, ContractProvider.active.is_(True))
-        if excluding_provider:
-            query = query.where(ContractProvider.id != excluding_provider)
-        conflict = await self.db.scalar(query.limit(1))
-        if conflict is not None:
-            raise HTTPException(409, f'O posto já está vinculado ao contrato {conflict}. '
-                'Cada posto pode ter apenas um contrato ativo, individual ou de rede credenciada. '
-                'Desative o vínculo anterior antes de vinculá-lo a outro contrato.')
 
     async def set_provider_active(self, contract_id, provider_id, active, actor):
         contract = await self.contract(contract_id, lock=True)
@@ -220,7 +211,7 @@ class ContractBalanceService:
             if not supplier or not supplier.active:
                 raise HTTPException(409, 'Prestador inativo')
             if provider.fuel_station_id:
-                await self._claim_station(provider.fuel_station_id, excluding_provider=provider_id)
+                await self._validate_station(provider.fuel_station_id)
         provider.active = active
         await self.audit.record(actor=actor, action='UPDATE_PROVIDER_LINK', entity_type='PAYMENT_CONTRACT',
             entity_id=contract_id, entity_label=contract.number, details={'provider_id': str(provider_id), 'active': active})
@@ -235,7 +226,7 @@ class ContractBalanceService:
         if getattr(contract.kind, 'value', contract.kind) == 'FUEL':
             if not data.fuel_station_id:
                 raise HTTPException(422, 'Vincule o posto executante do abastecimento')
-            await self._claim_station(data.fuel_station_id)
+            await self._validate_station(data.fuel_station_id)
             previous = await self.db.scalar(select(ContractProvider.id).where(
                 ContractProvider.contract_id == contract_id, ContractProvider.fuel_station_id == data.fuel_station_id))
             if previous:

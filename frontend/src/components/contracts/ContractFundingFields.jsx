@@ -12,7 +12,10 @@ export default function ContractFundingFields({ funding, externalFuelType = fals
     {funding.enabled === null ? <p role="status">Conferindo controle contratual…</p> : <>
       {funding.kind === 'FUEL' && !funding.stationId ? <p>Selecione o posto para identificar seu contrato.</p> : <>
         {funding.kind === 'FUEL' ? <>
-          {funding.contract && funding.provider ? <dl className="contract-funding__summary modal-field-span" aria-label="Contrato definido pelo posto">
+          {funding.contracts.length > 1 ? <label>Contrato<select className="app-select" aria-label="Contrato para reserva" value={funding.contract?.id || ''} disabled={funding.lockedContract} onChange={(e) => funding.selectContract(e.target.value)} required>
+            <option value="">Selecione o contrato</option>{funding.contracts.map((c) => <option key={c.id} value={c.id}>{c.number} · disponível {formatContractMoney(c.available_balance)}</option>)}
+          </select></label> : null}
+          {funding.contract && funding.provider ? <dl className="contract-funding__summary modal-field-span" aria-label="Contrato selecionado para o posto">
             <div><dt>Contrato do posto</dt><dd>{funding.contract.number}</dd></div>
             <div><dt>Posto executante</dt><dd>{funding.provider.station_name || funding.provider.name}</dd></div>
           </dl> : funding.loading ? <p role="status">Conferindo o contrato do posto…</p> : null}
@@ -20,7 +23,7 @@ export default function ContractFundingFields({ funding, externalFuelType = fals
           <option value="">Selecione o contrato</option>{funding.contracts.map((c) => <option key={c.id} value={c.id}>{c.number} · disponível {formatContractMoney(c.available_balance)}</option>)}
         </select></label>}
         {!funding.contracts.length && !funding.loading && !funding.error ? <p role="status">{funding.kind === 'FUEL'
-          ? 'Este posto não possui contrato liberado. A gestão precisa conferir o vínculo exclusivo, a vigência, os preços e o saldo inicial.'
+          ? 'Este posto não possui contrato liberado. A gestão precisa conferir os vínculos, a vigência, os preços e o saldo inicial.'
           : 'Nenhum contrato liberado para este serviço. A gestão precisa conferir vigência, rede e saldo inicial.'}</p> : null}
       </>}
       {funding.contract ? <>

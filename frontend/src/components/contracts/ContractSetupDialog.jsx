@@ -85,8 +85,8 @@ export default function ContractSetupDialog({ dialog, suppliers, stations, provi
         {input('opening_date', 'Data de início do controle', { type: 'date' })}{reason}</> : null}
       {type === 'provider' ? <>{select('supplier_id', 'Prestador executante', suppliers.filter((s) => s.active).map((s) => [s.id, `${s.name}${s.cnpj ? ' · '+s.cnpj : ''}`]))}
         {c.kind === 'FUEL' ? <>{select('fuel_station_id', 'Posto executante', stations.filter((s) => s.active).map((s) => [s.id,
-          `${s.name}${s.active_contract_id ? ` · vinculado ao contrato ${s.active_contract_number}` : ''}`, Boolean(s.active_contract_id)]))}
-          <p className="muted contract-form__wide">Cada posto pertence a um único contrato ativo, individual ou de rede credenciada. Para mudar de contrato, desative o vínculo anterior. Os vínculos antigos permanecem no histórico.</p></> : null}
+          s.name, providers.some((p) => p.fuel_station_id === s.id)]))}
+          <p className="muted contract-form__wide">O mesmo posto pode ser vinculado a vários contratos. Cada contrato mantém seus próprios preços e saldo. Postos já cadastrados neste contrato devem ser reativados no vínculo existente.</p></> : null}
         <p className="muted contract-form__wide">O prestador executante pode ser diferente da empresa contratada. Cadastre a empresa em Prestadores caso ainda não exista.</p></> : null}
       {type === 'price' ? <>{select('provider_id', 'Posto executante', providers.filter((p) => p.active && p.fuel_station_id).map((p) => [p.id, p.station_name || p.name]))}
         {select('fuel_type', 'Combustível', FUEL_TYPE_OPTIONS.filter((t) => t !== 'Outro').map((t) => [t, t]))}
