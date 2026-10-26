@@ -7,7 +7,7 @@ export default function ContractFundingFields({ funding, externalFuelType = fals
   const after = funding.kind === 'FUEL' ? funding.quote?.available_after
     : funding.contract ? Number(funding.contract.available_balance)-Number(amount || 0) : null
   return <fieldset className="contract-funding modal-field-span" aria-busy={funding.loading}>
-    <legend>Reserva no contrato</legend>
+    <legend>{funding.networkValue ? 'Consumo no contrato por valor' : 'Reserva no contrato'}</legend>
     {funding.error ? <div className="alert alert-error" role="alert">{funding.error}<button type="button" className="ghost-button" onClick={funding.refresh}>Tentar novamente</button></div> : null}
     {funding.enabled === null ? <p role="status">Conferindo controle contratual…</p> : <>
       {funding.kind === 'FUEL' && !funding.stationId ? <p>Selecione o posto para identificar seu contrato.</p> : <>
@@ -33,15 +33,15 @@ export default function ContractFundingFields({ funding, externalFuelType = fals
         {funding.kind === 'FUEL' && !externalFuelType ? <label>Combustível solicitado<select className="app-select" aria-label="Combustível solicitado" value={funding.fuelType} onChange={(e) => funding.selectFuel(e.target.value)} required>
           <option value="">Selecione o combustível</option>{funding.fuels.map((f) => <option key={f} value={f}>{f}</option>)}
         </select></label> : null}
-        {funding.loading ? <p role="status">Calculando reserva…</p> : <dl className="contract-funding__summary">
-          {funding.quote ? <div><dt>Preço cadastrado / litro</dt><dd>{Number(funding.quote.unit_price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4, maximumFractionDigits: 6 })}</dd></div> : null}
+        {funding.loading ? <p role="status">{funding.networkValue ? 'Conferindo contrato…' : 'Calculando reserva…'}</p> : <dl className="contract-funding__summary">
+          {funding.quote && !funding.networkValue ? <div><dt>Preço cadastrado / litro</dt><dd>{Number(funding.quote.unit_price).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', minimumFractionDigits: 4, maximumFractionDigits: 6 })}</dd></div> : null}
           <div><dt>Disponível agora</dt><dd>{formatContractMoney(funding.quote?.available_balance ?? funding.contract.available_balance)}</dd></div>
-          <div><dt>Valor a reservar</dt><dd>{formatContractMoney(amount)}</dd></div>
-          <div><dt>Disponível após o pedido</dt><dd>{formatContractMoney(after)}</dd></div>
+          {!funding.networkValue ? <><div><dt>Valor a reservar</dt><dd>{formatContractMoney(amount)}</dd></div>
+          <div><dt>Disponível após o pedido</dt><dd>{formatContractMoney(after)}</dd></div></> : null}
         </dl>}
         {after !== null && after !== undefined && Number(after) < 0 ? <p className="alert alert-error" role="alert">Saldo insuficiente. Ajuste o pedido ou regularize o contrato.</p> : null}
       </> : null}
-      <p className="muted">A reserva reduz o disponível. Na conclusão, o sistema registra o valor real e libera a sobra.</p>
+      <p className="muted">{funding.networkValue ? 'Rede credenciada por valor: este pedido não reserva saldo nem utiliza preço por litro cadastrado. O total real do comprovante será descontado ao confirmar o abastecimento.' : 'A reserva reduz o disponível. Na conclusão, o sistema registra o valor real e libera a sobra.'}</p>
     </>}
   </fieldset>
 }

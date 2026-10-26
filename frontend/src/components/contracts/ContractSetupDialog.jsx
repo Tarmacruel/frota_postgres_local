@@ -16,6 +16,7 @@ export default function ContractSetupDialog({ dialog, suppliers, stations, provi
   const c = dialog.contract || {}
   const [form, setForm] = useState(() => ({
     number: c.number || '', supplier_id: c.supplier_id || '', kind: c.kind || 'FUEL', status: c.status || 'ACTIVE',
+    fuel_pricing_mode: c.fuel_pricing_mode || 'FIXED_PRICE',
     valid_from: c.valid_from || '', valid_until: c.valid_until || '', value_initial: c.value_initial ?? '', value_updated: c.value_updated ?? '',
     notes: dialog.supplier?.notes || c.notes || '', contract_type: c.contract_type || '', object_description: c.object_description || '', balance: c.suggested_opening_balance ?? '', opening_date: toDateTimeLocalValue(new Date().toISOString()).slice(0, 10),
     justification: '', fuel_station_id: '', provider_id: '', fuel_type: 'Diesel S10', unit_price: dialog.price?.unit_price ?? '', price_from: '',
@@ -42,6 +43,7 @@ export default function ContractSetupDialog({ dialog, suppliers, stations, provi
       let result
       if (type === 'contract' || type === 'edit') {
         const payload = { number: form.number, supplier_id: form.supplier_id, kind: form.kind, status: form.status,
+          fuel_pricing_mode: form.kind === 'FUEL' ? form.fuel_pricing_mode : 'FIXED_PRICE',
           valid_from: form.valid_from || null, valid_until: form.valid_until || null,
           value_initial: form.value_initial === '' ? null : form.value_initial,
           value_updated: form.value_updated === '' ? null : form.value_updated, notes: form.notes || null,
@@ -79,6 +81,8 @@ export default function ContractSetupDialog({ dialog, suppliers, stations, provi
         {input('number', 'Número do contrato')}
         {select('supplier_id', 'Empresa contratada', suppliers.map((s) => [s.id, s.name]))}
         {select('kind', 'Objeto do contrato', [['FUEL', 'Abastecimento'], ['MAINTENANCE', 'Manutenção veicular']])}
+        {form.kind === 'FUEL' ? <>{select('fuel_pricing_mode', 'Controle do abastecimento', [['FIXED_PRICE', 'Preço contratado por litro'], ['NETWORK_VALUE', 'Rede credenciada por valor']])}
+          {form.fuel_pricing_mode === 'NETWORK_VALUE' ? <p className="muted contract-form__wide">Os postos utilizam preços próprios. Não há cadastro de preço por litro nem reserva prévia. Somente o total real confirmado será descontado do contrato. Pedidos anteriores mantêm sua modalidade original.</p> : null}</> : null}
         {select('status', 'Situação', [['ACTIVE', 'Ativo'], ['SUSPENDED', 'Suspenso'], ['FINISHED', 'Encerrado'], ['CANCELLED', 'Cancelado']])}
         {input('valid_from', 'Início da vigência', { type: 'date', readOnly: c.control_opened })}
         {input('valid_until', 'Fim da vigência', { type: 'date', readOnly: c.control_opened })}

@@ -16,8 +16,8 @@ export default function FuelOrderFundingForm({ order, onClose, onSuccess }) {
     event.preventDefault(); setSaving(true); setError('')
     try {
       await contractControlAPI.fundOrder(order.id, { ...funding.payload, requested_liters: liters, expires_at: new Date(expiresAt).toISOString(), justification: reason })
-      onSuccess?.('Ordem vinculada ao contrato, com saldo reservado e prazo atualizado.'); onClose?.()
-    } catch (err) { setError(getApiErrorMessage(err, 'Não foi possível reservar o saldo desta ordem.')) }
+      onSuccess?.(funding.networkValue ? 'Ordem vinculada à rede por valor, sem reserva prévia, com prazo atualizado.' : 'Ordem vinculada ao contrato, com saldo reservado e prazo atualizado.'); onClose?.()
+    } catch (err) { setError(getApiErrorMessage(err, 'Não foi possível vincular esta ordem ao contrato.')) }
     finally { setSaving(false) }
   }
   return <form className="contract-form" onSubmit={submit}>
@@ -27,6 +27,6 @@ export default function FuelOrderFundingForm({ order, onClose, onSuccess }) {
     <label>Prazo da ordem<input className="app-input" type="datetime-local" required value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} /></label>
     <ContractFundingFields funding={funding} />
     <label className="contract-form__wide">Justificativa do vínculo e prazo<textarea className="app-textarea" minLength={10} maxLength={1000} required value={reason} onChange={(e) => setReason(e.target.value)} /></label>
-    <div className="actions-inline"><button className="ghost-button" type="button" disabled={saving} onClick={onClose}>Voltar</button><button className="app-button" disabled={saving || !funding.ready}>{saving ? 'Reservando…' : 'Vincular e reservar saldo'}</button></div>
+    <div className="actions-inline"><button className="ghost-button" type="button" disabled={saving} onClick={onClose}>Voltar</button><button className="app-button" disabled={saving || !funding.ready}>{saving ? 'Vinculando…' : funding.networkValue ? 'Vincular sem reserva prévia' : 'Vincular e reservar saldo'}</button></div>
   </form>
 }

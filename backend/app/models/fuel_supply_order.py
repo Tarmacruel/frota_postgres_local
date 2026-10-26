@@ -4,7 +4,7 @@ import enum
 from datetime import datetime
 from decimal import Decimal
 from uuid import UUID
-from sqlalchemy import DateTime, Enum, ForeignKey, Index, Numeric, String, Text, text
+from sqlalchemy import CheckConstraint, DateTime, Enum, ForeignKey, Index, Numeric, String, Text, text
 from sqlalchemy.dialects.postgresql import UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base
@@ -22,6 +22,7 @@ class FuelSupplyOrderStatus(str, enum.Enum):
 class FuelSupplyOrder(ContractFundingMixin, LoanAttributionMixin, Base):
     __tablename__ = "fuel_supply_orders"
     __table_args__ = (
+        CheckConstraint("contract_funding_mode IS NULL OR contract_funding_mode IN ('FIXED_PRICE', 'NETWORK_VALUE')", name='ck_order_contract_funding_mode'),
         Index("idx_fuel_supply_orders_status", "status"),
         Index("idx_fuel_supply_orders_expires_at", "expires_at"),
         Index("idx_fuel_supply_orders_vehicle_id", "vehicle_id"),
@@ -62,6 +63,7 @@ class FuelSupplyOrder(ContractFundingMixin, LoanAttributionMixin, Base):
 
     requested_liters: Mapped[Decimal | None] = mapped_column(Numeric(10, 3), nullable=True)
     requested_fuel_type: Mapped[str | None] = mapped_column(String(80), nullable=True)
+    contract_funding_mode: Mapped[str | None] = mapped_column(String(20), nullable=True)
     request_key: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True, unique=True)
     batch_request_key: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True, index=True)
     max_amount: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)

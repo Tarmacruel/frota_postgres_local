@@ -132,7 +132,8 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
           <strong>Pedido original: </strong>{order.requested_fuel_type || 'Combustível não informado'}
           {order.requested_liters ? ` · ${Number(order.requested_liters).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} L previstos` : ''}.<br />
         </> : null}
-        {order.contract_funding ? <>Contrato {order.contract_funding.contract_number} · reserva {brl(order.contract_funding.reserved_amount)}.<br /></> : null}
+        {order.contract_funding ? <>Contrato {order.contract_funding.contract_number} · {order.contract_funding_mode === 'NETWORK_VALUE' ? 'rede por valor, sem reserva prévia' : `reserva ${brl(order.contract_funding.reserved_amount)}`}.
+          <br /></> : null}
         Use os dados reais do comprovante. O pedido original será preservado{order.contract_funding ? ' e o saldo ajustado pelo total real' : ''}.
       </p> : null}
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
