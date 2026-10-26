@@ -618,7 +618,8 @@ class FuelSupplyOrderService:
         await self._fund_order(order, data, actor)
         await self.audit.record(actor=actor, action='ORDER_FUNDED', entity_type='FUEL_SUPPLY_ORDER',
             entity_id=order.id, entity_label=str(order.id), details={'contract_id': str(order.contract_id),
-                'previous_deadline': previous_deadline, 'new_deadline': deadline, 'reason': data.justification})
+                'previous_deadline': previous_deadline, 'new_deadline': deadline, 'reason': data.justification},
+            suggestion_context='order_funding', suggestion_text=data.justification)
         await self.db.commit()
         return await self.get_order(order.id, current_user=actor)
 

@@ -4,6 +4,7 @@ import useContractFunding from '../../hooks/useContractFunding'
 import { getApiErrorMessage } from '../../utils/apiError'
 import { toDateTimeLocalValue } from '../../utils/datetime'
 import ContractFundingFields from './ContractFundingFields'
+import JustificationField from '../JustificationField'
 
 export default function FuelOrderFundingForm({ order, onClose, onSuccess }) {
   const [liters, setLiters] = useState(order.requested_liters || '')
@@ -26,7 +27,9 @@ export default function FuelOrderFundingForm({ order, onClose, onSuccess }) {
     <label>Litros previstos<input className="app-input" type="number" min=".001" step=".001" required value={liters} onChange={(e) => setLiters(e.target.value)} /></label>
     <label>Prazo da ordem<input className="app-input" type="datetime-local" required value={expiresAt} onChange={(e) => setExpiresAt(e.target.value)} /></label>
     <ContractFundingFields funding={funding} />
-    <label className="contract-form__wide">Justificativa do vínculo e prazo<textarea className="app-textarea" minLength={10} maxLength={1000} required value={reason} onChange={(e) => setReason(e.target.value)} /></label>
+    <div className="form-field contract-form__wide">
+      <JustificationField context="order_funding" label="Justificativa do vínculo e prazo" id="order-funding-reason" className="app-textarea" minLength={10} maxLength={1000} required value={reason} onChange={(e) => setReason(e.target.value)} disabled={saving} />
+    </div>
     <div className="actions-inline"><button className="ghost-button" type="button" disabled={saving} onClick={onClose}>Voltar</button><button className="app-button" disabled={saving || !funding.ready}>{saving ? 'Vinculando…' : funding.networkValue ? 'Vincular sem reserva prévia' : 'Vincular e reservar saldo'}</button></div>
   </form>
 }

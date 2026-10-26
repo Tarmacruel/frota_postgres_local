@@ -260,7 +260,8 @@ async def test_adopt_legacy_order_into_network_without_reserve_and_prevent_relin
     c.db.add(row)
     await c.db.commit()
     data = FuelOrderFunding(contract_id=c.contract.id, contract_provider_id=c.provider.id,
-        requested_fuel_type='DIESEL S10', requested_liters=3)
+        requested_fuel_type='DIESEL S10', requested_liters=3,
+        justification='Vinculação da ordem anterior à rede credenciada por valor.')
     service = FuelSupplyOrderService(c.db)
     saved = await service.adopt_funding(row.id, data, c.actor)
     assert saved['contract_funding_mode'] == 'NETWORK_VALUE' and saved['contract_reservation_id'] is None
@@ -269,3 +270,9 @@ async def test_adopt_legacy_order_into_network_without_reserve_and_prevent_relin
         await service.adopt_funding(row.id, data.model_copy(update={'contract_id': uuid4()}), c.actor)
     assert relink.value.status_code == 409
     assert (await c.service.balances(c.contract.id))['available_balance'] == 100
+    from app.services.justification_suggestions import list_suggestions
+    suggestions = await list_suggestions(c.db, c.actor, 'order_funding')
+    assert {preset['id'] for preset in suggestions['presets']} == {'legacy', 'schedule', 'network'}
+    assert len(suggestions['history']) == 1
+    assert suggestions['history'][0]['text'] == data.justification
+    assert suggestions['history'][0]['count'] == 1  # Retry and rejected relink do not inflate usage.
