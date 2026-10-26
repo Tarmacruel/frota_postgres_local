@@ -5,6 +5,8 @@ import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
 import useFuelSupplyOrderForm from '../hooks/useFuelSupplyOrderForm'
+import useContractFunding from '../hooks/useContractFunding'
+import ContractFundingFields from './contracts/ContractFundingFields'
 
 function buildDefaultDeadline() {
   const deadline = new Date(Date.now() + 48 * 60 * 60 * 1000)
@@ -74,6 +76,9 @@ export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organiza
     () => organizations.find((organization) => organization.id === form.organization_id),
     [form.organization_id, organizations],
   )
+  const itemLiters = selectedVehicles.map((vehicle) => String(getEffectiveLiters(vehicle.id) || 0))
+  const totalRequestedLiters = selectedVehicles.reduce((sum, vehicle) => sum + (Number(getEffectiveLiters(vehicle.id)) || 0), 0).toFixed(3)
+  const funding = useContractFunding({ stationId: form.fuel_station_id, liters: totalRequestedLiters, itemLiters: itemLiters.length ? itemLiters : undefined })
 
   const selectedStation = useMemo(
     () => fuelStations.find((station) => station.id === form.fuel_station_id),
@@ -133,6 +138,7 @@ export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organiza
     for (const vehicle of selectedVehicles) {
       const liters = parseOptionalLiters(getEffectiveLiters(vehicle.id))
       if (liters.error) return `${vehicle.plate || 'Veículo selecionado'}: ${liters.error}`
+      if (funding.enabled && !liters.value) return `${vehicle.plate}: informe os litros previstos para reservar o saldo.`
     }
 
     return ''
@@ -140,6 +146,7 @@ export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organiza
 
   function handleReview(event) {
     event.preventDefault()
+    if (!funding.ready) { setError(funding.error || 'Confira o contrato e a reserva de todo o lote.'); return }
     const validationError = validateForm()
     if (validationError) {
       setError(validationError)
@@ -151,6 +158,7 @@ export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organiza
 
   async function handleCreate(event) {
     event.preventDefault()
+    if (!funding.ready) { setError(funding.error || 'Confira o contrato e a reserva de todo o lote.'); setReviewing(false); return }
     const validationError = validateForm()
     if (validationError) {
       setError(validationError)
@@ -163,6 +171,7 @@ export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organiza
       setError('')
 
       const payload = {
+        ...funding.payload,
         items: selectedVehicles.map((vehicle) => {
           const item = { vehicle_id: vehicle.id }
           const requestedLiters = parseOptionalLiters(getEffectiveLiters(vehicle.id)).value
@@ -358,6 +367,7 @@ export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organiza
             />
           </div>
 
+          <ContractFundingFields funding={funding} />
           <div className="actions-inline modal-actions" data-tour="fuel-batch-review">
             <button className="app-button" type="submit" disabled={submitting}>Revisar {selectedVehicleIds.length} {selectedVehicleIds.length === 1 ? 'ordem' : 'ordens'}</button>
             <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>
@@ -391,7 +401,7 @@ export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organiza
           </ul>
           <div className="actions-inline modal-actions">
             <button className="secondary-button" type="button" onClick={() => setReviewing(false)} disabled={submitting}>Voltar e editar</button>
-            <button className="app-button" type="submit" data-tour="fuel-batch-submit" disabled={submitting}>
+            <button className="app-button" type="submit" data-tour="fuel-batch-submit" disabled={submitting || !funding.ready}>
               {submitting ? 'Emitindo ordens...' : `Emitir ${selectedVehicles.length} ${selectedVehicles.length === 1 ? 'ordem' : 'ordens'}`}
             </button>
           </div>

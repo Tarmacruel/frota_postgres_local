@@ -1,19 +1,22 @@
-import { useMemo, useRef, useState } from 'react'
+import { useId, useMemo, useRef, useState } from 'react'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
 import { ADDITIVE_TYPE_OPTIONS, FUEL_TYPE_OPTIONS, resolveOptionValue } from '../utils/fuelSupplyDetails'
+import { formatContractMoney as brl } from '../utils/contractBalance'
 
 const MAX_RECEIPT_SIZE_BYTES = 8 * 1024 * 1024
 const ALLOWED_RECEIPT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
+const fuelKey = (value) => String(value || '').trim().replace(/\s+/g, ' ').toUpperCase()
 
 export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }) {
+  const formId = useId()
   const [form, setForm] = useState({
     odometer_km: order?.suggested_odometer_km || '',
     liters: order?.requested_liters || '',
     total_amount: '',
-    fuel_type: '',
-    fuel_type_other: '',
+    fuel_type: order?.requested_fuel_type ? FUEL_TYPE_OPTIONS.find((t) => fuelKey(t) === fuelKey(order.requested_fuel_type)) || 'Outro' : '',
+    fuel_type_other: order?.requested_fuel_type || '',
     supplied_at: toDateTimeLocalValue(new Date().toISOString()),
     additive_enabled: false,
     additive_type: '',
@@ -26,6 +29,8 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const receiptRef = useRef(null)
+  const fuelType = resolveOptionValue(form.fuel_type, form.fuel_type_other)
+  const fuelChanged = Boolean(order?.requested_fuel_type && fuelType && fuelKey(fuelType) !== fuelKey(order.requested_fuel_type))
 
   const submitLabel = useMemo(() => (submitting ? 'Confirmando...' : 'Confirmar abastecimento'), [submitting])
 
@@ -59,7 +64,6 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
     event.preventDefault()
     setError('')
 
-    const fuelType = resolveOptionValue(form.fuel_type, form.fuel_type_other)
     const additiveType = form.additive_enabled ? resolveOptionValue(form.additive_type, form.additive_type_other) : ''
 
     if (!form.odometer_km || Number(form.odometer_km) < 0) {
@@ -122,26 +126,34 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
 
   return (
     <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
+      {order?.requested_fuel_type || order?.requested_liters || order?.contract_funding ? <p className="alert alert-info modal-field-span">
+        {order.requested_fuel_type || order.requested_liters ? <>
+          <strong>Pedido original: </strong>{order.requested_fuel_type || 'Combustível não informado'}
+          {order.requested_liters ? ` · ${Number(order.requested_liters).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} L previstos` : ''}.<br />
+        </> : null}
+        {order.contract_funding ? <>Contrato {order.contract_funding.contract_number} · reserva {brl(order.contract_funding.reserved_amount)}.<br /></> : null}
+        Use os dados reais do comprovante. O pedido original será preservado{order.contract_funding ? ' e o saldo ajustado pelo total real' : ''}.
+      </p> : null}
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
 
       <div className="form-field">
-        <label>Odômetro real (km)</label>
-        <input type="number" min="0" step="0.1" className="app-input" value={form.odometer_km} onChange={(event) => setForm((current) => ({ ...current, odometer_km: event.target.value }))} required />
+        <label htmlFor={`${formId}-odometer`}>Odômetro real (km)</label>
+        <input id={`${formId}-odometer`} type="number" min="0" step="0.1" className="app-input" value={form.odometer_km} onChange={(event) => setForm((current) => ({ ...current, odometer_km: event.target.value }))} required />
       </div>
 
       <div className="form-field">
-        <label>Litros abastecidos</label>
-        <input type="number" min="0" step="0.01" className="app-input" value={form.liters} onChange={(event) => setForm((current) => ({ ...current, liters: event.target.value }))} required />
+        <label htmlFor={`${formId}-liters`}>Litros abastecidos</label>
+        <input id={`${formId}-liters`} type="number" min="0" step="0.01" className="app-input" value={form.liters} onChange={(event) => setForm((current) => ({ ...current, liters: event.target.value }))} required />
       </div>
 
       <div className="form-field">
-        <label>Valor total abastecido (R$)</label>
-        <input type="number" min="0" step="0.01" className="app-input" value={form.total_amount} onChange={(event) => setForm((current) => ({ ...current, total_amount: event.target.value }))} required />
+        <label htmlFor={`${formId}-amount`}>Valor total abastecido (R$)</label>
+        <input id={`${formId}-amount`} type="number" min="0" step="0.01" className="app-input" value={form.total_amount} onChange={(event) => setForm((current) => ({ ...current, total_amount: event.target.value }))} required />
       </div>
 
       <div className="form-field">
-        <label>Tipo de combustível</label>
-        <select className="app-select" value={form.fuel_type} onChange={(event) => setForm((current) => ({ ...current, fuel_type: event.target.value }))} required>
+        <label htmlFor={`${formId}-fuel`}>Combustível efetivamente abastecido</label>
+        <select id={`${formId}-fuel`} className="app-select" value={form.fuel_type} onChange={(event) => setForm((current) => ({ ...current, fuel_type: event.target.value }))} required>
           <option value="">Selecione</option>
           {FUEL_TYPE_OPTIONS.map((option) => (
             <option key={option} value={option}>{option}</option>
@@ -149,16 +161,20 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
         </select>
       </div>
 
+      {fuelChanged ? <small className="muted modal-field-span" role="status">
+        <strong>Troca de combustível: </strong>será registrado {fuelType} no lugar de {order.requested_fuel_type}. Confira os litros e o valor total no comprovante.
+      </small> : null}
+
       {form.fuel_type === 'Outro' ? (
         <div className="form-field modal-field-span">
-          <label>Outro combustível</label>
-          <input className="app-input" value={form.fuel_type_other} onChange={(event) => setForm((current) => ({ ...current, fuel_type_other: event.target.value }))} maxLength={80} required />
+          <label htmlFor={`${formId}-other-fuel`}>Outro combustível</label>
+          <input id={`${formId}-other-fuel`} className="app-input" value={form.fuel_type_other} onChange={(event) => setForm((current) => ({ ...current, fuel_type_other: event.target.value }))} maxLength={80} required />
         </div>
       ) : null}
 
       <div className="form-field">
-        <label>Data/hora real</label>
-        <input type="datetime-local" className="app-input" value={form.supplied_at} onChange={(event) => setForm((current) => ({ ...current, supplied_at: event.target.value }))} required />
+        <label htmlFor={`${formId}-supplied-at`}>Data/hora real</label>
+        <input id={`${formId}-supplied-at`} type="datetime-local" className="app-input" value={form.supplied_at} onChange={(event) => setForm((current) => ({ ...current, supplied_at: event.target.value }))} required />
       </div>
 
       <div className="form-field">
@@ -195,14 +211,14 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
       ) : null}
 
       <div className="form-field modal-field-span">
-        <label>Comprovante</label>
-        <input ref={receiptRef} type="file" accept=".pdf,image/jpeg,image/png,image/webp" onChange={handleReceiptChange} required />
+        <label htmlFor={`${formId}-receipt`}>Comprovante</label>
+        <input id={`${formId}-receipt`} ref={receiptRef} type="file" accept=".pdf,image/jpeg,image/png,image/webp" onChange={handleReceiptChange} required />
         {receiptError ? <small className="form-error">{receiptError}</small> : null}
       </div>
 
       <div className="form-field modal-field-span">
-        <label>Observações</label>
-        <textarea className="app-textarea" rows="3" value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} />
+        <label htmlFor={`${formId}-notes`}>Observações</label>
+        <textarea id={`${formId}-notes`} className="app-textarea" rows="3" value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} />
       </div>
 
       <div className="actions-inline modal-actions">

@@ -1,0 +1,88 @@
+# Contratos e saldos — homologação
+
+Entrega funcional autorizada em 22/10/2026. Rota preservada: `/processos-pagamento`. Feature flag exclusiva da HML: `CONTRACT_BALANCE_ENABLED=true`; padrão do código é `false`. Nenhuma publicação em produção faz parte desta entrega.
+
+## Preparação pelo gestor
+
+### Operação diária e retorno ao contrato
+
+A página inicia em **Contratos**, com quatro indicadores: Disponível, Reservado, Consumido e A pagar em faturas. Os filtros compactos destacam configuração pendente, divergência, saldo baixo e vencimento próximo. Os totais representam a busca e os filtros gerais; a cobertura informa quantos contratos têm saldo confirmado. Saldo desconhecido continua como traço.
+
+Selecione **Abrir** na tabela para consultar o painel lateral. No celular, o painel ocupa a tela inteira. As abas **Resumo**, **Movimentações**, **Faturas** e **Configuração** mantêm o mesmo contrato. Configuração reúne cadastro, rede, preços, abertura e aditivos; ajustes e demais ações também estão em Mais ações. Nenhuma abertura de saldo é confirmada ao apenas visitar a tela.
+
+**Novo pedido** abre Abastecimentos ou Manutenções com o contrato de origem. O abastecimento oferece seus postos vinculados, preenchendo quando há apenas um; a manutenção mantém o contrato e suas oficinas. Falhas de preço, saldo ou elegibilidade preservam os campos. **Voltar ao contrato** mantém os filtros e a aba e consulta a posição atual. Em Abastecimentos, **Operação geral** permite sair desse contexto para acessar a emissão em lote e as demais operações habituais.
+
+Em Movimentações, **Sem conciliação** filtra serviços ainda não vinculados. **Selecionar fatura** abre a gestão financeira do contrato, sem vínculo automático. **Abrir processo** acessa a fatura já vinculada. Em Faturas, busca, etapa e contrato ficam visíveis; os outros campos ficam em Filtros, e importação/projeções permanecem em Ferramentas financeiras. Pagamento e conciliação invalidam a consulta anterior dos saldos para atualizar o acompanhamento ao voltar.
+
+### Configuração inicial
+
+1. Confira empresa contratada, objeto (abastecimento ou manutenção) e início/fim da vigência.
+2. Em Rede executante, vincule cada posto/oficina ao contrato. A empresa executante pode ser diferente da contratada. Postos continuam com seu cadastro operacional próprio.
+3. Para abastecimento, cadastre preço por posto e combustível, com até seis casas decimais e início de vigência. Nova versão encerra a anterior; pedidos emitidos guardam o preço original.
+4. Confira o saldo livre e a data de abertura. O valor sugerido é apenas referência histórica; a confirmação e a justificativa são obrigatórias. A abertura não pode ser sobrescrita.
+5. Mudanças posteriores de limite e vigência usam aditivos numerados; correções de saldo usam ajustes com documento e justificativa.
+
+### Editar e excluir preços por posto e combustível
+
+Na tabela **Preços por posto e combustível**, editores financeiros podem usar **Editar** e **Excluir**. O posto e o combustível identificam a série de preços. Editar cria uma nova versão do valor por litro; o início opcional aplica a mudança agora ou em data futura. Um preço agendado mantém seu início quando esse campo fica vazio. Versões encerradas não são reescritas: use Novo preço para uma nova vigência.
+
+Excluir pede confirmação, retira a versão dos novos pedidos e conserva seu registro/auditoria. **Mostrar histórico de preços** inclui versões encerradas, substituídas e excluídas. Excluir um preço vigente não reativa automaticamente um preço antigo. Ao excluir um agendamento, seu predecessor ainda válido pode continuar até o próximo agendamento; preços já excluídos nunca são reativados.
+
+Essas ações não alteram o saldo nem recalculam reservas existentes. A ordem já emitida mantém preço, combustível previsto e valor reservado e pode ser concluída normalmente pelo valor real. Se uma prévia de emissão ficar antiga após uma edição, o servidor pede uma nova conferência do preço. Operadores sem permissão de edição financeira continuam somente com a consulta permitida por seu perfil.
+
+Contratos copiados da produção permanecem pendentes. Nenhum vínculo é inferido por nome e nenhuma despesa anterior à abertura é descontada novamente. O histórico financeiro continua em Faturas e pagamentos > Histórico e projeções.
+
+## Operações
+
+**Contrato exclusivo por posto:** um posto possui apenas um vínculo ativo, seja com contrato individual ou com contrato de rede credenciada. Um posto vinculado ao individual não pode ser incluído em outro contrato da rede. O cadastro de vínculo identifica e desabilita postos já utilizados; o servidor e o banco também impedem duplicação ou reativação conflitante. Para mudar, desative o vínculo anterior e cadastre/reative o novo. Vínculos, preços e reservas anteriores permanecem no histórico; uma ordem já reservada continua vinculada ao contrato original.
+
+Na emissão de abastecimento, selecionar o posto determina automaticamente contrato e executante, sem oferecer outro contrato para escolha. Trocar o posto limpa a consulta e a prévia anteriores. Um posto sem contrato elegível exige conferência do vínculo exclusivo, vigência, preços e saldo inicial; nenhum vínculo é deduzido pelo nome. A escolha de contratos/oficinas no fluxo de manutenção permanece disponível.
+
+**Abastecimento:** escolha posto, contrato, combustível e litros previstos. A prévia mostra preço, reserva e disponível após emissão; um único contrato elegível é selecionado automaticamente. Em lotes, todos os veículos devem ter quantidade, o orçamento considera cada ordem e a gravação é atômica. Servidor recalcula os valores e bloqueia saldo insuficiente. Ordens antigas recebem a ação Vincular contrato e reservar; postos aguardam a equipe emissora regularizar o vínculo.
+
+Confirmação registra comprovante, combustível, litros e valor efetivamente abastecidos. É possível solicitar gasolina comum e confirmar etanol ou gasolina aditivada quando houver substituição no posto. A tela preserva a solicitação original e avisa sobre a troca; não exige nova emissão ou aprovação. Observações podem explicar a indisponibilidade. O preço original continua documentando a reserva, sem recálculo retroativo ou exigência de preço cadastrado para o substituto. A auditoria registra combustível e litros solicitados/realizados e valor real.
+
+Valor menor libera a sobra; valor maior utiliza o saldo livre. Gasto realizado acima do saldo é registrado como divergência, bloqueando novos pedidos. Recomponha o saldo por ajuste/aditivo e regularize a divergência explicitamente. Cancelamento e expiração liberam a reserva uma vez. Reabrir ordem expirada exige nova reserva ao preço vigente.
+
+**Manutenção:** Novo pedido informa veículo, oficina, contrato, descrição e orçamento. A emissão autoriza e reserva diretamente com a permissão atual. Iniciar serviço cria o registro operacional; pedido apenas autorizado não marca o veículo em manutenção. Concluir registra custo real, peças e conclusão, liberando sobra ou apontando divergência. Serviço iniciado deve ser concluído com o custo real, inclusive zero; retificação de custo exige justificativa e lança somente a diferença.
+
+Em **Manutenções**, pedidos e serviços aparecem em uma única tabela, com filtros, indicadores e paginação compartilhados. Autorizações aguardando início têm prioridade; depois aparecem os serviços e o histórico, seguidos de pedidos cancelados sem execução. Um pedido iniciado/concluído usa apenas seu registro de serviço, sem repetição. **Iniciar serviço**, **Concluir** e **Cancelar pedido** continuam nas ações da linha, conforme etapa/permissão. **Ver pedido e contrato** consulta oficina, orçamento e custo; **Retificar** corrige uma execução financeira concluída. O custo dos KPIs reúne serviços realizados; orçamento reservado não é contado como despesa. PDF/XLSX seguem o mesmo filtro da listagem única.
+
+**Faturas:** continuam processos, etapas, checklist, referências, documentos, assinaturas, importações e exportações. A conciliação seleciona operações inteiras do contrato; uma operação pertence a uma única fatura. O valor já consumido não é descontado novamente. Diferenças exigem justificativa e têm lançamento próprio. Alterar uma operação/fatura sinaliza conciliação desatualizada. Cancelar a fatura não estorna serviços executados; processo conciliado não é apagado nem troca de contrato.
+
+## Fórmulas e acesso
+
+- Saldo contratual = abertura + aditivos/ajustes − consumo realizado.
+- Disponível = saldo contratual − reservas abertas.
+- Pago/a pagar acompanham faturas separadamente.
+- Sem abertura confirmada, saldo desconhecido aparece como traço.
+- KPIs filtram toda a população consultada; extrato, reservas e operações têm filtros/paginação e PDF/XLSX de todos os resultados.
+
+O contrato é bloqueado transacionalmente antes de reservas/execuções. Chaves de requisição evitam duplicação em tentativas repetidas. Valores são calculados com Decimal e arredondamento final em centavos. O extrato PostgreSQL rejeita UPDATE/DELETE; correções são novos lançamentos. Visibilidade de operações/extrato respeita secretaria; o saldo compartilhado não concede acesso aos detalhes das demais. Postos recebem apenas o orçamento da sua ordem.
+
+## Atualização diária e recuperação
+
+Tarefa nativa existente: **FROTA Homologacao - Atualizar dados 06h**, 06h de Brasília, mesmo principal S4U. Código ativo em `D:\FROTAS\02-HOMOLOGACAO\sincronizacao\refresh_data.py`, cópia versionada em `scripts/homologation/refresh_data.py`.
+
+Produção é exportada em snapshot somente leitura. O job restaura em banco temporário HML, confere tabelas/arquivos, aplica `scripts/migrate-hml-refresh.py`, confere colunas de negócio originais e só então troca banco/arquivos e reinicia a API6969. Falha anterior à ativação preserva o ambiente; falha na ativação chama rollback. Arquivos `.env`, cookies, segredos e assinaturas de HML continuam isolados.
+
+Preços, vínculos, aberturas e pedidos exclusivos dos testes são reiniciados diariamente. Após a cópia, contratos voltam a aguardar configuração. Estado e logs privados ficam em `storage/production-refresh` e `storage/backups/sincronizacao-producao/<execução>`; snapshots completos têm retenção de sete dias. A rotina não modifica produção.
+
+Rollback funcional rápido: desabilitar a flag somente na `.env` de HML e reiniciar sua API pelo controlador existente; a interface volta aos processos anteriores. Banco/extrato permanecem preservados. Para reverter uma troca da rotina, executar sua função `rollback` com o estado da execução e o mesmo principal de manutenção. Backup anterior à entrega: `storage/backups/20261022-contract-balances/hml-before.dump`; índice frontend anterior no mesmo diretório. Nunca executar restauração no cluster5432.
+
+## Verificação técnica
+
+`scripts/run-contract-postgres-tests.py` cria e remove um banco descartável estritamente no cluster5441. Exercita concorrência pelo último saldo, repetição concorrente de emissão, lote atômico, expiração/reabertura, imutabilidade, manutenção, comprovante/retificação, cancelamento, projeção por vínculos exatos, acesso por secretaria, APIs e aditivo idempotente. Testes unitários cobrem ainda arredondamento, preço versionado, conciliação, divergência e abertura.
+
+`scripts/homologation/test_refresh_failure.py` faz restore/migration real em staging e injeta falha antes da ativação, comprovando preservação dos fingerprints e saúde da HML. É um teste manual opt-in; não faz parte de pytest. A publicação de 22/10 também executa a rotina completa com schemas diferentes. Evidências e screenshots ficam no backup privado da entrega.
+## Criação assistida de processos — 23/10/2026
+
+Em **Serviços realizados**, use **Criar processo** na operação desejada. O formulário abre no contrato correto e com o serviço selecionado. Para reunir mais operações na mesma fatura, marque os demais serviços sem conciliação; a seleção é mantida ao mudar de página ou filtro. Também é possível começar por **Faturas e pagamentos → Novo processo** e escolher o contrato.
+
+Ao continuar, confira os dados reaproveitados (empresa contratada, tipo, secretaria por ID da origem, competência e total). Em **Serviços desta fatura**, consulte as descrições, datas, veículo, prestador e combustível/litros disponíveis. Informe o número do processo e os dados fiscais que ainda faltam. **Identificação**, **Execução financeira** e **Responsável e observações** permitem revisar ou completar o cadastro, sem preencher novamente o que já consta.
+
+**Salvar e conciliar** cria o processo em Montagem e vincula as operações selecionadas pela conciliação existente. O consumo realizado não é descontado novamente. Diferença entre valor fiscal e serviços exige justificativa e confirmação de ajuste. Nenhum pagamento é executado automaticamente. Se apenas a conciliação falhar, tente novamente no mesmo processo ou abra o processo salvo e conclua pela aba Financeiro. Se a criação ficar sem resposta por falha de conexão/servidor, confira a fila antes de abrir outro cadastro.
+
+Para faturas históricas/sem operações disponíveis, escolha **Preenchimento manual**. Dados fiscais ausentes não são inventados; competência e secretaria só são propostas quando as origens permitem identificação unívoca. Serviços de secretarias diferentes não são atribuídos por aproximação de nome. As permissões e validações do servidor continuam prevalecendo.
+
+O painel do processo concentra valor, vencimento e etapa no cabeçalho; Resumo, Financeiro, Checklist e Histórico permanecem disponíveis. No celular, edição e detalhes ocupam a tela inteira. Recarregue a página para utilizar a versão publicada.

@@ -1,7 +1,7 @@
 import { useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 
-export default function useFuelSupplyOrderForm(initialValues, organizations, fuelStations) {
+export default function useFuelSupplyOrderForm(initialValues, organizations, fuelStations, { autoSelectFirstStation = true } = {}) {
   const { user } = useAuth()
   const [values, setValues] = useState(initialValues)
   // Catalogs may arrive after the form opens. An explicit choice (including
@@ -9,6 +9,6 @@ export default function useFuelSupplyOrderForm(initialValues, organizations, fue
   return [{
     ...values,
     organization_id: values.organization_id ?? organizations.find((org) => org.id === user?.organization_id)?.id ?? '',
-    fuel_station_id: values.fuel_station_id ?? fuelStations[0]?.id ?? '',
+    fuel_station_id: values.fuel_station_id ?? ((autoSelectFirstStation || fuelStations.length === 1) ? fuelStations[0]?.id : '') ?? '',
   }, setValues]
 }

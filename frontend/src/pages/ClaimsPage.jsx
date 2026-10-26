@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react'
+import IndicatorBar from '../components/ui/IndicatorBar'
+import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
+import { useEffect, useRef, useState } from 'react'
 import ClaimAttachmentsField from '../components/ClaimAttachmentsField'
 import ClaimForm from '../components/ClaimForm'
 import Modal from '../components/Modal'
@@ -47,6 +49,9 @@ function claimStatusTone(status) {
 }
 
 export default function ClaimsPage() {
+  const kpiRequest = useRef(0)
+  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
+
   const { canCreate, canEdit } = useAuth()
   const canCreateClaim = canCreate('claims')
   const canEditClaim = canEdit('claims')
@@ -93,10 +98,11 @@ export default function ClaimsPage() {
   }
 
   async function loadClaims(page = pagination.page) {
+    const request = ++kpiRequest.current
     try {
       setLoading(true)
       setError('')
-      const { data } = await claimsAPI.list({
+      const { data } = await claimsAPI.list({ indicator: indicator === 'total' ? undefined : indicator,
         page,
         limit: 10,
         vehicle_id: vehicleFilter || undefined,
@@ -105,22 +111,24 @@ export default function ClaimsPage() {
         tipo: typeFilter !== 'TODOS' ? typeFilter : undefined,
         search: search || undefined,
       })
+      if (request !== kpiRequest.current) return
       setRecords(data.data)
-      setPagination(data.pagination)
+      setPagination(data.pagination); setIndicators(data.indicators || null)
     } catch (err) {
+      if (request !== kpiRequest.current) return
       setError(getApiErrorMessage(err, 'Não foi possível carregar os sinistros.'))
     } finally {
-      setLoading(false)
+      if (request === kpiRequest.current) setLoading(false)
     }
   }
 
   useEffect(() => {
     loadVehicles().catch(() => {})
-  }, [])
+  }, [indicator])
 
   useEffect(() => {
     loadClaims(1)
-  }, [organizationFilter, vehicleFilter, statusFilter, typeFilter, search])
+  }, [organizationFilter, vehicleFilter, statusFilter, typeFilter, search, indicator])
 
   async function handlePreviewPdf() {
     if (!records.length) return
@@ -198,12 +206,7 @@ export default function ClaimsPage() {
         </div>
       </div>
 
-      <div className="panel-metrics">
-        <div className="metric-inline">
-          <strong>{pagination.total}</strong>
-          <span>sinistros no filtro</span>
-        </div>
-      </div>
+      <IndicatorBar state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={loading} error={error} resultCount={pagination.total} />
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}

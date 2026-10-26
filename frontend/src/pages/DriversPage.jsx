@@ -16,11 +16,11 @@ import '../components/DriverLicenseNotice.css'
 import './DriversPage.css'
 
 const CNH_FILTERS = [
-  { value: '', key: 'total', label: 'Condutores no filtro', help: 'Todos os condutores da busca, status e secretaria selecionados.' },
-  { value: 'expired', key: 'expired', label: 'CNHs vencidas', help: 'Validade anterior à data de hoje.' },
-  { value: 'expiring_30', key: 'expiring_30', label: 'CNHs em até 30 dias', help: 'Vencem entre hoje e os próximos 30 dias, inclusive.' },
-  { value: 'expiring_60', key: 'expiring_60', label: 'CNHs em até 60 dias', help: 'Vencem entre hoje e os próximos 60 dias; inclui as de até 30 dias.' },
-  { value: 'missing', key: 'missing', label: 'CNHs não informadas', help: 'Número ou validade da CNH não informados. Cada condutor é contado uma vez.' },
+  { value: '', key: 'total', tone: 'neutral', label: 'Condutores no filtro', help: 'Todos os condutores da busca, status e secretaria selecionados.' },
+  { value: 'expired', key: 'expired', tone: 'danger', label: 'CNHs vencidas', help: 'Validade anterior à data de hoje.' },
+  { value: 'expiring_30', key: 'expiring_30', tone: 'warning', label: 'CNHs em até 30 dias', help: 'Vencem entre hoje e os próximos 30 dias, inclusive.' },
+  { value: 'expiring_60', key: 'expiring_60', tone: 'info', label: 'CNHs em até 60 dias', help: 'Vencem entre hoje e os próximos 60 dias; inclui as de até 30 dias.' },
+  { value: 'missing', key: 'missing', tone: 'warning', label: 'CNHs não informadas', help: 'Número ou validade da CNH não informados. Cada condutor é contado uma vez.' },
 ]
 
 const initialForm = {
@@ -55,7 +55,13 @@ export default function DriversPage() {
   const [search, setSearch] = useState('')
   const [activeFilter, setActiveFilter] = useState('ATIVOS')
   const [organizationFilter, setOrganizationFilter] = useState('TODAS')
-  const [cnhFilter, setCnhFilter] = useState('')
+  const cnhFilter = CNH_FILTERS.some((item) => item.value === searchParams.get('cnh_status')) ? searchParams.get('cnh_status') : ''
+  function setCnhFilter(value) {
+    const next = new URLSearchParams(searchParams)
+    if (value) next.set('cnh_status', value)
+    else next.delete('cnh_status')
+    setSearchParams(next)
+  }
   const [summary, setSummary] = useState(null)
   const listRequestRef = useRef(0)
   const [loading, setLoading] = useState(true)
@@ -311,7 +317,7 @@ export default function DriversPage() {
       </div>
 
       <div className="driver-kpis" role="group" aria-label="Indicadores e filtros de CNH" aria-busy={loading}>
-        {CNH_FILTERS.map((filter) => <button key={filter.key} type="button" className="driver-kpi" title={filter.help} aria-label={filter.label} aria-pressed={cnhFilter === filter.value} disabled={loading || !summary} onClick={() => setCnhFilter(cnhFilter === filter.value ? '' : filter.value)}>
+        {CNH_FILTERS.map((filter) => <button key={filter.key} type="button" className="driver-kpi" data-tone={filter.tone} title={filter.help} aria-label={filter.label} aria-pressed={cnhFilter === filter.value} disabled={loading || !summary} onClick={() => setCnhFilter(cnhFilter === filter.value ? '' : filter.value)}>
           <strong>{summary?.[filter.key] ?? '—'}</strong><span>{filter.label}</span>
           {cnhFilter === filter.value ? <span className="driver-kpi__selected">Selecionado</span> : null}
         </button>)}

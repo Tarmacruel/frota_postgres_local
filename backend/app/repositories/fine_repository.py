@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import populate_indicators, filter_indicator
+
 from datetime import time
 from uuid import UUID
 from sqlalchemy import func, or_, select
@@ -70,6 +72,8 @@ class FineRepository:
             stmt = stmt.where(filter_clause)
             count_stmt = count_stmt.where(filter_clause)
 
+        stmt = await populate_indicators(self.db, 'fines', stmt)
+        count_stmt = filter_indicator(self.db, 'fines', count_stmt)
         stmt = stmt.order_by(Fine.infraction_date.desc(), Fine.created_at.desc()).offset((page - 1) * limit).limit(limit)
         total = int((await self.db.execute(count_stmt)).scalar_one())
         items = list((await self.db.execute(stmt)).scalars().unique().all())

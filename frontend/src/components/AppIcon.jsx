@@ -156,6 +156,12 @@ export function AppIcon({ name, className }) {
           <path d="M12 3.5 13.7 8l4.8 1.8-4.8 1.8L12 16l-1.7-4.4-4.8-1.8L10.3 8 12 3.5Z" />
         </svg>
       )
+    case 'check':
+      return (
+        <svg {...commonProps}>
+          <path d="m5 12 4.5 4.5L19 7" />
+        </svg>
+      )
     case 'close':
       return (
         <svg {...commonProps}>

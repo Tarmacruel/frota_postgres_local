@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import IndicatorRequest, indicator_context
+
 from uuid import UUID
 
 from datetime import date
@@ -56,10 +58,11 @@ async def list_payment_processes(
     due_from: date | None = Query(default=None),
     due_to: date | None = Query(default=None),
     search: str | None = Query(default=None, max_length=160),
+    kpis: IndicatorRequest = Depends(indicator_context('payments')),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("payment_processes", "view")),
 ):
-    return await PaymentProcessService(db).list(
+    return kpis.attach(await PaymentProcessService(db).list(
         page=page,
         limit=limit,
         current_user=current_user,
@@ -73,7 +76,7 @@ async def list_payment_processes(
         due_from=due_from,
         due_to=due_to,
         search=search,
-    )
+    ))
 
 
 @router.get("/dashboard", response_model=PaymentDashboardOut)
@@ -127,6 +130,7 @@ async def export_payment_processes(
     due_from: date | None = Query(default=None),
     due_to: date | None = Query(default=None),
     search: str | None = Query(default=None, max_length=160),
+    kpis: IndicatorRequest = Depends(indicator_context('payments')),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("payment_processes", "view")),
 ):
@@ -319,7 +323,7 @@ async def get_payment_contract_management(
     db: AsyncSession = Depends(get_db_session),
     _current_user: User = Depends(require_permission("payment_processes", "view")),
 ):
-    return await PaymentProcessService(db).contract_management(contract_id, horizon_months=horizon_months)
+    return await PaymentProcessService(db).contract_management(contract_id, horizon_months=horizon_months, current_user=_current_user)
 
 
 @contract_router.post("", response_model=PaymentContractOut, status_code=status.HTTP_201_CREATED)

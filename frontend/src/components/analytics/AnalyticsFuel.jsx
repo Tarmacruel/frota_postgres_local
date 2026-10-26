@@ -1,3 +1,4 @@
+import Modal from '../Modal'
 import { useMemo, useState } from 'react'
 import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, Legend } from 'recharts'
 import { analyticsV2API } from '../../api/analyticsV2'
@@ -32,6 +33,8 @@ export default function AnalyticsFuel({ enabled = true, organizations = [], cata
   const [draft, setDraft] = useState(applied)
   const [validation, setValidation] = useState('')
   const [revision, setRevision] = useState(0)
+  const [metricDetail, setMetricDetail] = useState(null)
+  const [metricShown, setMetricShown] = useState(30)
   const [shownVehicles, setShownVehicles] = useState(20)
   const [shownAnomalies, setShownAnomalies] = useState(20)
   const query = useMemo(() => ({ ...applied, organization: applied.organization || undefined,
@@ -97,17 +100,25 @@ export default function AnalyticsFuel({ enabled = true, organizations = [], cata
     {catalogError ? <p role="status" className="analytics-scope-note">Catálogo de secretarias indisponível. O escopo de acesso segue aplicado.</p> : null}
     <p className="analytics-scope-note">{formatDate(applied.date_from)} a {formatDate(applied.date_to)} · {data?.methodology.period}</p>
 
+    <Modal open={Boolean(metricDetail)} title={metricDetail || 'Composição do indicador'} onClose={() => setMetricDetail(null)}>
+      <p>Composição por veículo no mesmo período e filtros da tela. Valores e amostras incompletos permanecem identificados.</p>
+      <p>{data?.methodology.price} {data?.methodology.mileage}</p>
+      <div className="table-wrap"><table className="data-table"><thead><tr><th>Veículo</th><th>Abastecimentos</th><th>Litros</th><th>Valor</th><th>Preço médio/L</th><th>Km válidos</th><th>Km/L</th></tr></thead><tbody>{data?.vehicles.slice(0, metricShown).map((item) => <tr key={item.vehicle_id}><td>{item.plate}</td><td>{item.totals.records}</td><td>{amountLabel(item.totals.liters, 'L')}</td><td>{amountLabel(item.totals.cost, 'BRL')}</td><td>{priceLabel(item.totals.price_per_liter)}</td><td>{formatValue(item.distance_km, 'km')}</td><td>{formatValue(item.km_per_liter_supplied, 'km/L')}</td></tr>)}</tbody></table></div>
+      <p>{Math.min(metricShown, data?.vehicles.length || 0)} de {data?.vehicles.length || 0} veículo(s). Os indicadores consideram toda a base do recorte.</p>
+      {(data?.vehicles.length || 0) > metricShown ? <button type="button" className="ghost-button" onClick={() => setMetricShown((value) => value + 30)}>Ver mais veículos</button> : null}
+      {data?.can_view_records ? <button type="button" className="secondary-button" onClick={() => { setMetricDetail(null); openEvents('Abastecimentos que compõem o indicador') }}>Ver abastecimentos de origem</button> : null}
+    </Modal>
     <AnalyticsSection title="Abastecimentos do período" description="Litros e valores registrados; não há medição estruturada de tanque cheio." {...state}>
       <div className="analytics-fuel-summary">
-        <div><span>Litros abastecidos</span><strong>{amountLabel(data?.totals.liters, 'L')}</strong>
+        <div><button type="button" className="analytics-kpi-primary" onClick={() => { setMetricDetail('Litros abastecidos'); setMetricShown(30) }}><span>Litros abastecidos</span><strong>{amountLabel(data?.totals.liters, 'L')}</strong><small>Ver composição →</small></button>
           <small>{data?.totals.records} abastecimento(s)</small></div>
-        <div><span>Valor registrado</span><strong>{amountLabel(data?.totals.cost, 'BRL')}</strong>
+        <div><button type="button" className="analytics-kpi-primary" onClick={() => { setMetricDetail('Valor registrado'); setMetricShown(30) }}><span>Valor registrado</span><strong>{amountLabel(data?.totals.cost, 'BRL')}</strong><small>Ver composição →</small></button>
           <small>Período anterior: {amountLabel(data?.previous_totals.cost, 'BRL')}</small></div>
-        <div><span>Preço médio ponderado</span><strong>{priceLabel(data?.totals.price_per_liter)}</strong>
+        <div><button type="button" className="analytics-kpi-primary" onClick={() => { setMetricDetail('Preço médio ponderado'); setMetricShown(30) }}><span>Preço médio ponderado</span><strong>{priceLabel(data?.totals.price_per_liter)}</strong><small>Ver composição →</small></button>
           <small>{data?.totals.priced_records} registro(s) com valor e litros válidos</small></div>
-        <div><span>Km de posses válidas</span><strong>{formatValue(data?.measured_distance_km, 'km')}</strong>
+        <div><button type="button" className="analytics-kpi-primary" onClick={() => { setMetricDetail('Km de posses válidas'); setMetricShown(30) }}><span>Km de posses válidas</span><strong>{formatValue(data?.measured_distance_km, 'km')}</strong><small>Ver composição →</small></button>
           <small>{data?.measured_vehicles} veículo(s) medidos com abastecimento no recorte</small></div>
-        <div><span>Km por litro abastecido</span><strong>{formatValue(data?.measured_km_per_liter_supplied, 'km/L')}</strong>
+        <div><button type="button" className="analytics-kpi-primary" onClick={() => { setMetricDetail('Km por litro abastecido'); setMetricShown(30) }}><span>Km por litro abastecido</span><strong>{formatValue(data?.measured_km_per_liter_supplied, 'km/L')}</strong><small>Ver composição →</small></button>
           <small>Secundário: {formatValue(data?.measured_liters_per_100km_supplied, 'L/100km')}</small></div>
       </div>
       {data?.can_view_records ? <button type="button" className="analytics-entity-link" onClick={() => openEvents('Abastecimentos do período')}>Ver abastecimentos de origem</button> : null}

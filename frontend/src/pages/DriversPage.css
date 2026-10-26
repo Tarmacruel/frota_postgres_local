@@ -6,8 +6,6 @@
 }
 .driver-kpi strong { font-size: 23px; line-height: 1.1; font-variant-numeric: tabular-nums; }
 .driver-kpi > span { font-size: 12px; line-height: 1.4; }
-.operation-page .driver-kpi[aria-pressed='true'] { border-color: var(--ui-info-text); background: var(--ui-info-soft); color: var(--ui-info-text); }
-.operation-page .driver-kpi:hover:not(:disabled) { border-color: var(--ui-info-text); }
 .driver-kpi:focus-visible { outline: 3px solid var(--ui-info-text); outline-offset: 3px; }
 .driver-kpi:disabled { cursor: wait; opacity: .65; }
 .driver-kpi .driver-kpi__selected { flex-basis: 100%; font-size: 10px; font-weight: 700; }

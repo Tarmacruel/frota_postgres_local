@@ -126,6 +126,15 @@ class PaymentContractOut(BaseModel):
     paid_amount: Decimal = Decimal("0")
     pending_amount: Decimal = Decimal("0")
     available_balance: Decimal | None = None
+    control_opened: bool = False
+    suggested_opening_balance: Decimal | None = None
+    opening_balance: Decimal | None = None
+    opening_date: date | None = None
+    contractual_balance: Decimal | None = None
+    reserved_amount: Decimal = Decimal('0')
+    consumed_since_opening: Decimal = Decimal('0')
+    divergence_open: bool = False
+    divergence_note: str | None = None
     status: PaymentContractStatus
     notes: str | None
     alerts: list[str] = Field(default_factory=list)

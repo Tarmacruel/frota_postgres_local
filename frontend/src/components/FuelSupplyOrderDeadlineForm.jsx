@@ -4,6 +4,8 @@ import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
 import { formatOrderNumber } from '../utils/fuelSupplyOrders'
+import { useContractControl } from '../hooks/useContractFunding'
+import FuelOrderFundingForm from './contracts/FuelOrderFundingForm'
 
 function buildSuggestedDeadline(order) {
   const currentDeadline = new Date(order?.expires_at || 0).getTime()
@@ -11,7 +13,14 @@ function buildSuggestedDeadline(order) {
   return toDateTimeLocalValue(new Date(base + 24 * 60 * 60 * 1000).toISOString())
 }
 
-export default function FuelSupplyOrderDeadlineForm({ order, onClose, onSuccess }) {
+export default function FuelSupplyOrderDeadlineForm(props) {
+  const mode = useContractControl()
+  if (mode.enabled === null) return <p role="status">Conferindo reserva contratual…</p>
+  if (mode.enabled && !props.order?.contract_reservation_id) return <FuelOrderFundingForm {...props} />
+  return <ExistingFuelSupplyOrderDeadlineForm {...props} />
+}
+
+function ExistingFuelSupplyOrderDeadlineForm({ order, onClose, onSuccess }) {
   const isExpired = order?.status === 'EXPIRED' || new Date(order?.expires_at).getTime() <= Date.now()
   const [expiresAt, setExpiresAt] = useState(() => buildSuggestedDeadline(order))
   const [reason, setReason] = useState('')

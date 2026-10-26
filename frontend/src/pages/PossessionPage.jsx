@@ -1,3 +1,5 @@
+import IndicatorBar from '../components/ui/IndicatorBar'
+import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import JustificationField from '../components/JustificationField'
 import { VehicleTagBadges } from '../components/VehicleTags'
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -123,6 +125,9 @@ function normalizeUploadList(fileList) {
 }
 
 export default function PossessionPage() {
+  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
+  useEffect(() => { setCurrentPage(1) }, [indicator])
+
   const { canCreate, canEdit, isAdmin, isProduction, reload } = useAuth()
   const canCreatePossession = canCreate('possession')
   const canEditPossession = canEdit('possession')
@@ -184,7 +189,7 @@ export default function PossessionPage() {
   const editSending = useRef(false)
   const [currentPage, setCurrentPage] = useState(1)
   const [pagination, setPagination] = useState({ pages: 1, total: 0 })
-  const [summary, setSummary] = useState({ total: 0, active: 0 })
+
   const listRequest = useRef(0)
   const editDocumentInputRef = useRef(null)
   const editPhotoInputRef = useRef(null)
@@ -221,7 +226,7 @@ export default function PossessionPage() {
 
   function buildListParams(page = currentPage) {
     const focused = Boolean(focusRecordId)
-    return {
+    return { indicator: indicator === 'total' ? undefined : indicator,
       page,
       limit: 10,
       active: focused || viewFilter === 'TODAS' ? undefined : viewFilter === 'ATIVAS',
@@ -247,11 +252,8 @@ export default function PossessionPage() {
         return
       }
       setRecords(data.data)
-      setPagination(data.pagination)
-      setSummary(data.summary || {
-        total: data.pagination.total,
-        active: viewFilter === 'ATIVAS' ? data.pagination.total : data.data.filter((record) => record.is_active).length,
-      })
+      setPagination(data.pagination); setIndicators(data.indicators || null)
+
     } catch (err) {
       if (request === listRequest.current) setError(getApiErrorMessage(err, 'Não foi possível carregar as posses.'))
     } finally {
@@ -268,13 +270,13 @@ export default function PossessionPage() {
       }
     }
     loadPage()
-  }, [])
+  }, [indicator])
 
   useEffect(() => {
     listRequest.current += 1
     const timer = setTimeout(() => loadPossessions(), search.trim() ? 250 : 0)
     return () => clearTimeout(timer)
-  }, [currentPage, vehicleFilter, viewFilter, search, organizationFilter, startDateFrom, startDateTo, focusRecordId])
+  }, [currentPage, vehicleFilter, viewFilter, search, organizationFilter, startDateFrom, startDateTo, focusRecordId, indicator])
 
   useEffect(() => {
     if (focusRecordId && viewFilter !== 'TODAS') {
@@ -351,7 +353,7 @@ export default function PossessionPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, organizationFilter, vehicleFilter, startDateFrom, startDateTo, viewFilter, focusRecordId])
+  }, [search, organizationFilter, vehicleFilter, startDateFrom, startDateTo, viewFilter, focusRecordId, indicator])
 
   function patchSearchParams(updates) {
     const next = new URLSearchParams(searchParams)
@@ -835,7 +837,6 @@ export default function PossessionPage() {
     ]
   }
 
-  const activeCount = summary.active
 
   const tourSteps = useMemo(() => ([
     {
@@ -961,16 +962,7 @@ export default function PossessionPage() {
         </div>
       </div>
 
-      <div className="panel-metrics">
-        <div className="metric-inline">
-          <strong>{summary.total}</strong>
-          <span>registros exibidos</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{activeCount}</strong>
-          <span>posses ativas</span>
-        </div>
-      </div>
+      <IndicatorBar state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={loading} error={error} resultCount={pagination.total} />
 
       {focusedRecord ? (
         <div className="table-focus-banner">

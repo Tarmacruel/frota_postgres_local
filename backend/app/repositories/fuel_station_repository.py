@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import populate_indicators
+
 from uuid import UUID
 from sqlalchemy import func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -29,6 +31,7 @@ class FuelStationRepository:
             term = f"%{search.strip()}%"
             stmt = stmt.where(or_(FuelStation.name.ilike(term), FuelStation.cnpj.ilike(term),
                                   FuelStation.address.ilike(term), FuelStation.phone.ilike(term)))
+        stmt = await populate_indicators(self.db, 'fuel_stations', stmt)
         total = (await self.db.execute(select(func.count()).select_from(stmt.subquery()))).scalar_one()
         rows = await self.db.execute(stmt.order_by(FuelStation.name, FuelStation.id)
                                      .offset((page - 1) * limit).limit(limit))

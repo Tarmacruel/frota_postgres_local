@@ -1,3 +1,5 @@
+import IndicatorBar from '../components/ui/IndicatorBar'
+import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import StatusChip from '../components/ui/StatusChip'
 import PageHeader from '../components/ui/PageHeader'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -44,13 +46,14 @@ function formatFormCoordinate(value) {
 }
 
 export default function FuelStationsPage() {
+  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
+
   const { canCreate, canEdit, canDeleteModule, isAdmin } = useAuth()
   const canCreateStation = canCreate('fuel_stations')
   const canEditStation = canEdit('fuel_stations')
   const canDeleteStation = canDeleteModule('fuel_stations')
   const [stations, setStations] = useState([])
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
-  const [stationCounts, setStationCounts] = useState({ active: 0, inactive: 0 })
   const stationRequestId = useRef(0)
   const [users, setUsers] = useState([])
   const [chosenUser, setChosenUser] = useState(null)
@@ -91,22 +94,21 @@ export default function FuelStationsPage() {
   ], [])
 
   const stationParams = useCallback((page = 1, limit = 10) => (
-    { page, limit, search: search.trim() || undefined,
+    { indicator: indicator === 'total' ? undefined : indicator,  page, limit, search: search.trim() || undefined,
       active_only: statusFilter === 'TODOS' ? undefined : statusFilter === 'ATIVOS' }
-  ), [search, statusFilter])
+  ), [search, statusFilter, indicator])
 
   const loadStations = useCallback(async ({ preferredStationId = null, page = 1 } = {}) => {
     const currentRequest = ++stationRequestId.current
     const { data } = await fuelStationsAPI.listPaginated(stationParams(page))
     if (currentRequest !== stationRequestId.current) return
     setStations(data.data || [])
-    setPagination(data.pagination)
-    setStationCounts({ active: data.active_count || 0, inactive: data.inactive_count || 0 })
+    setPagination(data.pagination); setIndicators(data.indicators || null)
     const currentOrPreferredId = preferredStationId || selectedStationIdRef.current
     const stillExists = currentOrPreferredId && data.data.some((item) => item.id === currentOrPreferredId)
     setSelectedStationId(stillExists ? currentOrPreferredId : (data.data[0]?.id || ''))
     if (page > 1 && page > data.pagination.pages) loadStations({ page: data.pagination.pages })
-  }, [stationParams])
+  }, [stationParams, setIndicators])
 
   const searchUsers = useCallback(async (term = '') => {
     const currentRequest = ++userRequestId.current
@@ -374,24 +376,8 @@ export default function FuelStationsPage() {
         </div>
       </div>
 
-      <div className="panel-metrics">
-        <div className="metric-inline">
-          <strong>{pagination.total}</strong>
-          <span>postos exibidos</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{stationCounts.active}</strong>
-          <span>postos ativos</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{stationCounts.inactive}</strong>
-          <span>postos inativos</span>
-        </div>
-        {isAdmin ? <div className="metric-inline">
-          <strong>{links.length}</strong>
-          <span>vínculos no posto selecionado</span>
-        </div> : null}
-      </div>
+      {isAdmin && selectedStationId ? <button type="button" className="secondary-button" onClick={() => { const target = document.getElementById('station-user-links'); target?.scrollIntoView({ block: 'start', behavior: 'smooth' }); target?.focus({ preventScroll: true }) }}>{links.length} vínculo(s) de usuário no posto selecionado · consultar</button> : null}
+      <IndicatorBar state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={loading} error={error} resultCount={pagination.total} />
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
@@ -462,7 +448,7 @@ export default function FuelStationsPage() {
 
       <Pagination currentPage={pagination.page} totalPages={pagination.pages} onPageChange={(page) => loadStations({ page })} />
 
-      {isAdmin ? <div className="surface-panel panel-nested">
+      {isAdmin ? <div className="surface-panel panel-nested" id="station-user-links" tabIndex={-1}>
         <div className="panel-heading">
           <div>
             <h3 className="section-title">Vínculos de usuários {selectedStation ? `- ${selectedStation.name}` : ''}</h3>

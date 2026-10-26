@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import IndicatorRequest, indicator_context
+
 from app.services.vehicle_tag_service import with_vehicle_tags
 
 import json
@@ -248,10 +250,11 @@ async def list_possession_paginated(
     start_from: datetime | None = Query(default=None),
     start_to: datetime | None = Query(default=None),
     focus_id: UUID | None = Query(default=None),
+    kpis: IndicatorRequest = Depends(indicator_context('possession')),
     db: AsyncSession = Depends(get_db_session),
     current_user: User = Depends(require_permission("possession", "view")),
 ):
-    return await with_vehicle_tags(db, await PossessionService(db).list_paginated(
+    return kpis.attach(await with_vehicle_tags(db, await PossessionService(db).list_paginated(
         page=page,
         limit=limit,
         vehicle_id=vehicle_id,
@@ -264,7 +267,7 @@ async def list_possession_paginated(
         start_to=start_to,
         focus_id=focus_id,
         current_user=current_user,
-    ), current_user, vehicle_key="vehicle_id")
+    ), current_user, vehicle_key="vehicle_id"))
 
 
 @router.get("/odometer-suggestion", response_model=PossessionOdometerSuggestion | None)

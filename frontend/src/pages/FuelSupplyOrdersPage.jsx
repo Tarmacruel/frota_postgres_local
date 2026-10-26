@@ -1,3 +1,7 @@
+import IndicatorBar from '../components/ui/IndicatorBar'
+import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
+import { useContractControl } from '../hooks/useContractFunding'
+import FuelOrderFundingForm from '../components/contracts/FuelOrderFundingForm'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
@@ -67,9 +71,14 @@ function getDeadlineMeta(order) {
 }
 
 export default function FuelSupplyOrdersPage() {
+  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
+  useEffect(() => { setCurrentPage(1) }, [indicator])
+
   const [searchParams, setSearchParams] = useSearchParams()
   const focusedOrderId = searchParams.get('focus')
-  const { canEdit } = useAuth()
+  const { canEdit, isAdmin, isProduction } = useAuth()
+  const control = useContractControl()
+  const [fundingOrder, setFundingOrder] = useState(null)
   const canConfirmOrder = canEdit('fuel_supply_orders')
   const { organizations } = useMasterDataCatalog({ organizationsOnly: true })
   const [orders, setOrders] = useState([])
@@ -94,7 +103,7 @@ export default function FuelSupplyOrdersPage() {
     try {
       setLoading(true)
       setError('')
-      const { data } = await fuelSupplyOrdersAPI.listOpen({
+      const { data } = await fuelSupplyOrdersAPI.listOpen({ indicator: indicator === 'total' ? undefined : indicator,
         limit: 10,
         page,
         organization_id: organizationFilter || undefined,
@@ -106,7 +115,7 @@ export default function FuelSupplyOrdersPage() {
         return
       }
       setOrders(data.data || [])
-      setPagination(data.pagination)
+      setPagination(data.pagination); setIndicators(data.indicators || null)
     } catch (err) {
       if (request === listRequest.current) setError(getApiErrorMessage(err, 'Não foi possível carregar as ordens abertas de abastecimento.'))
     } finally {
@@ -118,7 +127,7 @@ export default function FuelSupplyOrdersPage() {
     listRequest.current += 1
     const timer = setTimeout(() => loadOrders(), search.trim() ? 250 : 0)
     return () => clearTimeout(timer)
-  }, [currentPage, organizationFilter, search])
+  }, [currentPage, organizationFilter, search, indicator])
 
   useEffect(() => {
     if (!focusedOrderId) return undefined
@@ -140,7 +149,7 @@ export default function FuelSupplyOrdersPage() {
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, organizationFilter])
+  }, [search, organizationFilter, indicator])
 
   async function handlePreviewOrderDocument(order) {
     try {
@@ -198,7 +207,8 @@ export default function FuelSupplyOrdersPage() {
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
       <div className="surface-panel panel-nested operation-module">
-        <div className="table-wrap table-wrap-wide operation-table-card">
+        <IndicatorBar state={{ selected: indicator, metadata: indicatorMetadata ? { ...indicatorMetadata, items: indicatorMetadata.items.filter((item) => ['total', 'open', 'due_today', 'expires_soon'].includes(item.key)) } : null, select: selectIndicator }} loading={loading} error={error} resultCount={pagination.total} />
+      <div className="table-wrap table-wrap-wide operation-table-card">
           <table className="data-table data-table-wide operation-table">
             <thead>
               <tr>
@@ -254,7 +264,10 @@ export default function FuelSupplyOrdersPage() {
                     <td data-label="Litros previstos">{formatNumber(order.requested_liters)}</td>
                     <td data-label="Ações">
                       <div className="operation-row-actions">
-                        {canConfirmOrder ? <button className="app-button" type="button" onClick={() => setSelectedOrder(order)}>Confirmar abastecimento</button> : null}
+                        {control.enabled && !order.contract_reservation_id ? (isAdmin || isProduction) && canConfirmOrder
+                          ? <button className="app-button" type="button" onClick={() => setFundingOrder(order)}>Vincular contrato e reservar</button>
+                          : <span className="muted">Aguarda vínculo contratual e reserva pela equipe emissora.</span>
+                          : canConfirmOrder ? <button className="app-button" type="button" onClick={() => setSelectedOrder(order)}>Confirmar abastecimento</button> : null}
                         <ActionMenu
                           label={`Mais ações da ordem ${formatOrderNumber(order)}`}
                           items={[
@@ -289,6 +302,10 @@ export default function FuelSupplyOrdersPage() {
             }}
           />
         ) : null}
+      </Modal>
+
+      <Modal open={Boolean(fundingOrder)} onClose={() => setFundingOrder(null)} title="Vincular contrato e reservar">
+        {fundingOrder ? <FuelOrderFundingForm order={fundingOrder} onClose={() => setFundingOrder(null)} onSuccess={(message) => { setFeedback(message); loadOrders() }} /> : null}
       </Modal>
 
       <Modal

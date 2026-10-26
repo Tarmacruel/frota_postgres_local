@@ -134,6 +134,11 @@ describe('Layout global shell', () => {
     expect(screen.getByRole('complementary', { name: 'Navegação principal' })).toBeInTheDocument()
     expect(screen.getByRole('navigation', { name: 'Visão geral' })).toBeInTheDocument()
     expect(screen.getByRole('link', { name: 'Veículos. Frota' })).toHaveAttribute('aria-current', 'page')
+    const sidebarLinks = within(screen.getByRole('complementary', { name: 'Navegação principal' })).getAllByRole('link')
+    const drawings = sidebarLinks.map((link) => link.querySelector('[data-module-icon]')?.innerHTML)
+    expect(drawings.every(Boolean)).toBe(true)
+    expect(new Set(drawings).size).toBe(sidebarLinks.length)
+    expect(container.querySelector('.topbar-module-mark [data-module-icon="fleet"]')).toBeInTheDocument()
     expect(screen.getByLabelText('Usuário: Servidor responsável. Perfil: Produção')).toHaveTextContent('SR')
 
     await user.click(screen.getByRole('button', { name: 'Ativar modo escuro' }))
@@ -148,6 +153,7 @@ describe('Layout global shell', () => {
     await user.click(screen.getByRole('button', { name: 'Rebater menu lateral' }))
     expect(container.querySelector('.app-shell')).toHaveClass('sidebar-compact')
     expect(window.localStorage.getItem('frota-sidebar-compact')).toBe('1')
+    expect(screen.getByRole('link', { name: 'Veículos. Frota' })).toHaveAttribute('title', 'Veículos')
   })
 
   it('abre todos os módulos pela barra inferior e devolve foco para Menu ao fechar', async () => {

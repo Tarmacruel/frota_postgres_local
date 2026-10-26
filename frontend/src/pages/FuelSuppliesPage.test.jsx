@@ -182,7 +182,7 @@ describe('FuelSuppliesPage administrative adjustments', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Mais ações da ordem AB-ORDER-EX' }))
     fireEvent.click(await screen.findByRole('menuitem', { name: 'Reabrir prazo' }))
     expect(screen.getByRole('dialog', { name: 'Reabrir prazo da ordem' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Novo prazo')).toBeRequired()
+    expect(await screen.findByLabelText('Novo prazo')).toBeRequired()
     expect(screen.getByLabelText('Justificativa')).toBeRequired()
   })
 
@@ -249,3 +249,5 @@ describe('FuelSuppliesPage administrative adjustments', () => {
     expect(screen.getByRole('dialog')).toHaveTextContent('Motivo do primeiro registro.')
   })
 })
+
+vi.mock('../api/contractControl', () => ({ contractControlAPI: { config: async () => ({ data: { enabled: false } }) }, maintenanceOrdersAPI: {} }))

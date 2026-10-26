@@ -164,6 +164,16 @@
   gap: var(--ui-space-2);
 }
 
+.ui-stat-card--interactive { text-decoration: none; color: var(--ui-text); transition: border-color .16s ease, background-color .16s ease; }
+.ui-stat-card--interactive:hover { border-color: var(--ui-primary); background: var(--ui-surface-subtle); }
+.ui-stat-card--interactive:focus-visible, .kpi-value-trigger:focus-visible { outline: 3px solid var(--ui-primary); outline-offset: 3px; }
+.kpi-value-trigger { text-align: left; font: inherit; color: var(--ui-text); cursor: pointer; }
+.kpi-value-trigger[aria-pressed='true'] { border-color: var(--ui-primary); background: var(--ui-info-soft, var(--ui-surface-subtle)); }
+.kpi-value-trigger small { color: var(--ui-text-muted); }
+.kpi-detail-list > li { padding: 12px 0; border-bottom: 1px solid var(--ui-border); }
+#catalog-records { scroll-margin-top: 110px; }
+.dashboard-day-metrics a { display: grid; text-decoration: none; color: inherit; }
+@media (prefers-reduced-motion: reduce) { .ui-stat-card--interactive { transition: none; } }
 .ui-stat-card {
   font-family: var(--ui-font-body);
   min-height: 72px;
@@ -1311,6 +1321,15 @@ body.internal-app-active .operation-page .operation-table-card {
 .operation-page--maintenance .operation-table td:nth-child(4) { width: 270px; }
 .operation-page--maintenance .operation-table th:last-child,
 .operation-page--maintenance .operation-table td:last-child { width: 76px; }
+
+@media (min-width: 721px) {
+  .maintenance-unified > .interactive-kpis .interactive-kpis__grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  .maintenance-unified .interactive-kpi:not([aria-pressed='true']) .interactive-kpi__label { grid-column: 1 / -1; }
+  .maintenance-unified .interactive-kpi[data-unit='BRL'] .interactive-kpi__value { font-size: clamp(16px, 1.2vw, 22px); white-space: nowrap; }
+}
+@media (min-width: 1280px) {
+  .maintenance-unified > .interactive-kpis .interactive-kpis__grid { grid-template-columns: repeat(7, minmax(0, 1fr)) minmax(160px, 1.4fr); }
+}
 
 .operation-module { gap: var(--ui-space-4); }
 .operation-page--loans .operation-table { min-width: 850px; }

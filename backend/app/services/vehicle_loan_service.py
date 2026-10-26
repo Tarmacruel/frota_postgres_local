@@ -1,3 +1,4 @@
+from app.repositories.interactive_kpis import populate_indicators, filter_indicator
 from contextlib import asynccontextmanager
 from datetime import datetime, timezone
 from decimal import Decimal
@@ -110,8 +111,9 @@ class VehicleLoanService:
             filters.append(VehicleLoan.vehicle_id == vehicle_id)
         if status:
             filters.append(VehicleLoan.status == status)
-        total = await self.db.scalar(select(func.count()).select_from(VehicleLoan).where(*filters))
-        rows = (await self.db.scalars(select(VehicleLoan).where(*filters)
+        stmt = await populate_indicators(self.db, 'vehicle_loans', select(VehicleLoan).where(*filters))
+        total = await self.db.scalar(filter_indicator(self.db, 'vehicle_loans', select(func.count()).select_from(VehicleLoan).where(*filters)))
+        rows = (await self.db.scalars(stmt
             .order_by(VehicleLoan.created_at.desc(), VehicleLoan.id.desc()).offset((page - 1) * limit).limit(limit))).all()
         return {'data': [LoanOut.model_validate(row) for row in rows], 'pagination': build_pagination(page, limit, total)}
 

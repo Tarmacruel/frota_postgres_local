@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from app.repositories.interactive_kpis import IndicatorRequest, indicator_context
+
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -33,13 +35,14 @@ async def list_users_paginated(
     role: str | None = Query(default=None),
     organization_id: UUID | None = Query(default=None),
     without_organization: bool = Query(default=False),
+    kpis: IndicatorRequest = Depends(indicator_context('users')),
     db: AsyncSession = Depends(get_db_session),
 ):
     rows, total, summary = await UserService(db).list_paginated(
         page=page, limit=limit, search=search, role=role,
         organization_id=organization_id, without_organization=without_organization,
     )
-    return {"data": rows, "pagination": build_pagination(page, limit, total), "summary": summary}
+    return kpis.attach({"data": rows, "pagination": build_pagination(page, limit, total), "summary": summary})
 
 
 @router.get("/signers", response_model=list[UserSignerOut])

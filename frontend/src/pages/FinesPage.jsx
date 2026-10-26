@@ -1,3 +1,5 @@
+import IndicatorBar from '../components/ui/IndicatorBar'
+import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
@@ -73,6 +75,9 @@ function fineStatusTone(status) {
 }
 
 export default function FinesPage() {
+  const kpiRequest = useRef(0)
+  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
+
   const { canCreate, canEdit } = useAuth()
   const canCreateFine = canCreate('fines')
   const canEditFine = canEdit('fines')
@@ -163,10 +168,11 @@ export default function FinesPage() {
   }
 
   async function loadFines(page = pagination.page) {
+    const request = ++kpiRequest.current
     try {
       setLoading(true)
       setError('')
-      const { data } = await finesAPI.list({
+      const { data } = await finesAPI.list({ indicator: indicator === 'total' ? undefined : indicator,
         page,
         limit: 10,
         vehicle_id: vehicleFilter || undefined,
@@ -174,17 +180,19 @@ export default function FinesPage() {
         status: statusFilter !== 'TODOS' ? statusFilter : undefined,
         search: search || undefined,
       })
+      if (request !== kpiRequest.current) return
       setRecords(data.data)
-      setPagination(data.pagination)
+      setPagination(data.pagination); setIndicators(data.indicators || null)
     } catch (err) {
+      if (request !== kpiRequest.current) return
       setError(getApiErrorMessage(err, 'Não foi possível carregar as multas.'))
     } finally {
-      setLoading(false)
+      if (request === kpiRequest.current) setLoading(false)
     }
   }
 
   useEffect(() => { loadAux().catch(() => {}) }, [])
-  useEffect(() => { loadFines(1) }, [search, organizationFilter, vehicleFilter, statusFilter])
+  useEffect(() => { loadFines(1) }, [search, organizationFilter, vehicleFilter, statusFilter, indicator])
 
   function openCreate() {
     setEditingRecord(null)
@@ -299,7 +307,7 @@ export default function FinesPage() {
     let page = 1
     let pages
     do {
-      const { data } = await finesAPI.list({
+      const { data } = await finesAPI.list({ indicator: indicator === 'total' ? undefined : indicator,
         page, limit: 100, vehicle_id: vehicleFilter || undefined,
         organization_id: organizationFilter || undefined,
         status: statusFilter !== 'TODOS' ? statusFilter : undefined,
@@ -339,7 +347,8 @@ export default function FinesPage() {
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
       <div className="surface-panel panel-nested operation-module">
-        <div className="table-wrap table-wrap-wide operation-table-card">
+        <IndicatorBar state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={loading} error={error} resultCount={pagination.total} />
+      <div className="table-wrap table-wrap-wide operation-table-card">
           <table className="data-table data-table-wide operation-table">
             <thead><tr><th>Veículo</th><th>Auto</th><th>Enquadramento</th><th>Condutor</th><th>Infração</th><th>Valor</th><th>Status</th>{canEditFine ? <th>Ações</th> : null}</tr></thead>
             <tbody>

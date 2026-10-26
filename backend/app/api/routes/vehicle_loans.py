@@ -1,3 +1,4 @@
+from app.repositories.interactive_kpis import IndicatorRequest, indicator_context
 from uuid import UUID
 from typing import Literal
 
@@ -41,11 +42,12 @@ async def create_regularization(data: LoanRegularizationConfirm, db: AsyncSessio
 async def list_loans(page: int = Query(1, ge=1), limit: int = Query(20, ge=1, le=100),
                      vehicle_id: UUID | None = None, status: LoanStatus | None = None,
                      search: str | None = Query(None, max_length=100), direction: Literal["sent", "received"] | None = None,
+                     kpis: IndicatorRequest = Depends(indicator_context('vehicle_loans')),
                      db: AsyncSession = Depends(get_db_session),
                      user: User = Depends(require_permission('vehicle_loans', 'view'))):
     result = await VehicleLoanService(db).list(user, page=page, limit=limit, vehicle_id=vehicle_id, status=status, search=search, direction=direction)
     result['data'] = await describe_loans(db, result['data'])
-    return result
+    return kpis.attach(result)
 
 
 @router.post('', response_model=LoanView, status_code=201)

@@ -45,6 +45,13 @@ export default function AnalyticsOverview({ enabled = true, organizations = [], 
     setApplied(next); setDraft(next)
   }
   function open(item) { onOpenEntity?.({ ...item, filters: query }) }
+  function openKpi(item) {
+    const isCost = item.key.startsWith('operational_cost')
+    const isDistance = item.key === 'distance_km'
+    open({ entityType: isCost ? 'costs' : isDistance ? 'mileage-events' : 'fuel-events', title: item.label,
+      costSource: 'operational', measuredOnly: item.key === 'operational_cost_per_km',
+      origin: { label: item.label, formula: item.calculation.formula, limitations: item.calculation.limitations } })
+  }
   function entity(item, alert = false) { return { entityType: 'vehicle', entityId: item.vehicle_id, title: item.plate,
     origin: { label: alert ? 'Alerta de consumo' : 'Veículo que exige atenção',
       formula: alert ? attention.data?.alert_basis : attention.data?.basis,
@@ -78,7 +85,7 @@ export default function AnalyticsOverview({ enabled = true, organizations = [], 
         <div className="analytics-kpi-grid">
           {kpis.map((item) => <div key={item.key}>
             <AnalyticsKpiCard label={item.label} value={formatValue(item.value, item.unit)}
-              note={deltaText(item.comparison, item.unit)} tone="status-info" />
+              note={deltaText(item.comparison, item.unit)} tone="status-info" onClick={() => openKpi(item)} />
             <details className="analytics-metric-help"><summary>{item.quality === 'partial' ? 'Cobertura parcial · fórmula' : 'Como é calculado'}</summary>
               <p>{item.calculation.formula}</p>{item.calculation.limitations.map((text) => <p key={text}>{text}</p>)}
             </details>

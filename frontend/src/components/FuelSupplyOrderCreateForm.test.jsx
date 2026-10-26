@@ -65,3 +65,5 @@ it('não inventa secretaria ou posto quando não estão disponíveis e permite a
   await waitFor(() => expect(fuelSupplyOrdersAPI.create).toHaveBeenCalledOnce())
   expect(fuelSupplyOrdersAPI.create.mock.calls[0][0]).not.toHaveProperty('requested_liters')
 })
+
+vi.mock('../api/contractControl', () => ({ contractControlAPI: { config: async () => ({ data: { enabled: false } }) }, maintenanceOrdersAPI: {} }))

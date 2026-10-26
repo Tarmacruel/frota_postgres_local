@@ -7,6 +7,7 @@ from uuid import UUID, uuid4
 from fastapi import HTTPException, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy.exc import IntegrityError
+from sqlalchemy import select, text
 from app.services.operational_scope import attribute_operation, ensure_record_visible
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.organization_scope import ensure_organization_access, production_scope_is_empty, scoped_organization_id
@@ -22,6 +23,8 @@ from app.repositories.vehicle_repository import VehicleRepository
 from app.schemas.common import PaginatedResponse, build_pagination
 from app.schemas.fuel_supply import FuelSupplyCreate, FuelSupplyRectify
 from app.services.audit_service import AuditService
+from app.services.contract_balance_service import ContractBalanceService, fuel_key, funding_fields, money
+from app.core.vehicle_handoff import lock_vehicle_handoff
 
 MAX_RECEIPT_SIZE_BYTES = 8 * 1024 * 1024
 RECEIPT_EXTENSIONS = {
@@ -58,7 +61,10 @@ class FuelSupplyService:
         if not supply:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Abastecimento não encontrado")
         await self._ensure_supply_visible_to_user(supply, current_user)
-        return self._serialize(supply)
+        result = self._serialize(supply)
+        if settings.CONTRACT_BALANCE_ENABLED:
+            result['contract_funding'] = await ContractBalanceService(self.db).funding(supply.contract_reservation_id)
+        return result
 
     async def rectify(
         self, supply_id: UUID, payload: FuelSupplyRectify, current_user: User,
@@ -120,6 +126,9 @@ class FuelSupplyService:
             for field, value in new_values.items():
                 setattr(supply, field, value)
             await attribute_operation(self.db, supply, current_user)
+            if settings.CONTRACT_BALANCE_ENABLED:
+                await ContractBalanceService(self.db).rectify_operation('FUEL_SUPPLY', supply.id,
+                    amount=supply.total_amount, actor=current_user, reason=payload.reason, occurred_at=supply.supplied_at)
             supply.updated_at = datetime.now(timezone.utc)
             consumption_inputs = {"supplied_at", "odometer_km", "liters"}
             recalculated_supply_ids = (
@@ -162,6 +171,20 @@ class FuelSupplyService:
         return self._serialize(supply)
 
     async def create(self, data: FuelSupplyCreate, receipt: UploadFile, current_user: User) -> dict:
+        if settings.CONTRACT_BALANCE_ENABLED:
+            if not all((data.contract_id, data.contract_provider_id, data.request_key, data.expected_price_id, data.fuel_station_id)):
+                raise HTTPException(422, 'Selecione contrato, posto e confira a prévia financeira para registrar o abastecimento')
+            if self.db.get_bind().dialect.name == 'postgresql':
+                await self.db.execute(text('SELECT pg_advisory_xact_lock(:key)'), {'key': (data.request_key.int & ((1 << 64)-1))-(1 << 63)})
+            await lock_vehicle_handoff(self.db, data.vehicle_id)
+            prior = await self.db.scalar(select(FuelSupply).where(FuelSupply.request_key == data.request_key))
+            if prior:
+                await self._ensure_supply_visible_to_user(prior, current_user)
+                if (prior.vehicle_id, prior.contract_id, prior.contract_provider_id, money(prior.total_amount),
+                        Decimal(str(prior.liters)), fuel_key(prior.fuel_type)) != (data.vehicle_id, data.contract_id,
+                        data.contract_provider_id, money(data.total_amount), Decimal(str(data.liters)), fuel_key(data.fuel_type)):
+                    raise HTTPException(409, 'Esta identificação já foi utilizada em outro abastecimento')
+                return await self.get(prior.id, current_user=current_user)
         if not settings.ENABLE_LEGACY_FUEL_SUPPLY_CREATE:
             raise HTTPException(
                 status_code=status.HTTP_410_GONE,
@@ -245,6 +268,17 @@ class FuelSupplyService:
         try:
             await attribute_operation(self.db, supply, current_user, new=True)
             await self.supplies.create(supply)
+            if settings.CONTRACT_BALANCE_ENABLED:
+                supply.request_key = data.request_key
+                reservation = await ContractBalanceService(self.db).reserve(contract_id=data.contract_id,
+                    provider_id=data.contract_provider_id, source_type='FUEL_DIRECT', source_id=supply.id,
+                    vehicle_id=supply.vehicle_id, organization_id=supply.organization_id, actor=current_user,
+                    fuel_type=supply.fuel_type, liters=supply.liters, expected_price_id=data.expected_price_id,
+                    station_id=supply.fuel_station_id)
+                supply.contract_id, supply.contract_provider_id = data.contract_id, data.contract_provider_id
+                supply.contract_reservation_id = reservation.id
+                await ContractBalanceService(self.db).settle(reservation.id, source_type='FUEL_SUPPLY',
+                    source_id=supply.id, amount=supply.total_amount, occurred_at=supply.supplied_at, actor=current_user)
             relative_receipt_path, stored_receipt_path = self._build_receipt_storage_paths(supply.id, receipt_payload["mime_type"])
             self._store_file(stored_receipt_path, receipt_payload["content"])
             supply.receipt_path = relative_receipt_path
@@ -467,6 +501,7 @@ class FuelSupplyService:
         if item.anomaly_details:
             alerts.append(item.anomaly_details)
         return {
+            **funding_fields(item),
             "id": item.id,
             "vehicle_loan_id": getattr(item, "vehicle_loan_id", None),
             "vehicle_id": item.vehicle_id,

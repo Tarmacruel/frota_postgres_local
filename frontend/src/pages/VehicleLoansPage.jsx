@@ -1,3 +1,5 @@
+import IndicatorBar from '../components/ui/IndicatorBar'
+import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import { useEffect, useRef, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -24,6 +26,9 @@ function getLoanStatusTone(status) {
 }
 
 export default function VehicleLoansPage() {
+  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
+  useEffect(() => { setPage(1) }, [indicator])
+
   const { user, canCreate, canEdit, canView } = useAuth()
   const [params, setParams] = useSearchParams()
   const selectedId = params.get('id') || ''
@@ -70,12 +75,12 @@ export default function VehicleLoansPage() {
   useEffect(() => {
     let current = true
     setLoading(true); setListError('')
-    vehicleLoansAPI.list({ page, limit: 20, status: status || undefined, direction: direction || undefined, search: appliedSearch || undefined })
-      .then(({ data }) => { if (current) { setRows(data.data); setPagination(data.pagination) } })
+    vehicleLoansAPI.list({ indicator: indicator === 'total' ? undefined : indicator,  page, limit: 20, status: status || undefined, direction: direction || undefined, search: appliedSearch || undefined })
+      .then(({ data }) => { if (current) { setRows(data.data); setPagination(data.pagination); setIndicators(data.indicators || null) } })
       .catch((err) => { if (current) { setRows([]); setListError(getApiErrorMessage(err)) } })
       .finally(() => { if (current) setLoading(false) })
     return () => { current = false }
-  }, [page, status, direction, appliedSearch, revision])
+  }, [page, status, direction, appliedSearch, revision, indicator, setIndicators])
 
   useEffect(() => {
     let current = true
@@ -134,7 +139,8 @@ export default function VehicleLoansPage() {
       {listError && <p role="alert" className="loan-error">{listError}</p>}
       {loading ? <p role="status">Carregando empréstimos…</p> : <>
         <p className="section-copy">{pagination.total} registro(s). Devolvidos, rejeitados e cancelados permanecem no histórico.</p>
-        <div className="loan-table-wrap operation-table-card"><table className="loan-table data-table operation-table"><thead><tr><th>Veículo</th><th>Origem → recebedora</th><th>Situação</th><th>Prazo</th><th>Consulta</th></tr></thead><tbody>
+        <IndicatorBar state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={loading} error={listError} resultCount={pagination.total} />
+      <div className="loan-table-wrap operation-table-card"><table className="loan-table data-table operation-table"><thead><tr><th>Veículo</th><th>Origem → recebedora</th><th>Situação</th><th>Prazo</th><th>Consulta</th></tr></thead><tbody>
           {rows.length === 0 && <tr><td colSpan={5}>Nenhum empréstimo encontrado para estes filtros.</td></tr>}
           {rows.map((loan) => <ResponsiveRecord key={loan.id} className={loan.id === selectedId ? 'loan-selected' : ''} label={loan.vehicle_plate} identityLabel="Veículo" statusLabel="Situação" summaryLabels={["Origem → recebedora", "Prazo"]}>
             <td data-label="Veículo"><div className="operation-vehicle-identity"><VehicleThumbnail vehicleType={loan.vehicle_type} plate={loan.vehicle_plate} /><span><strong>{loan.vehicle_plate}</strong></span></div></td>

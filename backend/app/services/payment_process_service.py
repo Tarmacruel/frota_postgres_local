@@ -58,6 +58,12 @@ from app.schemas.payment_process import (
 )
 from app.schemas.common import PaginatedResponse, build_pagination
 from app.services.audit_service import AuditService
+from app.core.config import settings
+from app.services.contract_balance_service import ContractBalanceService
+from app.models.contract_balance import ContractControl, ContractReconciliation
+from app.models.contract_balance import ContractMovement
+from app.models.contract_balance import ContractOperation
+from app.models.vehicle import Vehicle
 
 try:
     from openpyxl import Workbook, load_workbook
@@ -224,6 +230,10 @@ class PaymentProcessService:
         now = datetime.now(timezone.utc)
         record = PaymentProcess(
             import_key=self._manual_import_key(payload),
+            # Keep new collections loaded across flush: implicit lazy I/O is
+            # unavailable when synchronous helpers run on an AsyncSession.
+            references=[],
+            checklist_items=[],
             created_by_user_id=current_user.id,
             updated_by_user_id=current_user.id,
             created_at=now,
@@ -257,11 +267,21 @@ class PaymentProcessService:
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processo de pagamento não encontrado")
         self._ensure_process_visible(record, current_user)
+        if settings.CONTRACT_BALANCE_ENABLED and record.contract_id:
+            locked_contract_id = record.contract_id
+            await ContractBalanceService(self.db).contract(locked_contract_id, lock=True)
+            await self.db.refresh(record, with_for_update={"of": PaymentProcess})
+            if record.contract_id != locked_contract_id:
+                raise HTTPException(409, 'Contrato alterado durante a edição; atualize a consulta')
+            self._ensure_process_visible(record, current_user)
 
         payload = data.model_dump(exclude_unset=True)
         references = payload.pop("references", None)
         previous_contract_id = record.contract_id
         payload = await self._prepare_process_payload(payload, current_user=current_user, existing=record)
+        if settings.CONTRACT_BALANCE_ENABLED and payload.get('contract_id', record.contract_id) != record.contract_id:
+            if await self.db.get(ContractReconciliation, record.id):
+                raise HTTPException(409, 'Processo conciliado não pode trocar de contrato')
         previous = self._serialize(record)
         self._assign_process_fields(record, payload)
         record.updated_by_user_id = current_user.id
@@ -298,6 +318,16 @@ class PaymentProcessService:
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Processo de pagamento não encontrado")
         self._ensure_process_visible(record, current_user)
+        if settings.CONTRACT_BALANCE_ENABLED and record.contract_id:
+            locked_contract_id = record.contract_id
+            await ContractBalanceService(self.db).contract(locked_contract_id, lock=True)
+            await self.db.refresh(record, with_for_update={"of": PaymentProcess})
+            if record.contract_id != locked_contract_id:
+                raise HTTPException(409, 'Contrato alterado durante a edição; atualize a consulta')
+            self._ensure_process_visible(record, current_user)
+
+        if settings.CONTRACT_BALANCE_ENABLED and await self.db.get(ContractReconciliation, record.id):
+            raise HTTPException(409, 'Processo conciliado deve ser cancelado, preservando as operações e o extrato')
 
         details = self._delete_audit_details(record, reason=data.reason)
         contract_id = record.contract_id
@@ -407,7 +437,7 @@ class PaymentProcessService:
             return self._empty_dashboard()
 
         organization_id = scoped_organization_id(current_user)
-        records = await self.repository.list_for_export(organization_id=organization_id, limit=10000)
+        records = await self.repository.list_for_export(organization_id=organization_id, limit=None)
         today = date.today()
         soon_limit = today + timedelta(days=7)
         total_amount = Decimal("0")
@@ -571,6 +601,12 @@ class PaymentProcessService:
         if not contract:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
         payload = data.model_dump(exclude_unset=True)
+        if settings.CONTRACT_BALANCE_ENABLED:
+            await ContractBalanceService(self.db).contract(contract_id, lock=True)
+            if await self.db.get(ContractControl, contract_id):
+                protected = ('supplier_id', 'kind', 'valid_from', 'valid_until', 'value_initial', 'value_updated', 'imported_balance')
+                if any(field in payload and payload[field] != getattr(contract, field) for field in protected):
+                    raise HTTPException(409, 'Controle iniciado: altere limite ou vigência por aditivo; utilize ajustes para corrigir saldo')
         if "supplier_id" in payload and payload["supplier_id"]:
             supplier = await self.repository.get_supplier(payload["supplier_id"])
             if not supplier:
@@ -604,6 +640,19 @@ class PaymentProcessService:
         contract = await self.repository.get_contract(contract_id)
         if not contract:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
+        opened = False
+        if settings.CONTRACT_BALANCE_ENABLED:
+            await ContractBalanceService(self.db).contract(contract_id, lock=True)
+            opened = bool(await self.db.get(ContractControl, contract_id))
+            if opened:
+                if not data.number:
+                    raise HTTPException(422, 'Informe o número do aditivo para registrar seu efeito no saldo')
+                existing = await self.db.scalar(select(PaymentContractAmendment).where(
+                    PaymentContractAmendment.contract_id == contract_id, PaymentContractAmendment.number == data.number))
+                if existing:
+                    if existing.value_delta != data.value_delta or existing.valid_until != data.valid_until:
+                        raise HTTPException(409, 'Número de aditivo já utilizado com outros valores')
+                    return await self.get_contract(contract_id)
         amendment = PaymentContractAmendment(contract_id=contract.id, **data.model_dump())
         if amendment.value_delta is not None:
             base = contract.value_updated if contract.value_updated is not None else contract.value_initial or Decimal("0")
@@ -613,6 +662,10 @@ class PaymentProcessService:
         contract.updated_at = datetime.now(timezone.utc)
         try:
             await self.repository.create_contract_amendment(amendment)
+            if opened and amendment.value_delta:
+                await ContractBalanceService(self.db).adjust(contract_id, amount=amendment.value_delta,
+                    request_key=amendment.id, source_type='AMENDMENT', actor=current_user,
+                    reason=f'Aditivo {amendment.number}: {amendment.notes or "alteração do limite contratual"}')
             await self.audit.record(
                 actor=current_user,
                 action="AMEND",
@@ -632,12 +685,15 @@ class PaymentProcessService:
         contract_id: UUID,
         *,
         horizon_months: int = 6,
+        current_user: User | None = None,
     ) -> dict:
         contract = await self.repository.get_contract(contract_id)
         if not contract:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
         horizon = self._normalize_horizon(horizon_months)
-        return await self._build_contract_management(contract, horizon_months=horizon, include_related=True)
+        if production_scope_is_empty(current_user):
+            raise HTTPException(404, 'Contrato não encontrado')
+        return await self._build_contract_management(contract, horizon_months=horizon, include_related=True, current_user=current_user)
 
     async def contract_management_summary(
         self,
@@ -773,7 +829,7 @@ class PaymentProcessService:
                     action = "UPDATE"
                     record = existing
                 else:
-                    record = PaymentProcess(import_key=import_key)
+                    record = PaymentProcess(import_key=import_key, references=[], checklist_items=[])
                     self._fill_model(record, data, current_user=current_user, now=now, filename=filename, sheet=parsed["sheet"], import_key=import_key)
                     await self.repository.create(record)
                     created += 1
@@ -1312,6 +1368,8 @@ class PaymentProcessService:
 
     async def _normalize_legacy_contract_values(self, contract_ids: set[UUID | None]) -> None:
         for contract_id in {item for item in contract_ids if item}:
+            if settings.CONTRACT_BALANCE_ENABLED and await self.db.get(ContractControl, contract_id):
+                continue
             contract = await self.repository.get_contract(contract_id)
             if not contract:
                 continue
@@ -1664,6 +1722,11 @@ class PaymentProcessService:
             alerts.append("Contrato vencido.")
         if available_balance is not None and available_balance < Decimal("0"):
             alerts.append("Saldo contratual excedido.")
+        funding = await ContractBalanceService(self.db).balances(contract.id) if settings.CONTRACT_BALANCE_ENABLED else {}
+        if funding.get('control_opened'):
+            funding['consumed_amount'] = funding['consumed_since_opening']
+        if funding.get('divergence_open'):
+            alerts.append('Divergência financeira: novos pedidos bloqueados até regularização.')
         return {
             "id": contract.id,
             "supplier_id": contract.supplier_id,
@@ -1682,6 +1745,8 @@ class PaymentProcessService:
             "paid_amount": totals["paid_amount"],
             "pending_amount": totals["pending_amount"],
             "available_balance": available_balance,
+            "suggested_opening_balance": available_balance,
+            **funding,
             "status": contract.status,
             "notes": contract.notes,
             "alerts": alerts,
@@ -1775,7 +1840,7 @@ class PaymentProcessService:
             Decimal("0"),
         )
 
-    async def _build_contract_management(self, contract: PaymentContract, *, horizon_months: int, include_related: bool) -> dict:
+    async def _build_contract_management(self, contract: PaymentContract, *, horizon_months: int, include_related: bool, current_user: User | None = None) -> dict:
         contract_data = await self._serialize_contract(contract)
         processes = await self.repository.list_contract_processes(contract.id)
         organization_ids = await self.repository.contract_organization_ids(contract.id)
@@ -1803,7 +1868,28 @@ class PaymentProcessService:
         operations = []
         source_quality = "Previsao baseada nos processos financeiros vinculados ao contrato."
         contract_kind = contract.kind or self._infer_contract_kind(processes)
-        if contract_kind == PaymentProcessKind.FUEL:
+        funded_operations = None
+        if contract_data.get('control_opened'):
+            source_quality = 'Consumo real vinculado ao contrato desde a abertura. Faturas e reservas não são somadas novamente ao consumo.'
+            for item in history.values():
+                item['total_amount'], item['records_count'] = Decimal('0'), 0
+            funded_operations = []
+            rows = (await self.db.execute(select(ContractOperation, Vehicle.plate).outerjoin(Vehicle, Vehicle.id == ContractOperation.vehicle_id)
+                .where(ContractOperation.contract_id == contract.id, ContractOperation.occurred_at >= start_at)
+                .order_by(ContractOperation.occurred_at))).all()
+            for operation, plate in rows:
+                month = operation.occurred_at.date().replace(day=1)
+                if month in history:
+                    key = 'operational_amount' if operation.source_type == 'FUEL_SUPPLY' else 'maintenance_amount'
+                    history[month][key] += operation.amount
+                    history[month]['total_amount'] += operation.amount
+                    history[month]['records_count'] += 1
+                scope = scoped_organization_id(current_user)
+                if not scope or operation.organization_id == scope:
+                    funded_operations.append(dict(id=operation.source_id, kind='fuel' if operation.source_type == 'FUEL_SUPPLY' else 'maintenance',
+                        label=plate or 'Serviço', date=operation.occurred_at, amount=operation.amount,
+                        status='Realizado', detail='Operação vinculada ao extrato contratual'))
+        elif contract_kind == PaymentProcessKind.FUEL:
             fuel_rows = await self.repository.list_fuel_operations_for_supplier(
                 supplier_cnpj=contract.supplier.cnpj if contract.supplier else None,
                 supplier_name=contract.supplier.name if contract.supplier else None,
@@ -1843,7 +1929,7 @@ class PaymentProcessService:
                 source_quality = "Manutenção simplificada por histórico operacional dos órgãos relacionados."
 
         monthly_history = [self._serialize_management_month(item) for item in history.values()]
-        forecast_values = self._forecast_values(monthly_history, contract_kind)
+        forecast_values = [item['total_amount'] for item in monthly_history if item['total_amount'] > 0] if funded_operations is not None else self._forecast_values(monthly_history, contract_kind)
         average = self._average_decimal(forecast_values)
         variation = self._monthly_variation(forecast_values)
         depletion_date, depletion_label = self._project_depletion_date(contract_data["available_balance"], average, horizon_months)
@@ -1866,8 +1952,8 @@ class PaymentProcessService:
             "kpis": self._contract_management_kpis(contract_data, average, variation, depletion_label, alerts),
             "monthly_history": monthly_history,
             "monthly_projection": monthly_projection,
-            "related_processes": self._related_process_items(processes) if include_related else [],
-            "related_operations": self._related_operation_items(operations, contract_kind) if include_related else [],
+            "related_processes": self._related_process_items([p for p in processes if not scoped_organization_id(current_user) or p.organization_id == scoped_organization_id(current_user)]) if include_related else [],
+            "related_operations": (funded_operations if funded_operations is not None else self._related_operation_items([o for o in operations if not scoped_organization_id(current_user) or getattr(o, 'organization_id', getattr(o, 'responsible_organization_id', None)) == scoped_organization_id(current_user)], contract_kind)) if include_related else [],
             "alerts": alerts,
         }
 
@@ -1886,8 +1972,8 @@ class PaymentProcessService:
                 "value": contract_data["available_balance"],
                 "formatted": self._format_money(contract_data["available_balance"]),
                 "tone": "danger" if contract_data["available_balance"] is not None and contract_data["available_balance"] < 0 else "success",
-                "formula": "Valor efetivo do contrato - processos vinculados não devolvidos/cancelados.",
-                "source": "Processos de pagamento vinculados ao contrato.",
+                "formula": "Saldo inicial + ajustes e aditivos − consumo realizado − reservas abertas." if contract_data.get('control_opened') else "Valor efetivo do contrato - processos vinculados não devolvidos/cancelados.",
+                "source": "Extrato financeiro desde a abertura." if contract_data.get('control_opened') else "Processos de pagamento vinculados ao contrato.",
                 "detail_type": "processes",
             },
             {
@@ -1896,9 +1982,9 @@ class PaymentProcessService:
                 "value": contract_data["consumed_amount"],
                 "formatted": self._format_money(contract_data["consumed_amount"]),
                 "tone": "neutral",
-                "formula": "Soma de processos com contrato e valor, exceto Devolvido e Cancelado.",
-                "source": "Processos de pagamento.",
-                "detail_type": "processes",
+                "formula": "Custo real das operações + diferenças de conciliação justificadas." if contract_data.get('control_opened') else "Soma de processos com contrato e valor, exceto Devolvido e Cancelado.",
+                "source": "Extrato financeiro desde a abertura." if contract_data.get('control_opened') else "Processos de pagamento.",
+                "detail_type": "operations" if contract_data.get('control_opened') else "processes",
             },
             {
                 "key": "paid_amount",
@@ -1916,7 +2002,7 @@ class PaymentProcessService:
                 "value": contract_data["pending_amount"],
                 "formatted": self._format_money(contract_data["pending_amount"]),
                 "tone": "warning",
-                "formula": "Consumido - Pago.",
+                "formula": "Soma das faturas vinculadas ainda não pagas, exceto devolvidas/canceladas.",
                 "source": "Processos em aberto ou ainda não pagos.",
                 "detail_type": "processes",
             },
@@ -1927,7 +2013,7 @@ class PaymentProcessService:
                 "formatted": self._format_money(average),
                 "tone": "neutral",
                 "formula": "Media dos meses com consumo no horizonte selecionado.",
-                "source": "Processos financeiros e histórico operacional quando disponível.",
+                "source": "Operações vinculadas desde a abertura." if contract_data.get('control_opened') else "Processos financeiros e histórico operacional quando disponível.",
                 "detail_type": "operations",
             },
             {

@@ -3,6 +3,8 @@ import { maintenanceAPI } from '../api/maintenance'
 import SearchableSelect from './SearchableSelect'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
+import { useContractControl } from '../hooks/useContractFunding'
+import { MaintenanceOrderForm } from './contracts/MaintenanceOrdersPanel'
 
 function buildInitialState(initialData, vehicles) {
   if (initialData) {
@@ -36,11 +38,20 @@ function buildVehicleOption(vehicle) {
   }
 }
 
-export default function MaintenanceForm({ vehicles, initialData = null, onClose, onSuccess, onVehicleOptionsOpen }) {
+export default function MaintenanceForm(props) {
+  const mode = useContractControl()
+  if (!props.initialData && mode.enabled === null) return <p role="status">Conferindo controle contratual…</p>
+  if (!props.initialData && mode.enabled) return <MaintenanceOrderForm {...props} />
+  return <LegacyMaintenanceForm {...props} />
+}
+
+function LegacyMaintenanceForm({ vehicles, initialData = null, onClose, onSuccess, onVehicleOptionsOpen }) {
   const isEdit = Boolean(initialData?.id)
   const [form, setForm] = useState(() => buildInitialState(initialData, vehicles))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
+  const [reason, setReason] = useState('')
+  const changesFundedCost = Boolean(initialData?.contract_reservation_id) && Number(form.total_cost) !== Number(initialData.total_cost)
 
   const submitLabel = useMemo(() => {
     if (submitting) return 'Salvando...'
@@ -65,6 +76,7 @@ export default function MaintenanceForm({ vehicles, initialData = null, onClose,
           service_description: form.service_description,
           parts_replaced: form.parts_replaced || null,
           total_cost: Number(form.total_cost),
+          ...(changesFundedCost ? { reason: reason.trim() } : {}),
         })
         onSuccess?.('Manutenção atualizada com sucesso.')
       } else {
@@ -166,6 +178,7 @@ export default function MaintenanceForm({ vehicles, initialData = null, onClose,
       </div>
 
       <div className="actions-inline modal-actions">
+        {changesFundedCost ? <div className="form-field modal-field-span"><label htmlFor="maintenance-correction-reason">Justificativa da alteração de custo</label><textarea id="maintenance-correction-reason" className="app-textarea" value={reason} onChange={(event) => setReason(event.target.value)} minLength={10} maxLength={2000} required /></div> : null}
         <button className="app-button" type="submit" disabled={submitting || vehicles.length === 0}>
           {submitLabel}
         </button>

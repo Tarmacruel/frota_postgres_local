@@ -85,13 +85,13 @@ export default function AnalyticsUtilization({ enabled = true, organizations = [
 
     <AnalyticsSection title="Registros de posse no período" description="Eventos e distâncias observáveis; não são horas de veículo em operação." {...state}>
       <div className="analytics-costs-summary">
-        <div><span>Km de posses encerradas válidas</span><strong>{formatValue(data?.distance_km, 'km')}</strong>
+        <div><button type="button" className="analytics-kpi-primary" onClick={() => openPossessions('Posses que compõem os quilômetros', 'km')}><span>Km de posses encerradas válidas</span><strong>{formatValue(data?.distance_km, 'km')}</strong><small>Ver composição →</small></button>
           <p>{data?.valid_km_count ?? '—'} posse(s) com km válido</p>
           <button type="button" className="analytics-entity-link" onClick={() => openPossessions('Posses que compõem os quilômetros', 'km')}>Ver posses</button></div>
-        <div><span>Km por posse encerrada com km válido</span><strong>{formatValue(data?.km_per_valid_closed_possession, 'km')}</strong>
+        <div><button type="button" className="analytics-kpi-primary" onClick={() => openPossessions('Amostra de km por posse', 'km')}><span>Km por posse encerrada com km válido</span><strong>{formatValue(data?.km_per_valid_closed_possession, 'km')}</strong><small>Ver composição →</small></button>
           <p>Razão descritiva do total de km pelo número de posses válidas.</p>
           <button type="button" className="analytics-entity-link" onClick={() => openPossessions('Amostra de km por posse', 'km')}>Ver amostra</button></div>
-        <div><span>Posses iniciadas / encerradas</span><strong>{data ? `${data.started} / ${data.ended}` : '—'}</strong>
+        <div><button type="button" className="analytics-kpi-primary" onClick={() => openPossessions('Aberturas e encerramentos de posse')}><span>Posses iniciadas / encerradas</span><strong>{data ? `${data.started} / ${data.ended}` : '—'}</strong><small>Ver composição →</small></button>
           <button type="button" className="analytics-entity-link" onClick={() => openPossessions('Aberturas e encerramentos de posse')}>Ver eventos</button></div>
       </div>
       <p className="analytics-scope-note">{data?.methodology.events} {data?.methodology.distance}</p>

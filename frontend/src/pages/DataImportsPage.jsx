@@ -1,3 +1,5 @@
+import IndicatorBar from '../components/ui/IndicatorBar'
+import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import PageHeader from '../components/ui/PageHeader'
 import StatusChip from '../components/ui/StatusChip'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -258,12 +260,18 @@ function officialResultFields(item, entityType) {
 }
 
 export default function DataImportsPage() {
+  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
+
   const [batches, setBatches] = useState([])
   const [batchPagination, setBatchPagination] = useState({ page: 1, pages: 1, total: 0 })
   const [selectedBatch, setSelectedBatch] = useState(null)
   const [rows, setRows] = useState([])
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
   const [rowStatus, setRowStatus] = useState('')
+  const [rowIssue, setRowIssue] = useState('')
+  const [rowAction, setRowAction] = useState('')
+  const batchesRequest = useRef(0)
+  const rowsRequest = useRef(0)
   const [activeTab, setActiveTab] = useState('review')
   const [searchTerm, setSearchTerm] = useState('')
   const [searchType, setSearchType] = useState('ALL')
@@ -343,23 +351,27 @@ export default function DataImportsPage() {
   const canSearchSelectedBatch = selectedBatch && (searchType === 'ALL' || selectedBatch.entity_type === searchType)
 
   async function loadBatches(selectId = selectedBatch?.id, page = batchPagination.page) {
+    const request = ++batchesRequest.current
     try {
       setLoading(true)
       setError('')
-      const { data } = await dataImportsAPI.listPaginated({ page, limit: 10 })
+      const { data } = await dataImportsAPI.listPaginated({ indicator: indicator === 'total' ? undefined : indicator,  page, limit: 10 })
+      if (request !== batchesRequest.current) return
       setBatches(data.data || [])
-      setBatchPagination(data.pagination)
+      setBatchPagination(data.pagination); setIndicators(data.indicators || null)
       const nextSelected = data.data.find((batch) => batch.id === selectId) || data.data[0] || null
       setSelectedBatch(nextSelected)
       if (page > 1 && page > data.pagination.pages) loadBatches(null, data.pagination.pages)
     } catch (err) {
+      if (request !== batchesRequest.current) return
       setError(getApiErrorMessage(err, 'Não foi possível carregar os lotes de importação.'))
     } finally {
-      setLoading(false)
+      if (request === batchesRequest.current) setLoading(false)
     }
   }
 
   async function loadRows(page = 1) {
+    const request = ++rowsRequest.current
     if (!selectedBatch) {
       setRows([])
       return
@@ -371,13 +383,16 @@ export default function DataImportsPage() {
         page,
         limit: 50,
         status: rowStatus || undefined,
+        has_conflict: rowIssue === 'conflict' || undefined, has_error: rowIssue === 'error' || undefined, action: rowAction || undefined,
       })
+      if (request !== rowsRequest.current) return
       setRows(data.data)
       setPagination(data.pagination)
     } catch (err) {
+      if (request !== rowsRequest.current) return
       setError(getApiErrorMessage(err, 'Não foi possível carregar as linhas do lote.'))
     } finally {
-      setRowsLoading(false)
+      if (request === rowsRequest.current) setRowsLoading(false)
     }
   }
 
@@ -422,7 +437,7 @@ export default function DataImportsPage() {
 
   useEffect(() => {
     loadBatches(null, 1)
-  }, [])
+  }, [indicator])
 
   const searchVehicleOptions = useCallback(async (term = '') => {
     const currentRequest = ++vehicleRequestId.current
@@ -452,7 +467,7 @@ export default function DataImportsPage() {
 
   useEffect(() => {
     loadRows(1)
-  }, [selectedBatch?.id, rowStatus])
+  }, [selectedBatch?.id, rowStatus, rowIssue, rowAction])
 
   async function handleUpload(event) {
     event.preventDefault()
@@ -610,7 +625,7 @@ export default function DataImportsPage() {
     let page = 1
     let pages
     do {
-      const { data } = await dataImportsAPI.rows(selectedBatch.id, { page, limit: 200, status: rowStatus || undefined })
+      const { data } = await dataImportsAPI.rows(selectedBatch.id, { page, limit: 200, status: rowStatus || undefined, has_conflict: rowIssue === 'conflict' || undefined, has_error: rowIssue === 'error' || undefined, action: rowAction || undefined })
       reportRows.push(...(data.data || []).map(rowForExport))
       pages = data.pagination.pages
       page += 1
@@ -931,23 +946,9 @@ export default function DataImportsPage() {
       {error ? <div className="alert alert-error">{error}</div> : null}
       {feedback ? <div className="alert alert-success">{feedback}</div> : null}
 
-      <div className="metrics-grid">
-        <div className="metric-card">
-          <span>Lotes</span>
-          <strong>{batchPagination.total}</strong>
-        </div>
-        <div className="metric-card">
-          <span>Linhas no lote</span>
-          <strong>{summary.total_rows || 0}</strong>
-        </div>
-        <div className="metric-card management-metric--warning">
-          <span>Conflitos</span>
-          <strong>{summary.conflicts || 0}</strong>
-        </div>
-        <div className="metric-card management-metric--danger">
-          <span>Erros</span>
-          <strong>{summary.errors || 0}</strong>
-        </div>
+      <IndicatorBar state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={loading} error={error} resultCount={batchPagination.total} />
+      <div className="metrics-grid" role="group" aria-label="Indicadores do lote selecionado">
+        {[['', 'Linhas no lote', summary.total_rows || 0], ['conflict', 'Conflitos', summary.conflicts || 0], ['error', 'Erros', summary.errors || 0]].map(([key, label, count]) => <button key={key} type="button" className="metric-card kpi-value-trigger" aria-pressed={rowIssue === key} disabled={!selectedBatch} onClick={() => { setActiveTab('review'); setRowStatus(''); setRowAction(''); setRowIssue(key === rowIssue ? '' : key) }}><span>{label}</span><strong>{count}</strong><small>Ver linhas →</small></button>)}
       </div>
 
       <section className="toolbar-card data-import-panel">
@@ -1039,14 +1040,14 @@ export default function DataImportsPage() {
 
               {lastSearch ? (
                 <div className="panel-metrics">
-                  <span className="metric-inline"><strong>{officialSearchTotal}</strong><span>oficiais</span></span>
-                  <span className="metric-inline"><strong>{importSearchTotal}</strong><span>no lote</span></span>
+                  <button type="button" className="metric-inline kpi-value-trigger" onClick={() => { const target = document.getElementById('import-official-results'); target?.scrollIntoView({ block: 'center', behavior: 'smooth' }); target?.focus({ preventScroll: true }) }}><strong>{officialSearchTotal}</strong><span>oficiais →</span></button>
+                  <button type="button" className="metric-inline kpi-value-trigger" onClick={() => { const target = document.getElementById('import-batch-results'); target?.scrollIntoView({ block: 'center', behavior: 'smooth' }); target?.focus({ preventScroll: true }) }}><strong>{importSearchTotal}</strong><span>no lote →</span></button>
                   <span className="metric-inline"><strong>{lastSearch}</strong><span>termo pesquisado</span></span>
                 </div>
               ) : null}
 
               <div className="data-import-detail-stack data-import-search-results">
-                <article className="evidence-meta-card">
+                <article className="evidence-meta-card" id="import-official-results" tabIndex={-1}>
                   <strong>Cadastro oficial atual</strong>
                   <p className="section-copy">Resultados já integrados ao sistema, respeitando as permissões do usuário.</p>
                   {searchLoading ? (
@@ -1063,7 +1064,7 @@ export default function DataImportsPage() {
                   )}
                 </article>
 
-                <article className="evidence-meta-card">
+                <article className="evidence-meta-card" id="import-batch-results" tabIndex={-1}>
                   <strong>Linhas do lote selecionado</strong>
                   <p className="section-copy">Resultados encontrados nos dados em triagem do lote atual.</p>
                   {!selectedBatch ? (
@@ -1091,6 +1092,7 @@ export default function DataImportsPage() {
             </div>
           ) : activeTab === 'review' ? (
             <>
+              <p className="interactive-kpis__context">Indicadores de todas as linhas do lote selecionado. {rowIssue ? rowIssue === 'conflict' ? 'Filtrando linhas com conflito.' : 'Filtrando linhas com erro.' : ''} {rowAction ? 'Ação: ' + rowAction : ''} {(rowIssue || rowAction || rowStatus) ? <button type="button" className="ghost-button" onClick={() => { setRowIssue(''); setRowAction(''); setRowStatus('') }}>Limpar filtros das linhas</button> : null}</p>
               <div className="data-import-review-toolbar">
                 <label className="filter-inline">
                   <span>Status</span>
@@ -1105,11 +1107,11 @@ export default function DataImportsPage() {
                   <button type="button" className="secondary-button" onClick={() => downloadUrl(dataImportsAPI.exportUrl(selectedBatch.id))}>Baixar CSV do lote</button>
                 </div>
               </div>
-              <div className="panel-metrics">
-                <span className="metric-inline"><strong>{statusCounts.APPROVED || 0}</strong><span>aprovadas</span></span>
-                <span className="metric-inline"><strong>{statusCounts.PENDING || 0}</strong><span>pendentes</span></span>
-                <span className="metric-inline"><strong>{actionCounts.CREATE || 0}</strong><span>criar</span></span>
-                <span className="metric-inline"><strong>{actionCounts.UPDATE || 0}</strong><span>atualizar</span></span>
+              <div className="panel-metrics" aria-label="Filtrar linhas do lote">
+                <button type="button" className="metric-inline kpi-value-trigger" aria-pressed={rowStatus === 'APPROVED'} onClick={() => { setRowIssue(''); setRowAction(''); setRowStatus(rowStatus === 'APPROVED' ? '' : 'APPROVED') }}><strong>{statusCounts.APPROVED || 0}</strong><span>aprovadas</span></button>
+                <button type="button" className="metric-inline kpi-value-trigger" aria-pressed={rowStatus === 'PENDING'} onClick={() => { setRowIssue(''); setRowAction(''); setRowStatus(rowStatus === 'PENDING' ? '' : 'PENDING') }}><strong>{statusCounts.PENDING || 0}</strong><span>pendentes</span></button>
+                <button type="button" className="metric-inline kpi-value-trigger" aria-pressed={rowAction === 'CREATE'} onClick={() => { setRowIssue(''); setRowStatus(''); setRowAction(rowAction === 'CREATE' ? '' : 'CREATE') }}><strong>{actionCounts.CREATE || 0}</strong><span>criar</span></button>
+                <button type="button" className="metric-inline kpi-value-trigger" aria-pressed={rowAction === 'UPDATE'} onClick={() => { setRowIssue(''); setRowStatus(''); setRowAction(rowAction === 'UPDATE' ? '' : 'UPDATE') }}><strong>{actionCounts.UPDATE || 0}</strong><span>atualizar</span></button>
               </div>
               <div className="table-wrap table-wrap-wide">
                 <table className="data-table management-table data-table-wide">

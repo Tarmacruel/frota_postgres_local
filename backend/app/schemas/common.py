@@ -33,6 +33,7 @@ class PaginatedResponse(BaseModel, Generic[ItemT]):
 
     data: list[ItemT]
     pagination: PaginationOut
+    indicators: dict[str, object] | None = None
 
 
 def build_pagination(page: int, limit: int, total: int) -> PaginationOut:

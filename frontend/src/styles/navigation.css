@@ -1,0 +1,179 @@
+/* Navigation identity. Scoped to the shell; page layouts keep their own density. */
+body.internal-app-active .app-shell {
+  --nav-bg: #0b1526;
+  --nav-raised: #132239;
+  --nav-text: #bdcce0;
+  --nav-muted: #8499b6;
+  --nav-line: #23344c;
+  --nav-accent: #9bc7ff;
+  --nav-banner-offset: 0px;
+}
+body.internal-app-active .environment-banner + .app-shell { --nav-banner-offset: 36px; }
+
+.module-icon__accent { fill: currentColor; fill-opacity: .16; stroke: none; }
+
+body.internal-app-active .app-shell .app-sidebar {
+  padding: 14px 10px 10px;
+  gap: 14px;
+  color: var(--nav-text);
+  background: var(--nav-bg);
+  border: 1px solid var(--nav-line);
+  border-radius: 16px;
+  box-shadow: 0 10px 28px rgb(4 12 24 / .16);
+}
+
+body.internal-app-active .app-shell .sidebar-head {
+  flex: 0 0 auto;
+  min-height: 58px;
+  gap: 8px;
+  padding: 0 3px 14px;
+  border-bottom: 1px solid var(--nav-line);
+}
+
+body.internal-app-active .app-shell .brand-block { gap: 10px; }
+body.internal-app-active .app-shell .brand-mark { width: 36px; height: 40px; border-radius: 9px; box-shadow: none; }
+body.internal-app-active .app-shell .brand-name { font-size: 14px; line-height: 1.3; letter-spacing: -.02em; }
+body.internal-app-active .app-shell .brand-subtitle { display: block; margin-top: 3px; font-size: 10px; line-height: 1.3; color: var(--nav-muted); }
+body.internal-app-active .app-shell .sidebar-close { display: none; }
+
+body.internal-app-active .app-shell .sidebar-scroll {
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 18px;
+  padding: 0 2px;
+  scrollbar-width: thin;
+  scrollbar-color: #304560 transparent;
+  overscroll-behavior: contain;
+}
+
+body.internal-app-active .app-shell .nav-section { flex: 0 0 auto; gap: 7px; }
+body.internal-app-active .app-shell .nav-section-title {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 0 9px;
+  color: var(--nav-muted);
+  font-size: 9px;
+  font-weight: 600;
+  line-height: 1.5;
+  letter-spacing: .16em;
+}
+body.internal-app-active .app-shell .nav-section-title::after { content: ''; height: 1px; flex: 1; background: var(--nav-line); }
+body.internal-app-active .app-shell .nav-group { gap: 3px; }
+body.internal-app-active .app-shell .nav-link {
+  min-height: 40px;
+  gap: 10px;
+  padding: 4px 9px;
+  color: var(--nav-text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 11px;
+  box-shadow: none;
+  text-decoration: none;
+  transition: background-color 160ms ease, border-color 160ms ease, color 160ms ease;
+}
+body.internal-app-active .app-shell .nav-link::before {
+  content: '';
+  position: absolute;
+  top: 12px;
+  bottom: 12px;
+  left: -1px;
+  width: 3px;
+  border-radius: 0 3px 3px 0;
+  background: var(--nav-accent);
+  opacity: 0;
+  transform: scaleY(.4);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+body.internal-app-active .app-shell .nav-link:hover { background: #122139; border-color: #24374f; color: #fff; }
+body.internal-app-active .app-shell .app-sidebar .nav-link.active {
+  color: #fff;
+  background: #172f50;
+  border-color: #2b4d76;
+  box-shadow: inset 0 1px 0 rgb(255 255 255 / .04);
+}
+body.internal-app-active .app-shell .nav-link.active::before { opacity: 1; transform: scaleY(1); }
+body.internal-app-active .app-shell .nav-link:focus-visible { outline: 2px solid var(--nav-accent); outline-offset: -2px; }
+body.internal-app-active .app-shell .nav-icon {
+  width: 30px;
+  height: 30px;
+  color: #a8bfdc;
+  background: var(--nav-raised);
+  border: 1px solid #20334e;
+  border-radius: 9px;
+  transition: background-color 160ms ease, color 160ms ease, transform 160ms ease;
+}
+body.internal-app-active .app-shell .nav-icon .module-icon { width: 22px; height: 22px; }
+body.internal-app-active .app-shell .nav-link:hover .nav-icon { color: #e1edff; background: #1c304d; border-color: #324e71; transform: translateY(-1px); }
+body.internal-app-active .app-shell .nav-link.active .nav-icon { color: #c4dfff; background: #234365; border-color: #3b608a; }
+body.internal-app-active .app-shell .nav-label { font-size: 13px; font-weight: 600; line-height: 1.3; letter-spacing: .005em; }
+body.internal-app-active .app-shell .nav-text { flex: 1; }
+body.internal-app-active .app-shell .nav-link__chevron {
+  width: 12px;
+  height: 12px;
+  flex: 0 0 auto;
+  margin-left: auto;
+  color: var(--nav-accent);
+  opacity: 0;
+  transform: translateX(-3px);
+  transition: opacity 160ms ease, transform 160ms ease;
+}
+body.internal-app-active .app-shell .nav-link.active .nav-link__chevron { opacity: .85; transform: translateX(0); }
+body.internal-app-active .app-shell .loan-nav-badge { flex: 0 0 auto; background: #9bc7ff; color: #0b1526; border-color: transparent; }
+
+body.internal-app-active .app-shell .sidebar-footer { flex: 0 0 auto; padding-top: 10px; border-top-color: var(--nav-line); }
+body.internal-app-active .app-shell .account-card { gap: 8px; padding: 9px 7px; background: #101f34; border: 1px solid #22354f; border-radius: 11px; box-shadow: none; }
+body.internal-app-active .app-shell .account-avatar { width: 32px; height: 34px; background: #213e61; color: #d5e8ff; border: 1px solid #355578; border-radius: 9px; }
+body.internal-app-active .app-shell .account-meta strong { color: #e4edfa; font-size: 11px; }
+body.internal-app-active .app-shell .account-meta span { display: block; margin-top: 3px; font-size: 10px; color: var(--nav-muted); }
+body.internal-app-active .app-shell .app-sidebar .icon-button { color: #a9bed9; background: transparent; border: 1px solid #293d58; border-radius: 8px; box-shadow: none; }
+body.internal-app-active .app-shell .app-sidebar .icon-button:hover { color: #fff; background: #1c304b; border-color: #426286; }
+body.internal-app-active .app-shell .app-sidebar .icon-button:focus-visible { outline: 2px solid var(--nav-accent); outline-offset: 2px; }
+body.internal-app-active .app-shell .account-action { width: 28px; height: 32px; }
+body.internal-app-active .app-shell .topbar-module-mark { display: grid; place-items: center; flex: 0 0 auto; width: 32px; height: 32px; margin-right: 2px; color: var(--ui-info-text); background: var(--ui-info-soft); border: 1px solid var(--ui-border-soft); border-radius: 9px; }
+body.internal-app-active .app-shell .topbar-module-mark .module-icon { width: 21px; height: 21px; }
+
+@media (min-width: 1180px) {
+  body.internal-app-active .app-shell { grid-template-columns: 248px minmax(0, 1fr); transition: grid-template-columns 180ms ease; }
+  body.internal-app-active .app-shell.sidebar-compact { grid-template-columns: 80px minmax(0, 1fr); }
+  body.internal-app-active .app-shell .app-sidebar { top: calc(var(--nav-banner-offset) + 8px); min-height: 0; height: calc(100dvh - 16px - var(--nav-banner-offset)); }
+  body.internal-app-active .app-shell .app-sidebar.is-compact { padding-inline: 8px; }
+  body.internal-app-active .app-shell .app-sidebar.is-compact .sidebar-head { flex-direction: column; justify-content: center; gap: 10px; padding: 0 0 12px; }
+  body.internal-app-active .app-shell .app-sidebar.is-compact .brand-copy,
+  body.internal-app-active .app-shell .app-sidebar.is-compact .nav-text,
+  body.internal-app-active .app-shell .app-sidebar.is-compact .nav-section-title,
+  body.internal-app-active .app-shell .app-sidebar.is-compact .account-meta,
+  body.internal-app-active .app-shell .app-sidebar.is-compact .nav-link__chevron { display: none; }
+  body.internal-app-active .app-shell .app-sidebar.is-compact .sidebar-scroll { padding-inline: 0; gap: 12px; }
+  body.internal-app-active .app-shell .app-sidebar.is-compact .nav-section + .nav-section { border-top: 1px solid var(--nav-line); padding-top: 12px; }
+  body.internal-app-active .app-shell .app-sidebar.is-compact .nav-link { min-height: 44px; justify-content: center; padding: 4px; }
+  body.internal-app-active .app-shell .app-sidebar.is-compact .nav-icon { width: 34px; height: 34px; }
+  body.internal-app-active .app-shell .app-sidebar.is-compact .account-card { grid-template-columns: 1fr; justify-items: center; padding: 8px 3px; }
+  body.internal-app-active .app-shell .app-sidebar.is-compact .account-actions { flex-direction: column; gap: 6px; }
+  body.internal-app-active .app-shell .app-sidebar.is-compact .loan-nav-badge { position: absolute; top: 1px; right: 1px; padding: 0 4px; font-size: 9px; min-width: 16px; }
+}
+
+@media (max-width: 1179px) {
+  body.internal-app-active .app-shell .app-sidebar { width: min(328px, calc(100vw - 32px)); }
+  body.internal-app-active .app-shell .sidebar-close { display: inline-grid; place-items: center; min-width: 40px; min-height: 40px; }
+  body.internal-app-active .app-shell .app-sidebar .nav-link { min-height: 48px; }
+}
+
+@media (max-width: 720px) {
+  body.internal-app-active .app-shell .app-sidebar { border-radius: 0 20px 20px 0; padding: 16px 12px calc(14px + env(safe-area-inset-bottom, 0px)); }
+  body.internal-app-active .app-shell .nav-label { font-size: 14px; }
+  body.internal-app-active .app-shell .nav-icon { width: 34px; height: 34px; }
+  body.internal-app-active .app-shell .account-action { width: 44px; height: 44px; }
+  body.internal-app-active .app-shell .topbar-module-mark { display: none; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  body.internal-app-active .app-shell,
+  body.internal-app-active .app-shell .app-sidebar,
+  body.internal-app-active .app-shell .nav-link,
+  body.internal-app-active .app-shell .nav-link::before,
+  body.internal-app-active .app-shell .nav-icon,
+  body.internal-app-active .app-shell .nav-link__chevron { transition: none; }
+  body.internal-app-active .app-shell .nav-link:hover .nav-icon { transform: none; }
+}

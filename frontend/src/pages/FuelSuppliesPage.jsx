@@ -1,3 +1,8 @@
+import IndicatorBar from '../components/ui/IndicatorBar'
+import ContractReturnBanner from '../components/contracts/ContractReturnBanner'
+import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
+import { useContractControl } from '../hooks/useContractFunding'
+import { Link } from 'react-router-dom'
 import FuelSupplyOrderCancelForm from '../components/FuelSupplyOrderCancelForm'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -121,8 +126,13 @@ function asArray(payload) {
 }
 
 export default function FuelSuppliesPage() {
+  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
+  const { selected: orderIndicator, metadata: orderIndicatorMetadata, setMetadata: setOrderIndicators, select: selectOrderIndicator } = useInteractiveKpis('order_indicator')
+  useEffect(() => { setCurrentHistoryPage(1) }, [indicator])
+  useEffect(() => { setCurrentOrdersPage(1) }, [orderIndicator])
   const [searchParams, setSearchParams] = useSearchParams()
   const { canCreate, canEdit, canView, isAdmin, isProduction } = useAuth()
+  const control = useContractControl()
   const canViewOrders = canView('fuel_supply_orders')
   const canCreateOrder = canCreate('fuel_supply_orders')
   const canEditOrder = canEdit('fuel_supply_orders')
@@ -146,8 +156,6 @@ export default function FuelSuppliesPage() {
   const [currentOrdersPage, setCurrentOrdersPage] = useState(1)
   const [historyPagination, setHistoryPagination] = useState({ pages: 1, total: 0 })
   const [ordersPagination, setOrdersPagination] = useState({ pages: 1, total: 0 })
-  const [openOrdersCount, setOpenOrdersCount] = useState(null)
-  const [anomaliesCount, setAnomaliesCount] = useState(null)
   const historyRequest = useRef(0)
   const ordersRequest = useRef(0)
   const [isOrderModalOpen, setIsOrderModalOpen] = useState(false)
@@ -161,7 +169,7 @@ export default function FuelSuppliesPage() {
   const [cancellingOrder, setCancellingOrder] = useState(false)
 
   useEffect(() => {
-    const action = searchParams.get('acao')
+    const action = searchParams.get('acao') || (searchParams.get('action') === 'create' ? 'nova-ordem' : '')
     if (!['nova-ordem', 'nova-ordem-lote'].includes(action)) return
     const shouldStartBatchTour = action === 'nova-ordem-lote' && searchParams.get('guia') === '1'
 
@@ -173,6 +181,7 @@ export default function FuelSuppliesPage() {
 
     const nextSearchParams = new URLSearchParams(searchParams)
     nextSearchParams.delete('acao')
+    nextSearchParams.delete('action')
     if (shouldStartBatchTour) nextSearchParams.delete('guia')
     setSearchParams(nextSearchParams, { replace: true })
   }, [canCreateOrder, searchParams, setSearchParams])
@@ -205,16 +214,12 @@ export default function FuelSuppliesPage() {
     try {
       setHistoryLoading(true)
       setError('')
-      const params = { limit: 10, page, search: search.trim() || undefined }
+      const params = { limit: 10, page, search: search.trim() || undefined, indicator: indicator === 'total' ? undefined : indicator }
       if (filters.vehicle_id) params.vehicle_id = filters.vehicle_id
       if (filters.organization_id) params.organization_id = filters.organization_id
       if (filters.fuel_station_id) params.fuel_station_id = filters.fuel_station_id
       if (filters.only_anomalies === 'true') params.only_anomalies = true
-      const [pageResponse, countResponse] = await Promise.all([
-        fuelSuppliesAPI.list(params),
-        fuelSuppliesAPI.list({ ...params, page: 1, limit: 1, only_anomalies: true }).catch(() => null),
-      ])
-      const { data } = pageResponse
+      const { data } = await fuelSuppliesAPI.list(params)
       if (request !== historyRequest.current) return
       if (page > data.pagination.pages) {
         setCurrentHistoryPage(data.pagination.pages)
@@ -222,7 +227,7 @@ export default function FuelSuppliesPage() {
       }
       setRecords(data.data || [])
       setHistoryPagination(data.pagination)
-      setAnomaliesCount(countResponse?.data?.pagination?.total ?? null)
+      setIndicators(data.indicators || null)
     } catch (err) {
       if (request === historyRequest.current) setError(getApiErrorMessage(err, 'Não foi possível carregar os abastecimentos.'))
     } finally {
@@ -234,7 +239,6 @@ export default function FuelSuppliesPage() {
     if (!canViewOrders) {
       setOrders([])
       setOrdersPagination({ pages: 1, total: 0 })
-      setOpenOrdersCount(0)
       setOrdersLoading(false)
       return
     }
@@ -243,11 +247,7 @@ export default function FuelSuppliesPage() {
       setOrdersLoading(true)
       setError('')
       const params = buildOrderQueryParams({ includePaging: true, page })
-      const [pageResponse, countResponse] = await Promise.all([
-        fuelSupplyOrdersAPI.list(params),
-        fuelSupplyOrdersAPI.list({ ...params, page: 1, limit: 1, status: 'OPEN' }).catch(() => null),
-      ])
-      const { data } = pageResponse
+      const { data } = await fuelSupplyOrdersAPI.list(params)
       if (request !== ordersRequest.current) return
       if (page > data.pagination.pages) {
         setCurrentOrdersPage(data.pagination.pages)
@@ -255,7 +255,7 @@ export default function FuelSuppliesPage() {
       }
       setOrders(asArray(data))
       setOrdersPagination(data.pagination)
-      setOpenOrdersCount(countResponse?.data?.pagination?.total ?? null)
+      setOrderIndicators(data.indicators || null)
     } catch (err) {
       if (request === ordersRequest.current) setError(getApiErrorMessage(err, 'Não foi possível carregar as ordens de abastecimento.'))
     } finally {
@@ -267,16 +267,17 @@ export default function FuelSuppliesPage() {
     historyRequest.current += 1
     const timer = setTimeout(() => loadRecords(), search.trim() ? 250 : 0)
     return () => clearTimeout(timer)
-  }, [filters, search, currentHistoryPage])
+  }, [filters, search, currentHistoryPage, indicator])
 
   useEffect(() => {
     ordersRequest.current += 1
     const timer = setTimeout(() => loadOrders(), orderSearch.trim() ? 250 : 0)
     return () => clearTimeout(timer)
-  }, [orderFilters, orderSearch, currentOrdersPage, canViewOrders])
+  }, [orderFilters, orderSearch, currentOrdersPage, canViewOrders, orderIndicator])
 
   function buildOrderQueryParams({ includePaging = false, page = currentOrdersPage } = {}) {
     const params = includePaging ? { limit: 10, page, search: orderSearch.trim() || undefined } : {}
+    params.indicator = orderIndicator === 'total' ? undefined : orderIndicator
     if (orderFilters.status !== 'TODOS') params.status = orderFilters.status
     if (orderFilters.organization_id) params.organization_id = orderFilters.organization_id
     if (orderFilters.fuel_station_id) params.fuel_station_id = orderFilters.fuel_station_id
@@ -520,30 +521,15 @@ export default function FuelSuppliesPage() {
         description="Emita ordens para os postos vinculados e acompanhe o histórico confirmado com comprovantes e alertas de consumo."
         actions={<>
           {canCreateOrder ? <button className="app-button" type="button" onClick={() => setIsOrderModalOpen(true)}>Nova ordem</button> : null}
-          {canCreateOrder ? <button className="secondary-button" data-tour="fuel-batch-create" type="button" onClick={() => setIsBatchOrderModalOpen(true)}>Nova ordem em lote</button> : null}
-          {canCreateOrder ? <button className="ghost-button" type="button" onClick={openBatchOrderTour}>Ver guia rápido</button> : null}
+          {canCreateOrder && !searchParams.get('contract_id') ? <button className="secondary-button" data-tour="fuel-batch-create" type="button" onClick={() => setIsBatchOrderModalOpen(true)}>Nova ordem em lote</button> : null}
+          {canCreateOrder && !searchParams.get('contract_id') ? <button className="ghost-button" type="button" onClick={openBatchOrderTour}>Ver guia rápido</button> : null}
+          {searchParams.get('contract_id') ? <Link className="secondary-button" to="/abastecimentos">Operação geral</Link> : null}
           <button className="ghost-button" type="button" onClick={() => { loadOrders(); loadRecords() }}>Atualizar painel</button>
         </>}
       />
 
-      <div className="panel-metrics">
-        <div className="metric-inline">
-          <strong>{openOrdersCount ?? '—'}</strong>
-          <span>ordens abertas</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{historyPagination.total}</strong>
-          <span>abastecimentos encontrados</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{anomaliesCount ?? '—'}</strong>
-          <span>alertas de consumo</span>
-        </div>
-        <div className="metric-inline">
-          <strong>{fuelStations.length}</strong>
-          <span>postos ativos</span>
-        </div>
-      </div>
+      <ContractReturnBanner returnTo={searchParams.get('return_to')} />
+      <p className="interactive-kpis__context"><Link to="/postos?indicator=active">Consultar os {fuelStations.length} postos ativos</Link></p>
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
@@ -619,6 +605,7 @@ export default function FuelSuppliesPage() {
           </MobileFilters>
         </div>
 
+        <IndicatorBar label="Indicadores das ordens" state={{ selected: orderIndicator, metadata: orderIndicatorMetadata, select: selectOrderIndicator }} loading={ordersLoading} error={error} resultCount={ordersPagination.total} />
         <div className="table-wrap table-wrap-wide operation-table-card">
           <table className="data-table data-table-wide operation-table">
             <thead>
@@ -678,7 +665,7 @@ export default function FuelSuppliesPage() {
                         items={[
                           { key: 'public-link', label: 'Copiar link público', onClick: () => handleCopyPublicLink(order) },
                           { key: 'pdf', label: 'Baixar PDF', onClick: () => handleDownloadOrderDocument(order) },
-                          canAdjustOrderDeadline && ['OPEN', 'EXPIRED'].includes(order.status) ? { key: 'deadline', label: order.status === 'EXPIRED' ? 'Reabrir prazo' : 'Prorrogar prazo', onClick: () => setOrderToAdjust(order) } : null,
+                          canAdjustOrderDeadline && ['OPEN', 'EXPIRED'].includes(order.status) ? { key: 'deadline', label: control.enabled && !order.contract_reservation_id ? 'Vincular contrato e reservar' : order.status === 'EXPIRED' ? 'Reabrir prazo' : 'Prorrogar prazo', onClick: () => setOrderToAdjust(order) } : null,
                           order.status === 'OPEN' && canEditOrder ? { key: 'cancel', label: 'Cancelar ordem', tone: 'danger', onClick: () => handleCancelOrder(order) } : null,
                         ]}
                       />
@@ -693,6 +680,7 @@ export default function FuelSuppliesPage() {
       </div> : null}
 
       <div className="surface-panel panel-nested operation-module operation-module--fuel-history">
+        <IndicatorBar label="Indicadores dos abastecimentos" state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={historyLoading} error={error} resultCount={historyPagination.total} />
         <div className="panel-heading">
           <div>
             <h3 className="section-title">Histórico de abastecimentos</h3>
@@ -788,6 +776,8 @@ export default function FuelSuppliesPage() {
 
       <Modal open={isOrderModalOpen && canCreateOrder} onClose={() => setIsOrderModalOpen(false)} title="Nova ordem de abastecimento" description="Emita a ordem para um posto credenciado executar o abastecimento.">
         <FuelSupplyOrderCreateForm
+          initialContractId={searchParams.get('contract_id') || ''}
+          returnTo={searchParams.get('return_to') || ''}
           vehicles={vehicles} onVehicleOptionsOpen={refreshVehicleOptions}
           organizations={organizations}
           fuelStations={fuelStations}
@@ -859,7 +849,7 @@ export default function FuelSuppliesPage() {
       <Modal
         open={Boolean(orderToAdjust) && canAdjustOrderDeadline}
         onClose={() => setOrderToAdjust(null)}
-        title={orderToAdjust?.status === 'EXPIRED' ? 'Reabrir prazo da ordem' : 'Prorrogar prazo da ordem'}
+        title={control.enabled && !orderToAdjust?.contract_reservation_id ? 'Vincular contrato e reservar' : orderToAdjust?.status === 'EXPIRED' ? 'Reabrir prazo da ordem' : 'Prorrogar prazo da ordem'}
         description="Defina um novo prazo e informe a justificativa obrigatória para a auditoria."
       >
         {orderToAdjust ? (

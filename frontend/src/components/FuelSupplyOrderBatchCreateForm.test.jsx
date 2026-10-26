@@ -109,3 +109,5 @@ describe('FuelSupplyOrderBatchCreateForm', () => {
     expect(onClose).toHaveBeenCalledTimes(1)
   })
 })
+
+vi.mock('../api/contractControl', () => ({ contractControlAPI: { config: async () => ({ data: { enabled: false } }) }, maintenanceOrdersAPI: {} }))
