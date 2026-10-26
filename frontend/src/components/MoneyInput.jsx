@@ -35,7 +35,7 @@ const MoneyInput = forwardRef(function MoneyInput({ value = '', onChange, onBlur
     const keyboardEdit = /^(insertText|delete)/.test(event.nativeEvent?.inputType || '')
     const decimalKey = event.nativeEvent?.inputType === 'insertText' && event.nativeEvent?.data === '.' && !display.includes(',')
     const text = decimalKey ? raw.slice(0, cursor-1).replace(/\./g, '') + ',' + raw.slice(cursor).replace(/\./g, '')
-      : keyboardEdit && display.includes('.') && !raw.includes(',') ? raw.replace(/\./g, '') : raw
+      : keyboardEdit && display.includes('.') ? raw.replace(/\./g, '') : raw
     const parsed = parseMoneyInput(text, { precision, allowNegative })
     if (parsed.valid && parsed.value.includes('.') && !raw.includes(',') && raw.slice(0, cursor).includes('.')) pendingCaret.current++
     const numeric = Number(parsed.value)
@@ -43,17 +43,18 @@ const MoneyInput = forwardRef(function MoneyInput({ value = '', onChange, onBlur
     const message = !parsed.valid ? `Informe um valor em reais com até ${precision} casas decimais, como 1.234,56.`
       : !inRange ? 'Informe um valor dentro do limite permitido.' : ''
     event.target.setCustomValidity(message)
-    emitted.current = parsed.value
-    current.current = parsed.value
+    const canonical = parsed.value.endsWith('.') ? parsed.value.slice(0, -1) : parsed.value
+    emitted.current = canonical
+    current.current = canonical
     setDisplay(parsed.valid ? formatMoneyInput(parsed.value, { precision, editing: true }) : raw)
-    onChange?.({ ...event, target: { name, id, value: parsed.value }, currentTarget: { name, id, value: parsed.value } })
+    onChange?.({ ...event, target: { name, id, value: canonical }, currentTarget: { name, id, value: canonical } })
   }
   return <input {...props} id={id} name={name} ref={(element) => {
     inputRef.current = element
     if (typeof ref === 'function') ref(element)
     else if (ref) ref.current = element
   }} type="text" inputMode="decimal" value={display} onChange={change}
-    onFocus={(event) => { focused.current = true; setDisplay(formatMoneyInput(current.current, { precision, editing: true })); onFocus?.(event) }}
+    onFocus={(event) => { focused.current = true; if (!event.target.validity.customError) setDisplay(formatMoneyInput(current.current, { precision, editing: true })); onFocus?.(event) }}
     onBlur={(event) => { focused.current = false; if (event.target.validity.valid) setDisplay(formatMoneyInput(current.current, { precision })); onBlur?.(event) }} />
 })
 
