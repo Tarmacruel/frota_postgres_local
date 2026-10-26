@@ -5,7 +5,9 @@ const getReasonPresets = (context) => REASON_PRESETS[context] || []
 
 describe('catálogo fixo e contextos separados', () => {
   it('mantém modelos específicos para retificação, cancelamento e ações de empréstimo', () => {
-    expect(Object.keys(REASON_PRESETS)).toHaveLength(22)
+    expect(Object.keys(REASON_PRESETS)).toHaveLength(23)
+    expect(getReasonPresets('order_funding').find((item) => item.id === 'network').text).toContain('sem reserva prévia')
+    expect(getReasonPresets('order_funding')).not.toEqual(getReasonPresets('order_extend'))
     expect(getReasonPresets('fuel_supply').find((item) => item.id === 'receipt').text).toContain('Substituição do comprovante')
     expect(getReasonPresets('loan_accept')).not.toEqual(getReasonPresets('loan_reject'))
     expect(getReasonPresets('unknown')).toEqual([])
