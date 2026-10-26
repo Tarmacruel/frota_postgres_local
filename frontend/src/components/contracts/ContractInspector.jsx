@@ -45,6 +45,7 @@ export default function ContractInspector({ open, detail, row, loading, error, t
     { label: 'Cadastro e vigência', value: `${contractDate(c.valid_from)} a ${contractDate(c.valid_until)}`, action: 'Conferir cadastro', run: () => onShow('edit') },
     { label: 'Rede executante', value: `${providers.filter((p) => p.active).length} posto(s) / oficina(s) ativos`, action: 'Vincular prestador', run: () => onShow('provider') },
     ...(c.control_opened ? [{ label: 'Limite e vigência', value: 'Alterações registradas por aditivo', action: 'Registrar aditivo', run: () => onShow('amend') }] : []),
+    ...(c.control_opened ? [{ label: 'Correção de digitação no saldo', value: brl(c.available_balance), action: 'Corrigir saldo', run: () => onShow('correction') }] : []),
     ...(c.control_opened && c.available_balance !== null && Number(c.available_balance) <= 0 ? [{ label: 'Saldo disponível', value: 'Recomposição necessária para novos pedidos', action: 'Ajustar saldo', run: () => onShow('adjust') }] : []),
     ...(!c.control_opened ? [{ label: 'Abertura de saldo', value: 'Confirmação do gestor pendente', action: 'Conferir saldo inicial', run: () => onShow('opening') }] : []),
   ] : []
@@ -58,6 +59,7 @@ export default function ContractInspector({ open, detail, row, loading, error, t
           manage && { label: 'Editar cadastro', onClick: () => onShow('edit') },
           manage && { label: 'Registrar aditivo', onClick: () => onShow('amend') },
           manage && c.control_opened && { label: 'Ajustar saldo', onClick: () => onShow('adjust') },
+          manage && c.control_opened && { label: 'Corrigir saldo', onClick: () => onShow('correction') },
           manage && c.divergence_open && { label: 'Regularizar divergência', onClick: () => onShow('resolve') },
           { label: 'Histórico e projeções', onClick: () => onPayments({ financial_view: 'contractManagement' }) },
         ]} />

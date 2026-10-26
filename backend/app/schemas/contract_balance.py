@@ -65,6 +65,12 @@ class BalanceAdjustment(Justified):
     document_reference: str = Field(min_length=2, max_length=255)
 
 
+class BalanceCorrection(Justified):
+    target_available_balance: Decimal = Field(ge=0, max_digits=16, decimal_places=2)
+    expected_available_balance: Decimal = Field(max_digits=16, decimal_places=2)
+    request_key: UUID
+
+
 class ReconcileProcess(BaseModel):
     operation_ids: list[UUID] = Field(min_length=1, max_length=1000)
     justification: str | None = Field(default=None, max_length=4000)

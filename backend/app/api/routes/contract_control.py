@@ -17,7 +17,7 @@ from app.models.fuel_station import FuelStation
 from app.models.payment_process import PaymentContract, PaymentProcessKind
 from app.models.user import User
 from app.schemas.contract_balance import (
-    BalanceAdjustment, ContractOpening, ContractQuote, Justified, MaintenanceOrderCancel,
+    BalanceAdjustment, BalanceCorrection, ContractOpening, ContractQuote, Justified, MaintenanceOrderCancel,
     MaintenanceOrderComplete, MaintenanceOrderCreate, MaintenanceOrderStart,
     PriceCreate, PriceUpdate, ProviderCreate, ReconcileProcess,
 )
@@ -184,6 +184,11 @@ async def quote(contract_id: UUID, data: ContractQuote, db: AsyncSession = Depen
     result = await service.quote(contract_id, data.provider_id, data.fuel_type, data.liters, item_liters=data.item_liters)
     await db.commit()
     return result
+
+
+@router.post('/contracts/{contract_id}/balance-correction', dependencies=[Depends(enabled)])
+async def correct_balance(contract_id: UUID, data: BalanceCorrection, db: AsyncSession = Depends(get_db_session), user: User = Depends(financial_edit)):
+    return await write(db, ContractBalanceService(db).correct_balance(contract_id, data, user))
 
 
 @router.post('/contracts/{contract_id}/adjustments', dependencies=[Depends(enabled)])

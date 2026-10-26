@@ -1,3 +1,4 @@
+import MoneyInput from './MoneyInput'
 import { useId, useMemo, useRef, useState } from 'react'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -148,7 +149,7 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
 
       <div className="form-field">
         <label htmlFor={`${formId}-amount`}>Valor total abastecido (R$)</label>
-        <input id={`${formId}-amount`} type="number" min="0" step="0.01" className="app-input" value={form.total_amount} onChange={(event) => setForm((current) => ({ ...current, total_amount: event.target.value }))} required />
+        <MoneyInput id={`${formId}-amount`} type="number" min="0" step="0.01" className="app-input" value={form.total_amount} onChange={(event) => setForm((current) => ({ ...current, total_amount: event.target.value }))} required />
       </div>
 
       <div className="form-field">
