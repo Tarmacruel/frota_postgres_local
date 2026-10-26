@@ -58,7 +58,20 @@ async def catalog(db: AsyncSession = Depends(get_db_session), _user: User = Depe
         .outerjoin(ContractProvider, and_(ContractProvider.fuel_station_id == FuelStation.id, ContractProvider.active.is_(True)))
         .outerjoin(PaymentContract, PaymentContract.id == ContractProvider.contract_id)
         .order_by(FuelStation.name))).mappings().all()
-    return {'stations': [dict(s) for s in stations]}
+    catalog_stations = {}
+    for station in stations:
+        entry = catalog_stations.setdefault(station['id'], {
+            **dict(station), 'active_contracts': [],
+        })
+        if station['active_contract_id']:
+            entry['active_contracts'].append({
+                'id': station['active_contract_id'], 'number': station['active_contract_number'],
+            })
+    for entry in catalog_stations.values():
+        if len(entry['active_contracts']) != 1:
+            entry['active_contract_id'] = None
+            entry['active_contract_number'] = None
+    return {'stations': list(catalog_stations.values())}
 
 
 @router.get('/eligible', dependencies=[Depends(enabled)])
