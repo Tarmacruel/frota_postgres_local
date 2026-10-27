@@ -1,5 +1,5 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
-import { MemoryRouter, Route, Routes, useLocation } from 'react-router-dom'
+import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import FuelSuppliesPage from './FuelSuppliesPage'
 import { exportRowsToXlsx } from '../utils/exportData'
@@ -47,7 +47,6 @@ vi.mock('../context/AuthContext', () => ({
 vi.mock('../components/Modal', () => ({
   default: ({ open, title, children, onClose }) => (open ? <section role="dialog" aria-label={title}><button onClick={onClose}>Fechar</button>{children}</section> : null),
 }))
-vi.mock('../components/SearchableSelect', () => ({ default: ({ placeholder }) => <button type="button">{placeholder}</button> }))
 vi.mock('../components/FuelSupplyOrderCreateForm', () => ({ default: () => <div>Formulário de nova ordem</div> }))
 vi.mock('../components/FuelSupplyOrderBatchCreateForm', () => ({ default: () => <div>Formulário de ordens em lote</div> }))
 vi.mock('../components/FuelSupplyOrderConfirmForm', () => ({ default: ({ order, onSuccess, onClose }) => <><p>Confirmação de {order.id}</p><button onClick={() => { onSuccess('Abastecimento confirmado no teste'); onClose() }}>Salvar confirmação de teste</button></> }))
@@ -66,8 +65,8 @@ vi.mock('../utils/exportData', () => ({
 }))
 
 function LocationProbe() {
-  const location = useLocation()
-  return <output data-testid="location">{location.pathname}{location.search}</output>
+  const location = useLocation(); const navigate = useNavigate()
+  return <><output data-testid="location">{location.pathname}{location.search}</output><button onClick={() => navigate(-1)}>Voltar no navegador</button><button onClick={() => navigate(1)}>Avançar no navegador</button></>
 }
 
 function renderPage(initialEntry = '/abastecimentos?acao=nova-ordem') {
@@ -292,6 +291,135 @@ describe('FuelSuppliesPage quick order action', () => {
     expect(screen.getByTestId('location')).toHaveTextContent('view=open&indicator=alerts')
     fireEvent.click(screen.getByRole('button',{name:'Histórico',exact:true}))
     await waitFor(()=>expect(mocks.listSupplies).toHaveBeenCalledWith(expect.objectContaining({indicator:'alerts'})))
+  })
+})
+
+describe('FuelSuppliesPage common vehicle and entity filters', () => {
+  const vehicles = [{ id: 'vehicle-a', plate: 'TST1A23', brand: 'Marca', model: 'Modelo', current_department: 'Frota de teste' },
+    { id: 'vehicle-b', plate: 'TST9B87', brand: 'Marca', model: 'Modelo', current_department: 'Frota de teste' }]
+  const stations = [{ id: 'station-a', name: 'Posto de teste' }]
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.canCreate.mockReturnValue(true); mocks.canView.mockReturnValue(true)
+    mocks.get.mockReset().mockImplementation(async (url) => ({ data: url === '/vehicles/options' ? vehicles : [] }))
+    mocks.listStations.mockReset().mockResolvedValue({ data: stations })
+    mocks.listOrganizations.mockReset().mockResolvedValue({ data: [{ id: 'organization-a', name: 'Secretaria de teste' }] })
+    mocks.listSupplies.mockReset().mockResolvedValue(paged([]))
+    mocks.listOrders.mockReset().mockResolvedValue(paged([]))
+    mocks.listOpen.mockReset().mockResolvedValue(paged([]))
+    mocks.getOrder.mockReset().mockResolvedValue({ data: { id: 'focus-test' } })
+  })
+  function openFilters() { fireEvent.click(screen.getByRole('button', { name: /^Filtros/ })) }
+  async function chooseVehicle(plate) {
+    fireEvent.click(screen.getByRole('button', { name: /^Filtrar veículo:/ }))
+    fireEvent.change(screen.getByPlaceholderText('Buscar veículo por placa, marca ou modelo'), { target: { value: plate } })
+    fireEvent.click(await screen.findByRole('button', { name: new RegExp(`^${plate} ·`) }))
+  }
+
+  it('leva o veículo escolhido às três áreas, mantendo as buscas específicas', async () => {
+    renderPage('/abastecimentos?origem=teste')
+    await waitFor(() => expect(mocks.listOrders).toHaveBeenCalled())
+    fireEvent.change(screen.getByRole('textbox', { name: 'Buscar ordens' }), { target: { value: 'solicitante' } })
+    openFilters(); await chooseVehicle('TST1A23')
+    await waitFor(() => expect(mocks.listOrders).toHaveBeenLastCalledWith(expect.objectContaining({ vehicle_id: 'vehicle-a', search: 'solicitante', page: 1 })))
+    fireEvent.click(screen.getByRole('button', { name: 'Ordens abertas', exact: true }))
+    await waitFor(() => expect(mocks.listOpen).toHaveBeenLastCalledWith(expect.objectContaining({ vehicle_id: 'vehicle-a' })))
+    openFilters()
+    expect(screen.getByRole('button', { name: /^Filtrar veículo: TST1A23/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Histórico', exact: true }))
+    await waitFor(() => expect(mocks.listSupplies).toHaveBeenLastCalledWith(expect.objectContaining({ vehicle_id: 'vehicle-a' })))
+    fireEvent.click(screen.getByRole('button', { name: 'Ordens', exact: true }))
+    expect(screen.getByRole('textbox', { name: 'Buscar ordens' })).toHaveValue('solicitante')
+    expect(screen.getByTestId('location')).toHaveTextContent('origem=teste&vehicle_id=vehicle-a&view=orders')
+  })
+
+  it.each([['orders', 'listOrders'], ['open', 'listOpen']])('reinicia a página ao trocar o veículo em %s e recebe KPIs globais filtrados', async (view, apiName) => {
+    mocks[apiName].mockImplementation(async ({ page, vehicle_id }) => ({ data: { data: [], pagination: { page, pages: 3, total: vehicle_id ? 14 : 50 },
+      indicators: { items: [{ key: 'total', label: 'Ordens', value: vehicle_id ? 14 : 50 }] } } }))
+    renderPage(`/abastecimentos?view=${view}`)
+    fireEvent.click(await screen.findByRole('button', { name: 'Página 2' }))
+    await waitFor(() => expect(mocks[apiName]).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 })))
+    openFilters(); await chooseVehicle('TST1A23')
+    await waitFor(() => expect(mocks[apiName]).toHaveBeenLastCalledWith(expect.objectContaining({ page: 1, vehicle_id: 'vehicle-a' })))
+    expect(await screen.findByRole('button', { name: 'Ordens 14' })).toBeInTheDocument()
+  })
+
+  it('mantém o filtro no relatório completo de ordens', async () => {
+    const { fuelSupplyOrdersAPI } = await import('../api/fuelSupplyOrders')
+    mocks.listOrders.mockResolvedValue(paged([{ id: 'order-a', vehicle_plate: 'TST1A23' }]))
+    fuelSupplyOrdersAPI.listAllForReport.mockResolvedValue([{ id: 'order-a', vehicle_plate: 'TST1A23' }])
+    renderPage('/abastecimentos?view=orders&vehicle_id=vehicle-a')
+    await waitFor(() => expect(mocks.listOrders).toHaveBeenCalledWith(expect.objectContaining({ vehicle_id: 'vehicle-a' })))
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar ordens' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Exportar XLSX' }))
+    await waitFor(() => expect(fuelSupplyOrdersAPI.listAllForReport).toHaveBeenCalledWith(expect.objectContaining({ vehicle_id: 'vehicle-a' })))
+    expect(exportRowsToXlsx).toHaveBeenCalledWith(expect.objectContaining({ rows: [expect.objectContaining({ vehicle_plate: 'TST1A23' })] }))
+  })
+
+  it('combina veículo, secretaria, posto, situação e datas nas ordens', async () => {
+    renderPage('/abastecimentos?view=orders'); openFilters(); await chooseVehicle('TST1A23')
+    fireEvent.click(screen.getByRole('button', { name: /^Filtrar secretaria:/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Secretaria de teste', exact: true }))
+    fireEvent.click(screen.getByRole('button', { name: /^Filtrar posto:/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Posto de teste', exact: true }))
+    fireEvent.change(screen.getByLabelText('Situação das ordens'), { target: { value: 'OPEN' } })
+    fireEvent.change(screen.getByLabelText('Data inicial da emissão'), { target: { value: '2026-10-01' } })
+    await waitFor(() => expect(mocks.listOrders).toHaveBeenLastCalledWith(expect.objectContaining({ vehicle_id: 'vehicle-a', organization_id: 'organization-a', fuel_station_id: 'station-a', status: 'OPEN', created_from: expect.any(String) })))
+  })
+
+  it('carrega o catálogo autorizado de postos sob demanda nas abertas e combina os filtros no servidor', async () => {
+    renderPage('/abastecimentos?view=open'); openFilters(); await chooseVehicle('TST1A23')
+    expect(mocks.listStations).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: /^Filtrar posto:/ }))
+    fireEvent.click(await screen.findByRole('button', { name: 'Posto de teste', exact: true }))
+    await waitFor(() => expect(mocks.listOpen).toHaveBeenLastCalledWith(expect.objectContaining({ vehicle_id: 'vehicle-a', fuel_station_id: 'station-a' })))
+    expect(mocks.listOrders).not.toHaveBeenCalled(); expect(mocks.listSupplies).not.toHaveBeenCalled()
+  })
+
+  it('ao limpar um link antigo de veículo permanece no histórico e remove o UUID da URL', async () => {
+    renderPage('/abastecimentos?vehicle_id=vehicle-a&origem=emprestimo&indicator=alerts')
+    await waitFor(() => expect(mocks.listSupplies).toHaveBeenCalledWith(expect.objectContaining({ vehicle_id: 'vehicle-a' })))
+    openFilters(); fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros', exact: true }))
+    await waitFor(() => expect(mocks.listSupplies).toHaveBeenLastCalledWith(expect.not.objectContaining({ vehicle_id: expect.anything() })))
+    expect(screen.getByTestId('location')).toHaveTextContent('origem=emprestimo&indicator=alerts&view=history')
+    expect(screen.getByTestId('location')).not.toHaveTextContent('vehicle_id=')
+    expect(mocks.listOrders).not.toHaveBeenCalled()
+  })
+
+  it('Voltar e Avançar atualizam o seletor e a consulta sem perder o contrato', async () => {
+    renderPage('/abastecimentos?view=orders&contract_id=contract-a&return_to=%2Fprocessos-pagamento')
+    openFilters(); await chooseVehicle('TST1A23'); await chooseVehicle('TST9B87')
+    await waitFor(() => expect(mocks.listOrders).toHaveBeenLastCalledWith(expect.objectContaining({ vehicle_id: 'vehicle-b' })))
+    fireEvent.click(screen.getByRole('button', { name: 'Voltar no navegador' }))
+    await waitFor(() => expect(mocks.listOrders).toHaveBeenLastCalledWith(expect.objectContaining({ vehicle_id: 'vehicle-a' })))
+    expect(screen.getByRole('button', { name: /^Filtrar veículo: TST1A23/ })).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'Avançar no navegador' }))
+    await waitFor(() => expect(mocks.listOrders).toHaveBeenLastCalledWith(expect.objectContaining({ vehicle_id: 'vehicle-b' })))
+    expect(screen.getByTestId('location')).toHaveTextContent('contract_id=contract-a&return_to=')
+  })
+
+  it('mantém um veículo fora do catálogo identificado no link para perfis sem acesso a veículos', async () => {
+    mocks.canView.mockImplementation((module) => module === 'fuel_supply_orders')
+    renderPage('/abastecimentos?view=open&vehicle_id=vehicle-a')
+    await waitFor(() => expect(mocks.listOpen).toHaveBeenCalledWith(expect.objectContaining({ vehicle_id: 'vehicle-a' })))
+    openFilters()
+    expect(screen.getByRole('button', { name: 'Filtrar veículo: Veículo selecionado' })).toBeInTheDocument()
+    expect(mocks.get).not.toHaveBeenCalledWith('/vehicles/options'); expect(mocks.listStations).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Limpar filtros', exact: true }))
+    expect(screen.getByTestId('location')).not.toHaveTextContent('vehicle_id=')
+    expect(screen.queryByRole('button', { name: /^Filtrar veículo:/ })).not.toBeInTheDocument()
+  })
+
+  it('falha ao atualizar as opções preserva a seleção e os resultados consultados', async () => {
+    renderPage('/abastecimentos?view=history&vehicle_id=vehicle-a')
+    await waitFor(() => expect(mocks.listSupplies).toHaveBeenCalled())
+    openFilters()
+    await screen.findByRole('button', { name: /^Filtrar veículo: TST1A23/ })
+    mocks.get.mockRejectedValueOnce(new Error('Indisponível'))
+    fireEvent.click(screen.getByRole('button', { name: /^Filtrar veículo:/ }))
+    expect(await screen.findByRole('alert')).toHaveTextContent('Os dados da última consulta continuam visíveis')
+    expect(screen.getByRole('button', { name: /^Filtrar veículo: TST1A23/ })).toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('vehicle_id=vehicle-a')
   })
 })
 

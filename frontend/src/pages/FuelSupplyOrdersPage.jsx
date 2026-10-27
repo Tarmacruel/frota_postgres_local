@@ -3,12 +3,13 @@ import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import { useContractControl } from '../hooks/useContractFunding'
 import FuelOrderFundingForm from '../components/contracts/FuelOrderFundingForm'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import DocumentSignaturePanel from '../components/DocumentSignaturePanel'
 import Pagination from '../components/Pagination'
-import SearchableSelect from '../components/SearchableSelect'
+import FuelEntityFilters from '../components/FuelEntityFilters'
+import { useFuelVehicleFilter } from '../hooks/useFuelVehicleFilter'
 import FuelSupplyOrderConfirmForm from '../components/FuelSupplyOrderConfirmForm'
 import { MobileFilters, ResponsiveRecord, ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 import { DIGITAL_DOCUMENT_TYPES } from '../api/documentSignatures'
@@ -71,12 +72,13 @@ function getDeadlineMeta(order) {
   return { label: `Restam ${hoursRemaining} h`, tone: 'success', minutesRemaining }
 }
 
-export default function FuelSupplyOrdersPage({ embedded = false, active = true, refreshKey = 0, indicatorParameter = 'indicator' }) {
+export default function FuelSupplyOrdersPage({ embedded = false, active = true, refreshKey = 0, indicatorParameter = 'indicator', vehicles = [], fuelStations = [], onVehiclesOpen, onStationsOpen }) {
   const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis(indicatorParameter)
   useEffect(() => { setCurrentPage(1) }, [indicator])
 
   const [searchParams, setSearchParams] = useSearchParams()
   const focusedOrderId = searchParams.get('focus')
+  const { vehicleId, selectVehicle } = useFuelVehicleFilter('open')
   const { canEdit, isAdmin, isProduction } = useAuth()
   const control = useContractControl()
   const [fundingOrder, setFundingOrder] = useState(null)
@@ -87,17 +89,12 @@ export default function FuelSupplyOrdersPage({ embedded = false, active = true, 
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [search, setSearch] = useState('')
-  const [organizationFilter, setOrganizationFilter] = useState('')
+  const [filters, setFilters] = useState({ organization_id: '', fuel_station_id: '' })
   const [currentPage, setCurrentPage] = useState(1)
   const [pagination, setPagination] = useState({ pages: 1, total: 0 })
   const listRequest = useRef(0)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [signatureOrder, setSignatureOrder] = useState(null)
-
-  const organizationOptions = useMemo(
-    () => [{ value: '', label: 'Todas as secretarias' }, ...organizations.map((organization) => ({ value: organization.id, label: organization.name }))],
-    [organizations],
-  )
 
   async function loadOrders(page = currentPage) {
     const request = ++listRequest.current
@@ -107,7 +104,9 @@ export default function FuelSupplyOrdersPage({ embedded = false, active = true, 
       const { data } = await fuelSupplyOrdersAPI.listOpen({ indicator: indicator === 'total' ? undefined : indicator,
         limit: 10,
         page,
-        organization_id: organizationFilter || undefined,
+        organization_id: filters.organization_id || undefined,
+        vehicle_id: vehicleId || undefined,
+        fuel_station_id: filters.fuel_station_id || undefined,
         search: search.trim() || undefined,
       })
       if (request !== listRequest.current) return
@@ -129,7 +128,7 @@ export default function FuelSupplyOrdersPage({ embedded = false, active = true, 
     if (!active) return undefined
     const timer = setTimeout(() => loadOrders(), search.trim() ? 250 : 0)
     return () => { clearTimeout(timer); listRequest.current += 1 }
-  }, [currentPage, organizationFilter, search, indicator, active, refreshKey])
+  }, [currentPage, filters, vehicleId, search, indicator, active, refreshKey])
 
   useEffect(() => {
     if (!active || !focusedOrderId) return undefined
@@ -158,7 +157,7 @@ export default function FuelSupplyOrdersPage({ embedded = false, active = true, 
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, organizationFilter, indicator])
+  }, [search, filters, vehicleId, indicator])
 
   async function handlePreviewOrderDocument(order) {
     try {
@@ -190,8 +189,7 @@ export default function FuelSupplyOrdersPage({ embedded = false, active = true, 
         title="Ordens de abastecimento abertas"
       /> : null}
 
-      <div className="toolbar-card operation-toolbar">
-        <div className="filter-inline">
+      <div className="operation-toolbar filter-inline">
           <input
             className="app-input"
             aria-label="Buscar ordens abertas"
@@ -199,17 +197,13 @@ export default function FuelSupplyOrdersPage({ embedded = false, active = true, 
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-          <MobileFilters collapsibleDesktop={embedded} activeCount={organizationFilter ? 1 : 0}>
-          <SearchableSelect
-            value={organizationFilter}
-            onChange={setOrganizationFilter}
-            options={organizationOptions}
-            placeholder="Filtrar secretaria"
-            searchPlaceholder="Buscar secretaria"
-          />
+          <MobileFilters collapsibleDesktop={embedded} activeCount={Number(Boolean(vehicleId)) + Object.values(filters).filter(Boolean).length}>
+          <FuelEntityFilters vehicleId={vehicleId} onVehicleChange={selectVehicle} filters={filters}
+            onFilterChange={(key, value) => setFilters((current) => ({ ...current, [key]: value }))}
+            vehicles={vehicles} organizations={organizations} stations={fuelStations} onVehiclesOpen={onVehiclesOpen} onStationsOpen={onStationsOpen} />
+          <button className="ghost-button" type="button" onClick={() => { setSearch(''); selectVehicle(''); setFilters({ organization_id: '', fuel_station_id: '' }) }}>Limpar filtros</button>
           <button className="ghost-button" type="button" onClick={() => loadOrders()}>Atualizar</button>
           </MobileFilters>
-        </div>
       </div>
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
