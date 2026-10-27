@@ -2,7 +2,7 @@ from decimal import Decimal
 from uuid import uuid4
 import pytest
 from fastapi import HTTPException
-from app.schemas.contract_item import ItemAmendmentCreate
+from app.schemas.contract_item import ItemAmendmentCreate, OriginalItemComplement
 from app.services.contract_amendment_service import limits_for
 
 
@@ -49,3 +49,38 @@ def test_declared_financial_effect_cannot_default_to_zero():
         ItemAmendmentCreate(number='1', change_types=['PRICE'], price_reason='INDEX', price_financial_effect='DECLARED',
             signed_at='2026-01-01', effective_date='2026-01-01',document_reference='Documento teste',
             notes='Justificativa conferida',request_key=uuid4())
+
+
+def original_complement_data(**patch):
+    return dict(code='PECA-2', original_number='02', description='Peça original fictícia', category='PART', unit='UN',
+        original_quantity='100', original_unit_price='12.345678', remaining_quantity='50', historical_added_quantity='0',
+        document_reference='Contrato original, item 02', justification='Item original omitido do cadastro inicial',
+        original_contract_confirmed=True, request_key=uuid4(), prices=[], **patch)
+
+
+def test_original_complement_preserves_precision_and_requires_explicit_confirmation():
+    data = OriginalItemComplement(**original_complement_data())
+    assert data.original_unit_price == Decimal('12.345678')
+    assert data.reference_unit_price is None
+    assert data.remaining_quantity == 50
+    with pytest.raises(ValueError, match='Confirme'):
+        OriginalItemComplement(**{**original_complement_data(), 'original_contract_confirmed': False})
+
+
+@pytest.mark.parametrize('patch', [
+    {'remaining_quantity': '101'}, {'remaining_quantity': '-1'}, {'original_quantity': '0'},
+    {'historical_added_quantity': '-1'}, {'original_unit_price': '1.1234567'},
+    {'reference_unit_price': '20'}, {'value_delta': '1000'}, {'document_reference': ' '}, {'justification': 'curta'},
+])
+def test_original_complement_rejects_ambiguous_or_invalid_data(patch):
+    with pytest.raises(ValueError):
+        OriginalItemComplement(**{**original_complement_data(), **patch})
+
+
+def test_original_complement_accepts_exhausted_quantity_and_refuses_duplicate_providers():
+    data = OriginalItemComplement(**{**original_complement_data(), 'remaining_quantity': '0'})
+    assert data.remaining_quantity == 0
+    provider = uuid4()
+    with pytest.raises(ValueError, match='cada executante'):
+        OriginalItemComplement(**{**original_complement_data(), 'prices': [
+            {'provider_id': provider, 'unit_price': '12.345678'}, {'provider_id': provider, 'unit_price': '12.345678'}]})

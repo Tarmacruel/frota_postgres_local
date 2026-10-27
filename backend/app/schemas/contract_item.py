@@ -2,7 +2,7 @@ from datetime import date, datetime
 from decimal import Decimal
 from typing import Annotated, Literal
 from uuid import UUID
-from pydantic import BaseModel, Field, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 Quantity = Annotated[Decimal, Field(ge=0, max_digits=18, decimal_places=3)]
 Price = Annotated[Decimal, Field(gt=0, max_digits=14, decimal_places=6)]
@@ -32,6 +32,42 @@ class ItemPriceCreate(BaseModel):
     unit_price: Price
     valid_from: datetime | None = None
     fuel_price_id: UUID | None = None
+
+
+class OriginalItemPrice(BaseModel):
+    model_config = ConfigDict(extra='forbid')
+    provider_id: UUID
+    unit_price: Price
+    fuel_price_id: UUID | None = None
+
+
+class OriginalItemComplement(ContractItemCreate):
+    model_config = ConfigDict(extra='forbid')
+    reference_unit_price: Price | None = None
+    remaining_quantity: Quantity
+    historical_added_quantity: Quantity
+    document_reference: str = Field(min_length=2, max_length=255)
+    justification: str = Field(min_length=10, max_length=4000)
+    original_contract_confirmed: bool
+    request_key: UUID
+    prices: list[OriginalItemPrice] = Field(default_factory=list, max_length=100)
+
+    @field_validator('document_reference', 'justification', mode='before')
+    @classmethod
+    def clean_reference(cls, value):
+        return ' '.join(value.split()) if isinstance(value, str) else value
+
+    @model_validator(mode='after')
+    def confirmed_original(self):
+        if not self.original_contract_confirmed:
+            raise ValueError('Confirme que o item já consta no contrato original e que as quantidades foram conferidas')
+        if self.reference_unit_price is not None and self.reference_unit_price != self.original_unit_price:
+            raise ValueError('O complemento cadastral usa o preço original; reajustes exigem alteração vinculada')
+        if self.remaining_quantity > self.original_quantity + self.historical_added_quantity:
+            raise ValueError('O restante não pode superar a quantidade original e os acréscimos anteriores conferidos')
+        if len({p.provider_id for p in self.prices}) != len(self.prices):
+            raise ValueError('Informe cada executante apenas uma vez')
+        return self
 
 
 class ItemOrderLine(BaseModel):

@@ -6,6 +6,7 @@ import json
 from fastapi import APIRouter, Depends, File, HTTPException, UploadFile
 from fastapi.responses import FileResponse
 from sqlalchemy import func, or_, select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import get_current_user_ready, require_permission
 from app.api.routes.contract_control import enabled, financial_edit, financial_view, write
@@ -15,7 +16,7 @@ from app.db.session import get_db_session
 from app.models.contract_balance import ContractOperation, ContractReservation
 from app.models.contract_item import ContractItemMovement
 from app.models.payment_process import PaymentContractAmendment
-from app.schemas.contract_item import ContractItemCreate, ItemPriceCreate, ItemAmendmentCreate, QuantityOpening, ItemOrderLine, ItemQuote
+from app.schemas.contract_item import ContractItemCreate, OriginalItemComplement, ItemPriceCreate, ItemAmendmentCreate, QuantityOpening, ItemOrderLine, ItemQuote
 from app.models.user import User
 from app.services.contract_item_service import ContractItemService
 from app.services.contract_amendment_service import ContractAmendmentService
@@ -46,6 +47,18 @@ async def update_item(contract_id: UUID, item_id: UUID, data: ContractItemCreate
                       db: AsyncSession = Depends(get_db_session), user: User = Depends(financial_edit)):
     visible(user)
     return await write(db, ContractItemService(db).create(contract_id, data, user, item_id=item_id))
+
+
+@router.post('/{contract_id}/items/original-complements', status_code=201)
+async def complement_original_item(contract_id: UUID, data: OriginalItemComplement,
+        db: AsyncSession = Depends(get_db_session), user: User = Depends(financial_edit)):
+    visible(user)
+    try:
+        return await write(db, ContractItemService(db).complement_original(contract_id, data, user))
+    except IntegrityError as err:
+        if (getattr(err.orig, 'sqlstate', None) or getattr(err.orig, 'pgcode', None)) == '23505':
+            raise HTTPException(409, 'Cadastro repetido ou identificação já utilizada. Confira os itens; nenhuma inclusão parcial foi mantida.') from err
+        raise
 
 
 @router.post('/{contract_id}/item-prices', status_code=201)
@@ -124,7 +137,7 @@ async def movements(contract_id: UUID, item_id: UUID | None = None, page: int = 
         conditions.append(m.item_id == item_id)
     scope = scoped_organization_id(user)
     if scope:
-        conditions.append(or_(m.movement_type.in_(['OPENING','AMENDMENT']), ContractReservation.organization_id == scope, ContractOperation.organization_id == scope))
+        conditions.append(or_(m.movement_type.in_(['OPENING','AMENDMENT','ORIGINAL_ITEM_COMPLEMENT']), ContractReservation.organization_id == scope, ContractOperation.organization_id == scope))
     if page < 1:
         raise HTTPException(422, 'Página inválida')
     rows = (await db.scalars(stmt.where(*conditions).order_by(m.occurred_at.desc(), m.id).offset((page-1)*50).limit(50))).all()

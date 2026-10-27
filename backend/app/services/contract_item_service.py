@@ -11,7 +11,8 @@ from app.models.contract_item import (ContractItem, ContractQuantityControl, Con
     ContractReservationItem, ContractOperationItem, ContractItemMovement)
 from app.models.contract_balance import ContractControl, ContractFuelPrice, ContractReservation
 from app.schemas.contract_balance import PriceCreate
-from app.services.contract_balance_service import ContractBalanceService, fuel_key, money, utcnow
+from app.schemas.contract_item import ContractItemCreate, ItemPriceCreate
+from app.services.contract_balance_service import ContractBalanceService, NETWORK_VALUE, fuel_key, money, pricing_mode, utcnow
 
 
 def quantity(value):
@@ -58,7 +59,8 @@ class ContractItemService:
                 if control else None)
             result.append(row)
         return dict(opened=bool(control), adjudication=control.adjudication if control else None,
-            opened_at=control.opened_at if control else None, items=result, prices=await self.prices(contract_id))
+            opened_at=control.opened_at if control else None, items=result, prices=await self.prices(contract_id),
+            original_complements_supported=True)
 
     async def added_since_opening(self, item_id):
         return quantity(await self.db.scalar(select(func.coalesce(func.sum(ContractItemMovement.quantity_delta), 0))
@@ -68,6 +70,10 @@ class ContractItemService:
         contract = await self.balance.contract(contract_id, lock=True)
         if await self.db.get(ContractQuantityControl, contract_id):
             raise HTTPException(409, 'Abertura já confirmada. Preserve os itens originais e registre alterações por instrumento.')
+        return await self._store_item(contract, data, actor, item_id=item_id)
+
+    async def _store_item(self, contract, data, actor, *, item_id=None):
+        contract_id = contract.id
         values = fields(data)
         allowed = {'FUEL', 'ADDITIVE'} if contract.kind == 'FUEL' else {'SERVICE', 'PART'}
         if values['category'] not in allowed:
@@ -89,6 +95,91 @@ class ContractItemService:
         await self.db.flush()
         await self.balance.audit.record(actor=actor, action='CONFIGURE_CONTRACT_ITEM', entity_type='PAYMENT_CONTRACT',
             entity_id=contract_id, entity_label=contract.number, details={'item_id': str(row.id), 'code': row.code})
+        return row
+
+    async def complement_original(self, contract_id, data, actor):
+        """Append an omitted original item; never change money or existing quantity/price records."""
+        from app.core.config import settings
+        if not settings.CONTRACT_QUANTITY_ENABLED:
+            raise HTTPException(409, 'Controle por itens não habilitado neste ambiente')
+        contract = await self.balance.contract(contract_id, lock=True)
+        event_key = f'original-complement:{data.request_key}'
+        digest = fingerprint(data.model_dump(mode='json'))
+        prior = await self.db.scalar(select(ContractItemMovement).where(ContractItemMovement.event_key == event_key))
+        if prior:
+            if prior.contract_id != contract_id or (prior.details or {}).get('request_fingerprint') != digest:
+                raise HTTPException(409, 'Identificação já utilizada com outros dados ou em outro contrato')
+            return await self.db.get(ContractItem, prior.item_id)
+        control = await self.db.get(ContractQuantityControl, contract_id)
+        if not control or not await self.db.get(ContractControl, contract_id):
+            raise HTTPException(409, 'Antes da abertura, utilize Cadastrar item e confira as quantidades do contrato')
+        if control.adjudication == 'GROUP' and not data.group_key:
+            raise HTTPException(422, 'Informe o lote/grupo original deste item')
+        duplicate = select(ContractItem.id).where(ContractItem.contract_id == contract_id,
+            func.lower(ContractItem.original_number) == data.original_number.lower())
+        if control.adjudication == 'GROUP':
+            duplicate = duplicate.where(func.lower(func.coalesce(ContractItem.group_key, '')) == data.group_key.lower())
+        if await self.db.scalar(duplicate.limit(1)):
+            raise HTTPException(409, 'Este número de item original já está cadastrado. Consulte o item existente; não duplique suas quantidades.')
+        product = fuel_key(data.product_key)
+        if data.category in {'FUEL', 'ADDITIVE'} and await self.db.scalar(select(ContractItem.id).where(
+                ContractItem.contract_id == contract_id, ContractItem.category == data.category,
+                ContractItem.product_key == product, ContractItem.active.is_(True)).limit(1)):
+            raise HTTPException(409, 'Este combustível ou aditivo já possui item ativo. Consulte o cadastro existente.')
+        network = pricing_mode(contract) == NETWORK_VALUE
+        if network and data.prices:
+            raise HTTPException(422, 'Rede por valor acompanha quantidades sem cadastrar preços fixos por item')
+        if not network and not data.prices:
+            raise HTTPException(422, 'Informe ao menos uma oficina/posto e o preço cobrado pelo novo item')
+        now = utcnow()
+        # Validate every assignment before inserting. Existing fuel versions must be chosen explicitly.
+        for assignment in data.prices:
+            provider = await self.balance.provider(contract_id, assignment.provider_id)
+            if data.category != 'FUEL':
+                if assignment.fuel_price_id:
+                    raise HTTPException(422, 'Preço de combustível não corresponde a serviço, peça ou ARLA')
+                continue
+            if not provider.fuel_station_id:
+                raise HTTPException(422, 'Selecione um posto executante para o combustível')
+            if assignment.fuel_price_id:
+                legacy = await self.db.get(ContractFuelPrice, assignment.fuel_price_id, populate_existing=True)
+                if (not legacy or legacy.provider_id != provider.id or legacy.fuel_type != product
+                        or legacy.unit_price != assignment.unit_price or legacy.deleted_at
+                        or legacy.valid_from > now or (legacy.valid_until and legacy.valid_until <= now)):
+                    raise HTTPException(409, 'O preço selecionado não está vigente ou não corresponde ao item/posto. Confira novamente.')
+            elif await self.db.scalar(select(ContractFuelPrice.id).where(
+                    ContractFuelPrice.provider_id == provider.id, ContractFuelPrice.fuel_type == product,
+                    ContractFuelPrice.deleted_at.is_(None),
+                    or_(ContractFuelPrice.valid_until.is_(None), ContractFuelPrice.valid_until > now)).limit(1)):
+                raise HTTPException(409, 'Já existe preço vigente ou agendado deste combustível no posto. Selecione a versão vigente, sem substituí-la.')
+        original = data.model_dump(include=set(ContractItemCreate.model_fields), exclude={'reference_unit_price'})
+        row = await self._store_item(contract, ContractItemCreate(**original, reference_unit_price=data.original_unit_price), actor)
+        row.opening_quantity = data.remaining_quantity
+        row.historical_added_quantity = data.historical_added_quantity
+        configured_prices = []
+        for assignment in data.prices:
+            legacy_id = assignment.fuel_price_id
+            if data.category == 'FUEL' and not legacy_id:
+                # Only a missing product/version is initialized. No old version is closed or repriced.
+                legacy = ContractFuelPrice(provider_id=assignment.provider_id, fuel_type=product,
+                    unit_price=assignment.unit_price, valid_from=now, created_by=actor.id)
+                self.db.add(legacy)
+                await self.db.flush()
+                legacy_id = legacy.id
+            configured = await self.set_price(contract_id, ItemPriceCreate(item_id=row.id, provider_id=assignment.provider_id,
+                unit_price=assignment.unit_price, fuel_price_id=legacy_id, valid_from=now), actor)
+            configured_prices.append(dict(price_id=str(configured.id), provider_id=str(assignment.provider_id),
+                unit_price=str(assignment.unit_price), fuel_price_id=str(legacy_id) if legacy_id else None))
+        await self.movement(contract_id, row.id, event_key, 'ORIGINAL_ITEM_COMPLEMENT', actor,
+            quantity_delta=data.remaining_quantity, details=dict(request_fingerprint=digest,
+                document_reference=data.document_reference, justification=data.justification,
+                original_quantity=str(data.original_quantity), original_unit_price=str(data.original_unit_price),
+                historical_added_quantity=str(data.historical_added_quantity),
+                prices=configured_prices, financial_effect='NONE'))
+        await self.balance.audit.record(actor=actor, action='COMPLEMENT_ORIGINAL_ITEM',
+            entity_type='PAYMENT_CONTRACT', entity_id=contract_id, entity_label=contract.number,
+            details=dict(item_id=str(row.id), code=row.code, document_reference=data.document_reference,
+                justification=data.justification, remaining_quantity=str(data.remaining_quantity), financial_effect='NONE'))
         return row
 
     async def prices(self, contract_id, *, provider_id=None):

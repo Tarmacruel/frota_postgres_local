@@ -4,6 +4,7 @@ export const contractControlAPI = {
   config: () => api.get('/contract-control/config'),
   items: (id) => api.get(`/contract-control/contracts/${id}/items`),
   createItem: (id, data) => api.post(`/contract-control/contracts/${id}/items`, data),
+  complementOriginalItem: (id, data) => api.post(`/contract-control/contracts/${id}/items/original-complements`, data),
   updateItem: (id, item, data) => api.put(`/contract-control/contracts/${id}/items/${item}`, data),
   itemPrice: (id, data) => api.post(`/contract-control/contracts/${id}/item-prices`, data),
   quantityOpening: (id) => api.get(`/contract-control/contracts/${id}/quantity-opening`),

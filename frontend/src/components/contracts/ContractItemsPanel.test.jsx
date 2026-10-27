@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import { beforeEach, expect, it, vi } from 'vitest'
 import ContractItemsPanel from './ContractItemsPanel'
 import { contractControlAPI } from '../../api/contractControl'
-vi.mock('../../api/contractControl',()=>({contractControlAPI:{items:vi.fn(),quantityOpening:vi.fn(),openQuantities:vi.fn(),createItem:vi.fn(),updateItem:vi.fn(),itemPrice:vi.fn()}}))
+vi.mock('../../api/contractControl',()=>({contractControlAPI:{items:vi.fn(),quantityOpening:vi.fn(),openQuantities:vi.fn(),createItem:vi.fn(),updateItem:vi.fn(),itemPrice:vi.fn(),complementOriginalItem:vi.fn(),itemMovements:vi.fn()}}))
 const item={id:'i',code:'DIESEL',original_number:'03',description:'Diesel teste',category:'FUEL',product_key:'DIESEL S10',unit:'L',original_quantity:'100',original_unit_price:'5.80',reference_unit_price:'6.02',remaining:null,reserved:null,available:null,active:true}
 const provider={id:'p',name:'Oficina teste',active:true}
 const price={id:'price',item_id:'i',provider_id:'p',unit_price:'6.02',current:true}
@@ -191,4 +191,35 @@ it('não expõe ações de configuração ao perfil de leitura',async()=>{
   expect(screen.queryByRole('button',{name:'Cadastrar item'})).not.toBeInTheDocument()
   expect(screen.queryByRole('button',{name:'Conferir quantidades'})).not.toBeInTheDocument()
   expect(contractControlAPI.quantityOpening).not.toHaveBeenCalled()
+})
+
+it('mantém inclusão de item original disponível após a abertura sem liberar edição dos antigos',async()=>{
+  contractControlAPI.items.mockResolvedValue({data:{...context(),opened:true,original_complements_supported:true}})
+  render(<ContractItemsPanel contract={{id:'c',kind:'MAINTENANCE'}} manage providers={[provider]} />)
+  fireEvent.click(await screen.findByRole('button',{name:'Adicionar item original'}))
+  expect(screen.getByRole('dialog',{name:'Adicionar item original'})).toBeInTheDocument()
+  expect(screen.queryByRole('button',{name:'Editar',exact:true})).not.toBeInTheDocument()
+  expect(screen.queryByRole('button',{name:'Conferir quantidades'})).not.toBeInTheDocument()
+  expect(contractControlAPI.complementOriginalItem).not.toHaveBeenCalled()
+})
+
+it('não oferece complemento ao leitor nem quando o backend antigo não o suporta',async()=>{
+  contractControlAPI.items.mockResolvedValue({data:{...context(),opened:true,original_complements_supported:true}})
+  const page=render(<ContractItemsPanel contract={{id:'c',kind:'FUEL'}} manage={false} />)
+  await screen.findByText('03 · Diesel teste')
+  expect(screen.queryByRole('button',{name:'Adicionar item original'})).not.toBeInTheDocument()
+  contractControlAPI.items.mockResolvedValue({data:{...context(),opened:true}})
+  page.rerender(<ContractItemsPanel contract={{id:'c',kind:'FUEL'}} manage revision={1} />)
+  await waitFor(()=>expect(contractControlAPI.items).toHaveBeenCalledTimes(2))
+  await waitFor(()=>expect(screen.queryByRole('button',{name:'Adicionar item original'})).not.toBeInTheDocument())
+})
+
+it('identifica complemento cadastral no extrato com documento e justificativa',async()=>{
+  contractControlAPI.items.mockResolvedValue({data:{...context(),opened:true,original_complements_supported:true}})
+  contractControlAPI.itemMovements.mockResolvedValue({data:{data:[{id:'m',movement_type:'ORIGINAL_ITEM_COMPLEMENT',quantity_delta:'50',reserved_delta:'0',occurred_at:'2026-01-01T12:00:00Z',details:{document_reference:'Contrato original, item 03',justification:'Item omitido no cadastro inicial'}}],page:1}})
+  render(<ContractItemsPanel contract={{id:'c',kind:'FUEL'}} manage />)
+  fireEvent.click(await screen.findByRole('button',{name:'Extrato de itens'}))
+  expect(await screen.findByText('Complemento de item original')).toBeInTheDocument()
+  expect(screen.getByText('Documento: Contrato original, item 03')).toBeInTheDocument()
+  expect(screen.getByText('Item omitido no cadastro inicial')).toBeInTheDocument()
 })

@@ -42,6 +42,9 @@ body.internal-app-active :is(.contract-amendment-editor,.contract-item-editor) :
 .contract-item-readiness li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--ui-border)}
 .contract-item-readiness li>span{min-width:0;overflow-wrap:anywhere}
 .contract-item-readiness li>button{flex-shrink:0}
+.contract-original-provider{padding:12px 0;border-bottom:1px solid var(--ui-border)}
+.contract-original-provider>.contract-check{margin-bottom:12px;font-weight:600}
+.contract-original-provider>.contract-editor-grid{padding-left:25px}
 @keyframes contract-item-reveal{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:700px){
  body.internal-app-active .modal-backdrop:has(>:is(.contract-amendment-editor,.contract-item-editor)){padding:0;align-items:stretch;justify-items:stretch}
