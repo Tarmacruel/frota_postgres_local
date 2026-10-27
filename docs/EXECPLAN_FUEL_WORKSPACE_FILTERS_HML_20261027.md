@@ -21,7 +21,7 @@ Sem API/backend/schema/env/regras financeiras/permissões novas. Sem emissão, c
 2. [x] Unificar veículo pela URL e adicionar controles comuns, com reset de página e limpeza coerente.
 3. [x] Manter peculiaridades: situação e período de emissão nas ordens, prazo/KPIs/confirmar nas abertas, alertas de consumo no histórico. Buscas e filtros específicos permanecem por aba.
 4. [x] Cobrir paginação/KPIs/exportação, navegação/links, escopo e catálogos autorizados; test/lint/build.
-5. [ ] Publicar só frontend HML, QA desktop/mobile/claro/escuro, integridade e documentação.
+5. [x] Publicar só frontend HML, QA desktop/mobile/claro/escuro, integridade e documentação.
 
 ## Validação visual
 Tese: toolbar compacta, previsível e institucional, com uma listagem por aba. Conteúdo: busca seguida de Filtros recolhível, controles comuns na mesma ordem, filtros específicos e Limpar filtros. Interações: abertura recolhível, pesquisa de opções e estados ativos/foco existentes; sem nova animação ornamental. No celular, manter coluna única e toque44px. Usar o mesmo componente de controles nas três abas.
@@ -32,7 +32,15 @@ Seleção real de veículo deve filtrar no servidor todas as páginas, KPIs e re
 ## Resultado
 Controles comuns extraídos para FuelEntityFilters; opções pesquisáveis preservam descrição e etiquetas. Veículo passa a usar uma única origem pela URL nas três áreas. Clearing mantém view/contrato/retorno/indicadores; navegar Voltar/Avançar reconcilia seleção e consulta. Ordens abertas passa a usar o mesmo toolbar e oferece veículo/secretaria/posto, Limpar filtros e Atualizar. Catálogos gerais de veículos e postos atualizam sob demanda nas abertas; link com veículo recebe rótulo quando autorizado. Sem permissão, mantém busca textual e filtro antigo identificável, sem consultar o catálogo.
 
-50 regressões direcionadas/6 arquivos aprovadas, lint0 erros/39 avisos anteriores, build candidato aprovado. Suíte completa:579 testes/84 arquivos aprovados. Publicação e QA autenticada pendentes. Sem CSS novo: reuso de operation-workspaces.css, SearchableSelect e MobileFilters.
+50 regressões direcionadas/6 arquivos aprovadas, lint0 erros/39 avisos anteriores, build candidato aprovado. Suíte completa:579 testes/84 arquivos aprovados. Publicado em27/10/2026 às17:48:34 (Brasília), fontea47e2f5, somente frontend HML e sem reinício. Entrada index-BNQc-K77.js observada no navegador público; nove assets servidos conferidos.
+
+QA autenticada em viewport padrão2213×1115, desktop1366×767/1600×900 e mobile390×843/360×800, claro/escuro. Controles comuns na mesma ordem, sem overflow horizontal; seletores mobile acima de44px. Veículo TNU5A11 retornou10 ordens,1 aberta e9 históricos, todos restritos à placa. Nas abertas, combinar outro posto retornou0 e KPIs0; o Histórico preservou seu próprio posto e9 registros. Limpar remove vehicle_id mantendo Histórico; Voltar restaura seleção, URL e dados. Entrada direta nas abertas carrega opções de veículo sob demanda e aplica o filtro corretamente. Exportação completa/combinação com secretaria/situação/datas e paginação cobertas pelas regressões.
+
+Sessão expirou e foi renovada pelo usuário. Após recarregar a guia de QA, pacote final confirmado; console sem erros. Nenhuma emissão, confirmação, retificação, documento ou assinatura foi executada pela QA. Tema claro restaurado, emulação removida e guia temporária encerrada. A guia original foi preservada enquanto o usuário navegou para outras telas, sem recarga ou retorno forçados.
+
+Verificação final:75 tabelas idênticas, incluindo38 tabelas de negócio/documentos; configurações/backend intactos. HML PID21064 e produção PID2512 preservados, ambos prontos. Produção limpa em31543d4; rotina06h saudável, sem nova restauração.
+
+Capturas privadas:history-before.png, orders-desktop-light.png, history-desktop-dark.png, history-mobile-dark.png, open-orders-mobile-light.png e open-orders-desktop-light.png, no diretório de backup. Reversão do frontend anterior pronta. Sem CSS novo: reuso de operation-workspaces.css, SearchableSelect e MobileFilters.
 
 ## Pendências / decisões
 - Veículo é contexto compartilhado pela URL; os demais filtros preservam seus estados independentes em cada área.
