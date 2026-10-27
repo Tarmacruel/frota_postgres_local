@@ -573,7 +573,7 @@ export default function FuelSuppliesPage() {
         </nav>
         <div className="fuel-workspace-tools">
           <Link className="fuel-stations-link" to="/postos?indicator=active">Postos ({fuelStations.length})</Link>
-          {activeView === 'orders' ? <ActionMenu label="Exportar ordens" items={[
+          {activeView === 'orders' ? <ActionMenu label="Exportar ordens" triggerLabel="Exportar" items={[
             { label: 'Pré-visualizar PDF', onClick: handlePreviewOrdersPdf },
             { label: 'Exportar XLSX', onClick: handleExportOrdersXlsx },
           ]} /> : null}
