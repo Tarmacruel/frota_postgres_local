@@ -1,30 +1,20 @@
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import { useEffect, useRef, useState } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { vehicleLoansAPI } from '../api/vehicleLoans'
 import { LoanActionForm, LoanProposalForm } from '../components/VehicleLoanForms'
 import Pagination from '../components/Pagination'
-import VehicleLoanDocuments from '../components/VehicleLoanDocuments'
+import VehicleLoanInspector from '../components/VehicleLoanInspector'
 import VehicleLoanRegularization from '../components/VehicleLoanRegularization'
 import { getApiErrorMessage } from '../utils/apiError'
-import { availableLoanActions, blockedLoanAction, canRepresent, formatLoanDate, loanEventLabels, loanStatuses } from '../utils/vehicleLoans'
+import { availableLoanActions, canRepresent, formatLoanDate, getLoanStatusTone, loanStatuses } from '../utils/vehicleLoans'
 import './VehicleLoansPage.css'
 import { LOANS_CHANGED_EVENT } from '../hooks/usePendingVehicleLoans'
-import { ResponsiveRecord, MobileFilters, ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
+import { ResponsiveRecord, MobileFilters, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 
 const emptyCatalog = { vehicles: [], organizations: [], allocations: [] }
-const ended = ['RETURNED', 'REJECTED', 'CANCELLED']
-
-function getLoanStatusTone(status) {
-  if (status === 'ACTIVE') return 'success'
-  if (['AWAITING_RECEIPT', 'AWAITING_RETURN_RECEIPT'].includes(status)) return 'warning'
-  if (status === 'RETURNED') return 'info'
-  if (['REJECTED', 'CANCELLED'].includes(status)) return 'danger'
-  return 'neutral'
-}
-
 export default function VehicleLoansPage() {
   const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
   useEffect(() => { setPage(1) }, [indicator])
@@ -53,6 +43,24 @@ export default function VehicleLoansPage() {
   const [modal, setModal] = useState(null)
   const [feedback, setFeedback] = useState('')
   const catalogRequest = useRef(0)
+  const detailTrigger = useRef(null)
+  const listRef = useRef(null)
+  const detailPosition = useRef(null)
+  const detailWasOpen = useRef(Boolean(selectedId))
+  useEffect(() => {
+    const wasOpen = detailWasOpen.current
+    detailWasOpen.current = Boolean(selectedId)
+    if (!wasOpen || selectedId) return undefined
+    const trigger = detailTrigger.current
+    const list = listRef.current
+    const position = detailPosition.current
+    const frame = window.requestAnimationFrame(() => {
+      const target = trigger && document.contains(trigger) ? trigger : list
+      target?.focus({ preventScroll: true })
+      if (position) window.scrollTo({ top: position.y, left: position.x, behavior: 'auto' })
+    })
+    return () => window.cancelAnimationFrame(frame)
+  }, [selectedId])
 
   async function refreshVehicleCatalog() {
     const { data } = await vehicleLoansAPI.catalog()
@@ -99,18 +107,30 @@ export default function VehicleLoansPage() {
     return () => { current = false }
   }, [selectedId, revision])
 
+  function selectDetail(id) {
+    setParams((current) => { const next = new URLSearchParams(current); next.set('id', id); return next })
+  }
+  function openDetail(id, trigger) {
+    detailTrigger.current = trigger
+    detailPosition.current = { x: window.scrollX, y: window.scrollY }
+    setFeedback(''); setModal(null); selectDetail(id)
+  }
+  function closeDetail() {
+    setModal(null)
+    setParams((current) => { const next = new URLSearchParams(current); next.delete('id'); return next }, { replace: true })
+  }
   function refresh() { setModal(null); setRevision((value) => value + 1); loadCatalog() }
   function saved(record) {
     window.dispatchEvent(new Event(LOANS_CHANGED_EVENT))
-    setModal(null); setFeedback('Registro salvo. Consulte a situação e o histórico abaixo.')
-    setParams({ id: record.id }); setRevision((value) => value + 1); loadCatalog()
+    setModal(null); setFeedback('Registro salvo. Consulte a situação e o histórico do empréstimo.')
+    selectDetail(record.id); setRevision((value) => value + 1); loadCatalog()
   }
   const editable = detail && canEdit('vehicle_loans') && canRepresent(user, detail, 'origin') && ['DRAFT', 'AWAITING_RECEIPT'].includes(detail.status)
   const actions = detail && canEdit('vehicle_loans') ? availableLoanActions(user, detail) : []
   const orgName = (id) => catalog.organizations.find((item) => item.id === id)?.name || (id === detail?.origin_organization_id ? detail.origin_organization_name : detail?.recipient_organization_name) || 'Secretaria'
 
   return <div className="vehicle-loans-page operation-module">
-    <section className="card loan-section operation-page operation-page--loans">
+    <section ref={listRef} tabIndex={-1} aria-label="Lista de empréstimos" className="card loan-section operation-page operation-page--loans">
       <PageHeader
         title="Empréstimos entre secretarias"
         actions={(
@@ -121,7 +141,7 @@ export default function VehicleLoansPage() {
         )}
       />
       {catalogError && <div role="alert" className="loan-error">{catalogError} <button className="ghost-button" onClick={loadCatalog}>Tentar carregar opções novamente</button></div>}
-      {feedback && <p role="status" className="loan-success">{feedback}</p>}
+      {feedback && !selectedId && <p role="status" className="loan-success">{feedback}</p>}
       <form className="loan-filters operation-toolbar" onSubmit={(event) => { event.preventDefault(); setPage(1); setAppliedSearch(search.trim()) }}>
         <label>Placa<input className="app-input" value={search} onChange={(e) => setSearch(e.target.value)} maxLength={100} placeholder="Buscar placa" /></label>
         <button className="ghost-button">Buscar</button>
@@ -146,63 +166,17 @@ export default function VehicleLoansPage() {
             <td data-label="Origem → recebedora">{loan.origin_organization_name}<br /><span aria-label="para">→ </span>{loan.recipient_organization_name}</td>
             <td data-label="Situação"><StatusChip tone={getLoanStatusTone(loan.status)}>{loanStatuses[loan.status]}</StatusChip>{loan.regularized_at && <small className="loan-regularized">Inclusão retroativa</small>}</td>
             <td data-label="Prazo">{loan.expected_return_at ? formatLoanDate(loan.expected_return_at) : 'Indeterminado'}</td>
-            <td data-label="Consulta"><button className="mini-button" onClick={() => { setModal(null); setParams({ id: loan.id }) }} aria-label={`Ver empréstimo de ${loan.vehicle_plate}`}>Ver detalhes</button></td>
+            <td data-label="Consulta"><button className="mini-button" onClick={(event) => openDetail(loan.id, event.currentTarget)} aria-label={`Ver empréstimo de ${loan.vehicle_plate}`}>Ver detalhes</button></td>
           </ResponsiveRecord>)}
         </tbody></table></div>
         <Pagination currentPage={page} totalPages={pagination.pages} onPageChange={setPage} />
       </>}
     </section>
 
-    {selectedId && <section className="card loan-section operation-page operation-page--loan-detail" aria-label="Detalhe do empréstimo">
-      <PageHeader title="Detalhes do empréstimo" actions={<button className="ghost-button" onClick={() => { setModal(null); setParams({}) }}>Fechar detalhes</button>} />
-      {detailLoading && <p role="status">Carregando dados, pendências e histórico…</p>}
-      {detailError && <p role="alert" className="loan-error">{detailError} <button className="ghost-button" onClick={refresh}>Recarregar detalhe</button></p>}
-      {detail && <>
-        <h3 className="loan-detail-title"><VehicleThumbnail vehicleType={detail.vehicle_type} plate={detail.vehicle_plate} /><span>{detail.vehicle_plate}</span><StatusChip tone={getLoanStatusTone(detail.status)}>{loanStatuses[detail.status]}</StatusChip></h3>
-        {detail.regularized_at && <div className="loan-notice"><strong>Regularização administrativa registrada em {formatLoanDate(detail.regularized_at)}</strong><p>Referência: {detail.regularization_reference}</p><p>As datas efetivas foram informadas na regularização. Não representam aceites ou assinaturas realizados no passado.</p></div>}
-        <div className="loan-actions">
-          {editable && <ActionMenu label={`Mais ações do empréstimo de ${detail.vehicle_plate}`} items={[{ key: 'edit', label: 'Editar proposta', icon: 'catalog', disabled: !catalogReady || !context, onClick: () => setModal('edit') }]} />}
-          {actions.map(([operation, action]) => {
-            const blocked = blockedLoanAction(user, detail, action, context)
-            return <div key={operation}><button className="app-button" disabled={Boolean(blocked) || !catalogReady} onClick={() => setModal(operation)}>{action.label}</button>{blocked && <small>{blocked}</small>}</div>
-          })}
-        </div>
-        <dl className="loan-facts">
-          <div><dt>Secretaria de origem</dt><dd>{detail.origin_organization_name}</dd></div>
-          <div><dt>Secretaria recebedora</dt><dd>{detail.recipient_organization_name}</dd></div>
-          <div><dt>Lotação de origem</dt><dd>{detail.origin_allocation_name || 'Não identificada'}</dd></div>
-          <div><dt>Lotação de destino</dt><dd>{detail.destination_allocation_name}</dd></div>
-          <div><dt>Prazo previsto</dt><dd>{detail.expected_return_at ? formatLoanDate(detail.expected_return_at) : 'Indeterminado'}</dd></div>
-          <div><dt>Entrega efetiva</dt><dd>{formatLoanDate(detail.started_at)}</dd></div>
-          <div><dt>Odômetro de entrega</dt><dd>{detail.delivery_odometer_km == null ? 'Não informado' : `${detail.delivery_odometer_km} km`}</dd></div>
-          <div><dt>Devolução efetiva</dt><dd>{formatLoanDate(detail.returned_at)}</dd></div>
-          {detail.return_allocation_id && <div><dt>Lotação de retorno</dt><dd>{detail.return_allocation_name}</dd></div>}
-          {detail.return_odometer_km != null && <div><dt>Odômetro de devolução</dt><dd>{detail.return_odometer_km} km</dd></div>}
-        </dl>
-        <div className="loan-copy"><strong>Motivo</strong><p>{detail.reason}</p><strong>Condições de entrega</strong><p>{detail.delivery_condition || 'Ainda não informadas'}</p>
-          {detail.return_condition && <><strong>Condições de devolução</strong><p>{detail.return_condition}</p></>}
-        </div>
-        {!ended.includes(detail.status) && context && <div className="loan-notice">
-          <strong>Pendências para a troca de responsabilidade</strong>
-          <p>Posses abertas: {context.blockers.open_possessions} · Rotas abertas: {context.blockers.open_trips} · Ordens abertas: {context.blockers.open_fuel_orders}</p>
-          <p>Referência mínima do odômetro: {context.minimum_odometer_km} km.</p>
-          <p>As pendências serão verificadas novamente ao confirmar a ação.</p>
-        </div>}
-
-        {detail.status === 'RETURNED' && <p>A devolução foi concluída. A antiga recebedora conserva acesso aos registros até a data de devolução.</p>}
-        <div className="actions-inline">
-          {canView('possession') && <Link className="ghost-button" to={`/posses?vehicle_id=${detail.vehicle_id}`}>Consultar posses do veículo</Link>}
-          {canView('fuel_supplies') && <Link className="ghost-button" to={`/abastecimentos?vehicle_id=${detail.vehicle_id}`}>Consultar abastecimentos do veículo</Link>}
-        </div>
-        <VehicleLoanDocuments key={`${detail.id}-${detail.version}`} loanId={detail.id} regularized={Boolean(detail.regularized_at)} />
-        <h3>Histórico de ações</h3>
-        <ol className="loan-timeline">{events.map((event) => <li key={event.id}>
-          <strong>{loanEventLabels[event.event_type] || event.event_type}</strong><span>{formatLoanDate(event.created_at)}</span>
-          <p>{event.actor_name || 'Usuário registrado'} · {orgName(event.represented_organization_id)}</p>
-          {event.justification && <p className="loan-copy">{event.justification}</p>}
-        </li>)}</ol>
-      </>}
-    </section>}
+    {selectedId && <VehicleLoanInspector key={selectedId} detail={detail} context={context} events={events}
+      loading={detailLoading} error={detailError} catalogError={catalogError} catalogReady={catalogReady}
+      editable={editable} actions={actions} user={user} canView={canView} orgName={orgName}
+      onClose={closeDetail} onRefresh={refresh} onAction={setModal} feedback={feedback} returnFocusRef={detailTrigger} />}
     {(modal === 'new' || (modal === 'edit' && detail)) && <LoanProposalForm onVehicleOptionsOpen={refreshVehicleCatalog} key={modal === 'new' ? 'new' : `${detail.id}-${detail.version}`} loan={modal === 'edit' ? detail : null} catalog={catalog} user={user} onClose={() => setModal(null)} onSaved={saved} onRefresh={refresh} />}
     {modal === 'regularization' && <VehicleLoanRegularization onClose={() => setModal(null)} onSaved={saved} />}
     {modal && !['new', 'edit', 'regularization'].includes(modal) && detail && <LoanActionForm key={`${detail.id}-${detail.version}-${modal}`} operation={modal} loan={detail} context={context} catalog={catalog} user={user} onClose={() => setModal(null)} onSaved={saved} onRefresh={refresh} />}

@@ -34,3 +34,92 @@
 .loan-form textarea { resize: vertical; }
 .loan-form button:disabled, .loan-actions button:disabled { opacity: .6; cursor: not-allowed; }
 @media (max-width: 680px) { .loan-heading { flex-direction: column; } .loan-facts { grid-template-columns: 1fr; } .loan-section { padding: 16px; } .loan-filters label { width: 100%; } }
+
+/* Keep the loan context and actions outside the scrolling tab content. */
+body.internal-app-active .modal-backdrop.loan-inspector-backdrop { display: flex; padding: 0; align-items: stretch; justify-content: flex-end; }
+body.internal-app-active .loan-inspector-backdrop .modal-shell.loan-inspector {
+  width: min(820px, calc(100vw - 48px)); max-width: none;
+  height: 100dvh; max-height: 100dvh; margin: 0; padding: 0;
+  display: flex; flex-direction: column; overflow: hidden;
+  border-radius: var(--radius-lg) 0 0 var(--radius-lg);
+  background: var(--surface-strong); animation: loan-inspector-in 180ms ease-out;
+}
+body.internal-app-active .loan-inspector-backdrop .loan-inspector > .modal-header { flex: 0 0 auto; padding: 18px 24px; margin: 0; gap: 16px; border-bottom: 1px solid var(--line); }
+.loan-inspector > .modal-header h3 { margin: 0; font-size: 1.1rem; }
+body.internal-app-active .loan-inspector-backdrop .loan-inspector > .modal-body { padding: 0; display: flex; flex-direction: column; flex: 1 1 0; min-height: 0; overflow: hidden; gap: 0; }
+.loan-inspector__intro, .loan-inspector__identity, .loan-inspector__tabs, .loan-inspector__attention, .loan-inspector__footer, .loan-inspector__message { flex: 0 0 auto; }
+.loan-inspector__identity { padding: 16px 24px; background: var(--surface-muted); border-bottom: 1px solid var(--line); }
+.loan-inspector__status { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
+.loan-inspector__route { display: grid; grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); align-items: center; gap: 18px; }
+.loan-inspector__route > div { display: grid; gap: 3px; min-width: 0; overflow-wrap: anywhere; }
+.loan-inspector__route span { color: var(--ink-soft); font-size: .78rem; }
+.loan-inspector__route strong { font-size: .9rem; line-height: 1.4; font-weight: 600; }
+.loan-inspector__attention { margin: 12px 24px 0; padding: 10px 12px; display: flex; align-items: center; justify-content: space-between; gap: 12px; border-left: 3px solid var(--amber); background: color-mix(in srgb, var(--amber) 13%, var(--surface-strong)); }
+.loan-inspector__attention strong { font-size: .86rem; }
+.loan-inspector__attention small { display: block; margin-top: 3px; color: var(--ink-soft); font-size: .78rem; }
+.loan-inspector__attention button { flex: 0 0 auto; }
+.loan-inspector__tabs { display: flex; gap: 4px; margin: 0 24px; border-bottom: 1px solid var(--line); }
+.loan-inspector__tabs button { flex: 0 0 auto; min-height: 46px; padding: 10px 14px; border: 0; border-bottom: 2px solid transparent; border-radius: 0; background: transparent; color: var(--ink-soft); font: inherit; font-size: .86rem; cursor: pointer; }
+.loan-inspector__tabs button:hover { background: var(--surface-muted); color: var(--ink-strong); }
+.loan-inspector__tabs button[aria-selected="true"] { border-bottom-color: var(--navy); color: var(--navy); font-weight: 600; }
+.loan-inspector__content { flex: 1 1 0; min-height: 0; padding: 20px 24px 24px; overflow-y: auto; overscroll-behavior-y: contain; scrollbar-gutter: stable; }
+.loan-inspector__content > [role="tabpanel"] { min-width: 0; outline-offset: 4px; }
+.loan-inspector__panel[hidden] { display: none !important; }
+.loan-inspector__checks { padding: 14px; margin-bottom: 20px; background: var(--surface-muted); border: 1px solid var(--line); border-radius: var(--radius-md); }
+.loan-inspector__checks[data-attention="true"] { border-color: color-mix(in srgb, var(--amber) 60%, var(--line)); background: color-mix(in srgb, var(--amber) 7%, var(--surface-strong)); }
+.loan-inspector__checks h4 { margin: 0 0 12px; font-size: .88rem; }
+.loan-inspector__checks p { margin: 5px 0; font-size: .79rem; color: var(--ink-soft); }
+.loan-inspector__checks .actions-inline { margin-top: 12px; }
+.loan-inspector__counts { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 12px; margin: 0 0 10px; }
+.loan-inspector__counts div { display: flex; flex-direction: column-reverse; gap: 3px; }
+.loan-inspector__counts dt { font-size: .78rem; color: var(--ink-soft); }
+.loan-inspector__counts dd { margin: 0; font-size: 1.25rem; font-weight: 600; color: var(--ink-strong); }
+.loan-inspector .loan-facts { margin: 0 0 20px; gap: 0 24px; }
+.loan-inspector .loan-facts > div { padding: 12px 0; border-bottom: 1px solid var(--line); }
+.loan-inspector .loan-facts dt { font-size: .78rem; }
+.loan-inspector .loan-facts dd { font-size: .9rem; line-height: 1.5; }
+.loan-inspector__copy h4 { margin: 16px 0 6px; font-size: .84rem; }
+.loan-inspector__copy p { margin: 0 0 14px; font-size: .9rem; line-height: 1.6; }
+.loan-inspector__content .actions-inline { display: flex; flex-wrap: wrap; gap: 8px; }
+.loan-inspector__content .loan-notice { margin: 16px 0; }
+.loan-inspector__content h3 { font-size: 1rem; margin-top: 0; }
+.loan-inspector__content h4 { color: var(--ink-strong); }
+.loan-inspector__content .loan-timeline { margin: 20px 0 0 5px; font-size: .9rem; }
+.loan-inspector__content .loan-timeline li { position: relative; }
+.loan-inspector__content .loan-timeline li::before { content: ''; position: absolute; left: -24px; top: 4px; width: 8px; height: 8px; border-radius: 50%; border: 2px solid var(--surface-strong); background: var(--navy); }
+.loan-inspector__content .loan-timeline span, .loan-inspector__content .loan-timeline p { color: var(--ink-soft); }
+.loan-inspector__footer { padding: 14px 24px max(14px, env(safe-area-inset-bottom)); border-top: 1px solid var(--line); background: var(--surface-strong); display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+.loan-inspector__action-note { color: var(--ink-soft); font-size: .79rem; line-height: 1.4; max-width: 34ch; }
+.loan-inspector__action-note:empty { display: none; }
+.loan-inspector__footer-actions { display: flex; align-items: center; justify-content: flex-end; gap: 8px; margin-left: auto; }
+.loan-inspector__message { margin: 12px 24px 0; }
+.loan-inspector__intro > .loan-inspector__message:first-child { margin-bottom: 12px; }
+.loan-inspector :is(button, a, input, select, textarea):focus-visible, .loan-inspector__checks:focus, .vehicle-loans-page > .loan-section:focus-visible { outline: 2px solid var(--navy); outline-offset: 3px; }
+body.internal-app-active .loan-inspector :is(.app-button, .ghost-button, .secondary-button, .ui-icon-button) { min-height: 42px; }
+.loan-inspector__content input[type="file"] { width: 100%; max-width: 100%; min-width: 0; }
+@keyframes loan-inspector-in { from { transform: translateX(28px); opacity: .65; } to { transform: translateX(0); opacity: 1; } }
+@media (max-width: 720px) {
+  body.internal-app-active .loan-inspector-backdrop .modal-shell.loan-inspector { width: 100%; height: 100dvh; max-height: 100dvh; border-radius: 0; }
+  body.internal-app-active .loan-inspector-backdrop .loan-inspector > .modal-header { padding: 12px 16px; }
+  .loan-inspector__identity { padding: 12px 16px; }
+  .loan-inspector__route { gap: 12px; }
+  .loan-inspector__route strong { font-size: .82rem; }
+  .loan-inspector__attention { margin: 10px 16px 0; padding: 8px 10px; gap: 8px; }
+  .loan-inspector__attention small { display: none; }
+  .loan-inspector__attention button { padding-inline: 8px; font-size: .76rem; }
+  .loan-inspector__tabs { margin: 0 16px; gap: 0; }
+  .loan-inspector__tabs button { flex: 1; padding-inline: 8px; min-height: 46px; }
+  .loan-inspector__content { padding: 16px; }
+  .loan-inspector .loan-facts { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 16px; }
+  .loan-inspector .loan-facts dd { font-size: .84rem; }
+  .loan-inspector__checks { padding: 12px; }
+  .loan-inspector__counts { gap: 8px; }
+  .loan-inspector__counts dt { font-size: .72rem; }
+  .loan-inspector__footer { padding: 10px 16px max(10px, env(safe-area-inset-bottom)); flex-direction: column; align-items: stretch; gap: 8px; }
+  .loan-inspector__action-note { max-width: none; }
+  .loan-inspector__footer-actions { width: 100%; }
+  .loan-inspector__footer-actions > :last-child { flex: 1; }
+  body.internal-app-active .loan-inspector :is(.app-button, .ghost-button, .secondary-button, .ui-icon-button) { min-height: 44px; }
+  .loan-inspector__message { margin-inline: 16px; }
+}
+@media (prefers-reduced-motion: reduce) { body.internal-app-active .loan-inspector-backdrop .modal-shell.loan-inspector { animation: none; } }

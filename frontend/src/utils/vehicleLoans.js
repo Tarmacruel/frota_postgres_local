@@ -2,6 +2,13 @@ export const loanStatuses = {
   DRAFT: 'Rascunho', AWAITING_RECEIPT: 'Aguardando recebimento', ACTIVE: 'Em andamento',
   AWAITING_RETURN_RECEIPT: 'Aguardando devolução', RETURNED: 'Devolvido', REJECTED: 'Rejeitado', CANCELLED: 'Cancelado',
 }
+export function getLoanStatusTone(status) {
+  if (status === 'ACTIVE') return 'success'
+  if (['AWAITING_RECEIPT', 'AWAITING_RETURN_RECEIPT'].includes(status)) return 'warning'
+  if (status === 'RETURNED') return 'info'
+  if (['REJECTED', 'CANCELLED'].includes(status)) return 'danger'
+  return 'neutral'
+}
 export const loanActions = {
   submit: { label: 'Enviar para recebimento', side: 'origin', statuses: ['DRAFT'], handoff: true },
   accept: { label: 'Confirmar recebimento', side: 'recipient', statuses: ['AWAITING_RECEIPT'], handoff: true, distinct: 'submitted_by_user_id' },
