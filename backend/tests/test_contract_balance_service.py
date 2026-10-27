@@ -17,7 +17,7 @@ from app.models.fuel_station import FuelStation
 from app.models.fuel_supply_order import FuelSupplyOrder
 from app.models.payment_process import PaymentContract, PaymentProcess, PaymentSupplier
 from app.models.user import UserRole
-from app.schemas.contract_balance import ContractOpening, PriceCreate, ProviderCreate, ReconcileProcess
+from app.schemas.contract_balance import BalanceCorrection, ContractOpening, PriceCreate, ProviderCreate, ReconcileProcess
 from app.services.contract_balance_service import ContractBalanceService, money
 
 
@@ -62,6 +62,44 @@ async def reserve(c, liters='100', source_id=None):
         source_type='FUEL_ORDER', source_id=source_id or uuid4(), vehicle_id=c.vehicle,
         organization_id=c.organization, actor=c.actor, fuel_type='diesel s10', liters=Decimal(liters),
         station_id=c.station.id, expected_price_id=c.price.id)
+
+
+@pytest.mark.asyncio
+async def test_balance_correction_preserves_reservations_consumption_and_history(context):
+    c = context
+    await reserve(c, liters='100')
+    before = await c.service.balances(c.contract.id)
+    data = BalanceCorrection(target_available_balance='6835.50', expected_available_balance=before['available_balance'],
+        request_key=uuid4(), justification='Correção de erro de digitação no saldo')
+    movement = await c.service.correct_balance(c.contract.id, data, c.actor)
+    after = await c.service.balances(c.contract.id)
+    assert after['available_balance'] == Decimal('6835.50')
+    assert after['reserved_amount'] == before['reserved_amount']
+    assert after['consumed_since_opening'] == before['consumed_since_opening']
+    assert after['opening_balance'] == before['opening_balance']
+    assert movement.details['available_before'] == str(before['available_balance'])
+    assert movement.details['available_after'] == '6835.50'
+    assert (await c.service.correct_balance(c.contract.id, data, c.actor)).id == movement.id
+    assert (await c.service.balances(c.contract.id)) == after
+    with pytest.raises(HTTPException) as conflict:
+        await c.service.correct_balance(c.contract.id, data.model_copy(update={'target_available_balance': Decimal('8000')}), c.actor)
+    assert conflict.value.status_code == 409
+
+
+@pytest.mark.asyncio
+async def test_balance_correction_rejects_stale_preview_and_no_change(context):
+    c = context
+    data = BalanceCorrection(target_available_balance=9000, expected_available_balance=10000,
+        request_key=uuid4(), justification='Correção conferida pelo gestor')
+    await reserve(c)
+    with pytest.raises(HTTPException) as stale:
+        await c.service.correct_balance(c.contract.id, data, c.actor)
+    assert stale.value.status_code == 409
+    balance = await c.service.balances(c.contract.id)
+    with pytest.raises(HTTPException) as unchanged:
+        await c.service.correct_balance(c.contract.id, data.model_copy(update={
+            'target_available_balance': balance['available_balance'], 'expected_available_balance': balance['available_balance']}), c.actor)
+    assert unchanged.value.status_code == 422
 
 
 @pytest.mark.asyncio

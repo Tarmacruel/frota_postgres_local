@@ -1,3 +1,4 @@
+import MoneyInput from './MoneyInput'
 import { useMemo, useRef, useState } from 'react'
 import SearchableSelect from './SearchableSelect'
 import useContractFunding from '../hooks/useContractFunding'
@@ -61,7 +62,7 @@ export default function FuelSupplyForm({ vehicles, onVehicleOptionsOpen, drivers
   const [receiptFile, setReceiptFile] = useState(null)
   const funding = useContractFunding({ stationId: form.fuel_station_id, liters: form.liters,
     fuelType: resolveOptionValue(form.fuel_type, form.fuel_type_other), additiveType:form.additive_enabled?resolveOptionValue(form.additive_type,form.additive_type_other):'',additiveLiters:form.additive_quantity_liters })
-  const allocation=useFuelItemAllocation({funding:{item_lines:funding.quote?.item_lines},enabled:funding.quantityEnabled,contractId:funding.contract?.id,providerId:funding.provider?.id,fuelType:resolveOptionValue(form.fuel_type,form.fuel_type_other),liters:form.liters,totalAmount:form.total_amount,additiveType:form.additive_enabled?resolveOptionValue(form.additive_type,form.additive_type_other):'',additiveLiters:form.additive_enabled?form.additive_quantity_liters:''})
+  const allocation=useFuelItemAllocation({funding:{item_lines:funding.quote?.item_lines},enabled:funding.actualQuantityEnabled ?? funding.quantityEnabled,contractId:funding.contract?.id,providerId:funding.provider?.id,fuelType:resolveOptionValue(form.fuel_type,form.fuel_type_other),liters:form.liters,totalAmount:form.total_amount,additiveType:form.additive_enabled?resolveOptionValue(form.additive_type,form.additive_type_other):'',additiveLiters:form.additive_enabled?form.additive_quantity_liters:''})
   const [receiptError, setReceiptError] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -191,7 +192,7 @@ export default function FuelSupplyForm({ vehicles, onVehicleOptionsOpen, drivers
       </div>
       <div className="form-field">
         <label>Valor total abastecido (R$)</label>
-        <input type="number" min="0" step="0.01" className="app-input" value={form.total_amount} onChange={(event) => setForm({ ...form, total_amount: event.target.value })} required />
+        <MoneyInput type="number" min="0" step="0.01" className="app-input" value={form.total_amount} onChange={(event) => setForm({ ...form, total_amount: event.target.value })} required />
       </div>
       <div className="form-field">
         <label>Tipo de combustível</label>

@@ -17,7 +17,7 @@ from app.models.fuel_station import FuelStation
 from app.models.payment_process import PaymentContract, PaymentProcessKind
 from app.models.user import User
 from app.schemas.contract_balance import (
-    BalanceAdjustment, ContractOpening, ContractQuote, Justified, MaintenanceOrderCancel,
+    BalanceAdjustment, BalanceCorrection, ContractOpening, ContractQuote, Justified, MaintenanceOrderCancel,
     MaintenanceOrderComplete, MaintenanceOrderCreate, MaintenanceOrderStart,
     PriceCreate, PriceUpdate, ProviderCreate, ReconcileProcess,
 )
@@ -108,7 +108,8 @@ async def overview(kind: PaymentProcessKind | None = None, search: str | None = 
         'pending_setup': lambda c: not c.get('control_opened') or not c['provider_count'] or not c.get('valid_from') or not c.get('valid_until') or 'Itens e quantidades ainda não conferidos' in c.get('eligibility_errors', []),
         'reserved': lambda c: c.get('reserved_amount', 0) > 0,
         'consumed': lambda c: c.get('consumed_since_opening', 0) != 0,
-        'low_balance': lambda c: c.get('control_opened') and c['available_balance'] <= c['opening_balance']*Decimal('.10'),
+        'low_balance': lambda c: c.get('control_opened') and c['available_balance'] <= (
+            c['contractual_balance'] + c['consumed_since_opening'])*Decimal('.10'),
         'expires_30': lambda c: c.get('valid_until') and today <= c['valid_until'] <= today+timedelta(days=30),
         'divergence': lambda c: c.get('divergence_open'),
     }
@@ -180,6 +181,11 @@ async def quote(contract_id: UUID, data: ContractQuote, db: AsyncSession = Depen
     result = await service.quote(contract_id, data.provider_id, data.fuel_type, data.liters, item_liters=data.item_liters, item_lines=data.item_lines)
     await db.commit()
     return result
+
+
+@router.post('/contracts/{contract_id}/balance-correction', dependencies=[Depends(enabled)])
+async def correct_balance(contract_id: UUID, data: BalanceCorrection, db: AsyncSession = Depends(get_db_session), user: User = Depends(financial_edit)):
+    return await write(db, ContractBalanceService(db).correct_balance(contract_id, data, user))
 
 
 @router.post('/contracts/{contract_id}/adjustments', dependencies=[Depends(enabled)])

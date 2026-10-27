@@ -23,6 +23,7 @@ CONTEXTS = {
     "order_cancel": ("fuel_supply_orders", "edit", 1, 500, False),
     "order_reopen": ("fuel_supply_orders", "edit", 10, 1000, True),
     "order_extend": ("fuel_supply_orders", "edit", 10, 1000, True),
+    "order_funding": ("fuel_supply_orders", "edit", 10, 1000, True),
     "claim_close": ("claims", "write", 1, 1000, False),
     "payment_delete": ("payment_processes", "delete", 8, 500, False),
     "loan_create": ("vehicle_loans", "create", 8, 1000, False),

@@ -1,3 +1,4 @@
+import MoneyInput from '../MoneyInput'
 import { formatContractMoney as brl } from '../../utils/contractBalance'
 
 import { itemLineTotal, itemLinesTotal } from '../../utils/contractItemLines'
@@ -20,7 +21,7 @@ export default function ContractItemLines({ lines, onChange, items = [], prices 
         {line.item_id && !items.some((r) => r.id === line.item_id) ? <option value={line.item_id}>{line.description || 'Item reservado'}</option> : null}
       </select></label>
       <label>Quantidade {line.unit ? `(${line.unit})` : ''}<input className="app-input" aria-label={`Quantidade do item ${index+1}`} type="number" min=".001" step=".001" value={line.quantity} onChange={(e) => change(index, { quantity: e.target.value })} required /></label>
-      <label>{actual ? 'Valor realizado (R$)' : 'Preço unitário (R$)'}<input className="app-input" aria-label={`${actual ? 'Valor' : 'Preço'} do item ${index+1}`} type="number" min="0" step={actual ? '.01' : '.000001'} value={actual ? line.amount ?? '' : line.unit_price} readOnly={!actual && prices.length > 0} onChange={(e) => change(index, actual ? { amount: e.target.value } : { unit_price: e.target.value })} required /></label>
+      <label>{actual ? 'Valor realizado (R$)' : 'Preço unitário (R$)'}<MoneyInput precision={actual ? 2 : 6} className="app-input" aria-label={`${actual ? 'Valor' : 'Preço'} do item ${index+1}`} type="number" min="0" step={actual ? '.01' : '.000001'} value={actual ? line.amount ?? '' : line.unit_price} readOnly={!actual && prices.length > 0} onChange={(e) => change(index, actual ? { amount: e.target.value } : { unit_price: e.target.value })} required /></label>
       <span className="contract-item-lines__total">{brl(itemLineTotal(line))}</span><button type="button" className="ghost-button" aria-label={`Remover item ${index+1}`} onClick={() => onChange(lines.filter((_, i) => i !== index))}>Remover</button>
       {allowUnknown && !line.item_id ? <><label className="contract-item-lines__description">Descrição<input className="app-input" value={line.description || ''} onChange={(e) => change(index, { description: e.target.value })} required maxLength={500} /></label><label>Categoria<select className="app-select" value={line.category || 'SERVICE'} onChange={(e) => change(index, { category: e.target.value })}><option value="SERVICE">Serviço</option><option value="PART">Peça</option></select></label><small className="contract-form__wide">O gasto real será registrado com divergência até a identificação do item no contrato.</small></> : null}
     </div>)}

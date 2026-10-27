@@ -57,7 +57,7 @@ class FuelOrderFunding(BaseModel):
     contract_provider_id: UUID
     requested_fuel_type: str = Field(min_length=1, max_length=80)
     requested_liters: Decimal = Field(gt=0, max_digits=10, decimal_places=3)
-    expected_price_id: UUID
+    expected_price_id: UUID | None = None
     expires_at: datetime | None = None
     justification: str | None = Field(default=None, min_length=10, max_length=1000)
 
@@ -66,6 +66,12 @@ class BalanceAdjustment(Justified):
     amount: Decimal = Field(max_digits=16, decimal_places=2)
     request_key: UUID
     document_reference: str = Field(min_length=2, max_length=255)
+
+
+class BalanceCorrection(Justified):
+    target_available_balance: Decimal = Field(ge=0, max_digits=16, decimal_places=2)
+    expected_available_balance: Decimal = Field(max_digits=16, decimal_places=2)
+    request_key: UUID
 
 
 class ReconcileProcess(BaseModel):
@@ -100,6 +106,7 @@ class MaintenanceOrderCancel(Justified):
 
 
 class FundingFields(BaseModel):
+    contract_funding_mode: str | None = None
     contract_id: UUID | None = None
     contract_provider_id: UUID | None = None
     contract_reservation_id: UUID | None = None

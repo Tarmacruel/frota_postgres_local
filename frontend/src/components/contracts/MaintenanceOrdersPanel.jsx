@@ -1,3 +1,4 @@
+import MoneyInput from '../MoneyInput'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { maintenanceOrdersAPI } from '../../api/contractControl'
 import { vehiclesAPI } from '../../api/vehicles'
@@ -38,7 +39,7 @@ export function MaintenanceOrderForm({ vehicles = [], onVehicleOptionsOpen, init
     <label>Veículo<SearchableSelect value={form.vehicle_id} onOpen={onVehicleOptionsOpen} ariaLabel="Veículo para manutenção"
       onChange={(vehicle_id) => setForm((s) => ({ ...s, vehicle_id }))} placeholder="Selecione o veículo"
       options={vehicles.filter((v) => v.can_operate_vehicle !== false).map((v) => ({ value: v.id, label: `${v.plate} · ${v.brand || ''} ${v.model || ''}`, tags: v.tags || [] }))} /></label>
-    <label>Orçamento previsto (R$)<input className="app-input" aria-label="Orçamento previsto" type="number" min="0.01" step="0.01" required readOnly={funding.quantityEnabled} value={funding.quantityEnabled ? itemLinesTotal(lines) : form.estimated_cost} onChange={(e) => setForm((s) => ({ ...s, estimated_cost: e.target.value }))} /></label>
+    <label>Orçamento previsto (R$)<MoneyInput className="app-input" aria-label="Orçamento previsto" type="number" min="0.01" step="0.01" required readOnly={funding.quantityEnabled} value={funding.quantityEnabled ? itemLinesTotal(lines) : form.estimated_cost} onChange={(e) => setForm((s) => ({ ...s, estimated_cost: e.target.value }))} /></label>
     <label className="contract-form__wide">Serviço solicitado<textarea className="app-textarea" minLength={10} maxLength={2000} required value={form.service_description} onChange={(e) => setForm((s) => ({ ...s, service_description: e.target.value }))} /></label>
     <ContractFundingFields funding={{...funding,selectContract:(v)=>{setLines([]);funding.selectContract(v)},selectProvider:(v)=>{setLines([]);funding.selectProvider(v)}}} />
     {funding.quantityEnabled && funding.contract && funding.provider ? <ContractItemLines items={funding.items} prices={funding.itemPrices} lines={lines} onChange={setLines} /> : null}

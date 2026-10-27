@@ -138,7 +138,7 @@ export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organiza
     for (const vehicle of selectedVehicles) {
       const liters = parseOptionalLiters(getEffectiveLiters(vehicle.id))
       if (liters.error) return `${vehicle.plate || 'Veículo selecionado'}: ${liters.error}`
-      if (funding.enabled && !liters.value) return `${vehicle.plate}: informe os litros previstos para reservar o saldo.`
+      if (funding.enabled && !liters.value) return `${vehicle.plate}: informe os litros previstos do pedido.`
     }
 
     return ''
@@ -146,7 +146,7 @@ export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organiza
 
   function handleReview(event) {
     event.preventDefault()
-    if (!funding.ready) { setError(funding.error || 'Confira o contrato e a reserva de todo o lote.'); return }
+    if (!funding.ready) { setError(funding.error || 'Confira o contrato e os dados de todo o lote.'); return }
     const validationError = validateForm()
     if (validationError) {
       setError(validationError)
@@ -158,7 +158,7 @@ export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organiza
 
   async function handleCreate(event) {
     event.preventDefault()
-    if (!funding.ready) { setError(funding.error || 'Confira o contrato e a reserva de todo o lote.'); setReviewing(false); return }
+    if (!funding.ready) { setError(funding.error || 'Confira o contrato e os dados de todo o lote.'); setReviewing(false); return }
     const validationError = validateForm()
     if (validationError) {
       setError(validationError)

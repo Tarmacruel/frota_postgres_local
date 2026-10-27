@@ -30,7 +30,7 @@ from app.schemas.fuel_supply import (
     FuelSupplyOrderDeadlineUpdate,
 )
 from app.services.audit_service import AuditService
-from app.services.contract_balance_service import ContractBalanceService, fuel_key, TZ
+from app.services.contract_balance_service import ContractBalanceService, fuel_key, TZ, pricing_mode, NETWORK_VALUE, FIXED_PRICE
 from app.services.document_signature_service import DocumentSignatureService, SOURCE_FUEL_SUPPLY_ORDER
 from app.models.document_signature import DigitalDocumentType
 
@@ -368,9 +368,16 @@ class FuelSupplyOrderService:
             if settings.CONTRACT_BALANCE_ENABLED:
                 supply.contract_id, supply.contract_provider_id = order.contract_id, order.contract_provider_id
                 supply.contract_reservation_id = order.contract_reservation_id
-                await ContractBalanceService(self.db).settle(order.contract_reservation_id,
-                    source_type='FUEL_SUPPLY', source_id=supply.id, amount=supply.total_amount,
-                    occurred_at=supplied_at, actor=current_user, item_lines=data.item_lines)
+                if order.contract_funding_mode == NETWORK_VALUE and not order.contract_reservation_id:
+                    await ContractBalanceService(self.db).consume_unreserved(contract_id=order.contract_id,
+                        provider_id=order.contract_provider_id, source_type='FUEL_SUPPLY', source_id=supply.id,
+                        amount=supply.total_amount, occurred_at=supplied_at, actor=current_user,
+                        vehicle_id=supply.vehicle_id, organization_id=supply.organization_id, station_id=order.fuel_station_id,
+                        item_lines=data.item_lines)
+                else:
+                    await ContractBalanceService(self.db).settle(order.contract_reservation_id,
+                        source_type='FUEL_SUPPLY', source_id=supply.id, amount=supply.total_amount,
+                        occurred_at=supplied_at, actor=current_user, item_lines=data.item_lines)
             relative_receipt_path, stored_receipt_path = self._build_receipt_storage_paths(supply.id, receipt_payload["mime_type"])
             self._store_file(stored_receipt_path, receipt_payload["content"])
             supply.receipt_path = relative_receipt_path
@@ -512,7 +519,7 @@ class FuelSupplyOrderService:
                 await ContractBalanceService(self.db).release(order.contract_reservation_id, actor=current_user, reason='Reabertura de ordem expirada')
                 await self._fund_order(order, SimpleNamespace(contract_id=order.contract_id,
                     contract_provider_id=order.contract_provider_id, requested_fuel_type=order.requested_fuel_type,
-                    expected_price_id=None, item_lines=lines), current_user)
+                    expected_price_id=None, item_lines=lines), current_user, require_price=False)
         if not was_expired and payload.expires_at <= order.expires_at:
             raise HTTPException(
                 status_code=status.HTTP_400_BAD_REQUEST,
@@ -553,7 +560,7 @@ class FuelSupplyOrderService:
 
     @staticmethod
     def _require_funding_payload(data, *, batch=False):
-        if not all((data.contract_id, data.contract_provider_id, data.requested_fuel_type, data.request_key, data.expected_price_id)):
+        if not all((data.contract_id, data.contract_provider_id, data.requested_fuel_type, data.request_key)):
             raise HTTPException(422, 'Selecione contrato, prestador, combustível e confira a prévia financeira antes de emitir')
         quantities = [item.requested_liters for item in data.items] if batch else [data.requested_liters]
         if any(not quantity or quantity <= 0 for quantity in quantities):
@@ -564,23 +571,38 @@ class FuelSupplyOrderService:
             signed = (key.int & ((1 << 64)-1))-(1 << 63)
             await self.db.execute(text('SELECT pg_advisory_xact_lock(:request_key)'), {'request_key': signed})
 
-    async def _fund_order(self, order, data, actor, item_lines=None):
+    async def _fund_order(self, order, data, actor, item_lines=None, *, require_price=True):
         service = ContractBalanceService(self.db)
-        contract = await service.contract(data.contract_id)
+        contract = await service.contract(data.contract_id, lock=True)
+        mode = getattr(order, 'contract_funding_mode', None) or pricing_mode(contract)
         if contract.valid_until and order.expires_at.astimezone(TZ).date() > contract.valid_until:
             raise HTTPException(409, 'O prazo do pedido não pode ultrapassar a vigência do contrato')
+        if mode == NETWORK_VALUE:
+            quote = await service.quote(data.contract_id, data.contract_provider_id, data.requested_fuel_type,
+                order.requested_liters, funding_mode=NETWORK_VALUE)
+            await service.provider(data.contract_id, data.contract_provider_id, station_id=order.fuel_station_id)
+            order.contract_id, order.contract_provider_id = data.contract_id, data.contract_provider_id
+            order.contract_funding_mode = NETWORK_VALUE
+            order.contract_reservation_id, order.max_amount = None, None
+            order.requested_fuel_type = quote['fuel_type']
+            await self.db.flush()
+            return
+        if require_price and not data.expected_price_id:
+            raise HTTPException(422, 'Confira o preço e a prévia financeira antes de emitir pedido de preço fixo')
         reservation = await service.reserve(contract_id=data.contract_id, provider_id=data.contract_provider_id,
             source_type='FUEL_ORDER', source_id=order.id, vehicle_id=order.vehicle_id,
             organization_id=order.organization_id, actor=actor, fuel_type=data.requested_fuel_type,
             liters=order.requested_liters, expected_price_id=data.expected_price_id, station_id=order.fuel_station_id,
-            item_lines=item_lines if item_lines is not None else getattr(data, 'item_lines', None))
+            item_lines=item_lines if item_lines is not None else getattr(data, 'item_lines', None), funding_mode=mode)
         order.contract_id, order.contract_provider_id = data.contract_id, data.contract_provider_id
         order.contract_reservation_id, order.max_amount = reservation.id, reservation.amount
         order.requested_fuel_type = reservation.fuel_type
+        order.contract_funding_mode = FIXED_PRICE
         await self.db.flush()
 
     async def _lock_funded_order(self, order):
-        if not order.contract_id or not order.contract_reservation_id:
+        if not order.contract_id or not order.contract_provider_id or (not order.contract_reservation_id
+                and getattr(order, 'contract_funding_mode', None) != NETWORK_VALUE):
             raise HTTPException(409, 'Pedido legado sem reserva. Vincule o contrato e confira o orçamento antes de utilizar.')
         await lock_vehicle_handoff(self.db, order.vehicle_id)
         await ContractBalanceService(self.db).contract(order.contract_id, lock=True)
@@ -592,10 +614,13 @@ class FuelSupplyOrderService:
         if not order:
             raise HTTPException(404, 'Ordem não encontrada')
         await self._ensure_order_visible_to_user(order, actor)
+        await lock_vehicle_handoff(self.db, order.vehicle_id)
+        await self.db.refresh(order, attribute_names=['contract_id', 'contract_provider_id', 'contract_reservation_id',
+            'contract_funding_mode', 'status', 'expires_at'], with_for_update=True)
         await attribute_operation(self.db, order, actor)
         if order.status in {FuelSupplyOrderStatus.COMPLETED, FuelSupplyOrderStatus.CANCELLED}:
             raise HTTPException(409, 'Somente pedidos abertos ou expirados podem receber reserva')
-        if order.contract_reservation_id:
+        if order.contract_reservation_id or (order.contract_id and order.contract_funding_mode == NETWORK_VALUE):
             if order.contract_id == data.contract_id and order.contract_provider_id == data.contract_provider_id:
                 return await self.get_order(order.id, current_user=actor)
             raise HTTPException(409, 'Pedido já vinculado; cancele e emita outro para trocar de contrato')
@@ -609,7 +634,8 @@ class FuelSupplyOrderService:
         await self._fund_order(order, data, actor)
         await self.audit.record(actor=actor, action='ORDER_FUNDED', entity_type='FUEL_SUPPLY_ORDER',
             entity_id=order.id, entity_label=str(order.id), details={'contract_id': str(order.contract_id),
-                'previous_deadline': previous_deadline, 'new_deadline': deadline, 'reason': data.justification})
+                'previous_deadline': previous_deadline, 'new_deadline': deadline, 'reason': data.justification},
+            suggestion_context='order_funding', suggestion_text=data.justification)
         await self.db.commit()
         return await self.get_order(order.id, current_user=actor)
 
@@ -839,7 +865,8 @@ class FuelSupplyOrderService:
         if settings.CONTRACT_BALANCE_ENABLED:
             payload.update(contract_id=item.contract_id, contract_provider_id=item.contract_provider_id,
                 contract_reservation_id=item.contract_reservation_id, requested_fuel_type=item.requested_fuel_type,
-                contract_funding=await ContractBalanceService(self.db).funding(item.contract_reservation_id))
+                contract_funding_mode=item.contract_funding_mode,
+                contract_funding=await ContractBalanceService(self.db).funding(item.contract_reservation_id, order=item))
         payload["signature_summary"] = await DocumentSignatureService(self.db).get_summary_for_source(
             DigitalDocumentType.FUEL_SUPPLY_ORDER,
             item.id,

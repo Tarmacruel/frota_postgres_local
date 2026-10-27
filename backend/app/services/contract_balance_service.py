@@ -25,6 +25,12 @@ from app.services.audit_service import AuditService
 
 TZ = ZoneInfo('America/Sao_Paulo')
 ZERO = Decimal('0.00')
+FIXED_PRICE = 'FIXED_PRICE'
+NETWORK_VALUE = 'NETWORK_VALUE'
+
+
+def pricing_mode(contract):
+    return getattr(contract, 'fuel_pricing_mode', None) or FIXED_PRICE
 
 
 def utcnow():
@@ -101,11 +107,13 @@ class ContractBalanceService:
                     available_balance=balance-reserved, divergence_open=control.divergence_open,
                     divergence_note=control.divergence_note)
 
-    async def errors(self, contract, *, require_open=True):
+    async def errors(self, contract, *, require_open=True, require_price=None, require_quantity=None):
         errors = []
         from app.core.config import settings
-        if require_open and settings.CONTRACT_QUANTITY_ENABLED and getattr(contract, 'fuel_pricing_mode', 'FIXED_PRICE') == 'NETWORK_VALUE':
-            errors.append('Contrato de rede por valor: a integração operacional dessa modalidade está em implantação na homologação; não configure preço por litro ou reserva quantitativa para contornar a pendência')
+        if require_price is None:
+            require_price = pricing_mode(contract) != NETWORK_VALUE
+        if require_quantity is None:
+            require_quantity = pricing_mode(contract) != NETWORK_VALUE
         today = utcnow().astimezone(TZ).date()
         if contract.status != PaymentContractStatus.ACTIVE:
             errors.append('Contrato não está ativo')
@@ -125,7 +133,7 @@ class ContractBalanceService:
             errors.append('Regularize a divergência financeira')
         if balance['available_balance'] is not None and balance['available_balance'] <= 0:
             errors.append('Contrato sem saldo disponível')
-        if require_open and getattr(contract.kind, 'value', contract.kind) == 'FUEL':
+        if require_open and require_price and getattr(contract.kind, 'value', contract.kind) == 'FUEL':
             instant = utcnow()
             price_count = await self.db.scalar(select(func.count()).select_from(ContractFuelPrice)
                 .join(ContractProvider, ContractProvider.id == ContractFuelPrice.provider_id).where(
@@ -135,7 +143,7 @@ class ContractBalanceService:
                     or_(ContractFuelPrice.valid_until.is_(None), ContractFuelPrice.valid_until > instant)))
             if not price_count:
                 errors.append('Cadastre um preço vigente de combustível')
-        if require_open and settings.CONTRACT_QUANTITY_ENABLED:
+        if require_open and require_quantity and settings.CONTRACT_QUANTITY_ENABLED:
             from app.models.contract_item import ContractQuantityControl
             if not await self.db.get(ContractQuantityControl, contract.id):
                 errors.append('Itens e quantidades ainda não conferidos')
@@ -250,6 +258,8 @@ class ContractBalanceService:
 
     async def add_price(self, contract_id, data, actor, *, amendment=False):
         contract = await self.contract(contract_id, lock=True)
+        if pricing_mode(contract) == NETWORK_VALUE:
+            raise HTTPException(409, 'Contrato de rede por valor não utiliza preço por litro cadastrado')
         from app.core.config import settings
         if settings.CONTRACT_QUANTITY_ENABLED and not amendment:
             from app.models.contract_item import ContractQuantityControl
@@ -381,9 +391,10 @@ class ContractBalanceService:
             details={'before': before, 'after': price_snapshot(row), 'predecessor': predecessor_change})
         return {'id': row.id, 'deleted_at': row.deleted_at}
 
-    async def quote(self, contract_id, provider_id, fuel_type, liters, *, item_liters=None, item_lines=None):
+    async def quote(self, contract_id, provider_id, fuel_type, liters, *, item_liters=None, item_lines=None, funding_mode=None):
         contract = await self.contract(contract_id)
-        errors = await self.errors(contract)
+        mode = funding_mode or pricing_mode(contract)
+        errors = await self.errors(contract, require_price=mode != NETWORK_VALUE, require_quantity=mode != NETWORK_VALUE)
         if errors:
             raise HTTPException(409, '; '.join(errors))
         provider = await self.provider(contract_id, provider_id)
@@ -391,6 +402,18 @@ class ContractBalanceService:
             raise HTTPException(409, 'Selecione um contrato de abastecimento')
         if not liters or Decimal(str(liters)) <= 0:
             raise HTTPException(422, 'Informe a quantidade prevista de litros')
+        if not fuel_key(fuel_type):
+            raise HTTPException(422, 'Informe o combustível solicitado')
+        if item_liters is not None:
+            quantities = [Decimal(str(quantity)) for quantity in item_liters]
+            if any(quantity <= 0 for quantity in quantities) or sum(quantities) != Decimal(str(liters)):
+                raise HTTPException(422, 'Confira os litros previstos de cada veículo do lote')
+        if mode == NETWORK_VALUE:
+            balances = await self.balances(contract_id)
+            return dict(price_id=None, fuel_type=fuel_key(fuel_type), unit_price=None,
+                liters=Decimal(str(liters)), reserve_amount=ZERO, funding_mode=NETWORK_VALUE,
+                available_balance=balances['available_balance'], available_after=balances['available_balance'],
+                sufficient=balances['available_balance'] > 0)
         instant = utcnow()
         price = await self.db.scalar(select(ContractFuelPrice).where(
             ContractFuelPrice.provider_id == provider_id, ContractFuelPrice.fuel_type == fuel_key(fuel_type),
@@ -439,8 +462,11 @@ class ContractBalanceService:
 
     async def reserve(self, *, contract_id, provider_id, source_type, source_id, amount=None,
                       vehicle_id, organization_id, actor, fuel_type=None, liters=None,
-                      expected_price_id=None, station_id=None, item_lines=None):
+                      expected_price_id=None, station_id=None, item_lines=None, funding_mode=None):
         contract = await self.contract(contract_id, lock=True)
+        mode = funding_mode or pricing_mode(contract)
+        if source_type in {'FUEL_ORDER', 'FUEL_DIRECT'} and mode == NETWORK_VALUE:
+            raise HTTPException(409, 'Rede por valor registra somente o consumo real, sem reserva prévia')
         await self.release_expired(contract_id=contract_id, actor=actor)
         previous = await self.db.scalar(select(ContractReservation).where(
             ContractReservation.source_type == source_type, ContractReservation.source_id == source_id))
@@ -457,14 +483,14 @@ class ContractBalanceService:
                 from app.services.contract_item_service import ContractItemService
                 await ContractItemService(self.db).assert_replay(previous.id, item_lines, fuel_type=fuel_type, liters=liters)
             return previous
-        errors = await self.errors(contract)
+        errors = await self.errors(contract, require_price=mode != NETWORK_VALUE, require_quantity=mode != NETWORK_VALUE)
         if errors:
             raise HTTPException(409, '; '.join(errors))
         provider = await self.provider(contract_id, provider_id, station_id=station_id)
         if source_type in {'FUEL_ORDER', 'FUEL_DIRECT'}:
             if getattr(contract.kind, 'value', contract.kind) != 'FUEL' or not provider.fuel_station_id:
                 raise HTTPException(409, 'Contrato ou posto incompatível com abastecimento')
-            quote = await self.quote(contract_id, provider_id, fuel_type, liters, item_lines=item_lines)
+            quote = await self.quote(contract_id, provider_id, fuel_type, liters, item_lines=item_lines, funding_mode=mode)
             if expected_price_id and quote['price_id'] != expected_price_id:
                 raise HTTPException(409, 'O preço mudou. Atualize a prévia antes de emitir o pedido.')
             amount = quote['reserve_amount']
@@ -518,6 +544,8 @@ class ContractBalanceService:
         return row
 
     async def release(self, reservation_id, *, actor=None, reason='Cancelamento'):
+        if not reservation_id:
+            return False
         row = await self.db.get(ContractReservation, reservation_id)
         if not row:
             return False
@@ -611,6 +639,51 @@ class ContractBalanceService:
         await self.flag_overdraw(reservation.contract_id, f'Execução {source_id} acima do saldo disponível')
         return operation
 
+    async def consume_unreserved(self, *, contract_id, provider_id, source_type, source_id, amount,
+                                 occurred_at, vehicle_id, organization_id, actor, station_id, item_lines=None):
+        contract = await self.contract(contract_id, lock=True)
+        provider = await self.db.get(ContractProvider, provider_id)
+        if (getattr(contract.kind, 'value', contract.kind) != 'FUEL' or not provider
+                or provider.contract_id != contract_id or provider.fuel_station_id != station_id):
+            raise HTTPException(409, 'Posto ou contrato incompatível com a execução')
+        if amount is None or money(amount) <= 0:
+            raise HTTPException(422, 'Informe o valor real do abastecimento')
+        amount = money(amount)
+        existing = await self.db.scalar(select(ContractOperation).where(
+            ContractOperation.source_type == source_type, ContractOperation.source_id == source_id))
+        if existing:
+            if (existing.contract_id != contract_id or existing.provider_id != provider_id
+                    or existing.amount != amount or existing.reservation_id is not None):
+                raise HTTPException(409, 'Execução já registrada com outro vínculo ou valor')
+            if item_lines is not None and existing.item_revision:
+                from app.services.contract_item_service import ContractItemService
+                await ContractItemService(self.db).realize(existing, item_lines, actor)
+            return existing
+        control = await self.db.get(ContractControl, contract_id)
+        if not control or occurred_at.astimezone(TZ).date() < control.opening_date:
+            raise HTTPException(409, 'Execução sem abertura do controle ou anterior à abertura; confira a data')
+        row = ContractOperation(contract_id=contract_id, provider_id=provider_id, source_type=source_type,
+            source_id=source_id, amount=amount, occurred_at=occurred_at, vehicle_id=vehicle_id,
+            organization_id=organization_id)
+        self.db.add(row)
+        await self.db.flush()
+        from app.core.config import settings
+        if settings.CONTRACT_QUANTITY_ENABLED:
+            from app.models.contract_item import ContractQuantityControl
+            if await self.db.get(ContractQuantityControl, contract_id):
+                from app.models.fuel_supply import FuelSupply
+                from app.services.contract_item_service import ContractItemService
+                items = ContractItemService(self.db)
+                supply = await self.db.get(FuelSupply, source_id)
+                lines = await items.actual_fuel_lines(contract_id, supply, item_lines)
+                await items.realize(row, lines, actor)
+        await self.movement(event_key=f'consume-unreserved:{source_type}:{source_id}', contract_id=contract_id,
+            movement_type='CONSUMPTION', actor=actor, balance_delta=-amount, consumed_delta=amount,
+            operation_id=row.id, source_type=source_type, source_id=source_id, vehicle_id=vehicle_id,
+            organization_id=organization_id, provider_id=provider_id, details={'funding_mode': NETWORK_VALUE})
+        await self.flag_overdraw(contract_id, f'Execução {source_id} acima do saldo disponível')
+        return row
+
     async def flag_overdraw(self, contract_id, note):
         balances = await self.balances(contract_id)
         if balances['available_balance'] is not None and balances['available_balance'] < 0:
@@ -675,6 +748,35 @@ class ContractBalanceService:
         await self.flag_overdraw(contract_id, 'Ajuste deixou o saldo disponível negativo')
         return row
 
+    async def correct_balance(self, contract_id, data, actor):
+        await self.contract(contract_id, lock=True)
+        target = money(data.target_available_balance)
+        expected = money(data.expected_available_balance)
+        key = f'balance-correction:{data.request_key}'
+        existing = await self.db.scalar(select(ContractMovement).where(ContractMovement.event_key == key))
+        if existing:
+            details = existing.details or {}
+            if (existing.contract_id != contract_id or details.get('available_after') != str(target)
+                    or details.get('available_before') != str(expected)):
+                raise HTTPException(409, 'Esta identificação já foi usada para outra correção')
+            return existing
+        balance = await self.balances(contract_id)
+        if not balance['control_opened']:
+            raise HTTPException(409, 'Confirme o saldo inicial antes de corrigir')
+        if balance['available_balance'] != expected:
+            raise HTTPException(409, 'O saldo mudou desde a conferência. Atualize o contrato e confira novamente a correção.')
+        delta = target - expected
+        if not delta:
+            raise HTTPException(422, 'O valor informado já é o saldo disponível atual')
+        return await self.movement(event_key=key, contract_id=contract_id,
+            movement_type='BALANCE_CORRECTION', actor=actor, balance_delta=delta,
+            source_type='BALANCE_CORRECTION', source_id=data.request_key, justification=data.justification,
+            details={'available_before': str(expected), 'available_after': str(target),
+                     'contractual_before': str(balance['contractual_balance']),
+                     'contractual_after': str(balance['contractual_balance'] + delta),
+                     'reserved_amount': str(balance['reserved_amount']),
+                     'consumed_since_opening': str(balance['consumed_since_opening'])})
+
     async def resolve_divergence(self, contract_id, reason, actor):
         await self.contract(contract_id, lock=True)
         control = await self.db.get(ContractControl, contract_id)
@@ -699,7 +801,33 @@ class ContractBalanceService:
                 movement_type='DIVERGENCE_RESOLVED', actor=actor, source_type='MANUAL', justification=reason)
         return await self.balances(contract_id)
 
-    async def funding(self, reservation_id):
+    async def funding(self, reservation_id, *, order=None, record=None):
+        from app.core.config import settings
+        operation = None
+        if not reservation_id and record is not None and getattr(record, 'contract_id', None):
+            operation = await self.db.scalar(select(ContractOperation).where(
+                ContractOperation.source_type == 'FUEL_SUPPLY', ContractOperation.source_id == record.id))
+        network_order = order is not None and getattr(order, 'contract_funding_mode', None) == NETWORK_VALUE
+        if not reservation_id and (network_order or (operation and operation.reservation_id is None)):
+            context = order if network_order else record
+            contract = await self.contract(context.contract_id)
+            provider = await self.db.get(ContractProvider, context.contract_provider_id)
+            supplier = await self.db.get(PaymentSupplier, provider.supplier_id)
+            quantitative = False
+            actual_item_lines = None
+            if settings.CONTRACT_QUANTITY_ENABLED:
+                from app.models.contract_item import ContractQuantityControl
+                quantitative = bool(await self.db.get(ContractQuantityControl, contract.id)) if network_order else bool(operation.item_revision)
+                if operation and operation.item_revision:
+                    from app.services.contract_item_service import ContractItemService
+                    actual_item_lines = [dict(item_id=r.item_id, quantity=r.quantity, unit_price=r.unit_price,
+                        amount=r.amount, description=r.description, category=r.category)
+                        for r in await ContractItemService(self.db).operation_lines(operation)]
+            return dict(contract_id=contract.id, contract_number=contract.number, provider_id=provider.id,
+                provider_name=supplier.name, reserved_amount=ZERO, status='UNRESERVED',
+                fuel_type=getattr(context, 'requested_fuel_type', None) or getattr(context, 'fuel_type', None),
+                unit_price=None, price_id=None, funding_mode=NETWORK_VALUE, quantity_enabled=quantitative,
+                item_lines=[] if quantitative else None, actual_item_lines=actual_item_lines)
         if not reservation_id:
             return None
         row = await self.db.get(ContractReservation, reservation_id)
@@ -719,7 +847,7 @@ class ContractBalanceService:
             if operation and operation.item_revision:
                 actual_item_lines = [dict(item_id=r.item_id, quantity=r.quantity, unit_price=r.unit_price,
                     amount=r.amount, description=r.description, category=r.category) for r in await items.operation_lines(operation)]
-        return dict(item_lines=item_lines, actual_item_lines=actual_item_lines, contract_id=contract.id, contract_number=contract.number, provider_id=row.provider_id,
+        return dict(quantity_enabled=bool(item_lines or actual_item_lines), item_lines=item_lines, actual_item_lines=actual_item_lines, contract_id=contract.id, contract_number=contract.number, provider_id=row.provider_id,
                     provider_name=supplier.name, reserved_amount=row.amount, status=row.status,
                     fuel_type=row.fuel_type, unit_price=row.unit_price, price_id=row.price_id)
 
@@ -770,11 +898,12 @@ class ContractBalanceService:
                 if settings.CONTRACT_QUANTITY_ENABLED:
                     from app.services.contract_item_service import ContractItemService
                     catalog = await ContractItemService(self.db).list(contract.id)
-                    extra = dict(quantity_enabled=True, items=[{k: r[k] for k in ('id','code','description','category','unit','product_key','available')} for r in catalog['items'] if r['active']],
+                    extra = dict(quantity_enabled=True, quantity_opened=catalog['opened'], items=[{k: r[k] for k in ('id','code','description','category','unit','product_key','available')} for r in catalog['items'] if r['active']],
                         item_prices=[p for p in catalog['prices'] if p['current'] and any(v['id'] == p['provider_id'] for v in valid)])
                 result.append(dict(id=contract.id, number=contract.number, kind=kind,
+                    fuel_pricing_mode=pricing_mode(contract),
                     available_balance=(await self.balances(contract.id))['available_balance'],
-                    providers=valid, prices=await self.prices(contract.id) if kind == 'FUEL' else [], **extra))
+                    providers=valid, prices=await self.prices(contract.id) if kind == 'FUEL' and pricing_mode(contract) != NETWORK_VALUE else [], **extra))
         return result
 
     async def movements(self, contract_id, actor, *, page=1, limit=20, organization_id=None,

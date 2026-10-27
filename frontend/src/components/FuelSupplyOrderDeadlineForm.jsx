@@ -1,3 +1,4 @@
+import { hasContractFunding } from '../utils/contractBalance'
 import JustificationField from './JustificationField'
 import { useMemo, useState } from 'react'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
@@ -16,7 +17,7 @@ function buildSuggestedDeadline(order) {
 export default function FuelSupplyOrderDeadlineForm(props) {
   const mode = useContractControl()
   if (mode.enabled === null) return <p role="status">Conferindo reserva contratual…</p>
-  if (mode.enabled && !props.order?.contract_reservation_id) return <FuelOrderFundingForm {...props} />
+  if (mode.enabled && !hasContractFunding(props.order)) return <FuelOrderFundingForm {...props} />
   return <ExistingFuelSupplyOrderDeadlineForm {...props} />
 }
 

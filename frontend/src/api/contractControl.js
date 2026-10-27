@@ -27,6 +27,7 @@ export const contractControlAPI = {
   deletePrice: (id, price) => api.delete(`/contract-control/contracts/${id}/prices/${price}`),
   quote: (id, data) => api.post(`/contract-control/contracts/${id}/quote`, data),
   adjust: (id, data) => api.post(`/contract-control/contracts/${id}/adjustments`, data),
+  correctBalance: (id, data) => api.post(`/contract-control/contracts/${id}/balance-correction`, data),
   resolve: (id, data) => api.post(`/contract-control/contracts/${id}/resolve-divergence`, data),
   movements: (id, params) => api.get(`/contract-control/contracts/${id}/movements`, { params }),
   operations: (id, params) => api.get(`/contract-control/contracts/${id}/operations`, { params }),

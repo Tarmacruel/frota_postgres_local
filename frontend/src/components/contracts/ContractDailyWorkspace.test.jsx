@@ -226,7 +226,7 @@ it('mantém contrato e oficina de manutenção no escopo e conserva os dados qua
   fireEvent.change(screen.getByLabelText('Serviço solicitado'), { target: { value: 'Revisão de testes completa' } })
   fireEvent.click(screen.getByRole('button', { name: 'Autorizar e reservar saldo' }))
   await screen.findByText('Saldo insuficiente')
-  expect(screen.getByLabelText('Orçamento previsto')).toHaveValue(500)
+  expect(screen.getByLabelText('Orçamento previsto')).toHaveValue('500')
   expect(screen.getByLabelText('Serviço solicitado')).toHaveValue('Revisão de testes completa')
   expect(maintenanceOrdersAPI.create).toHaveBeenCalledWith(expect.objectContaining({ contract_id: 'a', provider_id: 'work-a' }))
 })

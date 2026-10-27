@@ -1,3 +1,4 @@
+import MoneyInput from './MoneyInput'
 import { useEffect, useMemo, useState } from 'react'
 import { maintenanceAPI } from '../api/maintenance'
 import SearchableSelect from './SearchableSelect'
@@ -162,7 +163,7 @@ function LegacyMaintenanceForm({ vehicles, initialData = null, onClose, onSucces
 
       <div className="form-field">
         <label htmlFor="maintenance-cost">Custo total</label>
-        <input
+        <MoneyInput
           id="maintenance-cost"
           type="number"
           min="0"

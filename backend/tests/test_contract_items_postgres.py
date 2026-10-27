@@ -366,11 +366,13 @@ async def test_document_examples_keep_other_items_and_total_fourth_term(pg,monke
 
 
 @pytest.mark.asyncio
-async def test_future_network_mode_cannot_accidentally_use_fixed_price_quantity_flow(stocked):
+async def test_network_mode_never_reserves_fixed_price_quantities(stocked):
     c=stocked
     c.contract.fuel_pricing_mode='NETWORK_VALUE';await c.db.flush()
+    quote=await c.service.quote(c.contract.id,c.provider.id,'DIESEL S10',1)
+    assert quote['reserve_amount']==0 and quote['price_id'] is None
     with pytest.raises(HTTPException) as error:await reserve(c,1)
-    assert error.value.status_code==409 and 'rede por valor' in error.value.detail
+    assert error.value.status_code==409 and 'rede por valor' in error.value.detail.lower()
     assert (await c.service.balances(c.contract.id))['available_balance']==1100
     assert (await c.items.balances(c.contract.id))[c.stock['diesel'][0].id]['available']==10
 
@@ -398,3 +400,86 @@ async def test_linked_correction_cannot_reverse_consumed_addition_and_keeps_snap
     assert correction.corrects_amendment_id==original.id and original.snapshot==original_snapshot
     assert (await c.items.balances(c.contract.id))[c.item.id]['available']==0
     assert (await c.service.balances(c.contract.id))['available_balance']==0
+
+
+@pytest.mark.asyncio
+async def test_network_without_item_opening_works_with_quantity_feature_enabled(pg,tmp_path,monkeypatch):
+    from test_network_value_contracts_postgres import network,receipt,confirmation
+    from app.services.fuel_supply_order_service import FuelSupplyOrderService
+    from app.schemas.fuel_supply import FuelSupplyRectify
+    from app.services.fuel_supply_service import FuelSupplyService
+    c=pg
+    monkeypatch.setattr(settings,'CONTRACT_QUANTITY_ENABLED',True)
+    monkeypatch.setattr(settings,'STORAGE_DIR',tmp_path)
+    payload=await network(c)
+    assert await c.service.errors(c.contract)==[]
+    orders=FuelSupplyOrderService(c.db)
+    order=await orders.create_order(payload,c.actor)
+    assert order['contract_funding_mode']=='NETWORK_VALUE' and order['contract_reservation_id'] is None
+    assert order['contract_funding']['quantity_enabled'] is False
+    assert (await c.service.balances(c.contract.id))['available_balance']==100
+    done=await orders.confirm_order(order['id'],confirmation(25),receipt(),c.actor)
+    await FuelSupplyService(c.db).rectify(done['supply_id'],FuelSupplyRectify(supplied_at=datetime.now(timezone.utc),
+        odometer_km=100,liters=3,total_amount=30,fuel_type='DIESEL S10',reason='Retificação fictícia da rede por valor'),c.actor)
+    assert (await c.service.balances(c.contract.id))['available_balance']==70
+    assert await c.db.scalar(select(func.count()).select_from(ContractItemMovement).where(ContractItemMovement.contract_id==c.contract.id))==0
+
+
+@pytest.mark.asyncio
+async def test_network_actual_consumption_tracks_existing_items_without_reserving(stocked,tmp_path,monkeypatch):
+    from test_network_value_contracts_postgres import receipt
+    from test_contract_balances_postgres import order_payload
+    from app.services.fuel_supply_order_service import FuelSupplyOrderService
+    from app.schemas.fuel_supply import FuelSupplyOrderConfirm,FuelSupplyRectify
+    from app.services.fuel_supply_service import FuelSupplyService
+    c=stocked
+    monkeypatch.setattr(settings,'STORAGE_DIR',tmp_path)
+    c.contract.fuel_pricing_mode='NETWORK_VALUE';await c.db.commit()
+    diesel,arla=c.stock['diesel'][0].id,c.stock['arla'][0].id
+    orders=FuelSupplyOrderService(c.db)
+    order=await orders.create_order(order_payload(c).model_copy(update={'expected_price_id':None}),c.actor)
+    assert order['contract_reservation_id'] is None and order['contract_funding']['quantity_enabled']
+    assert (await c.items.balances(c.contract.id))[diesel]['reserved']==0
+    done=await orders.confirm_order(order['id'],FuelSupplyOrderConfirm(odometer_km=100,liters=2,total_amount=20,fuel_type='DIESEL S10',
+        additive_type='ARLA 32',additive_quantity_liters='1.5',item_lines=[dict(item_id=diesel,quantity=2,amount='15.5'),dict(item_id=arla,quantity='1.5',amount='4.5')]),receipt(),c.actor)
+    supply_service=FuelSupplyService(c.db)
+    await supply_service.rectify(done['supply_id'],FuelSupplyRectify(supplied_at=datetime.now(timezone.utc),odometer_km=100,
+        liters='2.5',total_amount=23,fuel_type='DIESEL S10',additive_type='ARLA 32',additive_quantity_liters=1,
+        item_lines=[dict(item_id=diesel,quantity='2.5',amount=20),dict(item_id=arla,quantity=1,amount=3)],reason='Correção fictícia dos volumes efetivos'),c.actor)
+    totals=await c.items.balances(c.contract.id)
+    assert totals[diesel]['available']==Decimal('7.5') and totals[arla]['available']==4
+    balance=await c.service.balances(c.contract.id)
+    assert balance['reserved_amount']==0 and balance['available_balance']==1077
+
+
+@pytest.mark.asyncio
+async def test_fixed_order_reopens_with_original_quantity_policy_after_contract_becomes_network(stocked,tmp_path,monkeypatch):
+    from datetime import timedelta
+    from sqlalchemy import update
+    from app.models.fuel_supply_order import FuelSupplyOrder
+    from app.schemas.fuel_supply import FuelSupplyOrderCreate,FuelSupplyOrderDeadlineUpdate,FuelSupplyOrderConfirm
+    from app.services.fuel_supply_order_service import FuelSupplyOrderService
+    from test_network_value_contracts_postgres import receipt
+    c=stocked
+    monkeypatch.setattr(settings,'STORAGE_DIR',tmp_path)
+    orders=FuelSupplyOrderService(c.db)
+    diesel,arla=c.stock['diesel'][0].id,c.stock['arla'][0].id
+    order=await orders.create_order(FuelSupplyOrderCreate(vehicle_id=c.vehicle.id,fuel_station_id=c.station.id,
+        expires_at=datetime.now(timezone.utc)+timedelta(hours=12),contract_id=c.contract.id,contract_provider_id=c.provider.id,
+        requested_fuel_type='DIESEL S10',requested_liters=3,request_key=uuid4(),expected_price_id=c.price.id,
+        item_lines=[dict(item_id=diesel,quantity=3),dict(item_id=arla,quantity=2)]),c.actor)
+    assert order['contract_funding_mode']=='FIXED_PRICE'
+    c.contract.fuel_pricing_mode='NETWORK_VALUE'
+    await c.db.execute(update(FuelSupplyOrder).where(FuelSupplyOrder.id==order['id']).values(expires_at=datetime.now(timezone.utc)-timedelta(seconds=5)))
+    await c.db.commit()
+    await orders._expire_overdue_orders()
+    assert (await c.items.balances(c.contract.id))[diesel]['reserved']==0
+    reopened=await orders.update_deadline(order['id'],FuelSupplyOrderDeadlineUpdate(
+        expires_at=datetime.now(timezone.utc)+timedelta(hours=12),reason='Reabertura fictícia preservando a modalidade original'),c.actor)
+    assert reopened['contract_funding_mode']=='FIXED_PRICE' and reopened['contract_reservation_id']
+    assert (await c.items.balances(c.contract.id))[diesel]['reserved']==3
+    await orders.confirm_order(order['id'],FuelSupplyOrderConfirm(odometer_km=100,liters=2,total_amount=24,fuel_type='DIESEL S10',
+        additive_type='ARLA 32',additive_quantity_liters=2,item_lines=[dict(item_id=diesel,quantity=2,amount=20),dict(item_id=arla,quantity=2,amount=4)]),receipt(),c.actor)
+    assert (await c.items.balances(c.contract.id))[diesel]['available']==8
+    balance=await c.service.balances(c.contract.id)
+    assert balance['reserved_amount']==0 and balance['available_balance']==1076

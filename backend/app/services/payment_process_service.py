@@ -573,6 +573,8 @@ class PaymentProcessService:
         return await self._serialize_contract(contract)
 
     async def create_contract(self, data: PaymentContractCreate, current_user: User) -> dict:
+        if data.fuel_pricing_mode == 'NETWORK_VALUE' and data.kind != PaymentProcessKind.FUEL:
+            raise HTTPException(422, 'Rede por valor exige contrato de abastecimento')
         supplier = await self.repository.get_supplier(data.supplier_id)
         if not supplier:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Fornecedor não encontrado")
@@ -601,6 +603,11 @@ class PaymentProcessService:
         if not contract:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
         payload = data.model_dump(exclude_unset=True)
+        previous_pricing_mode = getattr(contract, 'fuel_pricing_mode', None) or 'FIXED_PRICE'
+        if 'fuel_pricing_mode' in payload and payload['fuel_pricing_mode'] is None:
+            raise HTTPException(422, 'Informe a modalidade de preço do abastecimento')
+        if payload.get('fuel_pricing_mode', previous_pricing_mode) == 'NETWORK_VALUE' and payload.get('kind', contract.kind) != PaymentProcessKind.FUEL:
+            raise HTTPException(422, 'Rede por valor exige contrato de abastecimento')
         if settings.CONTRACT_BALANCE_ENABLED:
             await ContractBalanceService(self.db).contract(contract_id, lock=True)
             if await self.db.get(ContractControl, contract_id):
@@ -619,7 +626,9 @@ class PaymentProcessService:
             contract.value_updated = contract.value_initial
         contract.updated_at = datetime.now(timezone.utc)
         try:
-            await self.audit.record(actor=current_user, action="UPDATE", entity_type="PAYMENT_CONTRACT", entity_id=contract.id, entity_label=contract.number, details={})
+            await self.audit.record(actor=current_user, action="UPDATE", entity_type="PAYMENT_CONTRACT", entity_id=contract.id, entity_label=contract.number,
+                details={'fuel_pricing_mode_before': previous_pricing_mode,
+                         'fuel_pricing_mode_after': getattr(contract, 'fuel_pricing_mode', None) or 'FIXED_PRICE'})
             await self.db.commit()
         except IntegrityError as exc:
             await self.db.rollback()
@@ -647,11 +656,11 @@ class PaymentProcessService:
             except Exception:
                 await self.db.rollback()
                 raise
-        if settings.CONTRACT_QUANTITY_ENABLED:
-            raise HTTPException(422, 'Utilize o formulário de alteração por itens, com prévia e confirmação dos impactos')
         contract = await self.repository.get_contract(contract_id)
         if not contract:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Contrato não encontrado")
+        if settings.CONTRACT_QUANTITY_ENABLED and getattr(contract, 'fuel_pricing_mode', None) != 'NETWORK_VALUE':
+            raise HTTPException(422, 'Utilize o formulário de alteração por itens, com prévia e confirmação dos impactos')
         opened = False
         if settings.CONTRACT_BALANCE_ENABLED:
             await ContractBalanceService(self.db).contract(contract_id, lock=True)
@@ -1746,6 +1755,7 @@ class PaymentProcessService:
             "number": contract.number,
             "kind": contract.kind,
             "contract_type": contract.contract_type,
+            "fuel_pricing_mode": getattr(contract, 'fuel_pricing_mode', None) or 'FIXED_PRICE',
             "object_description": contract.object_description,
             "valid_from": contract.valid_from,
             "valid_until": contract.valid_until,

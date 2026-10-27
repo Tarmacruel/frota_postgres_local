@@ -164,7 +164,7 @@ describe('FuelSuppliesPage administrative adjustments', () => {
 
     fireEvent.click(await screen.findByRole('button', { name: 'Retificar' }))
     expect(screen.getByRole('dialog', { name: 'Retificar confirmação de abastecimento' })).toBeInTheDocument()
-    expect(screen.getByLabelText('Valor total (R$)')).toHaveValue(225.3)
+    expect(screen.getByLabelText('Valor total (R$)')).toHaveValue('R$ 225,30')
     expect(screen.getByLabelText('Justificativa da retificação')).toBeRequired()
   })
 

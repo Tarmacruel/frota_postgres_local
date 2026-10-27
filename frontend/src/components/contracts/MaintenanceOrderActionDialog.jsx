@@ -1,3 +1,4 @@
+import MoneyInput from '../MoneyInput'
 import { useEffect, useState } from 'react'
 import Modal from '../Modal'
 import { contractControlAPI, maintenanceOrdersAPI } from '../../api/contractControl'
@@ -35,7 +36,7 @@ export default function MaintenanceOrderActionDialog({ row, action, onClose, onS
       {row.cancellation_reason ? <p>{row.cancellation_reason}</p> : null}
     </> : <form className="contract-form" onSubmit={submit}>
       <p className="contract-form__wide">{row.vehicle_plate} · {row.provider_name}<br />{row.service_description}</p>
-      {action === 'complete' ? <><label>Custo real (R$)<input className="app-input" aria-label="Custo real" type="number" min="0" step=".01" readOnly={quantitative} value={quantitative ? itemLinesTotal(lines) : form.total_cost} onChange={(e) => setForm({ ...form, total_cost: e.target.value })} required /></label>
+      {action === 'complete' ? <><label>Custo real (R$)<MoneyInput className="app-input" aria-label="Custo real" type="number" min="0" step=".01" readOnly={quantitative} value={quantitative ? itemLinesTotal(lines) : form.total_cost} onChange={(e) => setForm({ ...form, total_cost: e.target.value })} required /></label>
         <label>Conclusão (em branco: agora)<input className="app-input" type="datetime-local" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></label>
         {quantitative ? <ContractItemLines actual allowUnknown label="Itens efetivamente realizados" items={options.items} prices={options.prices} lines={lines} onChange={setLines} /> : null}
         <label className="contract-form__wide">Peças e observações<textarea className="app-textarea" value={form.parts_replaced} onChange={(e) => setForm({ ...form, parts_replaced: e.target.value })} /></label>

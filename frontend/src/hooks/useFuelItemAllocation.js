@@ -5,7 +5,7 @@ import { getApiErrorMessage } from '../utils/apiError'
 const key=(value)=>String(value||'').trim().replace(/\s+/g,' ').toUpperCase()
 
 export default function useFuelItemAllocation({ funding, enabled, contractId, providerId, fuelType, liters, totalAmount, additiveType, additiveLiters }) {
-  const active=enabled ?? Array.isArray(funding?.item_lines)
+  const active=enabled ?? funding?.quantity_enabled ?? Array.isArray(funding?.item_lines)
   const held=funding?.item_lines||[]
   const [catalog,setCatalog]=useState({scope:'',items:[],error:''})
   const [primary,setPrimary]=useState('')

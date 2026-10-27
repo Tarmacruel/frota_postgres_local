@@ -1,3 +1,4 @@
+import MoneyInput from './MoneyInput'
 import JustificationField from './JustificationField'
 import { useMemo, useRef, useState } from 'react'
 import { fuelSuppliesAPI } from '../api/fuelSupplies'
@@ -148,7 +149,7 @@ export default function FuelSupplyRectifyForm({ record, onClose, onSuccess }) {
       </div>
       <div className="form-field">
         <label htmlFor="rectify-total">Valor total (R$)</label>
-        <input id="rectify-total" type="number" min="0.01" step="0.01" className="app-input" value={form.total_amount} onChange={(event) => setForm((current) => ({ ...current, total_amount: event.target.value }))} required />
+        <MoneyInput id="rectify-total" type="number" min="0.01" step="0.01" className="app-input" value={form.total_amount} onChange={(event) => setForm((current) => ({ ...current, total_amount: event.target.value }))} required />
       </div>
       <div className="form-field">
         <label htmlFor="rectify-fuel">Tipo de combustível</label>

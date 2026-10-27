@@ -1,3 +1,4 @@
+import MoneyInput from './MoneyInput'
 import { useId, useMemo, useRef, useState } from 'react'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { getApiErrorMessage } from '../utils/apiError'
@@ -136,7 +137,8 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
           <strong>Pedido original: </strong>{order.requested_fuel_type || 'Combustível não informado'}
           {order.requested_liters ? ` · ${Number(order.requested_liters).toLocaleString('pt-BR', { maximumFractionDigits: 2 })} L previstos` : ''}.<br />
         </> : null}
-        {order.contract_funding ? <>Contrato {order.contract_funding.contract_number} · reserva {brl(order.contract_funding.reserved_amount)}.<br /></> : null}
+        {order.contract_funding ? <>Contrato {order.contract_funding.contract_number} · {order.contract_funding_mode === 'NETWORK_VALUE' ? 'rede por valor, sem reserva prévia' : `reserva ${brl(order.contract_funding.reserved_amount)}`}.
+          <br /></> : null}
         Use os dados reais do comprovante. O pedido original será preservado{order.contract_funding ? ' e o saldo ajustado pelo total real' : ''}.
       </p> : null}
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
@@ -153,7 +155,7 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
 
       <div className="form-field">
         <label htmlFor={`${formId}-amount`}>Valor total abastecido (R$)</label>
-        <input id={`${formId}-amount`} type="number" min="0" step="0.01" className="app-input" value={form.total_amount} onChange={(event) => setForm((current) => ({ ...current, total_amount: event.target.value }))} required />
+        <MoneyInput id={`${formId}-amount`} type="number" min="0" step="0.01" className="app-input" value={form.total_amount} onChange={(event) => setForm((current) => ({ ...current, total_amount: event.target.value }))} required />
       </div>
 
       <div className="form-field">

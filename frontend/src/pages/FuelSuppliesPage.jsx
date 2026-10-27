@@ -1,3 +1,4 @@
+import { hasContractFunding } from '../utils/contractBalance'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import ContractReturnBanner from '../components/contracts/ContractReturnBanner'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
@@ -665,7 +666,7 @@ export default function FuelSuppliesPage() {
                         items={[
                           { key: 'public-link', label: 'Copiar link público', onClick: () => handleCopyPublicLink(order) },
                           { key: 'pdf', label: 'Baixar PDF', onClick: () => handleDownloadOrderDocument(order) },
-                          canAdjustOrderDeadline && ['OPEN', 'EXPIRED'].includes(order.status) ? { key: 'deadline', label: control.enabled && !order.contract_reservation_id ? 'Vincular contrato e reservar' : order.status === 'EXPIRED' ? 'Reabrir prazo' : 'Prorrogar prazo', onClick: () => setOrderToAdjust(order) } : null,
+                          canAdjustOrderDeadline && ['OPEN', 'EXPIRED'].includes(order.status) ? { key: 'deadline', label: control.enabled && !hasContractFunding(order) ? 'Vincular contrato e reservar' : order.status === 'EXPIRED' ? 'Reabrir prazo' : 'Prorrogar prazo', onClick: () => setOrderToAdjust(order) } : null,
                           order.status === 'OPEN' && canEditOrder ? { key: 'cancel', label: 'Cancelar ordem', tone: 'danger', onClick: () => handleCancelOrder(order) } : null,
                         ]}
                       />
@@ -849,7 +850,7 @@ export default function FuelSuppliesPage() {
       <Modal
         open={Boolean(orderToAdjust) && canAdjustOrderDeadline}
         onClose={() => setOrderToAdjust(null)}
-        title={control.enabled && !orderToAdjust?.contract_reservation_id ? 'Vincular contrato e reservar' : orderToAdjust?.status === 'EXPIRED' ? 'Reabrir prazo da ordem' : 'Prorrogar prazo da ordem'}
+        title={control.enabled && !hasContractFunding(orderToAdjust) ? 'Vincular contrato e reservar' : orderToAdjust?.status === 'EXPIRED' ? 'Reabrir prazo da ordem' : 'Prorrogar prazo da ordem'}
         description="Defina um novo prazo e informe a justificativa obrigatória para a auditoria."
       >
         {orderToAdjust ? (

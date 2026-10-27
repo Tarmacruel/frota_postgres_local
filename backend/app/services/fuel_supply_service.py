@@ -23,7 +23,7 @@ from app.repositories.vehicle_repository import VehicleRepository
 from app.schemas.common import PaginatedResponse, build_pagination
 from app.schemas.fuel_supply import FuelSupplyCreate, FuelSupplyRectify
 from app.services.audit_service import AuditService
-from app.services.contract_balance_service import ContractBalanceService, fuel_key, funding_fields, money
+from app.services.contract_balance_service import ContractBalanceService, fuel_key, funding_fields, money, pricing_mode, NETWORK_VALUE
 from app.core.vehicle_handoff import lock_vehicle_handoff
 
 MAX_RECEIPT_SIZE_BYTES = 8 * 1024 * 1024
@@ -63,7 +63,7 @@ class FuelSupplyService:
         await self._ensure_supply_visible_to_user(supply, current_user)
         result = self._serialize(supply)
         if settings.CONTRACT_BALANCE_ENABLED:
-            result['contract_funding'] = await ContractBalanceService(self.db).funding(supply.contract_reservation_id)
+            result['contract_funding'] = await ContractBalanceService(self.db).funding(supply.contract_reservation_id, record=supply)
         return result
 
     async def rectify(
@@ -172,8 +172,11 @@ class FuelSupplyService:
 
     async def create(self, data: FuelSupplyCreate, receipt: UploadFile, current_user: User) -> dict:
         if settings.CONTRACT_BALANCE_ENABLED:
-            if not all((data.contract_id, data.contract_provider_id, data.request_key, data.expected_price_id, data.fuel_station_id)):
+            if not all((data.contract_id, data.contract_provider_id, data.request_key, data.fuel_station_id)):
                 raise HTTPException(422, 'Selecione contrato, posto e confira a prévia financeira para registrar o abastecimento')
+            contract = await ContractBalanceService(self.db).contract(data.contract_id)
+            if pricing_mode(contract) != NETWORK_VALUE and not data.expected_price_id:
+                raise HTTPException(422, 'Confira o preço vigente antes de registrar o abastecimento')
             if self.db.get_bind().dialect.name == 'postgresql':
                 await self.db.execute(text('SELECT pg_advisory_xact_lock(:key)'), {'key': (data.request_key.int & ((1 << 64)-1))-(1 << 63)})
             await lock_vehicle_handoff(self.db, data.vehicle_id)
@@ -270,15 +273,28 @@ class FuelSupplyService:
             await self.supplies.create(supply)
             if settings.CONTRACT_BALANCE_ENABLED:
                 supply.request_key = data.request_key
-                reservation = await ContractBalanceService(self.db).reserve(contract_id=data.contract_id,
-                    provider_id=data.contract_provider_id, source_type='FUEL_DIRECT', source_id=supply.id,
-                    vehicle_id=supply.vehicle_id, organization_id=supply.organization_id, actor=current_user,
-                    fuel_type=supply.fuel_type, liters=supply.liters, expected_price_id=data.expected_price_id,
-                    station_id=supply.fuel_station_id, item_lines=[{**r.model_dump(), 'unit_price': None} for r in data.item_lines] if data.item_lines else None)
                 supply.contract_id, supply.contract_provider_id = data.contract_id, data.contract_provider_id
-                supply.contract_reservation_id = reservation.id
-                await ContractBalanceService(self.db).settle(reservation.id, source_type='FUEL_SUPPLY',
-                    source_id=supply.id, amount=supply.total_amount, occurred_at=supply.supplied_at, actor=current_user, item_lines=data.item_lines)
+                service = ContractBalanceService(self.db)
+                contract = await service.contract(data.contract_id, lock=True)
+                if pricing_mode(contract) == NETWORK_VALUE:
+                    errors = await service.errors(contract)
+                    if errors:
+                        raise HTTPException(409, '; '.join(errors))
+                    await service.provider(data.contract_id, data.contract_provider_id, station_id=supply.fuel_station_id)
+                    await service.consume_unreserved(contract_id=data.contract_id, provider_id=data.contract_provider_id,
+                        source_type='FUEL_SUPPLY', source_id=supply.id, amount=supply.total_amount,
+                        occurred_at=supply.supplied_at, actor=current_user, vehicle_id=supply.vehicle_id,
+                        organization_id=supply.organization_id, station_id=supply.fuel_station_id, item_lines=data.item_lines)
+                else:
+                    reservation = await service.reserve(contract_id=data.contract_id,
+                        provider_id=data.contract_provider_id, source_type='FUEL_DIRECT', source_id=supply.id,
+                        vehicle_id=supply.vehicle_id, organization_id=supply.organization_id, actor=current_user,
+                        fuel_type=supply.fuel_type, liters=supply.liters, expected_price_id=data.expected_price_id,
+                        station_id=supply.fuel_station_id,
+                        item_lines=[{**r.model_dump(), 'unit_price': None} for r in data.item_lines] if data.item_lines else None)
+                    supply.contract_reservation_id = reservation.id
+                    await service.settle(reservation.id, source_type='FUEL_SUPPLY',
+                        source_id=supply.id, amount=supply.total_amount, occurred_at=supply.supplied_at, actor=current_user, item_lines=data.item_lines)
             relative_receipt_path, stored_receipt_path = self._build_receipt_storage_paths(supply.id, receipt_payload["mime_type"])
             self._store_file(stored_receipt_path, receipt_payload["content"])
             supply.receipt_path = relative_receipt_path

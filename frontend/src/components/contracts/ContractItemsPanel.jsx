@@ -5,6 +5,7 @@ import { getApiErrorMessage } from '../../utils/apiError'
 import { formatContractMoney as brl } from '../../utils/contractBalance'
 import { FUEL_TYPE_OPTIONS, ADDITIVE_TYPE_OPTIONS } from '../../utils/fuelSupplyDetails'
 import ContractItemLines from './ContractItemLines'
+import MoneyInput from '../MoneyInput'
 import { itemLinesPayload } from '../../utils/contractItemLines'
 
 const categories = { FUEL: 'Combustível', ADDITIVE: 'Aditivo / ARLA', SERVICE: 'Serviço', PART: 'Peça' }
@@ -26,6 +27,7 @@ export default function ContractItemsPanel({ contract, providers = [], legacyPri
     try { const response = await contractControlAPI.itemMovements(contract.id, { item_id: item.id }); setMovement({ item, ...response.data }) }
     catch (err) { setError(getApiErrorMessage(err, 'Não foi possível consultar as quantidades.')) }
   }
+  if (contract.fuel_pricing_mode === 'NETWORK_VALUE' && !data?.opened) return null
   return <section className="contract-detail__section contract-items-panel">
     <div className="contract-order-panel__heading"><div><h4>Itens e quantidades</h4><p className="muted">{data?.opened ? 'Quantidades conferidas · reservas e consumo acompanhados por item.' : 'Abertura pendente. Novos pedidos exigem quantidades e preços conferidos.'}</p></div>{manage ? <div className="actions-inline">{!data?.opened ? <><button className="secondary-button" onClick={() => setDialog({ type: 'item' })}>Cadastrar item</button><button className="secondary-button" disabled={!data?.items?.length} onClick={() => setDialog({ type: 'price' })}>Vincular preço</button><button className="app-button" disabled={!data?.items?.length} onClick={() => setDialog({ type: 'opening' })}>Conferir quantidades</button></> : null}</div> : null}</div>
     {error ? <div className="alert alert-error" role="alert">{error}<button className="ghost-button" onClick={load}>Tentar novamente</button></div> : null}
@@ -50,7 +52,7 @@ function ItemSetupDialog({ dialog, contract, items, providers, legacyPrices, onC
   const type=dialog.type
   const update=(name,value)=>setForm((s)=>({...s,[name]:value}))
   useEffect(()=>{ let active=true; if(type==='opening') contractControlAPI.quantityOpening(contract.id).then(({data})=>{if(active)setOpening(data)}).catch((err)=>{if(active)setError(getApiErrorMessage(err,'Não foi possível consultar as reservas abertas.'))}); return()=>{active=false} },[type,contract.id])
-  const input=(name,label,options={})=><label key={name} className={options.wide?'contract-form__wide':''}>{label}<input className="app-input" aria-label={label} required={options.required!==false} type={options.type||'text'} min={options.min} step={options.step} value={form[name]} onChange={(e)=>update(name,e.target.value)} maxLength={500}/></label>
+  const input=(name,label,options={})=>{ const Input=['original_unit_price','reference_unit_price','unit_price'].includes(name)?MoneyInput:'input'; return <label key={name} className={options.wide?'contract-form__wide':''}>{label}<Input {...(Input===MoneyInput?{precision:6}: {})} className="app-input" aria-label={label} required={options.required!==false} type={options.type||'text'} min={options.min} step={options.step} value={form[name]} onChange={(e)=>update(name,e.target.value)} maxLength={500}/></label> }
   const chosen=items.find((r)=>r.id===form.item_id)
   const fuelPrices=legacyPrices.filter((r)=>r.provider_id===form.provider_id && r.fuel_type===chosen?.product_key && !r.deleted_at && (!r.valid_until || new Date(r.valid_until)>new Date()))
   async function submit(event) {

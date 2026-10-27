@@ -18,7 +18,7 @@ beforeEach(()=>{
   contractControlAPI.amendmentPreview.mockResolvedValue({data:{preview_token:'token',snapshot}})
   paymentContractsAPI.createAmendment.mockImplementation(async(_id,data)=>({data:{amendments:[{id:'amendment',request_key:data.request_key,snapshot}]}}))
 })
-async function fillPrice(){
+async function fillPrice(price='6.21'){
   fireEvent.change(screen.getByLabelText('Número do instrumento'),{target:{value:'2TA-TESTE'}})
   fireEvent.change(screen.getByLabelText('Assinatura'),{target:{value:'2026-01-12'}})
   fireEvent.change(screen.getByLabelText('Processo / documento de referência'),{target:{value:'DOC-TESTE'}})
@@ -29,7 +29,7 @@ async function fillPrice(){
   fireEvent.change(screen.getByLabelText('Efeito no valor global'),{target:{value:'NONE'}})
   fireEvent.change(screen.getByLabelText('Adicionar item à alteração'),{target:{value:'diesel'}})
   fireEvent.change(screen.getByLabelText('Número do item neste documento'),{target:{value:'001'}})
-  fireEvent.change(screen.getByLabelText('Novo preço DIESEL'),{target:{value:'6.21'}})
+  fireEvent.change(screen.getByLabelText('Novo preço DIESEL'),{target:{value:price}})
   fireEvent.change(screen.getByLabelText('Justificativa da alteração'),{target:{value:'Justificativa conferida no termo'}})
 }
 it('altera um único item, preserva seu ID e diferencia a numeração do documento',async()=>{
@@ -54,8 +54,18 @@ it('preserva campos quando a confirmação rejeita uma prévia desatualizada',as
   paymentContractsAPI.createAmendment.mockRejectedValue({response:{status:409,data:{detail:'O saldo mudou. Confira novamente.'}}})
   render(<ContractAmendmentEditor contract={contract} providers={providers} onClose={vi.fn()}/>)
   await fillPrice();fireEvent.click(screen.getByRole('button',{name:'Conferir impactos'}));fireEvent.click(await screen.findByRole('button',{name:'Confirmar alteração e ver relatório'}))
-  await screen.findByRole('alert');expect(screen.getByLabelText('Número do instrumento')).toHaveValue('2TA-TESTE');expect(screen.getByLabelText('Novo preço DIESEL')).toHaveValue(6.21)
+  await screen.findByRole('alert');expect(screen.getByLabelText('Número do instrumento')).toHaveValue('2TA-TESTE');expect(screen.getByLabelText('Novo preço DIESEL')).toHaveValue('6,21')
   expect(screen.getByRole('button',{name:'Conferir impactos'})).toBeEnabled()
+})
+it('preserva seis casas no preço por item ao editar em reais e solicitar a prévia',async()=>{
+  render(<ContractAmendmentEditor contract={contract} providers={providers} onClose={vi.fn()}/>)
+  await fillPrice('6,210123');fireEvent.blur(screen.getByLabelText('Novo preço DIESEL'))
+  expect(screen.getByLabelText('Novo preço DIESEL')).toHaveValue('R$ 6,210123')
+  fireEvent.click(screen.getByRole('button',{name:'Conferir impactos'}))
+  await waitFor(()=>expect(contractControlAPI.amendmentPreview).toHaveBeenCalled())
+  expect(contractControlAPI.amendmentPreview.mock.calls[0][1].lines[0]).toMatchObject({
+    new_reference_price:'6.210123',prices:[{provider_id:'provider',unit_price:'6.210123'}],
+  })
 })
 it('exporta a fotografia salva sem reenviar a confirmação e permite repetir a geração',async()=>{
   previewRowsToPdf.mockRejectedValueOnce(new Error('PDF indisponível'))

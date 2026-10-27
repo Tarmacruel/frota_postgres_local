@@ -3,6 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 from uuid import UUID
+from typing import Literal
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
@@ -89,6 +90,7 @@ class PaymentContractCreate(TextNormalizeMixin):
     supplier_id: UUID
     number: str = Field(min_length=1, max_length=80)
     kind: PaymentProcessKind | None = None
+    fuel_pricing_mode: Literal['FIXED_PRICE', 'NETWORK_VALUE'] = 'FIXED_PRICE'
     contract_type: str | None = Field(default=None, max_length=120)
     object_description: str | None = Field(default=None, max_length=4000)
     valid_from: date | None = None
@@ -104,6 +106,7 @@ class PaymentContractUpdate(TextNormalizeMixin):
     supplier_id: UUID | None = None
     number: str | None = Field(default=None, min_length=1, max_length=80)
     kind: PaymentProcessKind | None = None
+    fuel_pricing_mode: Literal['FIXED_PRICE', 'NETWORK_VALUE'] | None = None
     contract_type: str | None = Field(default=None, max_length=120)
     object_description: str | None = Field(default=None, max_length=4000)
     valid_from: date | None = None
@@ -122,6 +125,7 @@ class PaymentContractOut(BaseModel):
     supplier_id: UUID
     supplier_name: str | None = None
     number: str
+    fuel_pricing_mode: str = 'FIXED_PRICE'
     kind: PaymentProcessKind | None
     contract_type: str | None
     object_description: str | None
