@@ -21,7 +21,7 @@ Sem produção, backend, migration, permissões, alteração de cálculos ou con
 2. [x] Simplificar cadastro preservando a referência interna.
 3. [x] Mostrar pendências por item e permitir vincular preço sem perder o rascunho de abertura.
 4. [x] Testes de regressão, suíte frontend, lint e build HML.
-5. [ ] Publicação HML, QA desktop/mobile/claro/escuro, configuração/dados/PIDs e documentação final.
+5. [x] Publicação HML, QA desktop/mobile/claro/escuro, configuração/dados/PIDs e documentação final.
 
 ## Validação visual
 Tese: configuração operacional enxuta, uma entrada para o preço original e pendências que indiquem a próxima ação. Conteúdo: item, preço original, aviso específico e botão direto para oficina/posto e preço. Reutilizar transições e foco dos modais, com retorno ao rascunho após a etapa auxiliar; sem decoração adicional.
@@ -34,7 +34,13 @@ Implementação concluída. Novos itens recebem referência interna igual ao pre
 
 Verificação indisponível impede confirmar com informações antigas. Se o preço vencer entre a conferência e a confirmação, a rejeição do servidor dispara nova consulta e explica como corrigir. Versões futuras ou históricas não atendem à pendência. Nenhum desconto, abertura, vínculo ou referência existente é alterado automaticamente.
 
-Suíte completa: 540 aprovados/82 arquivos. Direcionados finais: 42 aprovados/4 arquivos; lint zero erros/39 avisos anteriores, build HML candidato aprovado. Pequena revisão final só captura o objeto de sequência das consultas para cleanup, mantendo o comportamento e retirando um aviso novo do lint; direcionados, lint e build repetidos depois dessa revisão. Publicação e QA em andamento.
+Suíte completa: 540 aprovados/82 arquivos. Direcionados finais: 42 aprovados/4 arquivos; lint zero erros/39 avisos anteriores, build HML candidato aprovado. Pequena revisão final só captura o objeto de sequência das consultas para cleanup, mantendo o comportamento e retirando um aviso novo do lint; direcionados, lint e build repetidos depois dessa revisão.
+
+Publicado somente o frontend HML em 27/10 às 11:44:18 (Brasília), fonte 0f83f8f, entrada index-DTvDUtbK.js. QA autenticada no contrato informado: editor sem segundo preço; aviso antecipado com código/descrição; item, única oficina e preço sugeridos na etapa auxiliar; Escape devolve foco à ação e mantém quantidade/documento digitados. Nenhum preço, item ou abertura foi salvo. A confirmação continua desabilitada enquanto falta preço vigente.
+
+Desktop e mobile 390×843/360×800, temas claro/escuro, modais sem overflow horizontal e ações por teclado conferidos. O estado da guia original foi lido antes de atualizar: formulário vazio, preservado vazio, mesmo contrato/aba/abertura e tema claro no encerramento. Emulação removida e guia temporária fechada; console sem erros. Algumas capturas da emulação conservaram frame intermediário da transição móvel; medidas DOM do modal estabilizado confirmam tela inteira. Captura clara final usada como evidência visual; animações globais não alteradas por causa da ferramenta.
+
+Verificação privada: nove assets conferidos por hash, configurações/backend preservados, 75 tabelas idênticas (27 de negócio), APIs prontas e PIDs de produção/HML inalterados. Produção continua limpa em 31543d4; tarefa das 06h saudável, resultado zero e próxima execução 28/10 às 06h, sem restauração extra. Evidências e rollback em storage/backups/20261027-contract-item-setup: item-original-desktop.png, opening-guidance-desktop.png, provider-price-desktop.png, opening-mobile-light.png, logs, fingerprints e frontend-before.
 
 ## Pendências / decisões
 O requisito de um preço vigente por item continua no servidor. A interface identifica a falta e oferece correção explícita. O preenchimento do preço sugerido será revisável e só terá efeito ao salvar; nenhum vínculo será criado por inferência.
