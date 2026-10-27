@@ -1,0 +1,54 @@
+/* Working headers: keep orientation and actions together without introductory copy. */
+body.internal-app-active .ui-page-header--compact {
+  align-items: center;
+  gap: 8px 16px;
+  margin-bottom: 12px;
+  padding-bottom: 8px;
+}
+body.internal-app-active .ui-page-header--compact .ui-page-header__copy { flex: 1 1 auto; }
+body.internal-app-active .ui-page-header--inline-actions { flex-direction: row; flex-wrap: wrap; }
+body.internal-app-active .ui-page-header--inline-actions .ui-page-header__actions { flex: 0 0 auto; width: auto; align-items: center; }
+body.internal-app-active .ui-page-header--inline-actions .ui-page-header__secondary { display: contents; }
+body.internal-app-active .ui-page-header--inline-actions .ui-page-header__secondary > span { display: inline-flex; }
+
+.fuel-workspace-navigation { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 12px; border-bottom: 1px solid var(--ui-border); }
+.fuel-workspace-views, .fuel-workspace-tools { display: flex; align-items: center; gap: 12px; min-width: 0; }
+.fuel-workspace-views > button {
+  min-height: 40px; padding: 8px 6px; border: 0; border-bottom: 2px solid transparent;
+  border-radius: 0; background: transparent; color: var(--ui-text-muted); font: inherit; font-weight: 600; cursor: pointer;
+}
+.fuel-workspace-views > button[aria-pressed='true'] { color: var(--ui-info-text); border-bottom-color: var(--ui-primary); }
+.fuel-workspace-views > button:hover { color: var(--ui-text); }
+.fuel-workspace-views > button:focus-visible, .fuel-stations-link:focus-visible { outline: 3px solid var(--ui-primary); outline-offset: 2px; }
+.fuel-stations-link { color: var(--ui-text-muted); font-size: 12px; white-space: nowrap; text-decoration: none; }
+.fuel-stations-link:hover { color: var(--ui-info-text); text-decoration: underline; }
+body.internal-app-active .app-shell .operation-page--fuel-supplies .fuel-workspace {
+  margin: 0; padding: 0; border: 0; border-radius: 0; box-shadow: none; background: transparent;
+}
+body.internal-app-active .app-shell .fuel-workspace .operation-toolbar {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  margin: 0 0 10px; padding: 0; border: 0; background: transparent; box-shadow: none;
+}
+body.internal-app-active .fuel-workspace .operation-toolbar > .app-input { flex: 1 1 220px; width: auto; min-width: 0; }
+.mobile-filters--collapsible { display: contents; }
+body.internal-app-active .mobile-filters--collapsible .mobile-filters__trigger { display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+.mobile-filters--collapsible .mobile-filters__trigger svg { width: 18px; height: 18px; }
+body.internal-app-active .mobile-filters--collapsible .mobile-filters__fields {
+  flex: 1 0 100%; display: flex; flex-wrap: wrap; align-items: flex-end; gap: 8px;
+  padding: 10px; background: var(--ui-surface-subtle); border: 1px solid var(--ui-border); border-radius: var(--ui-radius-control, 8px);
+}
+body.internal-app-active .mobile-filters--collapsible .mobile-filters__fields[hidden] { display: none; }
+body.internal-app-active .mobile-filters--collapsible .mobile-filters__fields > :is(.searchable-select, .app-select, .app-input, label) { flex: 1 1 150px; min-width: 0; }
+body.internal-app-active .mobile-filters--collapsible .mobile-filters__fields > button { flex: 0 0 auto; }
+
+@media (max-width: 720px) {
+  body.internal-app-active .ui-page-header--compact { margin-bottom: 10px; padding-bottom: 0; }
+  body.internal-app-active .operation-page--fuel-supplies .ui-page-header__title { font-size: 18px; }
+  body.internal-app-active .ui-page-header--inline-actions .ui-page-header__secondary .ui-icon-button { width: 44px; min-width: 44px; }
+  .fuel-workspace-navigation { gap: 8px; margin-bottom: 10px; }
+  .fuel-workspace-views, .fuel-workspace-tools { gap: 8px; }
+  .fuel-workspace-views > button { min-height: 44px; padding: 8px 10px; }
+  .fuel-stations-link { display: inline-flex; align-items: center; min-height: 44px; }
+  body.internal-app-active .fuel-workspace .operation-toolbar > .app-input { flex: 1 1 160px; width: 0; }
+  body.internal-app-active .mobile-filters--collapsible .mobile-filters__fields { display: grid; grid-template-columns: minmax(0, 1fr); width: 100%; }
+}

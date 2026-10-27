@@ -740,7 +740,6 @@ export default function PaymentProcessesPage({ embedded = false, initialView = '
     <div className="page-shell payment-process-page payment-workflow-page management-page management-page--payments">
       {embedded ? <div className="actions-inline contract-financial-actions">{financialActions}</div> : <PageHeader
         title="Processos de pagamento"
-        description="Workflow financeiro de combustíveis e manutenção por fatura, contrato, etapa e pendência."
         actions={financialActions}
       />}
 

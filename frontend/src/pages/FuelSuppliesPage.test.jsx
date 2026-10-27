@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   listSupplies: vi.fn(),
   listOrders: vi.fn(),
   canCreate: vi.fn(),
+  canView: vi.fn(),
 }))
 
 vi.mock('../api/client', () => ({ default: { get: mocks.get } }))
@@ -34,7 +35,7 @@ vi.mock('../context/AuthContext', () => ({
   useAuth: () => ({
     canCreate: mocks.canCreate,
     canEdit: () => true,
-    canView: () => true,
+    canView: mocks.canView,
     isAdmin: true,
     isProduction: false,
   }),
@@ -42,7 +43,6 @@ vi.mock('../context/AuthContext', () => ({
 vi.mock('../components/Modal', () => ({
   default: ({ open, title, children, onClose }) => (open ? <section role="dialog" aria-label={title}><button onClick={onClose}>Fechar</button>{children}</section> : null),
 }))
-vi.mock('../components/Pagination', () => ({ default: () => null }))
 vi.mock('../components/SearchableSelect', () => ({ default: ({ placeholder }) => <button type="button">{placeholder}</button> }))
 vi.mock('../components/FuelSupplyOrderCreateForm', () => ({ default: () => <div>Formulário de nova ordem</div> }))
 vi.mock('../components/FuelSupplyOrderBatchCreateForm', () => ({ default: () => <div>Formulário de ordens em lote</div> }))
@@ -79,6 +79,7 @@ describe('FuelSuppliesPage quick order action', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.canCreate.mockReturnValue(true)
+    mocks.canView.mockReturnValue(true)
     mocks.get.mockResolvedValue({ data: [] })
     mocks.listOrganizations.mockResolvedValue({ data: [] })
     mocks.listStations.mockResolvedValue({ data: [] })
@@ -114,10 +115,89 @@ describe('FuelSuppliesPage quick order action', () => {
   it('oferece o guia rápido manualmente para quem pode emitir ordens', async () => {
     renderPage('/abastecimentos')
 
-    fireEvent.click(await screen.findByRole('button', { name: 'Ver guia rápido' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Mais ações de abastecimentos' }))
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Ver guia rápido' }))
 
     expect(screen.getByRole('dialog', { name: 'Nova ordem de abastecimento em lote' })).toBeInTheDocument()
     expect(screen.getByTestId('fuel-batch-guided-tour')).toHaveTextContent('Tour de lote 1')
+  })
+
+  it('mostra apenas ordens na entrada e só consulta o histórico ao selecioná-lo', async () => {
+    renderPage('/abastecimentos?origem=menu')
+    await waitFor(() => expect(mocks.listOrders).toHaveBeenCalled())
+    expect(screen.getByRole('region', { name: 'Ordens de abastecimento' })).toBeInTheDocument()
+    expect(screen.queryByRole('region', { name: 'Histórico de abastecimentos' })).not.toBeInTheDocument()
+    expect(mocks.listSupplies).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByRole('button', { name: 'Histórico', exact: true }))
+    await waitFor(() => expect(mocks.listSupplies).toHaveBeenCalled())
+    expect(screen.queryByRole('region', { name: 'Ordens de abastecimento' })).not.toBeInTheDocument()
+    expect(screen.getByTestId('location')).toHaveTextContent('origem=menu&view=history')
+  })
+
+  it('preserva busca, filtros e página de ordens ao ir ao histórico e voltar', async () => {
+    mocks.listOrders.mockImplementation(async ({ page }) => ({ data: { data: [{ id: `ordem-${page}`, status: 'OPEN' }],
+      pagination: { page, pages: 3, total: 25, limit: 10 } } }))
+    renderPage('/abastecimentos')
+    fireEvent.change(screen.getByRole('textbox', { name: 'Buscar ordens' }), { target: { value: 'TESTE' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Filtros', exact: true }))
+    fireEvent.change(screen.getByRole('combobox', { name: 'Situação das ordens' }), { target: { value: 'OPEN' } })
+    await waitFor(() => expect(mocks.listOrders).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'TESTE', status: 'OPEN', page: 1 })))
+    fireEvent.click(await screen.findByRole('button', { name: 'Página 2' }))
+    await waitFor(() => expect(mocks.listOrders).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2 })))
+    fireEvent.click(screen.getByRole('button', { name: 'Histórico', exact: true }))
+    await screen.findByRole('region', { name: 'Histórico de abastecimentos' })
+    fireEvent.change(screen.getByRole('textbox', { name: 'Buscar abastecimentos confirmados' }), { target: { value: 'ETANOL' } })
+    await waitFor(() => expect(mocks.listSupplies).toHaveBeenLastCalledWith(expect.objectContaining({ search: 'ETANOL' })))
+    fireEvent.click(screen.getByRole('button', { name: 'Ordens', exact: true }))
+    expect(screen.getByRole('textbox', { name: 'Buscar ordens' })).toHaveValue('TESTE')
+    await waitFor(() => expect(mocks.listOrders).toHaveBeenLastCalledWith(expect.objectContaining({ page: 2, status: 'OPEN', search: 'TESTE' })))
+    fireEvent.click(screen.getByRole('button', { name: 'Histórico', exact: true }))
+    expect(screen.getByRole('textbox', { name: 'Buscar abastecimentos confirmados' })).toHaveValue('ETANOL')
+  })
+
+  it('abre links antigos de indicador no histórico e permanece nele ao limpar o KPI', async () => {
+    const response = paged([])
+    response.data.indicators = { items: [{ key: 'total', label: 'Abastecimentos', value: 221, unit: 'count' },
+      { key: 'alerts', label: 'Com alerta de consumo', value: 135, unit: 'count' }] }
+    mocks.listSupplies.mockResolvedValue(response)
+    renderPage('/abastecimentos?indicator=alerts&origem=painel')
+    await waitFor(() => expect(mocks.listSupplies).toHaveBeenCalledWith(expect.objectContaining({ indicator: 'alerts' })))
+    expect(mocks.listOrders).not.toHaveBeenCalled()
+    fireEvent.click(await screen.findByRole('button', { name: 'Limpar indicador' }))
+    expect(screen.getByTestId('location')).toHaveTextContent('origem=painel&view=history')
+    await waitFor(() => expect(mocks.listSupplies).toHaveBeenLastCalledWith(expect.objectContaining({ indicator: undefined })))
+    expect(screen.getByRole('region', { name: 'Histórico de abastecimentos' })).toBeInTheDocument()
+  })
+
+  it('mantém o contexto e o retorno ao contrato ao alternar as áreas', async () => {
+    renderPage('/abastecimentos?contract_id=contrato-teste&return_to=%2Fprocessos-pagamento%3Fcontract_id%3Dcontrato-teste')
+    fireEvent.click(screen.getByRole('button', { name: 'Histórico', exact: true }))
+    expect(screen.getByTestId('location')).toHaveTextContent('contract_id=contrato-teste&return_to=')
+    expect(screen.getByRole('link', { name: 'Voltar ao contrato' })).toHaveAttribute('href', '/processos-pagamento?contract_id=contrato-teste')
+    fireEvent.click(screen.getByRole('button', { name: 'Ordens', exact: true }))
+    expect(screen.getByTestId('location')).toHaveTextContent('view=orders')
+    expect(screen.getByRole('link', { name: 'Voltar ao contrato' })).toBeInTheDocument()
+  })
+
+  it('consulta somente histórico quando o perfil não pode ver ordens', async () => {
+    mocks.canView.mockReturnValue(false)
+    renderPage('/abastecimentos?view=orders')
+    await waitFor(() => expect(mocks.listSupplies).toHaveBeenCalled())
+    expect(mocks.listOrders).not.toHaveBeenCalled()
+    expect(screen.queryByRole('button', { name: 'Ordens', exact: true })).not.toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'Exportar ordens' })).not.toBeInTheDocument()
+  })
+
+  it('ignora erro tardio da área anterior depois de trocar a listagem', async () => {
+    let rejectOrders
+    mocks.listOrders.mockImplementation(() => new Promise((_resolve, reject) => { rejectOrders = reject }))
+    renderPage('/abastecimentos')
+    await waitFor(() => expect(rejectOrders).toBeDefined())
+    fireEvent.click(screen.getByRole('button', { name: 'Histórico', exact: true }))
+    await waitFor(() => expect(mocks.listSupplies).toHaveBeenCalled())
+    rejectOrders(new Error('Falha tardia das ordens'))
+    await waitFor(() => expect(screen.queryByText('Falha tardia das ordens')).not.toBeInTheDocument())
+    expect(screen.getByRole('region', { name: 'Histórico de abastecimentos' })).toBeInTheDocument()
   })
 })
 
@@ -125,6 +205,7 @@ describe('FuelSuppliesPage administrative adjustments', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.canCreate.mockReturnValue(true)
+    mocks.canView.mockReturnValue(true)
     mocks.get.mockResolvedValue({ data: [] })
     mocks.listOrganizations.mockResolvedValue({ data: [] })
     mocks.listStations.mockResolvedValue({ data: [] })
@@ -141,7 +222,8 @@ describe('FuelSuppliesPage administrative adjustments', () => {
 
     await waitFor(() => expect(mocks.listOrders).toHaveBeenCalledWith(expect.objectContaining({ page: 1, limit: 10 })))
     expect(fuelSupplyOrdersAPI.listAllForReport).not.toHaveBeenCalled()
-    fireEvent.click(screen.getByRole('button', { name: 'Exportar XLSX' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Exportar ordens' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Exportar XLSX' }))
     await waitFor(() => expect(exportRowsToXlsx).toHaveBeenCalledWith(expect.objectContaining({ rows: reportRows })))
   })
 
@@ -160,7 +242,7 @@ describe('FuelSuppliesPage administrative adjustments', () => {
           receipt_url: '/api/fuel-supplies/supply-1/receipt',
         }]))
 
-    renderPage('/abastecimentos')
+    renderPage('/abastecimentos?view=history')
 
     fireEvent.click(await screen.findByRole('button', { name: 'Retificar' }))
     expect(screen.getByRole('dialog', { name: 'Retificar confirmação de abastecimento' })).toBeInTheDocument()
@@ -217,7 +299,7 @@ describe('FuelSuppliesPage administrative adjustments', () => {
       { id: 'missing', vehicle_plate: 'ABC1D23', is_consumption_anomaly: true, anomaly_details: '   ' },
       { id: 'regular', vehicle_plate: 'DEF4G56', is_consumption_anomaly: false },
     ]))
-    renderPage('/abastecimentos')
+    renderPage('/abastecimentos?view=history')
     fireEvent.click(await screen.findByRole('button', { name: 'Ver motivo do alerta de ABC1D23' }))
     expect(screen.getByRole('dialog')).toHaveTextContent('Motivo não informado no registro deste abastecimento.')
     expect(screen.getByText('Regular')).toBeInTheDocument()
@@ -229,7 +311,7 @@ describe('FuelSuppliesPage administrative adjustments', () => {
       { id: 'first', vehicle_plate: 'ABC1D23', is_consumption_anomaly: true, anomaly_details: 'Motivo do primeiro registro.' },
       { id: 'second', vehicle_plate: 'DEF4G56', is_consumption_anomaly: true, anomaly_details: 'Motivo do segundo registro.' },
     ]))
-    renderPage('/abastecimentos')
+    renderPage('/abastecimentos?view=history')
     const first = await screen.findByRole('button', { name: 'Ver motivo do alerta de ABC1D23' })
     const second = screen.getByRole('button', { name: 'Ver motivo do alerta de DEF4G56' })
     fireEvent.mouseEnter(first)

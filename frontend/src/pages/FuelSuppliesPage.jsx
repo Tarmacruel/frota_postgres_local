@@ -3,7 +3,7 @@ import IndicatorBar from '../components/ui/IndicatorBar'
 import ContractReturnBanner from '../components/contracts/ContractReturnBanner'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import { useContractControl } from '../hooks/useContractFunding'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import FuelSupplyOrderCancelForm from '../components/FuelSupplyOrderCancelForm'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -127,14 +127,20 @@ function asArray(payload) {
 }
 
 export default function FuelSuppliesPage() {
-  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
-  const { selected: orderIndicator, metadata: orderIndicatorMetadata, setMetadata: setOrderIndicators, select: selectOrderIndicator } = useInteractiveKpis('order_indicator')
+  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators } = useInteractiveKpis()
+  const { selected: orderIndicator, metadata: orderIndicatorMetadata, setMetadata: setOrderIndicators } = useInteractiveKpis('order_indicator')
   useEffect(() => { setCurrentHistoryPage(1) }, [indicator])
   useEffect(() => { setCurrentOrdersPage(1) }, [orderIndicator])
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const { canCreate, canEdit, canView, isAdmin, isProduction } = useAuth()
   const control = useContractControl()
   const canViewOrders = canView('fuel_supply_orders')
+  const requestedView = searchParams.get('view')
+  const orderContext = searchParams.has('contract_id') || searchParams.has('order_indicator') || searchParams.has('acao') || searchParams.get('action') === 'create'
+  const historyContext = searchParams.has('indicator') || searchParams.has('vehicle_id')
+  const activeView = !canViewOrders ? 'history' : requestedView === 'history' ? 'history'
+    : requestedView === 'orders' || orderContext ? 'orders' : historyContext ? 'history' : 'orders'
   const canCreateOrder = canCreate('fuel_supply_orders')
   const canEditOrder = canEdit('fuel_supply_orders')
   const canRectifySupply = canEdit('fuel_supplies') && (isAdmin || isProduction)
@@ -168,6 +174,31 @@ export default function FuelSuppliesPage() {
   const [orderToAdjust, setOrderToAdjust] = useState(null)
   const [orderToCancel, setOrderToCancel] = useState(null)
   const [cancellingOrder, setCancellingOrder] = useState(false)
+
+  function selectView(view) {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      next.set('view', view)
+      return next
+    })
+    setActiveAlertSummary(null)
+  }
+
+  function selectWorkspaceIndicator(parameter, key, view) {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      next.set('view', view)
+      if (!key || key === 'total' || key === current.get(parameter)) next.delete(parameter)
+      else next.set(parameter, key)
+      next.delete('focus')
+      return next
+    })
+  }
+
+  function refreshOrdersAfterIssue() {
+    if (canViewOrders && activeView !== 'orders') selectView('orders')
+    else loadOrders()
+  }
 
   useEffect(() => {
     const action = searchParams.get('acao') || (searchParams.get('action') === 'create' ? 'nova-ordem' : '')
@@ -266,15 +297,17 @@ export default function FuelSuppliesPage() {
 
   useEffect(() => {
     historyRequest.current += 1
+    if (activeView !== 'history') return undefined
     const timer = setTimeout(() => loadRecords(), search.trim() ? 250 : 0)
-    return () => clearTimeout(timer)
-  }, [filters, search, currentHistoryPage, indicator])
+    return () => { clearTimeout(timer); historyRequest.current += 1 }
+  }, [filters, search, currentHistoryPage, indicator, activeView])
 
   useEffect(() => {
     ordersRequest.current += 1
+    if (activeView !== 'orders') return undefined
     const timer = setTimeout(() => loadOrders(), orderSearch.trim() ? 250 : 0)
-    return () => clearTimeout(timer)
-  }, [orderFilters, orderSearch, currentOrdersPage, canViewOrders, orderIndicator])
+    return () => { clearTimeout(timer); ordersRequest.current += 1 }
+  }, [orderFilters, orderSearch, currentOrdersPage, canViewOrders, orderIndicator, activeView])
 
   function buildOrderQueryParams({ includePaging = false, page = currentOrdersPage } = {}) {
     const params = includePaging ? { limit: 10, page, search: orderSearch.trim() || undefined } : {}
@@ -495,7 +528,7 @@ export default function FuelSuppliesPage() {
     {
       selector: '[data-tour="fuel-batch-create"]',
       title: 'Nova ordem em lote',
-      description: 'Use este atalho para preparar várias ordens de abastecimento de uma vez, sem substituir a emissão individual.',
+      description: 'Abra Nova ordem em lote no menu de ações para preparar várias ordens, mantendo a emissão individual disponível.',
       placement: 'bottom',
     },
     {
@@ -518,19 +551,34 @@ export default function FuelSuppliesPage() {
   return (
     <div className="surface-panel operation-page operation-page--fuel-supplies">
       <PageHeader
-        title="Gestão de abastecimentos"
-        description="Emita ordens para os postos vinculados e acompanhe o histórico confirmado com comprovantes e alertas de consumo."
+        title="Abastecimentos"
+        inlineActions
         actions={<>
           {canCreateOrder ? <button className="app-button" type="button" onClick={() => setIsOrderModalOpen(true)}>Nova ordem</button> : null}
-          {canCreateOrder && !searchParams.get('contract_id') ? <button className="secondary-button" data-tour="fuel-batch-create" type="button" onClick={() => setIsBatchOrderModalOpen(true)}>Nova ordem em lote</button> : null}
-          {canCreateOrder && !searchParams.get('contract_id') ? <button className="ghost-button" type="button" onClick={openBatchOrderTour}>Ver guia rápido</button> : null}
-          {searchParams.get('contract_id') ? <Link className="secondary-button" to="/abastecimentos">Operação geral</Link> : null}
-          <button className="ghost-button" type="button" onClick={() => { loadOrders(); loadRecords() }}>Atualizar painel</button>
+          <span data-tour="fuel-batch-create"><ActionMenu label="Mais ações de abastecimentos" items={[
+            canCreateOrder && !searchParams.get('contract_id') && { label: 'Nova ordem em lote', onClick: () => setIsBatchOrderModalOpen(true) },
+            canCreateOrder && !searchParams.get('contract_id') && { label: 'Ver guia rápido', onClick: openBatchOrderTour },
+            { label: 'Atualizar listagem', onClick: () => activeView === 'orders' ? loadOrders() : loadRecords() },
+            searchParams.get('contract_id') && { label: 'Operação geral', onClick: () => navigate('/abastecimentos') },
+          ]} /></span>
         </>}
       />
 
       <ContractReturnBanner returnTo={searchParams.get('return_to')} />
-      <p className="interactive-kpis__context"><Link to="/postos?indicator=active">Consultar os {fuelStations.length} postos ativos</Link></p>
+
+      <div className="fuel-workspace-navigation">
+        <nav aria-label="Áreas de abastecimento" className="fuel-workspace-views">
+          {canViewOrders ? <button type="button" aria-pressed={activeView === 'orders'} aria-controls={activeView === 'orders' ? 'fuel-orders-workspace' : undefined} onClick={() => selectView('orders')}>Ordens</button> : null}
+          <button type="button" aria-pressed={activeView === 'history'} aria-controls={activeView === 'history' ? 'fuel-history-workspace' : undefined} onClick={() => selectView('history')}>Histórico</button>
+        </nav>
+        <div className="fuel-workspace-tools">
+          <Link className="fuel-stations-link" to="/postos?indicator=active">Postos ({fuelStations.length})</Link>
+          {activeView === 'orders' ? <ActionMenu label="Exportar ordens" items={[
+            { label: 'Pré-visualizar PDF', onClick: handlePreviewOrdersPdf },
+            { label: 'Exportar XLSX', onClick: handleExportOrdersXlsx },
+          ]} /> : null}
+        </div>
+      </div>
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
@@ -552,16 +600,11 @@ export default function FuelSuppliesPage() {
         </div>
       ) : null}
 
-      {canViewOrders ? <div className="surface-panel panel-nested operation-module operation-module--orders">
-        <PageHeader title="Ordens de abastecimento" description="Acompanhe o ciclo completo das ordens emitidas para os postos credenciados." actions={<>
-            <button className="secondary-button" type="button" onClick={handlePreviewOrdersPdf}>Pré-visualizar PDF</button>
-            <button className="ghost-button" type="button" onClick={handleExportOrdersXlsx}>Exportar XLSX</button>
-        </>} />
-
+      {activeView === 'orders' ? <section id="fuel-orders-workspace" aria-label="Ordens de abastecimento" className="fuel-workspace operation-module operation-module--orders">
         <div className="operation-toolbar filter-inline">
-          <input className="app-input" placeholder="Buscar ordem por placa, secretaria, posto, solicitante ou observação" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} />
-          <MobileFilters activeCount={Object.values(orderFilters).filter(Boolean).length}>
-          <select className="app-select" value={orderFilters.status} onChange={(event) => setOrderFilters((prev) => ({ ...prev, status: event.target.value }))}>
+          <input className="app-input" aria-label="Buscar ordens" placeholder="Buscar ordem por placa, secretaria, posto, solicitante ou observação" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} />
+          <MobileFilters collapsibleDesktop activeCount={Object.entries(orderFilters).filter(([key, value]) => value && !(key === 'status' && value === 'TODOS')).length}>
+          <select className="app-select" aria-label="Situação das ordens" value={orderFilters.status} onChange={(event) => setOrderFilters((prev) => ({ ...prev, status: event.target.value }))}>
             {ORDER_STATUS_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
@@ -606,7 +649,7 @@ export default function FuelSuppliesPage() {
           </MobileFilters>
         </div>
 
-        <IndicatorBar label="Indicadores das ordens" state={{ selected: orderIndicator, metadata: orderIndicatorMetadata, select: selectOrderIndicator }} loading={ordersLoading} error={error} resultCount={ordersPagination.total} />
+        <IndicatorBar label="Indicadores das ordens" state={{ selected: orderIndicator, metadata: orderIndicatorMetadata, select: (key) => selectWorkspaceIndicator('order_indicator', key, 'orders') }} loading={ordersLoading} error={error} resultCount={ordersPagination.total} />
         <div className="table-wrap table-wrap-wide operation-table-card">
           <table className="data-table data-table-wide operation-table">
             <thead>
@@ -678,24 +721,16 @@ export default function FuelSuppliesPage() {
           </table>
         </div>
         <Pagination currentPage={currentOrdersPage} totalPages={totalOrdersPages} onPageChange={setCurrentOrdersPage} />
-      </div> : null}
+      </section> : null}
 
-      <div className="surface-panel panel-nested operation-module operation-module--fuel-history">
-        <IndicatorBar label="Indicadores dos abastecimentos" state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={historyLoading} error={error} resultCount={historyPagination.total} />
-        <div className="panel-heading">
-          <div>
-            <h3 className="section-title">Histórico de abastecimentos</h3>
-            <p className="section-copy">Consulta histórica dos abastecimentos confirmados, com comprovantes e alertas de consumo.</p>
-          </div>
-        </div>
-
+      {activeView === 'history' ? <section id="fuel-history-workspace" aria-label="Histórico de abastecimentos" className="fuel-workspace operation-module operation-module--fuel-history">
         <div className="operation-toolbar filter-inline">
-          <input className="app-input" placeholder="Buscar por placa, secretaria, posto, combustível ou aditivo" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <MobileFilters activeCount={Object.values(filters).filter(Boolean).length}>
+          <input className="app-input" aria-label="Buscar abastecimentos confirmados" placeholder="Buscar por placa, secretaria, posto, combustível ou aditivo" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <MobileFilters collapsibleDesktop activeCount={Object.values(filters).filter(Boolean).length}>
           <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veículos' }, ...(filters.vehicle_id && !vehicles.some((item) => item.id === filters.vehicle_id) ? [{ value: filters.vehicle_id, label: 'Veiculo do historico de emprestimo' }] : []), ...vehicles.map(buildVehicleOption)]} onOpen={refreshVehicleOptions} placeholder="Filtrar veículo" />
           <SearchableSelect value={filters.organization_id} onChange={(value) => setFilters((prev) => ({ ...prev, organization_id: value }))} options={organizationFilterOptions} placeholder="Filtrar secretaria" />
           <SearchableSelect value={filters.fuel_station_id} onChange={(value) => setFilters((prev) => ({ ...prev, fuel_station_id: value }))} options={[{ value: '', label: 'Todos os postos' }, ...fuelStations.map(buildStationOption)]} placeholder="Filtrar posto" />
-          <select className="app-input" value={filters.only_anomalies} onChange={(event) => setFilters((prev) => ({ ...prev, only_anomalies: event.target.value }))}>
+          <select className="app-input" aria-label="Alertas de consumo" value={filters.only_anomalies} onChange={(event) => setFilters((prev) => ({ ...prev, only_anomalies: event.target.value }))}>
             <option value="">Todos</option>
             <option value="true">Somente alertas</option>
           </select>
@@ -703,6 +738,7 @@ export default function FuelSuppliesPage() {
           </MobileFilters>
         </div>
 
+        <IndicatorBar label="Indicadores dos abastecimentos" state={{ selected: indicator, metadata: indicatorMetadata, select: (key) => selectWorkspaceIndicator('indicator', key, 'history') }} loading={historyLoading} error={error} resultCount={historyPagination.total} />
         <div className="table-wrap table-wrap-wide operation-table-card">
           <table className="data-table data-table-wide operation-table">
             <thead>
@@ -750,7 +786,7 @@ export default function FuelSuppliesPage() {
           </table>
         </div>
         <Pagination currentPage={currentHistoryPage} totalPages={totalHistoryPages} onPageChange={setCurrentHistoryPage} />
-      </div>
+      </section> : null}
 
       <Modal open={Boolean(alertSupply)} onClose={() => setAlertSupply(null)}
         title={`Alerta de abastecimento${alertSupply?.vehicle_plate ? ` — ${alertSupply.vehicle_plate}` : ''}`}
@@ -786,7 +822,7 @@ export default function FuelSuppliesPage() {
           onSuccess={({ message, order }) => {
             setFeedback(message)
             setLastIssuedOrder(order || null)
-            loadOrders()
+            refreshOrdersAfterIssue()
           }}
         />
       </Modal>
@@ -798,7 +834,7 @@ export default function FuelSuppliesPage() {
           onClose={() => setOrderToCancel(null)} onSaved={() => {
             setFeedback(`Ordem ${formatOrderNumber(orderToCancel)} cancelada com sucesso.`)
             setOrderToCancel(null)
-            loadOrders()
+            refreshOrdersAfterIssue()
           }} />}
       </Modal>
       <Modal
@@ -815,7 +851,7 @@ export default function FuelSuppliesPage() {
           onSuccess={({ message }) => {
             setFeedback(message)
             setLastIssuedOrder(null)
-            loadOrders()
+            refreshOrdersAfterIssue()
           }}
         />
       </Modal>
@@ -841,7 +877,6 @@ export default function FuelSuppliesPage() {
             onSuccess={(message) => {
               setFeedback(message)
               loadRecords()
-              loadOrders()
             }}
           />
         ) : null}

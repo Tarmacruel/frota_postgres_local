@@ -113,7 +113,6 @@ export default function VehicleLoansPage() {
     <section className="card loan-section operation-page operation-page--loans">
       <PageHeader
         title="Empréstimos entre secretarias"
-        description="Entrega, recebimento e devolução de veículos. A secretaria de origem permanece no cadastro."
         actions={(
           <>
           {user.role === 'ADMIN' && canCreate('vehicle_loans') && <button className="ghost-button" onClick={() => { setFeedback(''); setModal('regularization') }}>Regularizar empréstimo anterior</button>}

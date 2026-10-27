@@ -351,7 +351,6 @@ export default function FuelStationsPage() {
     <div className="surface-panel operation-page management-page management-page--stations">
       <PageHeader
         title="Postos de combustível"
-        description="Cadastro administrativo de postos credenciados, relatórios institucionais e vínculos de usuários."
         actions={<>
           {canCreateStation ? <button className="app-button" type="button" onClick={openCreateModal}>Novo posto</button> : null}
           <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>

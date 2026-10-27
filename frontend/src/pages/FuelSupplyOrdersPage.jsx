@@ -180,7 +180,6 @@ export default function FuelSupplyOrdersPage() {
     <div className="surface-panel operation-page operation-page--open-orders">
       <PageHeader
         title="Ordens de abastecimento abertas"
-        description="Confirme abastecimentos pendentes e acompanhe prazos em tempo real."
       />
 
       <div className="toolbar-card operation-toolbar">

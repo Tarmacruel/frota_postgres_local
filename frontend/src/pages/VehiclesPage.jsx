@@ -870,7 +870,6 @@ export default function VehiclesPage() {
     <div className="surface-panel operation-page operation-page--vehicles">
       <PageHeader
         title="Operação de veículos"
-        description="Gerencie placa, chassi, tipo do veículo e lotação estruturada sem sair da consulta principal."
         actions={(
           <>
           {canEditVehicle ? <button className="secondary-button" type="button" data-tour="vehicle-tags-catalog" onClick={() => setTagsOpen(true)}>Minhas etiquetas</button> : null}

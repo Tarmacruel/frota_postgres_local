@@ -168,7 +168,6 @@ export default function ClaimsPage() {
     <div className="surface-panel operation-page operation-page--claims">
       <PageHeader
         title="Sinistros"
-        description="Registre ocorrências, acompanhe o status e mantenha o histórico de prejuízos e análises da frota."
         actions={<>
           {canCreateClaim ? <button className="app-button" type="button" onClick={() => { setEditingRecord(null); setClaimFormBusy(false); setIsModalOpen(true) }}>Novo sinistro</button> : null}
           <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>

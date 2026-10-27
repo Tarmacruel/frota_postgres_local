@@ -363,7 +363,6 @@ export default function UsersPage() {
     <div className="surface-panel operation-page management-page management-page--users">
       <PageHeader
         title="Gestão de usuários"
-        description="Gerencie perfis administrativos, operadores de produção, postos credenciados e usuários apenas de consulta."
         actions={<>
           <button className="app-button" type="button" onClick={openCreateModal}>Novo usuário</button>
           <button className="secondary-button" type="button" onClick={handleExportPdf}>Pré-visualizar PDF</button>

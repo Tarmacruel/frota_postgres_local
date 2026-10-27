@@ -283,7 +283,6 @@ export default function DriversPage() {
     <div className="surface-panel operation-page operation-page--drivers">
       <PageHeader
         title="Condutores cadastrados"
-        description="Mantenha a base reutilizável de condutores para posse, busca e futuros módulos operacionais."
         actions={(
           <>
           {canCreateDriver ? <button className="app-button" type="button" onClick={openCreateModal}>Novo condutor</button> : null}

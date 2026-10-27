@@ -139,7 +139,7 @@ function ContractWorkspace({ quantityEnabled = false }) {
     window.requestAnimationFrame(() => returnFocusRef.current?.focus({ preventScroll: true }))
   }
   return <div className="page-shell contract-workspace contract-workspace--daily">
-    <PageHeader title="Contratos e saldos" description="Consulte saldos, resolva pendências e acompanhe os pedidos."
+    <PageHeader title="Contratos e saldos"
       actions={<>{manage && view === 'contracts' ? <button className="app-button" onClick={() => show('contract')}>Novo contrato</button> : null}<button className="ghost-button" onClick={refresh} disabled={listNeeded && loading}>Atualizar</button></>} />
     <nav className="contract-workspace__tabs" aria-label="Áreas do acompanhamento contratual">{views.map(([key, label]) => <button key={key} type="button" aria-pressed={view === key} onClick={() => update({ view: key })}>{label}</button>)}</nav>
     {error && listNeeded ? <div className="alert alert-error" role="alert">{error}<button className="ghost-button" onClick={refresh}>Tentar novamente</button></div> : null}

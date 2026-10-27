@@ -345,7 +345,6 @@ export default function MaintenancePage() {
     <div className={`surface-panel operation-page operation-page--maintenance${contractMode.enabled ? ' maintenance-unified' : ''}`}>
       <PageHeader
         title="Manutenções"
-        description="Acompanhe revisões concluídas e serviços ainda em aberto sem sair do painel principal."
         actions={(
           <>
           {canCreateMaintenance ? (

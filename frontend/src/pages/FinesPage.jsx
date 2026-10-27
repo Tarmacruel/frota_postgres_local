@@ -325,7 +325,6 @@ export default function FinesPage() {
     <div className="surface-panel operation-page operation-page--fines">
       <PageHeader
         title="Multas"
-        description="Registre autos de infração, acompanhe vencimentos e status de pagamento, recurso ou deferimento."
         actions={<>
           {canCreateFine ? <button className="app-button" onClick={openCreate}>Nova multa</button> : null}
           <button className="secondary-button" type="button" onClick={handlePreviewPdf}>Pré-visualizar PDF</button>

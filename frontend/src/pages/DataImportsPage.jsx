@@ -941,7 +941,7 @@ export default function DataImportsPage() {
 
   return (
     <div className="page-shell data-import-page management-page management-page--imports">
-      <PageHeader title="Importação e exportação de dados" description="Analise relatórios externos, aprove linha a linha e integre somente dados revisados ao cadastro oficial." />
+      <PageHeader title="Importação e exportação de dados" />
 
       {error ? <div className="alert alert-error">{error}</div> : null}
       {feedback ? <div className="alert alert-success">{feedback}</div> : null}
