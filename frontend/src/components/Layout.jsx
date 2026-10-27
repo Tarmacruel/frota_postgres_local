@@ -29,7 +29,7 @@ export default function Layout() {
   const cpfRegistrationRequired = Boolean(mustRegisterCpf) && !passwordChangeRequired
   const accessBlocked = passwordChangeRequired || cpfRegistrationRequired
   const pendingLoans = usePendingVehicleLoans(user?.id, !accessBlocked && canView('vehicle_loans'))
-  const canCreateFuelSupplyOrders = canCreate('fuel_supply_orders')
+  const canCreateFuelSupplyOrders = canView('fuel_supplies') && canCreate('fuel_supply_orders')
   const mainRef = useRef(null)
   const navRef = useRef(null)
   const navTriggerRef = useRef(null)
@@ -82,8 +82,7 @@ export default function Layout() {
           { to: '/manutencoes', label: 'Manutenções', description: 'Custos', icon: 'wrench' },
           { to: '/sinistros', label: 'Sinistros', description: 'Ocorrências', icon: 'incident' },
           { to: '/multas', label: 'Multas', description: 'Autos', icon: 'ticket' },
-          ...(canView('fuel_supplies') ? [{ to: '/abastecimentos', label: 'Abastecimentos', description: 'Consumo', icon: 'fuel' }] : []),
-          ...(canView('fuel_supply_orders') ? [{ to: '/ordens-abastecimento', label: 'Ordens abertas', description: 'Pendentes', icon: 'orders' }] : []),
+          ...(canView('fuel_supplies') || canView('fuel_supply_orders') ? [{ to: '/abastecimentos', label: 'Abastecimentos', description: 'Consumo', icon: 'fuel' }] : []),
         ],
       },
     ]
@@ -99,7 +98,8 @@ export default function Layout() {
       '/abastecimentos': 'fuel_supplies',
       '/ordens-abastecimento': 'fuel_supply_orders',
     }
-    sections[1].items = sections[1].items.filter((item) => canView(moduleByRoute[item.to]))
+    sections[1].items = sections[1].items.filter((item) => item.to === '/abastecimentos'
+      ? canView('fuel_supplies') || canView('fuel_supply_orders') : canView(moduleByRoute[item.to]))
     if (sections[1].items.length === 0) sections.splice(1, 1)
 
     if (isAdmin || canView('master_data') || canView('fuel_stations') || canView('payment_processes') || canView('analytics') || canView('data_imports')) {
@@ -138,7 +138,7 @@ export default function Layout() {
     ['/', '/vehicles', '/posses', '/condutores'].includes(item.to),
   )
   const fuelSuppliesItem = navSections.flatMap((section) => section.items).find((item) => item.to === '/abastecimentos')
-  if (fuelSuppliesItem && canCreate('fuel_supply_orders')) {
+  if (fuelSuppliesItem && canCreateFuelSupplyOrders) {
     // Keep room for Menu, which exposes every permitted module on a phone.
     const driversIndex = mobileTabs.findIndex((item) => item.to === '/condutores')
     if (driversIndex >= 0) mobileTabs.splice(driversIndex, 1)
@@ -394,8 +394,8 @@ export default function Layout() {
     }
     if (document.document_type === 'FUEL_SUPPLY_ORDER') {
       navigate(document.source_id
-        ? `/ordens-abastecimento?focus=${encodeURIComponent(document.source_id)}`
-        : '/ordens-abastecimento')
+        ? `/abastecimentos?view=open&focus=${encodeURIComponent(document.source_id)}`
+        : '/abastecimentos?view=open')
       return
     }
     if (document.source_id) {
