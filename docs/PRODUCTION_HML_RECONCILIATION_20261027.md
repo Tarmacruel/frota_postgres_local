@@ -25,7 +25,13 @@ Não há migrations novas nesta conciliação. HML permanece em0062_items_networ
 
 Branch isolada:feature/hml-production-sync-20261027. Execução registrada em[ExecPlan](EXECPLAN_PRODUCTION_SYNC_HML_20261027.md). Backup privado em `storage/backups/20261027-production-sync`: fonte Git anterior, build/configurações anteriores, dump consistente HML, fingerprints, logs e capturas. Nenhuma credencial deve ser incluída em commits ou relatórios públicos.
 
-Publicação pendente de gates finais e conferência visual. Produção será apenas consultada, sem escrita, reinício ou publicação. Não será executada nova restauração da homologação: a atualização de27/10 concluiu06:00:57, resultado0, com configurações preservadas e aplicação da migration até0062.
+Publicada na homologação em 27/10, às 08:01:17, com refinamento posterior somente de texto no frontend. Merge 86fe9ae e ajuste d537298. Produção permaneceu em 31543d4, com working tree limpo e mesmo processo; foi apenas consultada, sem escrita, reinício ou publicação. A atualização diária de 27/10 havia concluído às 06:00:57, resultado 0; nenhuma nova restauração foi executada.
+
+Validação: 708 testes backend, 69 PostgreSQL real, 511 frontend/81 arquivos; 38 regressões da interface após o refinamento final. Lint com 0 erros e 39 avisos anteriores; build em modo homologation aprovado. As 75 tabelas foram preservadas na ativação e as 27 tabelas de contratos, abastecimentos, manutenção e pagamentos continuaram idênticas durante a QA visual. Configurações sem alteração e nove assets servidos conferidos.
+
+Interface autenticada conferida em desktop e mobile 390×843 CSS, claro/escuro, sem overflow. Pedido Prime sem preço ou reserva e correção BRL com prévia conferidos sem salvar; contrato fixo continua exigindo conferência quantitativa, com reserva existente preservada e editor por item disponível. A sessão original foi devolvida à página inicial, com tema e dimensões restaurados. [Captura final](../storage/backups/20261027-production-sync/sync-final-proof.png).
+
+A branch isolada inclui a linha produtiva inteira como ancestral, sem apagar funcionalidades exclusivas da HML. A tarefa das 06h continua sendo sincronização de dados; futuras melhorias de código feitas diretamente em produção precisarão da mesma integração auditada, em vez de sobrescrever a árvore HML.
 
 ## Reversão
 

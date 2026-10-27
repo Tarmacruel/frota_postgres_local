@@ -59,3 +59,7 @@ Evidências, dumps consistentes, zip de anexos, configurações, bundle Git e bu
 ## Reversão
 
 Somente HML: parar API6969 pelo gerenciador validado, preservar gravações novas, desativar a flag quantitativa, restaurar a fonte e o build de referência documentados no bundle/backup e iniciar a API. Manter migrations aditivas e movimentos; não executar downgrade ou restaurar banco automaticamente. Não usar o comando geral de parada que também desliga PostgreSQL. Produção, PostgreSQL5432 e Cloudflare não fazem parte desta publicação.
+
+## Atualização de compatibilidade — 27/10/2026
+
+O bloqueio temporário da modalidade NETWORK_VALUE foi removido após incorporar e validar sua operação produtiva na HML. Rede por valor emite sem reserva ou preço unitário; contratos por item e manutenção preservam abertura quantitativa, reservas e aditivos. Consulte a [conciliação de produção com HML](PRODUCTION_HML_RECONCILIATION_20261027.md) para as diferenças intencionais, validação e reversão desta integração.
