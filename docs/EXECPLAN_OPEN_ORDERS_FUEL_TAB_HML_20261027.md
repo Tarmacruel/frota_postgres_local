@@ -20,7 +20,7 @@ Sem backend, schema, cálculo financeiro, permissão concedida, cópia de dados,
 2. [x] Incorporar Ordens abertas, isolando seu indicador e preservando estado da consulta ao alternar.
 3. [x] Consolidar navegação; adaptar endereço antigo preservando foco de assinatura/indicadores e acesso dos postos.
 4. [x] Regressões, suíte completa frontend, lint e build candidato HML.
-5. [ ] Publicar somente frontend, conferir desktop/mobile/claro/escuro, dados/PIDs/configurações e documentar.
+5. [x] Publicar somente frontend, conferir desktop/mobile/claro/escuro, dados/PIDs/configurações e documentar.
 
 ## Validação visual
 Tese: uma área de abastecimento com três consultas bem identificadas e uma única lista visível. Conteúdo: cabeçalho compacto, Ordens / Ordens abertas / Histórico, filtros e KPIs próprios, registro com próxima ação. No celular, priorizar as três áreas e transferir utilitários para o menu existente, evitando quebra do cabeçalho. Reutilizar foco, menu, diálogos e transições existentes, sem ornamentos.
@@ -29,7 +29,15 @@ Tese: uma área de abastecimento com três consultas bem identificadas e uma ún
 Testar perfil completo, somente histórico, somente ordens e sem acesso; não fazer chamadas de histórico/catálogos para postos sem permissão. Confirmar carregamento só da área ativa, preservação de busca/página, foco da assinatura após redirecionamento e separação de indicadores. Conferir confirmação/vínculo/assinaturas sem executar lançamentos reais no navegador. Testes de UI com APIs isoladas, suíte completa, lint e build --mode homologation fora de dist.
 
 ## Resultado
-Pronta para publicação HML:528 testes/82 arquivos,67 direcionados finais em5 arquivos, lint0 erros/39 avisos anteriores e build HML aprovados. Abrange rota autenticada/autorizada, endereço antigo com foco/indicador/hash, três áreas, isolamento dos postos, preservação da consulta, confirmação e atualização apenas das abertas. Refinamento final limpa erro da área anterior ao navegar, com regressão específica; suíte direcionada, lint e build repetidos após esse ajuste. Nenhum arquivo de backend alterado.
+Frontend publicado somente na HML às 09:59:02 de 27/10/2026 (Brasília), fonte b54dea2, entrada index-zOjYSp5i.js. Suíte completa: 528 testes em 82 arquivos. Após refinamento final que limpa o erro da área anterior ao navegar, passaram 67 testes direcionados em cinco arquivos, lint com zero erros/39 avisos anteriores e build HML. Abrange rota autenticada/autorizada, endereço antigo com foco/indicador/hash, três áreas, isolamento dos postos, preservação da consulta, confirmação e atualização apenas das abertas. Nenhum arquivo de backend alterado.
+
+QA desktop autenticada confirmou redirecionamento do endereço antigo, uma entrada lateral, três áreas, uma listagem visível, prazos, paginação e abertura dos diálogos originais de confirmação/assinatura. Após o usuário renovar a sessão expirada, pesquisa e página 2 foram preservadas ao alternar as áreas; consulta histórica, filtros recolhíveis, atualização e utilitários móveis foram conferidos. Nenhum abastecimento foi confirmado e nenhum documento foi emitido ou assinado.
+
+Mobile real em 390×844 e 360×801, claro/escuro: três áreas cabem sem rolagem horizontal, alvos com 44 px, uma lista visível e confirmação em painel adaptado sem overflow interno. Menu das ordens preserva PDF/XLSX, postos, lote e guia. Console sem erros após a nova autenticação. Rota /abastecimentos, busca vazia, tema claro e viewport 1597×930 originais restaurados; guia temporária fechada.
+
+Verificação privada de publicação aprovada: 75 tabelas idênticas, incluindo 27 operacionais/financeiras, configurações e backend preservados, nove assets servidos conferidos por hash e ambas as APIs saudáveis. PIDs 6969/8000 inalterados, produção limpa em 31543d4. Rotina 06h saudável (resultado zero), próxima execução 28/10 às 06h; nenhuma restauração extra. Backup, fingerprints, logs e capturas em storage/backups/20261027-open-orders-tab. Branch isolada feature/open-orders-fuel-tab-hml-20261027 publicada no remoto, sem merge em main.
+
+Capturas verificadas: open-tab-desktop.png, open-tab-mobile-light.png, open-tab-mobile-dark.png e open-confirm-mobile-dark.png. Arquivos privados de publicação e retorno: frontend-before, frontend-candidate, publication.json e final-verification.json. Banco e configurações não fazem parte do rollback desta entrega.
 
 ## Pendências / decisões
 - Abastecimentos poderá ser aberto usando qualquer uma das duas permissões existentes. Cada área continua exigindo seu acesso anterior: consulta geral exige fuel_supplies:view e fuel_supply_orders:view; histórico exige fuel_supplies:view; abertas exige fuel_supply_orders:view. Guardas de API não mudam.
