@@ -36,6 +36,12 @@ body.internal-app-active :is(.contract-amendment-editor,.contract-item-editor) :
 .contract-item-price-list{margin-top:12px}
 .contract-items-panel .contract-order-panel__heading{flex-wrap:wrap}
 .contract-items-panel td input{min-width:100px}
+.contract-item-readiness{padding:12px 16px;border-left:3px solid var(--ui-warning);background:var(--ui-surface-subtle);font-size:13px;color:var(--ui-text)}
+.contract-item-readiness>p{margin:6px 0 10px;color:var(--ui-text-muted)}
+.contract-item-readiness>ul{list-style:none;margin:0;padding:0}
+.contract-item-readiness li{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--ui-border)}
+.contract-item-readiness li>span{min-width:0;overflow-wrap:anywhere}
+.contract-item-readiness li>button{flex-shrink:0}
 @keyframes contract-item-reveal{from{opacity:0;transform:translateY(3px)}to{opacity:1;transform:translateY(0)}}
 @media(max-width:700px){
  body.internal-app-active .modal-backdrop:has(>:is(.contract-amendment-editor,.contract-item-editor)){padding:0;align-items:stretch;justify-items:stretch}
@@ -52,6 +58,8 @@ body.internal-app-active :is(.contract-amendment-editor,.contract-item-editor) :
  .contract-item-lines__row>button{justify-self:end}
  .contract-item-lines__description{grid-column:1/-1}
  .contract-editor-footer>.app-button{flex:1}
+ .contract-item-readiness li{align-items:stretch;flex-direction:column;gap:8px}
+ .contract-item-readiness li>button{min-height:44px}
  .contract-amendment-impact{gap:12px}
 }
 @media(prefers-reduced-motion:reduce){.contract-amendment-item{animation:none}}
