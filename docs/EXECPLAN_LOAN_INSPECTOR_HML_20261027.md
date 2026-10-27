@@ -21,7 +21,7 @@ Sem backend, schema, payloads, permissões, regras de aceite, cancelamento, repr
 2. [x] Extrair painel modal responsivo com abas, pendências e rodapé.
 3. [x] Integrar URL id, preservação de filtros/página/posição, foco e formulários aninhados.
 4. [x] Regressões, suíte frontend, lint e build HML candidato.
-5. [ ] Publicar só frontend HML, conferir desktop/mobile/claro/escuro e integridade; documentar e enviar branch.
+5. [x] Publicar só frontend HML, conferir desktop/mobile/claro/escuro e integridade; documentar e enviar branch.
 
 ## Validação visual
 Tese: consulta focada, com a lista preservada ao fundo, hierarquia enxuta e uma ação principal. Conteúdo: identificação/status, origem→destino, alerta compacto de pendências, abas e conteúdo rolável, rodapé fixo. Interação: abertura lateral curta, estados de foco/aba e retorno ao disparador; respeitar redução de movimento, sem animação ornamental. Abas/rodapé não encolhem nem desaparecem ao consultar conteúdo longo. No celular, uma coluna e controles de toque.
@@ -32,7 +32,13 @@ Cobrir link direto, abrir/fechar/voltar sem apagar KPI/busca/página, permissõe
 ## Resultado
 Painel e integração implementados; documentos são montados na primeira visita e preservados entre abas. Busca, situação, KPI, parâmetros extras, página e posição da lista são mantidos ao fechar ou voltar. Foco fica no painel durante o carregamento e retorna ao disparador ou à lista; Escape fecha primeiro o formulário aninhado. Nenhuma regra de negócio alterada.
 
-Suíte final: 569 testes frontend/84 arquivos; lint zero erros/39 avisos anteriores; build HML candidato aprovado. Publicação e inspeção autenticada em andamento.
+Suíte final: 569 testes frontend/84 arquivos; lint zero erros/39 avisos anteriores; build HML candidato aprovado. Publicado em 27/10/2026 às 17:10:02 (Brasília), fonte 363477e, apenas frontend HML. Entrada index-DW7V4PP8.js observada na guia original e na guia de QA; nove assets servidos conferidos. Nenhum reinício da API.
+
+QA autenticada: desktop 1600×900 e viewport padrão, mobile 390×843/360×800, claro/escuro, sem overflow horizontal. Abas de 46 px e rodapé preservados ao rolar Resumo e Documentos. Histórico e anexo impresso existentes acessíveis. Edição abre o formulário original sobre o painel; Escape fecha só o formulário e retorna ao menu. Busca/situação/foco preservados; na lista longa mobile, posição 1505 px mantida ao fechar e ao voltar no navegador. Não foram enviados formulários, arquivos ou assinaturas, nem executados aceites, rejeições ou cancelamentos.
+
+Console sem erros. Emulação removida, tema claro restaurado e guia original no mesmo empréstimo solicitado, com o novo painel aberto; guia de QA encerrada. Capturas privadas: loan-inline-before.png, loan-desktop-light.png, loan-desktop-dark.png, loan-mobile-light.png e loan-mobile-dark.png no diretório de backup.
+
+Verificação final: 75 tabelas idênticas, incluindo 38 tabelas de negócio/documentos protegidas; configurações/backend preservados. API HML PID21064 e produção PID2512 inalterados; produção limpa no HEAD31543d4 e pronta. Rotina06h resultado0 em27/10, próxima28/10/2026 06h, sem execução adicional. Backup e reversão prontos no diretório privado, sem dados sensíveis no repositório.
 
 ## Pendências / decisões
 - Manter id da URL e demais parâmetros ao selecionar/fechar. Não transformar filtros locais em novos filtros de API.
