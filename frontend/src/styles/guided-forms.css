@@ -66,7 +66,7 @@ body.internal-app-active .modal-shell:has(> .modal-body > .guided-form) > .modal
 
 /* Keep legacy mobile sheet rules from adding spacing inside the guided footer. */
 body.internal-app-active .modal-shell .guided-form .guided-form__footer .modal-actions { position: static; padding: 0; margin: 0; border: 0; background: transparent; }
-body.internal-app-active .modal-shell .guided-form .guided-form__body .form-field { align-self: start; justify-content: start; }
+body.internal-app-active .modal-shell .guided-form .guided-form__body .form-field { align-self: start; align-content: start; }
 body.internal-app-active .modal-shell .guided-form .guided-form__body label { color: var(--ui-text); font-weight: 500; }
 body.internal-app-active .modal-shell .guided-form[data-attempted="true"] .guided-form__body .form-field:has(:invalid) > label,
 body.internal-app-active .modal-shell .guided-form[data-attempted="true"] .guided-form__body label:has(:invalid),
