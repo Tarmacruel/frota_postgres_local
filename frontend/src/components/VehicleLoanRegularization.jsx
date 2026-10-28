@@ -95,6 +95,8 @@ export default function VehicleLoanRegularization({ onClose, onSaved, canView })
   const area = (key, label, minLength = 8, maxLength = 2000) => <LoanField wide name={key} label={label} error={wizard.errors[key]}><textarea className="app-input" rows={3} required minLength={minLength} maxLength={maxLength} value={form[key]} onChange={(event) => change(key, event.target.value)} /></LoanField>
   const complete = validation.map((issues, index) => index === 3 ? Boolean(preview?.can_confirm && reviewed) : !issues.length)
   const recoveryStep = (message) => ({ destination: 0, delivery: 1, period: 1, operations: 1, review: 2 }[loanFeedback(message).target] ?? 2)
+  const firstInvalidField = Object.entries(wizard.errors).find(([, message]) => message)?.[0]
+  const invalidStep = validation.findIndex((issues) => issues.some(([field]) => field === firstInvalidField))
   return <LoanFormLayout title="Regularizar empréstimo anterior" steps={steps} step={wizard.step} complete={complete} onStep={go}
     onClose={onClose} busy={busy} onSubmit={inspect} formRef={wizard.formRef}
     footer={<><span>{wizard.step === 3 ? preview?.can_confirm ? 'Confira os efeitos para liberar a confirmação.' : 'A prévia precisa estar sem impedimentos.' : `Etapa ${wizard.step + 1} de 4 · nada foi registrado`}</span><div>
@@ -102,7 +104,7 @@ export default function VehicleLoanRegularization({ onClose, onSaved, canView })
       {wizard.step === 3 && preview ? <button type="button" className="app-button" disabled={!preview.can_confirm || !reviewed || busy} onClick={confirm}>{busy ? 'Processando…' : 'Confirmar regularização'}</button>
         : <button className="app-button" disabled={!catalog || busy}>{busy ? 'Processando…' : wizard.step < 2 ? 'Continuar' : 'Conferir prévia da regularização'}</button>}
     </div></>}>
-    <LoanFeedback error={error} readOnly={errorReadOnly}><button type="button" className="ghost-button" disabled={busy} onClick={() => wizard.show(recoveryStep(error))}>Rever preenchimento</button></LoanFeedback>
+    <LoanFeedback error={error} readOnly={errorReadOnly}><button type="button" className="ghost-button" disabled={busy} onClick={() => wizard.show(invalidStep >= 0 ? invalidStep : recoveryStep(error))}>Rever preenchimento</button></LoanFeedback>
     {!catalog ? <div className="loan-editor__hint"><p role="status">{error ? 'As opções ainda não foram carregadas.' : 'Carregando veículos, secretarias e lotações…'}</p><button type="button" className="ghost-button" onClick={() => setRetry((value) => value + 1)}>Recarregar opções</button></div> : null}
     <fieldset disabled={!catalog || busy}>
       <LoanFormStep title="Qual situação precisa ser registrada?" description="Registro administrativo de um empréstimo já ocorrido. Assinaturas e aceites do passado não serão criados." hidden={wizard.step !== 0}>

@@ -33,7 +33,8 @@ export function loanFeedback(error, fallback, readOnly = false) {
   let title = 'Não foi possível concluir'
   let guidance = 'Confira a mensagem e os dados informados. Se o problema persistir, informe a referência ao suporte.'
   let target = 'review'
-  if (status === 401) { title = 'Sua sessão expirou'; guidance = 'Entre novamente na homologação e retorne a este empréstimo. Não informe sua senha ao suporte.'; target = 'session' }
+  if (/^revise os campos destacados/i.test(message)) { title = 'Complete os campos desta etapa'; guidance = 'Os campos que precisam de atenção estão destacados. Corrija-os para continuar; o preenchimento das outras etapas foi mantido.'; target = 'fields' }
+  else if (status === 401) { title = 'Sua sessão expirou'; guidance = 'Entre novamente na homologação e retorne a este empréstimo. Não informe sua senha ao suporte.'; target = 'session' }
   else if (status === 403) { title = 'Esta ação exige outra representação'; guidance = 'Confira a secretaria responsável e peça a um usuário autorizado dessa secretaria para realizar a ação.'; target = 'permission' }
   else if (code === 'LOAN_DISTINCT_ACCEPTOR_REQUIRED' || /outro usu[aá]rio/.test(text)) { title = 'A confirmação precisa de outra pessoa'; guidance = 'Peça a outro usuário autorizado da secretaria responsável para abrir este empréstimo e confirmar o recebimento. Quem enviou não pode confirmar.'; target = 'permission' }
   else if (status === 404) { title = 'O registro não foi encontrado'; guidance = 'Atualize a consulta e confira o registro ou anexo selecionado. Se ele estava disponível antes, peça à gestão ou ao suporte para conferir sua disponibilidade.'; target = 'refresh' }

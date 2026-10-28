@@ -58,7 +58,9 @@ export default function LoanProposalForm({ loan, catalog, user, onClose, onSaved
     finally { sending.current = false; setBusy(false) }
   }
   const complete = validation.map((issues, index) => !issues.length && (index !== 2 || wizard.visited.includes(2)))
-  const issueStep = { destination: 0, delivery: 1, period: 1, review: 2 }[loanFeedback(error || '').target] ?? wizard.step
+  const firstInvalidField = Object.entries(wizard.errors).find(([, message]) => message)?.[0]
+  const invalidStep = validation.findIndex((issues) => issues.some(([field]) => field === firstInvalidField))
+  const issueStep = invalidStep >= 0 ? invalidStep : ({ destination: 0, delivery: 1, period: 1, review: 2 }[loanFeedback(error || '').target] ?? wizard.step)
   const select = (field, props) => <VehicleLoanSelect {...props} field={field} value={form[field]} error={wizard.errors[field]}
     disabled={busy || stale || props.disabled} onChange={(value) => change(field, value)} />
   return <LoanFormLayout title={loan ? 'Editar proposta de empréstimo' : 'Novo empréstimo entre secretarias'} steps={steps} step={wizard.step}

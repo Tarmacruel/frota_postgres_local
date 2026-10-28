@@ -160,6 +160,8 @@ it('orienta o primeiro campo e impede pular etapas incompletas sem gravar', asyn
   expect(screen.getByRole('button', { name: 'Veículo' })).toHaveFocus()
   expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0')
   expect(screen.getByRole('alert')).toHaveTextContent('Revise os campos destacados')
+  await actor.click(screen.getByRole('button', { name: 'Rever destino' }))
+  expect(screen.getByRole('heading', { name: 'Quem vai receber o veículo?' })).toBeVisible()
   expect(vehicleLoansAPI.create).not.toHaveBeenCalled()
 })
 
