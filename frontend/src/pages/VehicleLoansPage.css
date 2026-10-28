@@ -220,7 +220,7 @@ body.internal-app-active .loan-inspector :is(.loan-summary__text-action, .loan-s
 
 /* Local guided editors: fixed orientation/actions, one task per step. */
 body.internal-app-active .modal-backdrop.loan-editor-backdrop { display: flex; align-items: center; justify-content: center; padding: 24px; }
-body.internal-app-active .modal-shell.loan-editor { display: flex; flex-direction: column; width: min(960px, 100%); max-width: none; height: min(860px, calc(100dvh - 48px)); max-height: calc(100dvh - 48px); padding: 0; margin: 0; border-radius: var(--radius-lg); overflow: hidden; }
+body.internal-app-active .modal-shell.loan-editor { display: flex; flex-direction: column; width: min(960px, 100%); max-width: none; height: auto; max-height: min(860px, calc(100dvh - 48px)); padding: 0; margin: 0; border-radius: var(--radius-lg); overflow: hidden; background: var(--surface-strong); }
 body.internal-app-active .loan-editor > .modal-header { flex: 0 0 auto; padding: 18px 24px; border-bottom: 1px solid var(--line); }
 body.internal-app-active .loan-editor > .modal-body { display: flex; min-height: 0; flex: 1; overflow: hidden; padding: 0; }
 .loan-editor__form { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; margin: 0; }
