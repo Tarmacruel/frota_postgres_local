@@ -170,7 +170,7 @@ describe('GuidedForm', () => {
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '1')
     expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '0')
     expect(screen.getByRole('button', { name: 'Lotação final' })).toHaveAttribute('aria-required', 'true')
-    expect(screen.getByText(/Lotação final/, { selector: 'label' })).toHaveTextContent('*')
+    expect(screen.getByText((_, element) => element.tagName === 'LABEL' && element.textContent.includes('Lotação final'))).toHaveTextContent('*')
     fireEvent.click(screen.getByRole('button', { name: 'Salvar' }))
     expect(screen.getByRole('alert')).toHaveTextContent('Lotação final')
     await waitFor(() => expect(screen.getByLabelText('Órgão')).toHaveFocus())

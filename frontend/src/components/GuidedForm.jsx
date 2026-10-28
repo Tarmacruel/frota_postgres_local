@@ -64,8 +64,13 @@ function decorate(children, ids, labels, inheritedLabel = '') {
     if (child.type === 'label' && (child.props['data-guided-required-label'] || requiredDescendant(child) || ids.has(child.props.htmlFor))) {
       const parts = Children.toArray(content)
       const controlIndex = parts.findIndex(requiredDescendant)
-      parts.splice(controlIndex < 0 ? parts.length : controlIndex, 0, <span key="required" className="guided-form__required" aria-hidden="true"> *</span>)
-      return cloneElement(child, attributes, parts)
+      const marker = <span className="guided-form__required" aria-hidden="true"> *</span>
+      // Grid labels need one caption item so the asterisk stays beside the text.
+      const caption = (text) => <span key="caption" className="guided-form__label">{text}{marker}</span>
+      const marked = controlIndex < 0 ? [caption(parts)] : controlIndex === 0
+        ? [parts[0], caption(parts.slice(1))]
+        : [caption(parts.slice(0, controlIndex)), ...parts.slice(controlIndex)]
+      return cloneElement(child, attributes, marked)
     }
     if (typeof child.type === 'string' && child.props.className?.split(' ').includes('alert-error')) {
       return <FormFeedback className={child.props.className} id={child.props.id}>{content}</FormFeedback>
