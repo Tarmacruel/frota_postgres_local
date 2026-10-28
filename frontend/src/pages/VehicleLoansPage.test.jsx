@@ -141,7 +141,7 @@ it('fecha o painel preservando busca, situação, página, query e foco da lista
   expect(screen.getByLabelText('Placa')).toHaveValue('ABC1234')
   expect(screen.getByRole('button', { name: 'Página 2' })).toHaveAttribute('aria-current', 'page')
   expect(vehicleLoansAPI.list).toHaveBeenCalledTimes(listCalls)
-  expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 0, left: 0, behavior: 'auto' })
+  await waitFor(() => expect(window.scrollTo).toHaveBeenLastCalledWith({ top: 0, left: 0, behavior: 'auto' }))
 })
 
 it('voltar no navegador fecha o detalhe aberto a partir da lista', async () => {
