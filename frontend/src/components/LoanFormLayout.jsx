@@ -38,8 +38,12 @@ export function LoanFormStep({ title, description, hidden, children }) {
 export function LoanField({ name, label, hint, error, wide, children }) {
   const hintId = useId()
   return <div className={`loan-field ${wide ? 'loan-editor__wide' : ''}`} data-loan-field={name} data-invalid={Boolean(error)}>
-    <label htmlFor={`${hintId}-input`}>{label}</label>{cloneElement(children, { id: `${hintId}-input`, 'aria-invalid': Boolean(error), 'aria-describedby': error || hint ? hintId : undefined })}{error ? <small id={hintId} className="loan-editor__field-error">{error}</small> : hint ? <small id={hintId}>{hint}</small> : null}
+    <label htmlFor={`${hintId}-input`}><LoanFieldLabel label={label} required={children.props.required} /></label>{cloneElement(children, { id: `${hintId}-input`, 'aria-label': children.props['aria-label'] || label, 'aria-invalid': Boolean(error), 'aria-describedby': error || hint ? hintId : undefined })}{error ? <small id={hintId} className="loan-editor__field-error">{error}</small> : hint ? <small id={hintId}>{hint}</small> : null}
   </div>
+}
+
+export function LoanFieldLabel({ label, required }) {
+  return <>{label}{required ? <span className="loan-editor__required" aria-hidden="true"> *</span> : null}</>
 }
 
 export function LoanReview({ rows }) {

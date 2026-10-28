@@ -179,8 +179,8 @@ export default function VehicleLoansPage() {
       loading={detailLoading} error={detailError} catalogError={catalogError} catalogReady={catalogReady}
       editable={editable} actions={actions} user={user} canView={canView} orgName={orgName}
       onClose={closeDetail} onRefresh={refresh} onAction={setModal} feedback={feedback} returnFocusRef={detailTrigger} />}
-    {(modal === 'new' || (modal === 'edit' && detail)) && <LoanProposalForm onVehicleOptionsOpen={refreshVehicleCatalog} key={modal === 'new' ? 'new' : `${detail.id}-${detail.version}`} loan={modal === 'edit' ? detail : null} catalog={catalog} user={user} onClose={() => setModal(null)} onSaved={saved} onRefresh={refresh} />}
-    {modal === 'regularization' && <VehicleLoanRegularization onClose={() => setModal(null)} onSaved={saved} canView={canView} />}
+    {(modal === 'new' || (modal === 'edit' && detail)) && <LoanProposalForm onVehicleOptionsOpen={refreshVehicleCatalog} key={modal === 'new' ? 'new' : `${detail.id}-${detail.version}`} loan={modal === 'edit' ? detail : null} catalog={catalog} user={user} onClose={() => setModal(null)} onSaved={saved} onRefresh={refresh} canView={canView} />}
+    {modal === 'regularization' && <VehicleLoanRegularization onClose={() => setModal(null)} onSaved={saved} canView={canView} user={user} />}
     {modal && !['new', 'edit', 'regularization'].includes(modal) && detail && <LoanActionForm key={`${detail.id}-${detail.version}-${modal}`} operation={modal} loan={detail} context={context} catalog={catalog} user={user} onClose={() => setModal(null)} onSaved={saved} onRefresh={refresh} onEdit={editable ? () => setModal('edit') : undefined} canView={canView} />}
   </div>
 }

@@ -1,6 +1,6 @@
 import JustificationField from './JustificationField'
 import { useEffect, useRef, useState } from 'react'
-import { LoanField, LoanFormLayout, LoanFormStep, LoanReview } from './LoanFormLayout'
+import { LoanField, LoanFieldLabel, LoanFormLayout, LoanFormStep, LoanReview } from './LoanFormLayout'
 import LoanFeedback from './LoanFeedback'
 import LoanRecoveryLinks from './LoanRecoveryLinks'
 import useLoanFormSteps from '../hooks/useLoanFormSteps'
@@ -8,12 +8,14 @@ import VehicleLoanSelect from './VehicleLoanSelect'
 import { vehicleLoansAPI } from '../api/vehicleLoans'
 import { loanFeedback } from '../utils/loanFeedback'
 import { formatLoanDate, validLoanOdometer } from '../utils/vehicleLoans'
+import useLoanVehicleIdentity from '../hooks/useLoanVehicleIdentity'
 
 const empty = { vehicle_id: '', origin: '', recipient: '', origin_allocation_id: '', destination_allocation_id: '', started_at: '', returned_at: '', return_allocation_id: '', expected_return_at: '', delivery_odometer_km: '', return_odometer_km: '', delivery_condition: '', return_condition: '', reason: '', justification: '', document_reference: '', correct_owner: false }
 
 const steps = ['Destino', 'Datas', 'Documento', 'Conferência']
-export default function VehicleLoanRegularization({ onClose, onSaved, canView }) {
+export default function VehicleLoanRegularization({ onClose, onSaved, canView, user }) {
   const [catalog, setCatalog] = useState(null)
+  const identity = useLoanVehicleIdentity(catalog?.vehicles || [], Boolean(canView?.('vehicles')), `${user?.id || ''}:${user?.role || ''}:${user?.organization_id || ''}`)
   const [form, setForm] = useState(empty)
   const [ended, setEnded] = useState(false)
   const [preview, setPreview] = useState(null)
@@ -89,7 +91,9 @@ export default function VehicleLoanRegularization({ onClose, onSaved, canView })
   ]
   const wizard = useLoanFormSteps(validation)
   function go(next) { if (!wizard.go(next)) setError('Revise os campos destacados para continuar.'); else setError('') }
-  const select = (key, label, options) => <VehicleLoanSelect label={label} options={options} value={form[key]} onOpen={key === 'vehicle_id' ? refreshVehicleCatalog : undefined}
+  const select = (key, label, options) => <VehicleLoanSelect label={label} required options={options} value={form[key]} onOpen={key === 'vehicle_id' ? refreshVehicleCatalog : undefined}
+    hint={key === 'vehicle_id' && identity.status === 'loading' ? 'Carregando dados de identificação…' : key === 'vehicle_id' && identity.status === 'error' ? 'Os dados adicionais não puderam ser consultados. A lista mantém os dados disponíveis do empréstimo.' : undefined}
+    searchPlaceholder={key === 'vehicle_id' ? 'Buscar por placa, marca ou modelo' : 'Digite para filtrar'}
     field={key} error={wizard.errors[key]} disabled={!catalog || busy || !options.length} onChange={(value) => change(key, value)} />
   const input = (key, label, type = 'text', required = true) => <LoanField name={key} label={label} error={wizard.errors[key]}><input className="app-input" type={type} required={required} min={type === 'number' ? 0 : undefined} step={type === 'number' ? '0.1' : undefined} value={form[key]} onChange={(event) => change(key, event.target.value)} /></LoanField>
   const area = (key, label, minLength = 8, maxLength = 2000) => <LoanField wide name={key} label={label} error={wizard.errors[key]}><textarea className="app-input" rows={3} required minLength={minLength} maxLength={maxLength} value={form[key]} onChange={(event) => change(key, event.target.value)} /></LoanField>
@@ -109,7 +113,7 @@ export default function VehicleLoanRegularization({ onClose, onSaved, canView })
     <fieldset disabled={!catalog || busy}>
       <LoanFormStep title="Qual situação precisa ser registrada?" description="Registro administrativo de um empréstimo já ocorrido. Assinaturas e aceites do passado não serão criados." hidden={wizard.step !== 0}>
         <div className="loan-editor__grid">
-          <div className="loan-editor__wide">{select('vehicle_id', 'Veículo', catalog?.vehicles || [])}</div>
+          <div className="loan-editor__wide">{select('vehicle_id', 'Veículo', identity.vehicles)}</div>
           {select('origin', 'Secretaria de origem', organizations)}
           {select('origin_allocation_id', 'Lotação de origem no início do empréstimo', allocations(form.origin))}
           {ownerChange ? <label className="loan-notice loan-editor__wide"><input type="checkbox" checked={form.correct_owner} onChange={(event) => change('correct_owner', event.target.checked)} /> Confirmo a correção da secretaria proprietária para a origem informada, conforme a referência documental.</label> : null}
@@ -128,7 +132,7 @@ export default function VehicleLoanRegularization({ onClose, onSaved, canView })
       <LoanFormStep title="Em qual documento o registro se baseia?" description="Identifique o motivo e a referência que permitem conferir a situação anterior." hidden={wizard.step !== 2}>
         <div className="loan-editor__grid">{area('reason', 'Motivo do empréstimo')}{area('document_reference', 'Referência documental (processo, protocolo ou termo existente)', 8, 1000)}
           <div className="loan-field loan-editor__wide" data-loan-field="justification" data-invalid={Boolean(wizard.errors.justification)}>
-            <JustificationField label="Justificativa da regularização administrativa" context="loan_regularization" className="app-input" required minLength={15} maxLength={1000} rows={3} value={form.justification} onChange={(event) => change('justification', event.target.value)} />
+            <JustificationField label={<LoanFieldLabel label="Justificativa da regularização administrativa" required />} aria-label="Justificativa da regularização administrativa" aria-invalid={Boolean(wizard.errors.justification)} context="loan_regularization" className="app-input" required minLength={15} maxLength={1000} rows={3} value={form.justification} onChange={(event) => change('justification', event.target.value)} />
             {wizard.errors.justification ? <small className="loan-editor__field-error">{wizard.errors.justification}</small> : <small>Explique com pelo menos 15 caracteres por que o registro está sendo feito agora.</small>}
           </div>
         </div>
@@ -143,7 +147,7 @@ export default function VehicleLoanRegularization({ onClose, onSaved, canView })
           {preview.blockers.length ? <div className="loan-editor__blockers" role="alert"><h5>O que precisa ser corrigido</h5><ul>{preview.blockers.map((item) => <li key={item}><strong>{item}</strong><p>{loanFeedback(item).guidance}</p><button type="button" className="ghost-button" onClick={() => wizard.show(recoveryStep(item))}>Rever {steps[recoveryStep(item)].toLowerCase()}</button><LoanRecoveryLinks target={loanFeedback(item).target} vehicleId={form.vehicle_id} canView={canView} /></li>)}</ul></div> : null}
           {preview.warnings.length ? <details className="loan-editor__warnings"><summary>Observações da conferência ({preview.warnings.length})</summary><ul>{preview.warnings.map((item) => <li key={item}>{item}</li>)}</ul></details> : null}
           <details className="loan-editor__warnings"><summary>Registros encontrados no período</summary><div className="loan-table-wrap"><table className="loan-table"><thead><tr><th>Registros no período</th><th>Total</th><th>Sem responsável</th><th>Outra responsável</th></tr></thead><tbody>{preview.impact.map((item) => <tr key={item.module}><td>{item.module}</td><td>{item.records}</td><td>{item.without_responsibility}</td><td>{item.other_responsibility}</td></tr>)}</tbody></table></div></details>
-          {preview.can_confirm ? <label className="loan-editor__review-check"><input type="checkbox" checked={reviewed} disabled={busy} onChange={(event) => setReviewed(event.target.checked)} /> Conferi as datas, a referência e os efeitos. Os registros antigos permanecerão com seus vínculos atuais.</label> : null}
+          {preview.can_confirm ? <label className="loan-editor__review-check"><input type="checkbox" checked={reviewed} disabled={busy} onChange={(event) => setReviewed(event.target.checked)} /><span><LoanFieldLabel label="Conferi as datas, a referência e os efeitos. Os registros antigos permanecerão com seus vínculos atuais." required /></span></label> : null}
         </section> : <p className="loan-editor__hint">A prévia ainda não está disponível. Clique em Conferir prévia da regularização para verificar os efeitos, sem registrar o empréstimo.</p>}
       </LoanFormStep>
     </fieldset>

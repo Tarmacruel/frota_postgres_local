@@ -1,6 +1,6 @@
 import JustificationField from './JustificationField'
 import { useRef, useState } from 'react'
-import { LoanField, LoanFormLayout, LoanFormStep } from './LoanFormLayout'
+import { LoanField, LoanFieldLabel, LoanFormLayout, LoanFormStep } from './LoanFormLayout'
 import LoanFeedback from './LoanFeedback'
 import LoanRecoveryLinks from './LoanRecoveryLinks'
 import useLoanFormSteps from '../hooks/useLoanFormSteps'
@@ -11,7 +11,7 @@ import { blockedLoanAction, loanActions, validLoanOdometer } from '../utils/vehi
 
 function Reason({ value, onChange, required, context, userId, error }) {
   return <div className="loan-field loan-editor__wide" data-loan-field="justification" data-invalid={Boolean(error)}>
-    <JustificationField label={`Justificativa ${required ? '(obrigatória)' : '(opcional)'}`} context={context} userId={userId} className="app-input" value={value} onChange={(e) => onChange(e.target.value)} required={required} minLength={8} maxLength={1000} rows={3} />
+    <JustificationField label={<LoanFieldLabel label={`Justificativa ${required ? '(obrigatória)' : '(opcional)'}`} required={required} />} aria-label={`Justificativa ${required ? '(obrigatória)' : '(opcional)'}`} aria-invalid={Boolean(error)} context={context} userId={userId} className="app-input" value={value} onChange={(e) => onChange(e.target.value)} required={required} minLength={8} maxLength={1000} rows={3} />
     {error ? <small className="loan-editor__field-error">{error}</small> : null}
   </div>
 }
@@ -72,7 +72,7 @@ export function LoanActionForm({ operation, loan, context, catalog, user, onClos
       {action.reason ? <p className="loan-editor__hint">A justificativa ficará registrada no histórico desta ação.</p> : null}
       <fieldset className="loan-editor__grid" disabled={busy || stale || Boolean(blocked)}>
         {returnRequest ? <>
-          <div className="loan-editor__wide"><VehicleLoanSelect label="Lotação de retorno" value={allocation} onChange={(value) => { setAllocation(value); wizard.clear('return_allocation_id') }} field="return_allocation_id" error={wizard.errors.return_allocation_id}
+          <div className="loan-editor__wide"><VehicleLoanSelect label="Lotação de retorno" required value={allocation} onChange={(value) => { setAllocation(value); wizard.clear('return_allocation_id') }} field="return_allocation_id" error={wizard.errors.return_allocation_id}
             options={catalog.allocations.filter((item) => item.organization_id === loan.origin_organization_id)} disabled={busy || stale || Boolean(blocked)} placeholder="Selecione a lotação de retorno" searchPlaceholder="Buscar lotação de retorno" /></div>
           <LoanField name="return_odometer_km" label="Odômetro de devolução (km)" error={wizard.errors.return_odometer_km} hint={`Referência mínima: ${context?.minimum_odometer_km ?? '—'} km. Confira o valor no veículo.`}><input className="app-input" type="number" required min={context?.minimum_odometer_km ?? 0} step="0.1" value={odometer} onChange={(e) => { setOdometer(e.target.value); wizard.clear('return_odometer_km') }} /></LoanField>
           <LoanField wide name="return_condition" label="Condições de devolução" error={wizard.errors.return_condition}><textarea className="app-input" required minLength={3} maxLength={2000} value={condition} rows={3} onChange={(e) => { setCondition(e.target.value); wizard.clear('return_condition') }} /></LoanField>

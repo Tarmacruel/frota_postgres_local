@@ -15,6 +15,9 @@ export default function SearchableSelect({
   allowClear = false,
   clearLabel = 'Limpar seleção',
   ariaLabel,
+  panelClassName = '',
+  ariaDescribedBy,
+  invalid = false,
   remoteSearch = false,
   onSearch,
   loading = false,
@@ -146,6 +149,8 @@ export default function SearchableSelect({
         }}
         disabled={disabled}
         aria-label={ariaLabel}
+        aria-describedby={ariaDescribedBy}
+        aria-invalid={invalid || undefined}
       >
         <span className={`searchable-select-value${selectedOption ? '' : ' is-placeholder'}`}>
           {selectedOption?.label || placeholder}
@@ -156,7 +161,7 @@ export default function SearchableSelect({
 
       {open && panelStyle && typeof document !== 'undefined'
         ? createPortal(
-            <div ref={panelRef} className="searchable-select-panel" style={panelStyle}>
+            <div ref={panelRef} className={`searchable-select-panel ${panelClassName}`.trim()} style={panelStyle}>
               <div className="searchable-select-input-shell">
                 <AppIcon name="search" className="app-icon" />
                 <input
@@ -192,7 +197,7 @@ export default function SearchableSelect({
                       onClick={() => handleSelect(option.value)}
                     >
                       <strong>{option.label}</strong>
-                      {option.description ? <span>{option.description}</span> : null}
+                      {option.description ? <span className="searchable-select-option-description">{option.description}</span> : null}
                       <VehicleTagBadges tags={option.tags} interactive={false} />
                     </button>
                   ))

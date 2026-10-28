@@ -253,7 +253,13 @@ body.internal-app-active .loan-editor .loan-editor__progress [aria-current="step
 .loan-editor .loan-field textarea { resize: vertical; }
 .loan-editor .loan-field small { color: var(--ink-soft); font-size: .76rem; line-height: 1.45; }
 .loan-editor [data-invalid="true"] :is(input, textarea, .searchable-select-trigger) { border-color: var(--danger); }
-.loan-editor .loan-editor__field-error { color: var(--danger); }
+.loan-editor .loan-field .loan-editor__field-error { color: var(--danger); font-weight: 600; }
+.loan-editor .loan-field[data-invalid="true"] > :is(label, span) { color: var(--danger); }
+.loan-editor__required { color: var(--danger); font-weight: 700; }
+.loan-editor__lookup { color: var(--ink-soft); font-size: .76rem; line-height: 1.5; margin-top: 8px; }
+.loan-editor__lookup button { display: inline-flex; align-items: center; min-height: 32px; border: 0; padding: 2px 4px; background: transparent; color: var(--navy); font: inherit; font-weight: 600; text-decoration: underline; cursor: pointer; }
+body.internal-app-active .loan-vehicle-options .searchable-select-option { gap: 5px; min-height: 44px; padding: 10px; }
+body.internal-app-active .loan-vehicle-options .searchable-select-option > .searchable-select-option-description { display: block; font-size: .76rem; line-height: 1.4; overflow-wrap: anywhere; }
 .loan-editor__identity { display: grid; gap: 5px; margin: 0; padding: 12px 0; border-bottom: 1px solid var(--line); }
 .loan-editor__identity span { color: var(--ink-soft); font-size: .76rem; }
 .loan-editor__identity strong { font-size: .9rem; }
@@ -315,6 +321,7 @@ body.internal-app-active .loan-editor .loan-editor__progress [aria-current="step
   .loan-editor__footer > div { flex-wrap: wrap; }
   .loan-editor__footer > div > :last-child { flex: 1; }
   .loan-editor__footer button, body.internal-app-active .loan-editor :is(.app-input, .searchable-select-trigger, .ghost-button) { min-height: 44px; }
+  .loan-editor__lookup button { min-height: 44px; }
   .loan-feedback { padding: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .loan-editor__step { animation: none; } .loan-editor__bar span { transition: none; } }
