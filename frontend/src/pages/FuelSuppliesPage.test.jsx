@@ -1,3 +1,4 @@
+import { reviewGuidedForm } from '../test/guidedForms'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation, useNavigate } from 'react-router-dom'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -218,9 +219,11 @@ describe('FuelSuppliesPage quick order action', () => {
     expect(screen.getByRole('region',{name:'Ordens abertas'})).toBeInTheDocument()
     expect(screen.queryByRole('region',{name:'Ordens de abastecimento'})).not.toBeInTheDocument()
     expect(screen.queryByRole('heading',{name:'Ordens de abastecimento abertas'})).not.toBeInTheDocument()
-    fireEvent.click(await screen.findByRole('button',{name:'Confirmar abastecimento'}))
+    reviewGuidedForm()
+  fireEvent.click(await screen.findByRole('button',{name:'Confirmar abastecimento', hidden: true }))
     expect(screen.getByRole('dialog',{name:'Confirmar abastecimento'})).toHaveTextContent('Confirmação de aberta-teste')
-    fireEvent.click(screen.getByRole('button',{name:'Salvar confirmação de teste'}))
+    reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button',{name:'Salvar confirmação de teste', hidden: true }))
     await waitFor(()=>expect(mocks.listOpen).toHaveBeenCalledTimes(2))
     expect(mocks.listOrders).toHaveBeenCalledTimes(1);expect(mocks.listSupplies).not.toHaveBeenCalled()
   })

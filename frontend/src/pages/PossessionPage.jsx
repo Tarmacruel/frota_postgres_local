@@ -1,3 +1,4 @@
+import GuidedForm from '../components/GuidedForm'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import JustificationField from '../components/JustificationField'
@@ -1128,7 +1129,7 @@ export default function PossessionPage() {
         {editLoading && <p role="status">Carregando dados e versões da posse…</p>}
         {editError && <div role="alert" className="alert alert-error">{editError}</div>}
         {!editLoading && (!editContext || editStale) && <button type="button" className="ghost-button" onClick={() => openEditModal(editingRecord)}>Recarregar retificação</button>}
-        {editContext && <form onSubmit={handleEditPossession} className="form-grid modal-form-grid">
+        {editContext && <GuidedForm busy={ending} onSubmit={handleEditPossession} className="form-grid modal-form-grid">
           <fieldset className="form-grid modal-form-grid modal-field-span" disabled={savingEdit} style={{ border: 0, margin: 0, padding: 0, minWidth: 0 }}>
           <div className="alert alert-info modal-field-span">Versão atual: {editingRecord.revision}. Corrija os dados necessários e informe uma única justificativa. O salvamento preserva a versão anterior.</div>
           <div className="form-field modal-field-span">
@@ -1320,7 +1321,7 @@ export default function PossessionPage() {
           </div>
           </fieldset>
           <PossessionRevisionHistory revisions={editContext.revisions} />
-        </form>}
+        </GuidedForm>}
       </Modal>
 
       <PossessionPostClosurePhotosModal

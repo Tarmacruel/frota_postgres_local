@@ -1,3 +1,4 @@
+import GuidedForm, { FormSection as GuidedSection } from './GuidedForm'
 import MoneyInput from './MoneyInput'
 import { useId, useMemo, useRef, useState } from 'react'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
@@ -131,7 +132,7 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
+    <GuidedForm busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid">
       {order?.requested_fuel_type || order?.requested_liters || order?.contract_funding ? <p className="alert alert-info modal-field-span">
         {order.requested_fuel_type || order.requested_liters ? <>
           <strong>Pedido original: </strong>{order.requested_fuel_type || 'Combustível não informado'}
@@ -143,7 +144,8 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
       </p> : null}
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
 
-      <div className="form-field">
+      <GuidedSection title="Dados reais" description="Confira a quilometragem, os litros e o valor efetivamente abastecido.">
+<div className="form-field">
         <label htmlFor={`${formId}-odometer`}>Odômetro real (km)</label>
         <input id={`${formId}-odometer`} type="number" min="0" step="0.1" className="app-input" value={form.odometer_km} onChange={(event) => setForm((current) => ({ ...current, odometer_km: event.target.value }))} required />
       </div>
@@ -179,7 +181,10 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
         </div>
       ) : null}
 
-      <div className="form-field">
+
+</GuidedSection>
+<GuidedSection title="Complementos" description="Confirme a data e os aditivos fornecidos, se houver.">
+<div className="form-field">
         <label htmlFor={`${formId}-supplied-at`}>Data/hora real</label>
         <input id={`${formId}-supplied-at`} type="datetime-local" className="app-input" value={form.supplied_at} onChange={(event) => setForm((current) => ({ ...current, supplied_at: event.target.value }))} required />
       </div>
@@ -217,9 +222,12 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
         </>
       ) : null}
 
-      <div className="form-field modal-field-span">
+
+</GuidedSection>
+<GuidedSection title="Comprovante e itens" description="Anexe o documento e confira os itens realizados antes de confirmar.">
+<div className="form-field modal-field-span">
         <label htmlFor={`${formId}-receipt`}>Comprovante</label>
-        <input id={`${formId}-receipt`} ref={receiptRef} type="file" accept=".pdf,image/jpeg,image/png,image/webp" onChange={handleReceiptChange} required />
+        <input id={`${formId}-receipt`} ref={receiptRef} data-required-message="Envie o comprovante para confirmar o abastecimento." type="file" accept=".pdf,image/jpeg,image/png,image/webp" onChange={handleReceiptChange} required />
         {receiptError ? <small className="form-error">{receiptError}</small> : null}
       </div>
 
@@ -229,10 +237,11 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
       </div>
 
       <FuelItemAllocationFields allocation={allocation}/>
+</GuidedSection>
       <div className="actions-inline modal-actions">
         <button className="app-button" type="submit" disabled={submitting}>{submitLabel}</button>
         <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>
       </div>
-    </form>
+    </GuidedForm>
   )
 }

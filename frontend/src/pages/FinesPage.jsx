@@ -1,3 +1,4 @@
+import GuidedForm, { FormSection as GuidedSection } from '../components/GuidedForm'
 import MoneyInput from '../components/MoneyInput'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
@@ -343,7 +344,7 @@ export default function FinesPage() {
         </div>
       </div>
 
-      {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
+      {error && !isModalOpen ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
       <div className="surface-panel panel-nested operation-module">
@@ -372,10 +373,11 @@ export default function FinesPage() {
       <Pagination currentPage={pagination.page} totalPages={pagination.pages} onPageChange={loadFines} />
 
       <Modal open={isModalOpen} title={editingRecord ? 'Editar multa' : 'Nova multa'} onClose={() => setIsModalOpen(false)}>
-        <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
-          <div className="form-field">
+        <GuidedForm formError={error} busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid">
+          <GuidedSection title="Identificação" description="Identifique o veículo, o condutor e o enquadramento.">
+<div className="form-field">
             <label>Veículo</label>
-            <SearchableSelect value={form.vehicle_id} onChange={handleVehicleChange} options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(vehicleOption)} onOpen={loadAux} placeholder="Selecionar veículo" searchPlaceholder="Buscar veículo por placa, RENAVAM, marca ou modelo" />
+            <SearchableSelect required value={form.vehicle_id} onChange={handleVehicleChange} options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(vehicleOption)} onOpen={loadAux} placeholder="Selecionar veículo" searchPlaceholder="Buscar veículo por placa, RENAVAM, marca ou modelo" />
           </div>
           <div className="form-field">
             <label>Condutor</label>
@@ -389,7 +391,7 @@ export default function FinesPage() {
           </div>
           <div className="form-field modal-field-span">
             <label>Enquadramento</label>
-            <SearchableSelect value={form.infraction_type_id} onChange={handleInfractionChange} options={infractionOptions} placeholder="Selecionar infração CTB/CONTRAN" searchPlaceholder="Buscar código, artigo ou descrição" remoteSearch onSearch={loadInfractions} loading={infractionsLoading} />
+            <SearchableSelect required value={form.infraction_type_id} onChange={handleInfractionChange} options={infractionOptions} placeholder="Selecionar infração CTB/CONTRAN" searchPlaceholder="Buscar código, artigo ou descrição" remoteSearch onSearch={loadInfractions} loading={infractionsLoading} />
           </div>
           {selectedInfraction ? (
             <div className="evidence-meta-card modal-field-span">
@@ -401,21 +403,28 @@ export default function FinesPage() {
               </div>
             </div>
           ) : null}
-          <div className="form-field"><label>Número do auto</label><input className="app-input" value={form.ticket_number} onChange={(e) => setForm({ ...form, ticket_number: e.target.value })} required /></div>
+
+</GuidedSection>
+<GuidedSection title="Infração" description="Confira o auto, a data, o valor e o local.">
+<div className="form-field"><label>Número do auto</label><input className="app-input" value={form.ticket_number} onChange={(e) => setForm({ ...form, ticket_number: e.target.value })} required /></div>
           <div className="form-field"><label>Data infração</label><input type="date" className="app-input" value={form.infraction_date} onChange={(e) => setForm({ ...form, infraction_date: e.target.value })} required /></div>
           <div className="form-field"><label>Hora</label><input type="time" className="app-input" value={form.infraction_time} onChange={(e) => setForm({ ...form, infraction_time: e.target.value })} /></div>
           <div className="form-field"><label>Vencimento</label><input type="date" className="app-input" value={form.due_date} onChange={(e) => setForm({ ...form, due_date: e.target.value })} /></div>
           <div className="form-field"><label>Valor</label><MoneyInput type="number" min="0" step="0.01" className="app-input" value={form.amount} onChange={(e) => setForm({ ...form, amount: e.target.value })} required /></div>
           <div className="form-field"><label>Local</label><input className="app-input" value={form.location} onChange={(e) => setForm({ ...form, location: e.target.value })} /></div>
           <div className="form-field"><label>Status</label><select className="app-select" value={form.status} onChange={(e) => setForm({ ...form, status: e.target.value })}>{statusOptions.filter((o) => o !== 'TODOS').map((o) => <option key={o} value={o}>{o}</option>)}</select></div>
-          <div className="form-field"><label>C.I.</label><input className="app-input" value={form.communication_number} onChange={(e) => setForm({ ...form, communication_number: e.target.value })} /></div>
+
+</GuidedSection>
+<GuidedSection title="Acompanhamento" description="Complete os dados de comunicação e do processo quando disponíveis.">
+<div className="form-field"><label>C.I.</label><input className="app-input" value={form.communication_number} onChange={(e) => setForm({ ...form, communication_number: e.target.value })} /></div>
           <div className="form-field"><label>Enviado em</label><input type="date" className="app-input" value={form.sent_date} onChange={(e) => setForm({ ...form, sent_date: e.target.value })} /></div>
           <div className="form-field"><label>Processo</label><input className="app-input" value={form.process_number} onChange={(e) => setForm({ ...form, process_number: e.target.value })} /></div>
           <div className="form-field modal-field-span"><label>Observações</label><textarea className="app-textarea" rows="3" value={form.notes} onChange={(e) => setForm({ ...form, notes: e.target.value })} /></div>
+</GuidedSection>
           <div className="actions-inline modal-actions" style={{ gridColumn: '1 / -1' }}>
             <button className="app-button" type="submit" disabled={submitting}>{submitting ? 'Salvando...' : 'Salvar multa'}</button>
           </div>
-        </form>
+        </GuidedForm>
       </Modal>
     </div>
   )

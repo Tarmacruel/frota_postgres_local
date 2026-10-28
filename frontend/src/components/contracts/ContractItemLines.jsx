@@ -1,3 +1,4 @@
+import { FormFields } from '../GuidedForm'
 import MoneyInput from '../MoneyInput'
 import { formatContractMoney as brl } from '../../utils/contractBalance'
 
@@ -13,7 +14,7 @@ export default function ContractItemLines({ lines, onChange, items = [], prices 
       quantity: lines[index].quantity || '1', unit_price: unit, expected_price_id: price?.id,
       ...(actual ? { amount: unit === '' ? '' : (Number(lines[index].quantity || 1)*Number(unit)).toFixed(2) } : {}) })
   }
-  return <section className="contract-item-lines contract-form__wide" aria-label={label}>
+  return <FormFields><section className="contract-item-lines contract-form__wide" aria-label={label}>
     <div className="contract-order-panel__heading"><h4>{label}</h4><button type="button" className="ghost-button" onClick={() => onChange([...lines, { key: crypto.randomUUID(), item_id: '', quantity: '', unit_price: '', ...(actual ? { amount: '' } : {}) }])}>Adicionar item</button></div>
     {lines.map((line, index) => <div className="contract-item-lines__row" key={line.key || `${line.item_id}:${index}`}>
       <label>Item<select className="app-select" aria-label={`Item ${index+1}`} value={line.item_id || ''} onChange={(e) => select(index, e.target.value)} required={!allowUnknown}>
@@ -26,5 +27,5 @@ export default function ContractItemLines({ lines, onChange, items = [], prices 
       {allowUnknown && !line.item_id ? <><label className="contract-item-lines__description">Descrição<input className="app-input" value={line.description || ''} onChange={(e) => change(index, { description: e.target.value })} required maxLength={500} /></label><label>Categoria<select className="app-select" value={line.category || 'SERVICE'} onChange={(e) => change(index, { category: e.target.value })}><option value="SERVICE">Serviço</option><option value="PART">Peça</option></select></label><small className="contract-form__wide">O gasto real será registrado com divergência até a identificação do item no contrato.</small></> : null}
     </div>)}
     {!lines.length ? <p className="muted">Adicione os itens e informe suas quantidades.</p> : <p className="contract-item-lines__sum">Total dos itens <strong>{brl(itemLinesTotal(lines))}</strong></p>}
-  </section>
+  </section></FormFields>
 }

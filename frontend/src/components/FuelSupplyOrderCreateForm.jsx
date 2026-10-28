@@ -1,3 +1,4 @@
+import GuidedForm, { FormSection as GuidedSection } from './GuidedForm'
 import { useEffect, useMemo, useState } from 'react'
 import SearchableSelect from './SearchableSelect'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
@@ -119,16 +120,17 @@ export default function FuelSupplyOrderCreateForm({ vehicles = [], onVehicleOpti
   }
 
   return (
-    <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
+    <GuidedForm busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid">
       <ContractReturnBanner returnTo={returnTo} compact saving={submitting} />
       {contextLoading ? <p className="modal-field-span" role="status">Consultando os postos do contrato…</p> : null}
       {contextError ? <div className="alert alert-error modal-field-span" role="alert">{contextError}<button className="ghost-button" type="button" onClick={() => setContextRevision((value) => value + 1)}>Tentar novamente</button></div> : null}
       {contextual && context.contract ? <p className="modal-field-span muted">Contrato {context.contract.number} · {context.contract.supplier_name || 'Postos vinculados ao contrato selecionado'}</p> : null}
       {error ? <div className="alert alert-error modal-field-span" role="alert">{error}{funding.enabled ? <button className="ghost-button" type="button" onClick={funding.refresh}>Atualizar saldo e preço</button> : null}</div> : null}
 
-      <div className="form-field">
+      <GuidedSection title="Destino" description="Selecione o veículo e o posto que atenderá o pedido.">
+<div className="form-field">
         <label>Veículo</label>
-        <SearchableSelect
+        <SearchableSelect required
           value={form.vehicle_id} onOpen={onVehicleOptionsOpen}
           onChange={(value) => setForm((current) => ({ ...current, vehicle_id: value }))}
           options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(buildVehicleOption)}
@@ -140,7 +142,7 @@ export default function FuelSupplyOrderCreateForm({ vehicles = [], onVehicleOpti
 
       <div className="form-field">
         <label>Posto</label>
-        <SearchableSelect
+        <SearchableSelect required
           value={form.fuel_station_id}
           onChange={(value) => setForm((current) => ({ ...current, fuel_station_id: value }))}
           options={stationOptions.map(buildFuelStationOption)}
@@ -162,7 +164,10 @@ export default function FuelSupplyOrderCreateForm({ vehicles = [], onVehicleOpti
         />
       </div>
 
-      <div className="form-field">
+
+</GuidedSection>
+<GuidedSection title="Pedido" description="Confira o prazo e a quantidade prevista.">
+<div className="form-field">
         <label>Prazo limite</label>
         <input
           type="datetime-local"
@@ -197,13 +202,17 @@ export default function FuelSupplyOrderCreateForm({ vehicles = [], onVehicleOpti
         />
       </div>
 
-      <ContractFundingFields funding={funding} />
+
+</GuidedSection>
+<GuidedSection title="Contrato e saldo" description="Confira a modalidade do contrato, os itens e o valor antes de emitir.">
+<ContractFundingFields funding={funding} />
+</GuidedSection>
       <div className="actions-inline modal-actions">
         <button className="app-button" type="submit" disabled={submitting || !ready}>
           {submitLabel}
         </button>
         <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>
       </div>
-    </form>
+    </GuidedForm>
   )
 }

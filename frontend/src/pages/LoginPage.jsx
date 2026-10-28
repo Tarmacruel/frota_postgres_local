@@ -1,3 +1,4 @@
+import GuidedForm from '../components/GuidedForm'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -84,12 +85,12 @@ export default function LoginPage() {
               <p className="panel-subtitle">Entre com a conta vinculada ao ambiente institucional da Prefeitura Municipal de Teixeira de Freitas.</p>
             </div>
 
-            <form onSubmit={handleSubmit} className="form-grid">
+            <GuidedForm busy={submitting} onSubmit={handleSubmit} className="form-grid">
               <div className="form-field">
                 <label htmlFor="email">Login institucional</label>
                 <div className="login-input-shell">
                   <span className="login-input-icon">@</span>
-                  <input
+                  <input required
                     id="email"
                     className="app-input login-app-input"
                     value={email}
@@ -103,7 +104,7 @@ export default function LoginPage() {
                 <label htmlFor="password">Sua senha</label>
                 <div className="login-input-shell">
                   <span className="login-input-icon">#</span>
-                  <input
+                  <input required
                     id="password"
                     className="app-input login-app-input"
                     type="password"
@@ -119,7 +120,7 @@ export default function LoginPage() {
               <button className="app-button login-submit-button" type="submit" disabled={submitting}>
                 {submitting ? 'Entrando...' : 'Entrar no sistema'}
               </button>
-            </form>
+            </GuidedForm>
 
             <div className="login-demo-block">
               <strong>Orientações de acesso</strong>

@@ -1,3 +1,4 @@
+import GuidedForm from '../GuidedForm'
 import { useMemo, useRef, useState } from 'react'
 import { analyticsV2API } from '../../api/analyticsV2'
 import { getApiErrorMessage } from '../../utils/apiError'
@@ -78,7 +79,7 @@ export default function AnalyticsAlertDetail({ detail, onOpen }) {
       {data.driver_id ? <AnalyticsEntityLink entityType="driver" entityId={data.driver_id} entityName="Condutor vinculado"
         onOpen={(item) => onOpen({ ...item, filters, origin })}>Ver condutor vinculado</AnalyticsEntityLink> : null}
     </div>
-    {data.allowed_states.length ? <form className="analytics-alert-treatment" aria-label="Tratamento do alerta" onSubmit={submit}>
+    {data.allowed_states.length ? <GuidedForm className="analytics-alert-treatment" aria-label="Tratamento do alerta" onSubmit={submit}>
       <h4>Registrar decisão</h4>
       <label>Novo estado<select value={target} disabled={busy || conflict} required onChange={(e) => setTarget(e.target.value)}>
         <option value="">Selecione</option>{data.allowed_states.map((value) => <option key={value} value={value}>{ALERT_STATES[value]}</option>)}</select></label>
@@ -86,7 +87,7 @@ export default function AnalyticsAlertDetail({ detail, onOpen }) {
         required={Boolean(target && !(data.status === 'NEW' && target === 'IN_REVIEW'))} onChange={(e) => setReason(e.target.value)} /></label>
       <p className="analytics-scope-note">Obrigatória para resolver, ignorar ou reabrir. A decisão não altera o abastecimento nem apaga evidências.</p>
       <button className="app-button" disabled={busy || conflict || !target}>{busy ? 'Registrando…' : 'Registrar decisão'}</button>
-    </form> : <p>Consulta somente leitura; tratamento depende de permissão de edição de Análises e do perfil autorizado.</p>}
+    </GuidedForm> : <p>Consulta somente leitura; tratamento depende de permissão de edição de Análises e do perfil autorizado.</p>}
     {error ? <p role="alert">{error}</p> : null}{success ? <p role="status">{success}</p> : null}
     <button type="button" className="ghost-button" disabled={busy} onClick={refresh}>{conflict ? 'Recarregar caso antes de decidir' : 'Atualizar caso'}</button>
     <details className="analytics-costs-legacy"><summary>Evidência original preservada</summary>

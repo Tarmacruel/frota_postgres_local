@@ -1,3 +1,4 @@
+import GuidedForm, { FormSection as GuidedSection } from '../GuidedForm'
 import { useState } from 'react'
 import Modal from '../Modal'
 import MoneyInput from '../MoneyInput'
@@ -62,10 +63,10 @@ export default function OriginalContractItemForm({ contract, providers = [], leg
     finally { setSaving(false) }
   }
   return <Modal open title="Adicionar item original" onClose={onClose} canClose={!saving} className="contract-item-editor">
-    <form className="contract-amendment-form" onSubmit={submit}>
+    <GuidedForm busy={saving} className="contract-amendment-form" onSubmit={submit}>
       {error ? <div className="alert alert-error" role="alert">{error}</div> : null}
       <p className="muted">Complete o cadastro de um item que já consta no contrato original. O saldo financeiro e os pedidos anteriores permanecem iguais.</p>
-      <section className="contract-editor-section"><h3>Item do contrato original</h3><div className="contract-editor-grid">
+      <GuidedSection title="Item do contrato original"><div className="contract-editor-grid">
         {textInput('code', 'Código permanente do item')}
         {textInput('original_number', 'Número no contrato original')}
         {textInput('description', 'Descrição', { wide: true, maxLength: 500 })}
@@ -82,15 +83,15 @@ export default function OriginalContractItemForm({ contract, providers = [], leg
         {textInput('original_quantity', 'Quantidade original', { type: 'number', min: '.001', step: '.001' })}
         <label>Preço unitário original (R$)<MoneyInput className="app-input" aria-label="Preço unitário original (R$)" precision={6}
           min=".000001" required value={form.original_unit_price} onChange={(e) => changeOriginalPrice(e.target.value)} /></label>
-      </div></section>
-      <section className="contract-editor-section"><h3>Posição atual das quantidades</h3>
+      </div></GuidedSection>
+      <GuidedSection title="Posição atual das quantidades">
         <p className="muted">Informe o que ainda não foi executado. As reservas e os consumos já registrados nos outros itens serão preservados.</p>
         <div className="contract-editor-grid">
           {textInput('remaining_quantity', 'Quantidade restante não executada', { type: 'number', min: '0', step: '.001' })}
           {textInput('historical_added_quantity', 'Acréscimos anteriores (quantidade)', { type: 'number', min: '0', step: '.001' })}
         </div>
-      </section>
-      <section className="contract-editor-section"><h3>{isFuel ? 'Postos e preços' : 'Oficinas e preços'}</h3>
+      </GuidedSection>
+      <GuidedSection title={isFuel ? 'Postos e preços' : 'Oficinas e preços'}>
         {network ? <p className="muted">Na rede por valor, este cadastro acompanha as quantidades; o abastecimento continua usando o valor real do comprovante.</p> : <>
           <p className="muted">Selecione quem fornece o item e confira o preço usado nos próximos pedidos. Os preços dos itens existentes permanecem iguais.</p>
           {!activeProviders.length ? <p className="contract-pending-note">Adicione primeiro {isFuel ? 'um posto' : 'uma oficina'} na Rede executante do contrato.</p> : null}
@@ -114,16 +115,16 @@ export default function OriginalContractItemForm({ contract, providers = [], leg
             </div>
           })}
         </>}
-      </section>
-      <section className="contract-editor-section"><h3>Conferência do cadastro</h3><div className="contract-editor-grid">
+      </GuidedSection>
+      <GuidedSection title="Conferência do cadastro"><div className="contract-editor-grid">
         {textInput('document_reference', 'Documento ou cláusula do contrato original', { wide: true, maxLength: 255 })}
         <label className="contract-form__wide">Justificativa da inclusão<textarea className="app-textarea" aria-label="Justificativa da inclusão" required minLength={10} maxLength={4000}
           value={form.justification} onChange={(e) => update('justification', e.target.value)} /></label>
         <label className="contract-check contract-form__wide"><input type="checkbox" required checked={form.original_contract_confirmed}
           onChange={(e) => update('original_contract_confirmed', e.target.checked)} />Confirmo que este item já consta no contrato original e que as quantidades e os acréscimos anteriores foram conferidos.</label>
-      </div></section>
+      </div></GuidedSection>
       <div className="contract-editor-footer"><button type="button" className="ghost-button" disabled={saving} onClick={onClose}>Voltar</button>
         <button className="app-button" disabled={saving || (!network && !activeProviders.length)}>{saving ? 'Incluindo…' : 'Incluir item original'}</button></div>
-    </form>
+    </GuidedForm>
   </Modal>
 }

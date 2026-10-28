@@ -1,3 +1,4 @@
+import { FormFields } from '../GuidedForm'
 import '../../styles/contracts-balances.css'
 import { formatContractMoney } from '../../utils/contractBalance'
 
@@ -6,7 +7,7 @@ export default function ContractFundingFields({ funding, externalFuelType = fals
   const amount = funding.kind === 'FUEL' ? funding.quote?.reserve_amount : funding.estimatedCost
   const after = funding.kind === 'FUEL' ? funding.quote?.available_after
     : funding.contract ? Number(funding.contract.available_balance)-Number(amount || 0) : null
-  return <fieldset className="contract-funding modal-field-span" aria-busy={funding.loading}>
+  return <FormFields><fieldset className="contract-funding modal-field-span" aria-busy={funding.loading}>
     <legend>{funding.networkValue ? 'Consumo no contrato por valor' : 'Reserva no contrato'}</legend>
     {funding.error ? <div className="alert alert-error" role="alert">{funding.error}<button type="button" className="ghost-button" onClick={funding.refresh}>Tentar novamente</button></div> : null}
     {funding.enabled === null ? <p role="status">Conferindo controle contratual…</p> : <>
@@ -47,5 +48,5 @@ export default function ContractFundingFields({ funding, externalFuelType = fals
       </> : null}
       <p className="muted">{funding.networkValue ? 'Rede credenciada por valor: este pedido não reserva saldo nem utiliza preço por litro cadastrado. O total real do comprovante será descontado ao confirmar o abastecimento.' : 'A reserva reduz o disponível. Na conclusão, o sistema registra o valor real e libera a sobra.'}</p>
     </>}
-  </fieldset>
+  </fieldset></FormFields>
 }

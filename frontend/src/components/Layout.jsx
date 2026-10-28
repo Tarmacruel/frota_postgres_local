@@ -1,3 +1,4 @@
+import GuidedForm from './GuidedForm'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
 import { officialBrand } from '../constants/officialBrand'
@@ -698,7 +699,7 @@ export default function Layout() {
         }}
         canClose={!passwordChangeRequired}
       >
-        <form onSubmit={handlePasswordChange} className="stack">
+        <GuidedForm onSubmit={handlePasswordChange} className="stack">
           <input className="app-input" type="password" placeholder="Senha atual" value={passwordForm.current_password} onChange={(e) => setPasswordForm({ ...passwordForm, current_password: e.target.value })} required />
           <input className="app-input" type="password" placeholder="Nova senha (mínimo 8 caracteres)" value={passwordForm.new_password} onChange={(e) => setPasswordForm({ ...passwordForm, new_password: e.target.value })} required />
           <input className="app-input" type="password" placeholder="Confirmar nova senha" value={passwordForm.confirm_password} onChange={(e) => setPasswordForm({ ...passwordForm, confirm_password: e.target.value })} required />
@@ -707,7 +708,7 @@ export default function Layout() {
             <button className="app-button" type="submit">Salvar senha</button>
             {passwordChangeRequired ? <button className="ghost-button" type="button" onClick={handleLogout}>Sair</button> : null}
           </div>
-        </form>
+        </GuidedForm>
       </Modal>
 
       <Modal
@@ -717,7 +718,7 @@ export default function Layout() {
         onClose={() => {}}
         canClose={false}
       >
-        <form onSubmit={handleCpfRegistration} className="stack">
+        <GuidedForm onSubmit={handleCpfRegistration} className="stack">
           <input
             className="app-input"
             placeholder="CPF"
@@ -732,7 +733,7 @@ export default function Layout() {
             <button className="app-button" type="submit">Registrar CPF</button>
             <button className="ghost-button" type="button" onClick={handleLogout}>Sair</button>
           </div>
-        </form>
+        </GuidedForm>
       </Modal>
 
       <Modal

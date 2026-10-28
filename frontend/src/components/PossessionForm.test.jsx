@@ -1,3 +1,4 @@
+import { reviewGuidedForm } from '../test/guidedForms'
 import '../test/mockJustificationSuggestions'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
@@ -61,7 +62,8 @@ describe('PossessionForm', () => {
     expect(odometerInput()).toHaveValue(90)
     expect(await screen.findByText(/O odômetro informado é menor/)).toBeInTheDocument()
     fireEvent.click(screen.getByText('Selecionar condutor de teste'))
-    fireEvent.click(screen.getByRole('button', { name: 'Registrar posse' }))
+    reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button', { name: 'Registrar posse' , hidden: true }))
     await waitFor(() => expect(possessionAPI.create).toHaveBeenCalledTimes(1))
     expect(possessionAPI.create.mock.calls[0][0].get('start_odometer_km')).toBe('90')
   })
@@ -119,13 +121,16 @@ describe('PossessionForm', () => {
     render(<PossessionForm vehicles={[vehicle]} onClose={vi.fn()} onSuccess={onSuccess} onUnauthorized={vi.fn()} />)
 
     await user.click(screen.getByRole('button', { name: 'Selecionar veículo de teste' }))
-    await user.click(screen.getByRole('button', { name: 'Selecionar condutor de teste' }))
     await user.type(screen.getByRole('spinbutton', { name: 'Odômetro inicial (km)' }), '100')
+    await user.click(screen.getByRole('button', {name:'Condutor',exact:true}))
+    await user.click(screen.getByRole('button', { name: 'Selecionar condutor de teste' }))
+    await user.click(screen.getByRole('button', {name:'Rota e observações',exact:true}))
     await user.click(screen.getByRole('checkbox', { name: /Rota inicial/ }))
     expect(screen.getByRole('textbox', { name: 'Origem' })).toHaveValue('Garagem municipal')
     await user.type(screen.getByRole('textbox', { name: 'Finalidade' }), 'Entrega de documentos')
 
-    await user.click(screen.getByRole('button', { name: 'Registrar posse' }))
+    reviewGuidedForm()
+  await user.click(screen.getByRole('button', { name: 'Registrar posse' , hidden: true }))
 
     await waitFor(() => expect(possessionAPI.create).toHaveBeenCalledTimes(1))
     const firstPayload = possessionAPI.create.mock.calls[0][0]

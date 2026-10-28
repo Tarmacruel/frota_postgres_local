@@ -1,3 +1,4 @@
+import GuidedForm, { FormSection as GuidedSection } from '../components/GuidedForm'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import StatusChip from '../components/ui/StatusChip'
@@ -397,7 +398,7 @@ export default function UsersPage() {
 
       <IndicatorBar state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={loading} error={error} resultCount={pagination.total} />
 
-      {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
+      {error && !isModalOpen ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {catalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
@@ -478,10 +479,11 @@ export default function UsersPage() {
       >
         {formError ? <div role="alert" className="alert alert-error" style={{ marginBottom: 16 }}>{formError}</div> : null}
         {catalogError ? <div role="alert" className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError}</div> : null}
-        <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
-          <div className="form-field modal-field-span">
+        <GuidedForm busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid">
+          <GuidedSection title="Identificação" description="Confira os dados de identificação do usuário.">
+<div className="form-field modal-field-span">
             <label htmlFor="user-name">Nome completo</label>
-            <input
+            <input required
               id="user-name"
               className="app-input"
               placeholder="Nome do servidor"
@@ -491,7 +493,7 @@ export default function UsersPage() {
           </div>
           <div className="form-field">
             <label htmlFor="user-email">E-mail</label>
-            <input
+            <input required
               id="user-email"
               className="app-input"
               placeholder="usuario@frota.local"
@@ -501,7 +503,7 @@ export default function UsersPage() {
           </div>
           <div className="form-field">
             <label htmlFor="user-cpf">{editingUser ? 'Substituir CPF (opcional)' : 'CPF'}</label>
-            <input
+            <input required={!editingUser} data-required-message="Informe o CPF do usuário com os 11 números do documento."
               id="user-cpf"
               className="app-input"
               placeholder={editingUser ? (editingUser.cpf_masked || 'Preencha somente para substituir') : '000.000.000-00'}
@@ -519,9 +521,12 @@ export default function UsersPage() {
             />
             {cpfError ? <span id="user-cpf-error" style={{ color: 'var(--danger)' }}>{cpfError}</span> : null}
           </div>
-          <div className="form-field">
+
+</GuidedSection>
+<GuidedSection title="Acesso" description="Confira a secretaria, o perfil e os dados de acesso. As permissões existentes serão mantidas.">
+<div className="form-field">
             <label htmlFor="user-password">{editingUser ? 'Redefinir senha provisória (opcional)' : 'Senha provisória'}</label>
-            <input
+            <input required={!editingUser} minLength={8}
               id="user-password"
               className="app-input"
               type="password"
@@ -532,7 +537,7 @@ export default function UsersPage() {
           </div>
           <div className="form-field modal-field-span">
             <label>Secretaria</label>
-            <SearchableSelect
+            <SearchableSelect required
               value={form.organization_id}
               onChange={(value) => setForm({ ...form, organization_id: value })}
               options={organizationOptions}
@@ -549,13 +554,14 @@ export default function UsersPage() {
               ))}
             </select>
           </div>
+</GuidedSection>
           <div className="actions-inline modal-actions">
             <button className="app-button" type="submit" disabled={submitting}>
               {submitting ? 'Salvando...' : editingUser ? 'Atualizar usuário' : 'Criar usuário'}
             </button>
             <button className="ghost-button" type="button" disabled={submitting} onClick={closeModal}>Cancelar</button>
           </div>
-        </form>
+        </GuidedForm>
       </Modal>
 
       <Modal
@@ -563,12 +569,14 @@ export default function UsersPage() {
         title={permissionsUser ? `Permissões de ${permissionsUser.name}` : 'Permissões'}
         description="Defina acesso por módulo e ação operacional."
         onClose={closePermissionsModal}
+        canClose={!permissionsSaving}
       >
-        {permissionsError ? <div role="alert" className="alert alert-error" style={{ marginBottom: 16 }}>{permissionsError}</div> : null}
+
         {permissionsLoading ? (
           <div className="empty-state">Carregando permissões...</div>
         ) : (
-          <div className="stack">
+          <GuidedForm title="Revisão de acessos" busy={permissionsSaving} formError={permissionsError} className="stack" onSubmit={(event) => { event.preventDefault(); savePermissions() }}>
+            <GuidedSection title="Permissões" description="Marque os acessos permitidos para este usuário. Os limites do perfil continuam se aplicando.">
             <div className="table-wrap table-wrap-wide">
               <table className="data-table data-table-wide management-table">
                 <thead>
@@ -607,13 +615,20 @@ export default function UsersPage() {
                 </tbody>
               </table>
             </div>
+            </GuidedSection>
+            <GuidedSection title="Conferência" description="Confira as opções marcadas antes de salvar. Nenhuma permissão foi alterada ainda.">
+              <dl className="guided-form__review">{PERMISSION_MODULES.map((module) => {
+                const selected = PERMISSION_ACTIONS.filter((action) => permissionsForm[module.key]?.[action.field])
+                return <div key={module.key}><dt>{module.label}</dt><dd>{selected.map((action) => action.label).join(' · ') || 'Nenhuma opção marcada'}</dd></div>
+              })}</dl>
+            </GuidedSection>
             <div className="actions-inline modal-actions">
-              <button className="app-button" type="button" disabled={permissionsSaving} onClick={savePermissions}>
+              <button className="app-button" type="submit" disabled={permissionsSaving}>
                 {permissionsSaving ? 'Salvando...' : 'Salvar permissões'}
               </button>
               <button className="ghost-button" type="button" onClick={closePermissionsModal}>Cancelar</button>
             </div>
-          </div>
+          </GuidedForm>
         )}
       </Modal>
     </div>

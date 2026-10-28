@@ -1,3 +1,4 @@
+import { reviewGuidedForm } from '../../test/guidedForms'
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
@@ -38,13 +39,14 @@ beforeEach(() => {
 it('calcula a reserva, preenche o único contrato e só emite após a confirmação do usuário', async () => {
   render(<FuelSupplyOrderCreateForm {...catalog} />)
   fireEvent.change(screen.getByLabelText('Veículo'), { target: { value: 'car' } })
-  const button = screen.getByRole('button', { name: 'Criar ordem' })
+  const button = screen.getByRole('button', { name: 'Criar ordem' , hidden: true })
   await waitFor(() => expect(button).toBeEnabled())
   expect(screen.getByText('TEST-01')).toBeInTheDocument()
   expect(screen.queryByLabelText('Contrato para reserva')).not.toBeInTheDocument()
   expect(screen.queryByLabelText('Prestador para reserva')).not.toBeInTheDocument()
   expect(screen.getByText(/180,00/)).toBeInTheDocument()
   expect(fuelSupplyOrdersAPI.create).not.toHaveBeenCalled()
+  reviewGuidedForm()
   fireEvent.click(button)
   await waitFor(() => expect(fuelSupplyOrdersAPI.create).toHaveBeenCalledWith(expect.objectContaining({
     contract_id: 'contract', contract_provider_id: 'provider', requested_fuel_type: 'DIESEL S10', expected_price_id: 'price',
@@ -56,7 +58,7 @@ it('bloqueia a emissão quando a prévia aponta saldo insuficiente', async () =>
   contractControlAPI.quote.mockResolvedValue({ data: { price_id: 'price', unit_price: '6', reserve_amount: '180', available_balance: '100', available_after: '-80', sufficient: false } })
   render(<FuelSupplyOrderCreateForm {...catalog} />)
   expect(await screen.findByText(/Saldo insuficiente/)).toBeInTheDocument()
-  expect(screen.getByRole('button', { name: 'Criar ordem' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Criar ordem' , hidden: true })).toBeDisabled()
   expect(fuelSupplyOrdersAPI.create).not.toHaveBeenCalled()
 })
 
@@ -82,6 +84,7 @@ it('autoriza manutenção diretamente com orçamento e não exige etapa adiciona
   const button = screen.getByRole('button', { name: 'Autorizar e reservar saldo' })
   await waitFor(() => expect(button).toBeEnabled())
   expect(maintenanceOrdersAPI.create).not.toHaveBeenCalled()
+  reviewGuidedForm()
   fireEvent.click(button)
   await waitFor(() => expect(maintenanceOrdersAPI.create).toHaveBeenCalledWith(expect.objectContaining({ contract_id: 'contract', provider_id: 'workshop', estimated_cost: '500' })))
 })

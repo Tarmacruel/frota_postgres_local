@@ -1,3 +1,4 @@
+import { reviewGuidedForm } from '../test/guidedForms'
 import '../test/mockJustificationSuggestions'
 import { useState } from 'react'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -13,7 +14,8 @@ beforeEach(() => vi.resetAllMocks())
 
 it('envia a justificativa de encerramento do sinistro revisada pelo usuário', async () => {
   claimsAPI.update.mockResolvedValue({})
-  render(<ClaimForm vehicles={[]} initialData={{ id: 'claim', vehicle_id: 'vehicle', data_ocorrencia: '2026-10-01T12:00:00Z', descricao: 'Ocorrência fictícia', status: 'ENCERRADO' }} />)
+  render(<ClaimForm vehicles={[]} initialData={{ id: 'claim', vehicle_id: 'vehicle', data_ocorrencia: '2026-10-01T12:00:00Z', descricao: 'Ocorrência fictícia para teste controlado', local:'Local de teste', status: 'ENCERRADO' }} />)
+  reviewGuidedForm()
   const input = screen.getByLabelText('Justificativa de encerramento')
   expect(input).not.toBeRequired()
   await waitFor(() => expect(screen.getByRole('button', { name: 'Ver modelos' })).toBeEnabled())
@@ -22,6 +24,7 @@ it('envia a justificativa de encerramento do sinistro revisada pelo usuário', a
   expect(input.value).toContain('sem necessidade de despesa')
   expect(claimsAPI.update).not.toHaveBeenCalled()
   fireEvent.change(input, { target: { value: 'Encerramento sem despesas adicionais, conforme registro revisado.' } })
+  reviewGuidedForm()
   fireEvent.submit(input.closest('form'))
   await waitFor(() => expect(claimsAPI.update).toHaveBeenCalledWith('claim', expect.objectContaining({ justificativa_encerramento: input.value })))
 })
@@ -35,6 +38,7 @@ it('mantém declaração obrigatória na retificação da confirmação de devol
       form={form} onChange={(patch) => setForm((old) => ({ ...old, ...patch }))} onSubmit={submit} />
   }
   render(<Form />)
+  reviewGuidedForm()
   expect(screen.getByLabelText('Justificativa administrativa')).toBeRequired()
   await waitFor(() => expect(screen.getByRole('button', { name: 'Ver modelos' })).toBeEnabled())
   fireEvent.click(screen.getByRole('button', { name: 'Ver modelos' }))

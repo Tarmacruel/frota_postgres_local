@@ -1,3 +1,4 @@
+import GuidedForm, { FormSection as GuidedSection } from './GuidedForm'
 import MoneyInput from './MoneyInput'
 import JustificationField from './JustificationField'
 import { useMemo, useRef, useState } from 'react'
@@ -129,13 +130,14 @@ export default function FuelSupplyRectifyForm({ record, onClose, onSuccess }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="form-grid modal-form-grid fuel-supply-rectify-form">
+    <GuidedForm busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid fuel-supply-rectify-form">
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
       <div className="alert alert-info modal-field-span">
         Você pode corrigir os dados e substituir o comprovante. Sem novo arquivo, o comprovante atual será mantido. Valores derivados de consumo serão recalculados quando necessário.
       </div>
 
-      <div className="form-field">
+      <GuidedSection title="Dados corrigidos" description="Altere somente o que precisa ser corrigido no abastecimento.">
+<div className="form-field">
         <label htmlFor="rectify-supplied-at">Data/hora real</label>
         <input id="rectify-supplied-at" type="datetime-local" className="app-input" value={form.supplied_at} onChange={(event) => setForm((current) => ({ ...current, supplied_at: event.target.value }))} required />
       </div>
@@ -165,7 +167,10 @@ export default function FuelSupplyRectifyForm({ record, onClose, onSuccess }) {
         </div>
       ) : null}
 
-      <div className="form-field modal-field-span">
+
+</GuidedSection>
+<GuidedSection title="Aditivos e comprovante" description="Confira os aditivos e substitua o comprovante somente se necessário.">
+<div className="form-field modal-field-span">
         <label className="checkbox-line">
           <input type="checkbox" checked={form.additive_enabled} onChange={(event) => setForm((current) => ({ ...current, additive_enabled: event.target.checked, additive_type: '', additive_type_other: '', additive_quantity_liters: '' }))} />
           <span>Houve aditivo</span>
@@ -206,17 +211,21 @@ export default function FuelSupplyRectifyForm({ record, onClose, onSuccess }) {
         <label htmlFor="rectify-notes">Observações</label>
         <textarea id="rectify-notes" className="app-textarea" rows="2" value={form.notes} onChange={(event) => setForm((current) => ({ ...current, notes: event.target.value }))} maxLength={4000} />
       </div>
-      <div className="form-field modal-field-span">
+
+</GuidedSection>
+<GuidedSection title="Justificativa e itens" description="Explique a correção e confira os itens realizados. O histórico será preservado.">
+<div className="form-field modal-field-span">
         <label htmlFor="rectify-reason">Justificativa da retificação</label>
         <JustificationField context="fuel_supply" id="rectify-reason" className="app-textarea" rows="3" value={form.reason} onChange={(event) => setForm((current) => ({ ...current, reason: event.target.value }))} minLength={10} maxLength={1000} required disabled={submitting} />
         <small className="muted">A justificativa e os valores anterior e novo ficarão registrados na auditoria.</small>
       </div>
 
       <FuelItemAllocationFields allocation={allocation}/>
+</GuidedSection>
       <div className="actions-inline modal-actions">
         <button className="app-button" type="submit" disabled={submitting || Boolean(receiptError) || Boolean(allocation.error)}>{submitLabel}</button>
         <button className="ghost-button" type="button" onClick={onClose} disabled={submitting}>Cancelar</button>
       </div>
-    </form>
+    </GuidedForm>
   )
 }

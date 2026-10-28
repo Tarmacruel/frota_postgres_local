@@ -1,3 +1,4 @@
+import GuidedForm from '../GuidedForm'
 import { useState } from 'react'
 import { contractControlAPI } from '../../api/contractControl'
 import { useContractControl } from '../../hooks/useContractFunding'
@@ -50,7 +51,7 @@ export default function ProcessReconciliation({ process, onChange }) {
     {feedback ? <p className="alert alert-success" role="status">{feedback}</p> : null}
     <Modal open={open} title="Conciliar fatura e serviços realizados" onClose={() => setOpen(false)} canClose={!saving && !loading}>
       {error ? <div className="alert alert-error" role="alert">{error}</div> : null}
-      {loading ? <p role="status">Consultando operações disponíveis…</p> : <form onSubmit={save}>
+      {loading ? <p role="status">Consultando operações disponíveis…</p> : <GuidedForm busy={saving} onSubmit={save}>
         <p>Selecione os serviços desta fatura. O consumo já registrado no contrato será preservado.</p>
         {stale ? <p className="alert alert-warning" role="status">A fatura ou uma operação foi alterada após a última conciliação. Confira os valores atualizados e confirme novamente.</p> : null}
         <div className="contract-checklist">{operations.map((o) => <label key={o.id}><input type="checkbox" checked={selected.includes(o.id)} onChange={() => setSelected((s) => s.includes(o.id) ? s.filter((id) => id !== o.id) : [...s, o.id])} />
@@ -59,7 +60,7 @@ export default function ProcessReconciliation({ process, onChange }) {
         <dl className="contract-funding__summary"><div><dt>Fatura</dt><dd>{brl(process.amount)}</dd></div><div><dt>Operações selecionadas</dt><dd>{brl(total)}</dd></div><div><dt>Diferença a ajustar</dt><dd>{brl(difference)}</dd></div></dl>
         {Math.abs(difference) >= .005 ? <label className="form-field">Justificativa da diferença<textarea className="app-textarea" minLength={10} required value={reason} onChange={(e) => setReason(e.target.value)} /><small>Somente a diferença confirmada será lançada como ajuste no extrato.</small></label> : null}
         <div className="actions-inline modal-actions"><button className="ghost-button" type="button" disabled={saving} onClick={() => setOpen(false)}>Voltar</button><button className="app-button" disabled={saving || !selected.length}>{saving ? 'Salvando…' : 'Confirmar conciliação'}</button></div>
-      </form>}
+      </GuidedForm>}
     </Modal>
   </section>
 }

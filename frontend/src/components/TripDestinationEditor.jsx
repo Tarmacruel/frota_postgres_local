@@ -1,3 +1,4 @@
+import { FormFields } from './GuidedForm'
 import { createDestinationDraft } from '../utils/tripDestination'
 
 export default function TripDestinationEditor({ destinations, onChange, idPrefix, disabled = false }) {
@@ -21,7 +22,7 @@ export default function TripDestinationEditor({ destinations, onChange, idPrefix
   }
 
   return (
-    <section className="trip-destination-editor" aria-labelledby={`${idPrefix}-destinations-title`}>
+    <FormFields><section className="trip-destination-editor" aria-labelledby={`${idPrefix}-destinations-title`}>
       <div className="trip-section-heading">
         <div>
           <h4 id={`${idPrefix}-destinations-title`}>Destinos</h4>
@@ -119,6 +120,6 @@ export default function TripDestinationEditor({ destinations, onChange, idPrefix
           })}
         </ol>
       )}
-    </section>
+    </section></FormFields>
   )
 }

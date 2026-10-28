@@ -1,3 +1,4 @@
+import { reviewGuidedForm } from '../../test/guidedForms'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import OriginalContractItemForm from './OriginalContractItemForm'
@@ -15,6 +16,9 @@ function fillOriginal() {
     ['Acréscimos anteriores (quantidade)', '0'], ['Documento ou cláusula do contrato original', 'Contrato, item 02'],
     ['Justificativa da inclusão', 'Item previsto originalmente e omitido no cadastro'],
   ]) fireEvent.change(screen.getByLabelText(label, { exact: true }), { target: { value } })
+  const product = screen.queryByLabelText('Produto correspondente')
+  if (product) fireEvent.change(product, {target:{value:'ETANOL'}})
+  reviewGuidedForm()
   fireEvent.click(screen.getByRole('checkbox', { name: /Confirmo que este item/ }))
 }
 
@@ -25,10 +29,11 @@ it('inclui somente após conferência, usando o preço original e o executante s
   expect(screen.getByLabelText('Acréscimos anteriores (quantidade)')).toHaveValue(null)
   expect(screen.queryByLabelText('Preço de referência atualizado (R$)')).not.toBeInTheDocument()
   fillOriginal()
-  expect(screen.getByRole('checkbox', { name: 'Vincular Oficina de teste' })).toBeChecked()
+  expect(screen.getByRole('checkbox', { name: 'Vincular Oficina de teste', hidden:true })).toBeChecked()
   expect(screen.getByLabelText('Preço cobrado em Oficina de teste')).toHaveValue('R$ 12,345678')
   expect(contractControlAPI.complementOriginalItem).not.toHaveBeenCalled()
-  fireEvent.click(screen.getByRole('button', { name: 'Incluir item original' }))
+  reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button', { name: 'Incluir item original' , hidden: true }))
   await waitFor(() => expect(contractControlAPI.complementOriginalItem).toHaveBeenCalledTimes(1))
   expect(contractControlAPI.complementOriginalItem).toHaveBeenCalledWith('c', expect.objectContaining({
     code: 'PECA-02', original_unit_price: '12.345678', remaining_quantity: '50', historical_added_quantity: '0',
@@ -42,11 +47,13 @@ it('não presume conferência nem quantidade histórica', async () => {
   render(<OriginalContractItemForm contract={contract} providers={[provider]} />)
   fillOriginal()
   fireEvent.click(screen.getByRole('checkbox', { name: /Confirmo que este item/ }))
-  fireEvent.click(screen.getByRole('button', { name: 'Incluir item original' }))
+  reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button', { name: 'Incluir item original' , hidden: true }))
   expect(contractControlAPI.complementOriginalItem).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('checkbox', { name: /Confirmo que este item/ }))
   fireEvent.change(screen.getByLabelText('Acréscimos anteriores (quantidade)'), { target: { value: '' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Incluir item original' }))
+  reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button', { name: 'Incluir item original' , hidden: true }))
   expect(contractControlAPI.complementOriginalItem).not.toHaveBeenCalled()
 })
 
@@ -54,13 +61,15 @@ it('preserva dados e chave idempotente ao repetir após falha', async () => {
   contractControlAPI.complementOriginalItem.mockRejectedValueOnce(new Error('Falha de conexão'))
   render(<OriginalContractItemForm contract={contract} providers={[provider]} onSuccess={vi.fn()} onClose={vi.fn()} />)
   fillOriginal()
-  fireEvent.click(screen.getByRole('button', { name: 'Incluir item original' }))
+  reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button', { name: 'Incluir item original' , hidden: true }))
   await screen.findByRole('alert')
   expect(screen.getByLabelText('Quantidade restante não executada')).toHaveValue(50)
   expect(screen.getByLabelText('Documento ou cláusula do contrato original')).toHaveValue('Contrato, item 02')
   expect(screen.getByRole('checkbox', { name: /Confirmo que este item/ })).toBeChecked()
   const first = contractControlAPI.complementOriginalItem.mock.calls[0][1]
-  fireEvent.click(screen.getByRole('button', { name: 'Incluir item original' }))
+  reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button', { name: 'Incluir item original' , hidden: true }))
   await waitFor(() => expect(contractControlAPI.complementOriginalItem).toHaveBeenCalledTimes(2))
   expect(contractControlAPI.complementOriginalItem.mock.calls[1][1]).toEqual(first)
 })
@@ -68,14 +77,17 @@ it('preserva dados e chave idempotente ao repetir após falha', async () => {
 it('exige seleção explícita com várias oficinas e preserva preço corrigido', async () => {
   render(<OriginalContractItemForm contract={contract} providers={[provider, { id: 'p2', name: 'Outra oficina', active: true }, { id: 'dead', name: 'Inativa', active: false }]} onSuccess={vi.fn()} onClose={vi.fn()} />)
   fillOriginal()
-  expect(screen.getByRole('checkbox', { name: 'Vincular Oficina de teste' })).not.toBeChecked()
+  expect(screen.getByRole('checkbox', { name: 'Vincular Oficina de teste', hidden:true })).not.toBeChecked()
   expect(screen.queryByRole('checkbox', { name: 'Vincular Inativa' })).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Incluir item original' }))
+  reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button', { name: 'Incluir item original' , hidden: true }))
   expect(await screen.findByRole('alert')).toHaveTextContent('Selecione ao menos uma oficina/posto')
+  fireEvent.click(screen.getByRole('button', {name:'Oficinas e preços',exact:true}))
   fireEvent.click(screen.getByRole('checkbox', { name: 'Vincular Outra oficina' }))
   fireEvent.change(screen.getByLabelText('Preço cobrado em Outra oficina'), { target: { value: '15,123456' } })
   fireEvent.change(screen.getByLabelText('Preço unitário original (R$)'), { target: { value: '13' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Incluir item original' }))
+  reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button', { name: 'Incluir item original' , hidden: true }))
   await waitFor(() => expect(contractControlAPI.complementOriginalItem).toHaveBeenCalledWith('c', expect.objectContaining({
     original_unit_price: '13', prices: [{ provider_id: 'p2', unit_price: '15.123456', fuel_price_id: null }],
   })))
@@ -92,7 +104,8 @@ it('reaproveita a versão vigente exata de combustível sem permitir reprecific�
   expect(screen.getByLabelText('Preço vigente em Posto teste')).toHaveValue('current')
   expect(screen.getByLabelText('Preço cobrado em Posto teste')).toHaveAttribute('readonly')
   expect(screen.getByLabelText('Preço cobrado em Posto teste')).toHaveValue('R$ 5,123456')
-  fireEvent.click(screen.getByRole('button', { name: 'Incluir item original' }))
+  reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button', { name: 'Incluir item original' , hidden: true }))
   await waitFor(() => expect(contractControlAPI.complementOriginalItem).toHaveBeenCalledWith('c', expect.objectContaining({
     product_key: 'ETANOL', prices: [{ provider_id: 'p', unit_price: '5.123456', fuel_price_id: 'current' }],
   })))
@@ -103,14 +116,15 @@ it('rede por valor inclui só o controle quantitativo sem preços fixos', async 
   fillOriginal()
   fireEvent.change(screen.getByLabelText('Produto correspondente'), { target: { value: 'ETANOL' } })
   expect(screen.queryByLabelText(/Preço cobrado em/)).not.toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Incluir item original' }))
+  reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button', { name: 'Incluir item original' , hidden: true }))
   await waitFor(() => expect(contractControlAPI.complementOriginalItem).toHaveBeenCalledWith('c', expect.objectContaining({ prices: [] })))
 })
 
 it('pede lote quando a abertura foi por grupo e bloqueia sem executante cadastrado', () => {
   render(<OriginalContractItemForm contract={contract} adjudication="GROUP" providers={[]} />)
   expect(screen.getByLabelText('Lote/grupo original')).toBeRequired()
-  expect(screen.getByRole('button', { name: 'Incluir item original' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Incluir item original' , hidden: true })).toBeDisabled()
   expect(screen.getByText(/Adicione primeiro uma oficina/)).toBeInTheDocument()
 })
 

@@ -1,3 +1,4 @@
+import { reviewGuidedForm } from '../test/guidedForms'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import FuelSupplyOrderConfirmForm from './FuelSupplyOrderConfirmForm'
@@ -24,7 +25,8 @@ function addReceipt() {
 }
 
 function submit() {
-  fireEvent.submit(screen.getByRole('button', { name: 'Confirmar abastecimento' }).closest('form'))
+  reviewGuidedForm()
+  fireEvent.submit(screen.getByRole('button', { name: 'Confirmar abastecimento' , hidden: true }).closest('form'))
 }
 
 it.each([

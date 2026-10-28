@@ -1,3 +1,4 @@
+import GuidedForm, { FormSection as GuidedSection } from '../GuidedForm'
 import { useState } from 'react'
 import { contractControlAPI } from '../../api/contractControl'
 import { paymentContractsAPI, paymentSuppliersAPI } from '../../api/paymentProcesses'
@@ -75,24 +76,27 @@ export default function ContractSetupDialog({ dialog, suppliers, stations, provi
     finally { setSaving(false) }
   }
   return <Modal open title={titles[type]} onClose={onClose} canClose={!saving}>
-    <form className="contract-form" onSubmit={submit}>
+    <GuidedForm busy={saving} className="contract-form" onSubmit={submit}>
       {error ? <div className="alert alert-error contract-form__wide" role="alert">{error}</div> : null}
       {['contract', 'edit'].includes(type) ? <>
+<GuidedSection title="Identificação" description="Confira a empresa, o objeto e a modalidade do contrato.">
         {input('number', 'Número do contrato')}
         {select('supplier_id', 'Empresa contratada', suppliers.map((s) => [s.id, s.name]))}
         {select('kind', 'Objeto do contrato', [['FUEL', 'Abastecimento'], ['MAINTENANCE', 'Manutenção veicular']])}
         {form.kind === 'FUEL' ? <>{select('fuel_pricing_mode', 'Controle do abastecimento', [['FIXED_PRICE', 'Preço contratado por litro'], ['NETWORK_VALUE', 'Rede credenciada por valor']])}
           {form.fuel_pricing_mode === 'NETWORK_VALUE' ? <p className="muted contract-form__wide">Os postos utilizam preços próprios. Não há cadastro de preço por litro nem reserva prévia. Somente o total real confirmado será descontado do contrato. Pedidos anteriores mantêm sua modalidade original.</p> : null}</> : null}
         {select('status', 'Situação', [['ACTIVE', 'Ativo'], ['SUSPENDED', 'Suspenso'], ['FINISHED', 'Encerrado'], ['CANCELLED', 'Cancelado']])}
+</GuidedSection><GuidedSection title="Vigência e valores" description="Confira as datas e os valores do documento contratual.">
         {input('valid_from', 'Início da vigência', { type: 'date', readOnly: c.control_opened })}
         {input('valid_until', 'Fim da vigência', { type: 'date', readOnly: c.control_opened })}
         {input('value_initial', 'Valor inicial (R$)', { type: 'number', step: '.01', min: '0', required: false, readOnly: c.control_opened })}
         {input('value_updated', 'Valor atualizado (R$)', { type: 'number', step: '.01', min: '0', required: false, readOnly: c.control_opened })}
         {input('contract_type', 'Modalidade do contrato', { required: false })}
+</GuidedSection><GuidedSection title="Objeto e observações" description="Complete a descrição e revise as informações antes de salvar.">
         <label className="contract-form__wide">Descrição do objeto<textarea className="app-textarea" value={form.object_description} onChange={(e) => update('object_description', e.target.value)} /></label>
         {c.control_opened ? <p className="muted contract-form__wide">O controle já foi iniciado. Para erro de digitação no disponível, use Corrigir saldo em Configuração. Limite e vigência devem ser alterados por aditivo; empresa e objeto ficam preservados.</p> : null}
         <label className="contract-form__wide">Observações<textarea className="app-textarea" value={form.notes} onChange={(e) => update('notes', e.target.value)} /></label>
-      </> : null}
+      </GuidedSection></> : null}
       {type === 'opening' ? <><p className="contract-form__wide">Contrato <strong>{c.number}</strong>. Confira o saldo livre na data informada. Despesas anteriores permanecem no histórico e não serão descontadas novamente.</p>
         {input('balance', 'Saldo inicial conferido (R$)', { type: 'number', min: '0', step: '.01' })}
         {input('opening_date', 'Data de início do controle', { type: 'date' })}{reason}</> : null}
@@ -135,6 +139,6 @@ export default function ContractSetupDialog({ dialog, suppliers, stations, provi
         <label>Ativo<select className="app-select" value={String(form.active)} onChange={(e) => update('active', e.target.value === 'true')}><option value="true">Sim</option><option value="false">Não</option></select></label>
         <label className="contract-form__wide">Observações<textarea className="app-textarea" value={form.notes} onChange={(e) => update('notes', e.target.value)} /></label></> : null}
       <div className="actions-inline"><button className="ghost-button" type="button" disabled={saving} onClick={onClose}>Voltar</button><button className={type === 'priceDelete' ? 'mini-button danger' : 'app-button'} disabled={saving}>{saving ? 'Salvando…' : type === 'opening' ? 'Confirmar abertura do saldo' : type === 'priceDelete' ? 'Confirmar exclusão' : type === 'correction' ? 'Confirmar correção' : 'Salvar'}</button></div>
-    </form>
+    </GuidedForm>
   </Modal>
 }

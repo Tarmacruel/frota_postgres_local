@@ -1,3 +1,4 @@
+import GuidedForm from './GuidedForm'
 import { useRef, useState } from 'react'
 import JustificationField from './JustificationField'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
@@ -21,7 +22,7 @@ export default function FuelSupplyOrderCancelForm({ order, onSaved, onClose, onB
     } finally { sending.current = false; setBusy(false); onBusy(false) }
     onSaved()
   }
-  return <form onSubmit={submit}>
+  return <GuidedForm busy={busy} onSubmit={submit}>
     {error && <p role="alert" className="alert alert-error">{error}</p>}
     <label htmlFor="order-cancel-reason">Motivo do cancelamento (opcional)</label>
     <JustificationField context="order_cancel" id="order-cancel-reason" className="app-textarea" rows={3}
@@ -30,5 +31,5 @@ export default function FuelSupplyOrderCancelForm({ order, onSaved, onClose, onB
       <button type="button" className="ghost-button" disabled={busy} onClick={onClose}>Voltar</button>
       <button type="submit" className="app-button" disabled={busy}>{busy ? 'Cancelando...' : 'Confirmar cancelamento'}</button>
     </div>
-  </form>
+  </GuidedForm>
 }

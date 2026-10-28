@@ -1,3 +1,4 @@
+import GuidedForm, { FormSection as GuidedSection } from '../components/GuidedForm'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import StatusChip from '../components/ui/StatusChip'
@@ -378,7 +379,7 @@ export default function FuelStationsPage() {
       {isAdmin && selectedStationId ? <button type="button" className="secondary-button" onClick={() => { const target = document.getElementById('station-user-links'); target?.scrollIntoView({ block: 'start', behavior: 'smooth' }); target?.focus({ preventScroll: true }) }}>{links.length} vínculo(s) de usuário no posto selecionado · consultar</button> : null}
       <IndicatorBar state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={loading} error={error} resultCount={pagination.total} />
 
-      {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
+      {error && !isModalOpen ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
       <div className="surface-panel panel-nested" style={{ marginBottom: 16 }}>
@@ -491,8 +492,9 @@ export default function FuelStationsPage() {
         description="Cadastre ou atualize os dados institucionais do posto credenciado."
         onClose={closeModal}
       >
-        <form className="form-grid modal-form-grid" onSubmit={saveStation}>
-          <div className="form-field">
+        <GuidedForm formError={error} busy={submitting} className="form-grid modal-form-grid" onSubmit={saveStation}>
+          <GuidedSection title="Identificação" description="Confira os dados do posto e os contatos.">
+<div className="form-field">
             <label htmlFor="station-name">Nome</label>
             <input
               id="station-name"
@@ -532,7 +534,10 @@ export default function FuelStationsPage() {
               placeholder="(00) 00000-0000"
             />
           </div>
-          <div className="form-field modal-field-span">
+
+</GuidedSection>
+<GuidedSection title="Localização" description="Confira a posição do posto e a situação do cadastro.">
+<div className="form-field modal-field-span">
             <label>Localização do posto</label>
             <StationLocationPicker
               latitude={stationForm.latitude}
@@ -552,13 +557,14 @@ export default function FuelStationsPage() {
               <option value="false">Inativo</option>
             </select>
           </div>
+</GuidedSection>
           <div className="actions-inline modal-actions">
             <button className="app-button" type="submit" disabled={submitting}>
               {submitting ? 'Salvando...' : stationForm.id ? 'Salvar posto' : 'Cadastrar posto'}
             </button>
             <button className="ghost-button" type="button" onClick={closeModal}>Cancelar</button>
           </div>
-        </form>
+        </GuidedForm>
       </Modal>
     </div>
   )

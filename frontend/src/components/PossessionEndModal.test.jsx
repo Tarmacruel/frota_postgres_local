@@ -1,3 +1,4 @@
+import { reviewGuidedForm } from '../test/guidedForms'
 import { render, screen } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { describe, expect, it, vi } from 'vitest'
@@ -32,6 +33,7 @@ function Harness({ onSubmit = vi.fn() }) {
 describe('PossessionEndModal', () => {
   it('exibe a declaração integral, deixa o aceite desmarcado e bloqueia o envio', () => {
     render(<Harness />)
+    reviewGuidedForm()
     expect(screen.getByText(context.declaration.text)).toBeInTheDocument()
     expect(screen.getByText('Versão 1.0')).toBeInTheDocument()
     expect(screen.getByRole('checkbox', { name: /Li integralmente/ })).not.toBeChecked()
@@ -42,6 +44,7 @@ describe('PossessionEndModal', () => {
     const onChange = vi.fn()
     const user = userEvent.setup()
     render(<PossessionEndModal record={record} context={context} form={{ end_date: '2026-07-13T15:00', end_odometer_km: '105', vehicle_condition_notes: 'Sem ressalvas', declaration_accepted: false }} ending={false} error="" onChange={onChange} onClose={vi.fn()} onSubmit={vi.fn()} />)
+    reviewGuidedForm()
     await user.click(screen.getByRole('checkbox', { name: /Li integralmente/ }))
     expect(onChange).toHaveBeenCalledWith({ declaration_accepted: true })
   })

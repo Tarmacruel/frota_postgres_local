@@ -1,3 +1,4 @@
+import { reviewGuidedForm } from '../../test/guidedForms'
 import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, Route, Routes, useLocation, useSearchParams } from 'react-router-dom'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -193,9 +194,10 @@ it('oferece apenas o posto do contrato e preserva o formulário após rejeição
   expect(within(screen.getByLabelText('Posto')).queryByRole('option', { name: 'Posto B' })).not.toBeInTheDocument()
   fireEvent.change(screen.getByLabelText('Veículo'), { target: { value: 'car' } })
   fireEvent.change(screen.getByPlaceholderText(/Informações adicionais/), { target: { value: 'Observação mantida' } })
-  const create = screen.getByRole('button', { name: 'Criar ordem' })
+  const create = screen.getByRole('button', { name: 'Criar ordem' , hidden: true })
   await waitFor(() => expect(create).toBeEnabled())
   expect(fuelSupplyOrdersAPI.create).not.toHaveBeenCalled()
+  reviewGuidedForm()
   fireEvent.click(create)
   await screen.findByText(/Preço alterado/)
   expect(screen.getByLabelText('Veículo')).toHaveValue('car')
@@ -210,7 +212,7 @@ it('pede uma escolha quando o contrato possui mais de um posto', async () => {
   render(<FuelSupplyOrderCreateForm {...catalogs} initialContractId="a" />)
   await screen.findByText(/Contrato TESTE-A/)
   expect(screen.getByLabelText('Posto')).toHaveValue('')
-  expect(screen.getByRole('button', { name: 'Criar ordem' })).toBeDisabled()
+  expect(screen.getByRole('button', { name: 'Criar ordem' , hidden: true })).toBeDisabled()
   expect(contractControlAPI.quote).not.toHaveBeenCalled()
 })
 
@@ -224,6 +226,7 @@ it('mantém contrato e oficina de manutenção no escopo e conserva os dados qua
   fireEvent.change(screen.getByLabelText('Veículo para manutenção'), { target: { value: 'car' } })
   fireEvent.change(screen.getByLabelText('Orçamento previsto'), { target: { value: '500' } })
   fireEvent.change(screen.getByLabelText('Serviço solicitado'), { target: { value: 'Revisão de testes completa' } })
+  reviewGuidedForm()
   fireEvent.click(screen.getByRole('button', { name: 'Autorizar e reservar saldo' }))
   await screen.findByText('Saldo insuficiente')
   expect(screen.getByLabelText('Orçamento previsto')).toHaveValue('500')

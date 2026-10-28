@@ -1,3 +1,4 @@
+import GuidedForm, { FormSection as GuidedSection } from './GuidedForm'
 import MoneyInput from './MoneyInput'
 import { useEffect, useMemo, useState } from 'react'
 import { maintenanceAPI } from '../api/maintenance'
@@ -122,12 +123,13 @@ function LegacyMaintenanceForm({ vehicles, initialData = null, onClose, onSucces
   }
 
   return (
-    <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
+    <GuidedForm busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid">
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
 
-      <div className="form-field">
+      <GuidedSection title="Execução" description="Confira o veículo, as datas e o custo realizado.">
+<div className="form-field">
         <label>Veículo</label>
-        <SearchableSelect
+        <SearchableSelect required
           value={form.vehicle_id} onOpen={onVehicleOptionsOpen}
           onChange={(value) => setForm({ ...form, vehicle_id: value })}
           options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(buildVehicleOption)}
@@ -140,7 +142,7 @@ function LegacyMaintenanceForm({ vehicles, initialData = null, onClose, onSucces
 
       <div className="form-field">
         <label htmlFor="maintenance-start">Início</label>
-        <input
+        <input required
           id="maintenance-start"
           type="datetime-local"
           className="app-input"
@@ -176,9 +178,12 @@ function LegacyMaintenanceForm({ vehicles, initialData = null, onClose, onSucces
         />
       </div>
 
-      <div className="form-field modal-field-span">
+
+</GuidedSection>
+<GuidedSection title="Serviços e peças" description="Descreva os serviços e confira as peças e os itens realizados.">
+<div className="form-field modal-field-span">
         <label htmlFor="maintenance-description">Serviço realizado</label>
-        <textarea
+        <textarea required
           id="maintenance-description"
           className="app-textarea"
           rows="5"
@@ -202,6 +207,7 @@ function LegacyMaintenanceForm({ vehicles, initialData = null, onClose, onSucces
 
       {quantitative?<ContractItemLines actual allowUnknown label="Itens e quantidades realizados" items={quantityContext.items} prices={quantityContext.prices} lines={lines} onChange={setLines}/>:null}
       {needsContext&&!quantityContext.loaded?<p role="status">Conferindo itens da manutenção…</p>:null}
+</GuidedSection>
       <div className="actions-inline modal-actions">
         {changesFundedCost ? <div className="form-field modal-field-span"><label htmlFor="maintenance-correction-reason">Justificativa da alteração de custo</label><textarea id="maintenance-correction-reason" className="app-textarea" value={reason} onChange={(event) => setReason(event.target.value)} minLength={10} maxLength={2000} required /></div> : null}
         <button className="app-button" type="submit" disabled={submitting || vehicles.length === 0 || (needsContext&&!quantityContext.loaded)}>
@@ -209,6 +215,6 @@ function LegacyMaintenanceForm({ vehicles, initialData = null, onClose, onSucces
         </button>
         <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>
       </div>
-    </form>
+    </GuidedForm>
   )
 }

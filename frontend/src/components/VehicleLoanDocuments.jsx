@@ -1,3 +1,4 @@
+import GuidedForm from './GuidedForm'
 import { useEffect, useRef, useState } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { vehicleLoansAPI } from '../api/vehicleLoans'
@@ -57,11 +58,11 @@ function Term({ document, loanId, onChanged, onRefresh }) {
       <button className="ghost-button" disabled={busy} onClick={() => download()}>Baixar termo e evidências</button>
       {document.canonical_artifact_available && <button className="ghost-button" disabled={busy} onClick={() => download(true)}>Baixar PDF original preservado</button>}
     </div>
-    {allowed && <form className="loan-form" onSubmit={sign}>
+    {allowed && <GuidedForm className="loan-form" onSubmit={sign}>
       <p>Você assina como {rep.role.toLowerCase()}, representando {rep.organization_name}. Baixe e confira o termo antes de assinar.</p>
       <label className="loan-field">Sua senha atual<input className="app-input" type="password" autoComplete="current-password" minLength={8} maxLength={128} required value={password} onChange={(event) => setPassword(event.target.value)} disabled={busy} /></label>
       <button className="app-button" disabled={busy || !reviewed || password.length < 8}>{busy ? 'Processando…' : 'Assinar termo com senha'}</button>
-    </form>}
+    </GuidedForm>}
     <LoanFeedback error={error} readOnly={errorReadOnly}><button type="button" className="ghost-button" disabled={busy} onClick={onRefresh}>Consultar situação das assinaturas</button></LoanFeedback>
   </article>
 }
@@ -135,12 +136,12 @@ export default function VehicleLoanDocuments({ loanId, regularized = false }) {
     <div className="loan-notice">
       <h4>Termo de empréstimo impresso</h4>
       <p>Anexe uma digitalização em PDF, JPG ou PNG de até 10 MB (máximo de 10 anexos por empréstimo). Ela fica separada dos termos e assinaturas digitais.</p>
-      {canEdit('vehicle_loans') && printedTerms.length < MAX_PRINTED_TERMS && <form className="loan-form" onSubmit={uploadPrinted}>
+      {canEdit('vehicle_loans') && printedTerms.length < MAX_PRINTED_TERMS && <GuidedForm className="loan-form" onSubmit={uploadPrinted}>
         <label className="loan-field">Arquivo do termo impresso
           <input type="file" accept=".pdf,.jpg,.jpeg,.png" onChange={(event) => setPrintedFile(event.target.files?.[0] || null)} disabled={printedBusy} />
         </label>
         <button type="submit" className="app-button" disabled={!printedFile || printedBusy}>{printedBusy ? 'Enviando…' : 'Anexar termo impresso'}</button>
-      </form>}
+      </GuidedForm>}
       {canEdit('vehicle_loans') && printedTerms.length >= MAX_PRINTED_TERMS && <p>Limite de 10 termos impressos atingido.</p>}
       {printedTerms.length === 0 && <p>Nenhum termo impresso anexado.</p>}
       {printedTerms.map((term) => <div className="actions-inline" key={term.id}>

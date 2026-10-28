@@ -1,3 +1,4 @@
+import GuidedForm from './GuidedForm'
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import { possessionAPI } from '../api/possession'
 import { getApiBlobErrorMessage, getApiErrorMessage } from '../utils/apiError'
@@ -290,7 +291,7 @@ export default function PossessionReportBuilder({ vehicles = EMPTY_VEHICLES, ini
         canClose={!busy}
         initialFocusRef={firstControlRef}
       >
-        <form className="report-builder" onSubmit={(event) => event.preventDefault()}>
+        <GuidedForm busy={busy} className="report-builder" onSubmit={(event) => event.preventDefault()}>
           <div className="report-builder-summary">
             <p><strong>{modeMetadata?.title}</strong> · {selectedColumns.length} coluna(s)</p>
             <p>PDF até {metadata?.limits?.pdf_rows} registros; XLSX até {metadata?.limits?.xlsx_rows}.</p>
@@ -461,7 +462,7 @@ export default function PossessionReportBuilder({ vehicles = EMPTY_VEHICLES, ini
               </button>
             ) : null}
           </div>
-        </form>
+        </GuidedForm>
       </Modal>
     </div>
   )

@@ -1,0 +1,65 @@
+.guided-form { --form-danger: #b73a3a; display: flex; flex-direction: column; min-height: 0; width: 100%; gap: 0; color: var(--ui-text, #14233a); }
+[data-theme="dark"] .guided-form { --form-danger: #ff7b7b; }
+.modal-shell:has(.modal-body > .guided-form) { width: min(960px, calc(100vw - 40px)); max-height: calc(100dvh - 40px); display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 16px; }
+.modal-shell:has(.modal-body > .guided-form) > .modal-header { flex: none; padding: 16px 24px; margin: 0; border-bottom: 1px solid var(--ui-border, #d7e0ed); }
+.modal-shell:has(.modal-body > .guided-form) > .modal-body { display: flex; min-height: 0; padding: 0; overflow: hidden; }
+.guided-form__progress { flex: none; padding: 16px 24px 0; background: var(--ui-surface-subtle, #f8fafd); border-bottom: 1px solid var(--ui-border, #d7e0ed); }
+.guided-form__caption { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--ui-text-muted, #64748b); margin-bottom: 10px; }
+.guided-form__caption strong { font-weight: 600; text-align: right; }
+.guided-form__bar { height: 3px; border-radius: 3px; background: var(--ui-border, #d7e0ed); overflow: hidden; margin-bottom: 16px; }
+.guided-form__bar > span { display: block; height: 100%; background: var(--ui-success, #16a36a); transition: width .16s ease; }
+.guided-form__progress nav ol { display: flex; list-style: none; margin: 0; padding: 0; overflow-x: auto; }
+.guided-form__progress nav li { flex: 1; min-width: 0; }
+.guided-form__progress nav button { display: flex; align-items: center; justify-content: center; gap: 8px; width: 100%; min-height: 48px; padding: 8px; background: none; border: 0; border-bottom: 2px solid transparent; color: var(--ui-text-muted, #64748b); font: inherit; font-size: 12px; font-weight: 600; cursor: pointer; }
+.guided-form__progress nav button > span { display: grid; place-items: center; width: 20px; height: 20px; flex: none; border: 1px solid currentColor; border-radius: 50%; font-size: 11px; }
+.guided-form__progress nav .app-icon { width: 12px; height: 12px; }
+.guided-form__progress [aria-current="step"] button { color: var(--ui-primary, #2563eb); border-bottom-color: currentColor; }
+.guided-form__body { flex: 1 1 auto; min-height: 0; overflow-y: auto; padding: 24px; align-content: start; margin: 0; }
+.guided-form__body > .guided-section, .guided-form__body > .guided-feedback { grid-column: 1/-1; }
+.guided-form__blocker { grid-column: 1/-1; margin: 0 0 12px; padding: 12px 14px; border-left: 3px solid var(--ui-warning); background: var(--ui-surface-subtle); color: var(--ui-text); font-size: 13px; line-height: 1.5; }
+.guided-section { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; min-width: 0; align-content: start; }
+.guided-section[hidden] { display: none !important; }
+.guided-section__heading { grid-column: 1/-1; margin-bottom: 4px; }
+.guided-section__heading h4 { margin: 0 0 6px; font-size: 16px; font-weight: 700; }
+.guided-section__heading p { margin: 0; color: var(--ui-text-muted, #64748b); font-size: 13px; line-height: 1.5; max-width: 70ch; }
+.guided-section > .form-grid, .guided-section > .accordion-section, .guided-section > .contract-form__wide, .guided-section > fieldset, .guided-section > .actions-inline { grid-column: 1/-1; }
+.guided-form__review { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 14px; grid-column: 1/-1; margin: 0; }
+.guided-form__review > div { border-bottom: 1px solid var(--ui-border-soft); padding-bottom: 12px; min-width: 0; }
+.guided-form__review dt { color: var(--ui-text-muted); font-size: 12px; margin-bottom: 5px; }
+.guided-form__review dd { margin: 0; font-size: 13px; overflow-wrap: anywhere; }
+.guided-form__body label { font-size: 13px; line-height: 1.5; }
+.guided-form__required { color: var(--form-danger); font-weight: 800; }
+.guided-form[data-attempted="true"] :is(input,select,textarea):invalid { border-color: var(--form-danger); box-shadow: 0 0 0 1px var(--form-danger); }
+.guided-form[data-attempted="true"] label:has(:invalid), .guided-form[data-attempted="true"] .form-field:has(:invalid) > label { color: var(--form-danger); }
+.guided-feedback { display: flex; align-items: start; gap: 12px; grid-column: 1/-1; border: 0; border-left: 3px solid var(--form-danger, #b73a3a); background: color-mix(in srgb, var(--form-danger, #b73a3a) 6%, var(--ui-surface, white)); color: var(--ui-text, #14233a); padding: 16px; margin-bottom: 16px; min-width: 0; overflow-wrap: anywhere; }
+.guided-feedback > .app-icon { flex: none; width: 18px; height: 18px; color: var(--form-danger, #b73a3a); }
+.guided-feedback strong { font-size: 13px; }
+.guided-feedback p, .guided-feedback__message { font-size: 13px; line-height: 1.5; margin: 6px 0 0; }
+.guided-feedback p { color: var(--ui-text-muted, #64748b); }
+.guided-feedback ul { margin: 10px 0 0; padding-left: 18px; }
+.guided-feedback li button { text-align: left; color: var(--form-danger); text-decoration: underline; font: inherit; font-size: 13px; font-weight: 600; background: none; padding: 5px 0; border: 0; cursor: pointer; }
+.guided-form__footer { flex: none; display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px; border-top: 1px solid var(--ui-border, #d7e0ed); padding: 14px 24px; background: var(--ui-surface, #fff); }
+.guided-form__footer > span { color: var(--ui-text-muted, #64748b); font-size: 12px; }
+.guided-form__actions, .guided-form__actions > .actions-inline { display: flex; align-items: center; justify-content: flex-end; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; border: 0; }
+.guided-form[data-final="false"] .guided-form__actions button:not([type="button"]) { display: none; }
+.guided-form[data-final="false"] .guided-form__actions > div .app-button { display: none; }
+.guided-form button[hidden] { display: none !important; }
+.guided-form[data-attempted="true"] button[data-form-required="true"][data-form-value=""] { border-color: var(--form-danger); box-shadow: 0 0 0 1px var(--form-danger); }
+.guided-form :is(input, select, textarea, button) { max-width: 100%; }
+@media (max-width: 700px) {
+  .modal-shell:has(.modal-body > .guided-form) { width: 100%; height: 100dvh; max-height: 100dvh; border-radius: 0; }
+  .modal-backdrop:has(> .modal-shell > .modal-body > .guided-form) { padding: 0; }
+  .modal-shell:has(.modal-body > .guided-form) > .modal-header { padding: 12px 16px; }
+  .guided-form__progress { padding: 12px 16px 0; }
+  .guided-form__caption { font-size: 11px; }
+  .guided-form__progress nav button { min-height: 58px; flex-direction: column; gap: 4px; font-size: 11px; }
+  .guided-form__body { padding: 16px; }
+  .guided-section { grid-template-columns: minmax(0, 1fr); gap: 14px; }
+  .guided-form__review { grid-template-columns: minmax(0, 1fr); }
+  .guided-form__footer { padding: 12px 16px max(12px, env(safe-area-inset-bottom)); }
+  .guided-form__actions { width: 100%; }
+  .guided-form__actions button { min-height: 44px; }
+  .guided-form__actions > .app-button { flex: 1; }
+  .guided-form__body :is(.contract-form__wide, .modal-field-span) { grid-column: 1/-1; }
+}
+@media (prefers-reduced-motion: reduce) { .guided-form__bar > span { transition: none; } }

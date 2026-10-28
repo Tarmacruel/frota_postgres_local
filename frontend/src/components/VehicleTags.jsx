@@ -1,3 +1,4 @@
+import GuidedForm from './GuidedForm'
 import { useEffect, useId, useRef, useState } from 'react'
 import Modal from './Modal'
 import { vehicleTagsAPI } from '../api/vehicleTags'
@@ -171,7 +172,7 @@ export function MyVehicleTagsModal({ onClose, onChanged }) {
         <p>Arquivar “{archive.name}” impede novas aplicações. As marcações nos veículos permanecem até serem retiradas manualmente.</p>
         <div className="actions-inline"><button type="button" className="secondary-button" disabled={busy} onClick={() => toggle(archive)}>Confirmar arquivamento</button><button type="button" className="ghost-button" disabled={busy} onClick={() => setArchive(null)}>Voltar</button></div>
       </div> : null}
-      <form onSubmit={save} className="vehicle-tag-form">
+      <GuidedForm busy={busy} onSubmit={save} className="vehicle-tag-form">
         <h4>{editing ? 'Editar etiqueta' : 'Criar etiqueta'}</h4>
         {!editing ? <div className="actions-inline vehicle-tag-suggestions">{[['Em manutenção', 'amber'], ['Inativo temporariamente', 'red'], ['Em lavagem', 'blue']].map(([name, color]) => <button className="ghost-button" type="button" key={name} disabled={busy} onClick={() => setForm({ ...empty, name, color })}>{name}</button>)}</div> : null}
         <label>Nome<input className="app-input" value={form.name} maxLength={40} required disabled={busy} onChange={(event) => setForm({ ...form, name: event.target.value })} /></label>
@@ -183,7 +184,7 @@ export function MyVehicleTagsModal({ onClose, onChanged }) {
         {error ? <div className="alert alert-error" role="alert">{error}</div> : null}
         {feedback ? <p role="status">{feedback}</p> : null}
         <div className="actions-inline"><button type="submit" className="app-button" disabled={busy || !form.name.trim()}>{busy ? 'Salvando…' : 'Salvar etiqueta'}</button>{editing ? <button type="button" className="ghost-button" disabled={busy} onClick={() => { setEditing(null); setForm(empty) }}>Cancelar edição</button> : null}</div>
-      </form>
+      </GuidedForm>
     </div>
   </Modal>
 }
@@ -240,15 +241,15 @@ export function VehicleTagsManager({ vehicle, user, isAdmin, onClose, onChanged 
           {removing.applied_by_user_id !== user?.id ? <label>Justificativa<textarea className="app-input" maxLength={500} value={reason} disabled={busy} onChange={(event) => setReason(event.target.value)} /></label> : null}
           <div className="actions-inline"><button className="secondary-button" type="button" disabled={busy || (removing.applied_by_user_id !== user?.id && !reason.trim())} onClick={() => mutate(() => vehicleTagsAPI.remove(vehicle.id, removing.id, reason))}>Confirmar retirada</button><button className="ghost-button" type="button" disabled={busy} onClick={() => setRemoving(null)}>Voltar</button></div>
         </div> : null}
-        <form className="vehicle-tag-form" onSubmit={(event) => { event.preventDefault(); if (tagId) mutate(() => vehicleTagsAPI.apply(vehicle.id, { tag_id: tagId, note: note.trim() || null })) }}>
+        <GuidedForm busy={busy} className="vehicle-tag-form" onSubmit={(event) => { event.preventDefault(); if (tagId) mutate(() => vehicleTagsAPI.apply(vehicle.id, { tag_id: tagId, note: note.trim() || null })) }}>
           <div className="vehicle-tag-entry-header"><h4>Adicionar uma etiqueta minha</h4><button type="button" className="ghost-button" disabled={busy} onClick={() => setCatalogOpen(true)}>Minhas etiquetas</button></div>
-          <label>Etiqueta<select className="app-select" value={tagId} disabled={busy || loading} onChange={(event) => setTagId(event.target.value)}><option value="">Selecione uma etiqueta</option>{available.map((tag) => <option value={tag.id} key={tag.id}>{tag.name}</option>)}</select></label>
+          <label>Etiqueta<select required className="app-select" value={tagId} disabled={busy || loading} onChange={(event) => setTagId(event.target.value)}><option value="">Selecione uma etiqueta</option>{available.map((tag) => <option value={tag.id} key={tag.id}>{tag.name}</option>)}</select></label>
           {!loading && !available.length ? <p className="muted">Crie uma etiqueta em “Minhas etiquetas” ou reative uma etiqueta arquivada.</p> : null}
           <label>Observação opcional<textarea className="app-input" maxLength={500} value={note} disabled={busy} onChange={(event) => setNote(event.target.value)} /></label>
           {error ? <div className="alert alert-error" role="alert">{error}</div> : null}
           {feedback ? <p role="status">{feedback}</p> : null}
           <div className="actions-inline"><button className="app-button" type="submit" disabled={busy || !tagId}>{busy ? 'Salvando…' : 'Adicionar etiqueta'}</button><button className="ghost-button" type="button" disabled={busy} onClick={onClose}>Fechar</button></div>
-        </form>
+        </GuidedForm>
       </div>
     </Modal>
     {catalogOpen ? <MyVehicleTagsModal onClose={() => { setCatalogOpen(false); reload().catch((err) => setError(getApiErrorMessage(err))) }} onChanged={onChanged} /> : null}

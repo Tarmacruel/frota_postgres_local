@@ -1,6 +1,6 @@
+import GuidedForm, { FormSection as GuidedSection } from '../components/GuidedForm'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import AccordionSection from '../components/AccordionSection'
 import Modal from '../components/Modal'
 import Pagination from '../components/Pagination'
 import SearchableSelect from '../components/SearchableSelect'
@@ -399,25 +399,25 @@ export default function DriversPage() {
         canClose={!submitting}
         initialFocusRef={regularizingCnh && !openingEdit ? cnhNumberRef : undefined}
       >
-        {openingEdit ? <p role="status">Carregando o cadastro do condutor…</p> : <form onSubmit={handleSubmit} className="stack">
+        {openingEdit ? <p role="status">Carregando o cadastro do condutor…</p> : <GuidedForm busy={submitting} initialStep={regularizingCnh ? 1 : 0} onSubmit={handleSubmit} className="stack">
           {error ? <div className="alert alert-error" role="alert">{error}</div> : null}
-          <AccordionSection title="Dados básicos" subtitle="Identificação e contato" open>
+          <GuidedSection title="Dados básicos" description="Identificação e contato">
             <div className="form-grid modal-form-grid">
               <div className="form-field">
                 <label htmlFor="driver-name">Nome completo</label>
-                <input id="driver-name" className="app-input" value={form.nome_completo} onChange={(event) => setForm({ ...form, nome_completo: event.target.value })} />
+                <input required minLength={3} maxLength={150} id="driver-name" className="app-input" value={form.nome_completo} onChange={(event) => setForm({ ...form, nome_completo: event.target.value })} />
               </div>
               <div className="form-field">
                 <label htmlFor="driver-document">Documento</label>
-                <input id="driver-document" className="app-input" value={form.documento} onChange={(event) => setForm({ ...form, documento: event.target.value })} />
+                <input required minLength={5} maxLength={20} id="driver-document" className="app-input" value={form.documento} onChange={(event) => setForm({ ...form, documento: event.target.value })} />
               </div>
               <div className="form-field">
                 <label htmlFor="driver-registration">Matrícula (obrigatória)</label>
-                <input id="driver-registration" className="app-input" required maxLength={30} value={form.matricula} onChange={(event) => setForm({ ...form, matricula: event.target.value })} />
+                <input id="driver-registration" className="app-input" required data-required-message="Informe a matrícula do condutor para prosseguir." maxLength={30} value={form.matricula} onChange={(event) => setForm({ ...form, matricula: event.target.value })} />
               </div>
               <div className="form-field modal-field-span">
                 <label>Secretaria</label>
-                <SearchableSelect
+                <SearchableSelect required
                   value={form.organization_id}
                   onChange={(value) => setForm({ ...form, organization_id: value })}
                   options={organizationOptions}
@@ -435,9 +435,9 @@ export default function DriversPage() {
                 <input id="driver-email" className="app-input" value={form.email} onChange={(event) => setForm({ ...form, email: event.target.value })} />
               </div>
             </div>
-          </AccordionSection>
+          </GuidedSection>
 
-          <AccordionSection title="CNH" subtitle="Número, categoria e vencimento" open={regularizingCnh || !editingRecord}>
+          <GuidedSection title="CNH" description="Número, categoria e vencimento">
             <div className="form-grid modal-form-grid">
               <div className="form-field">
                 <label htmlFor="driver-license-number">Número da CNH</label>
@@ -454,13 +454,13 @@ export default function DriversPage() {
                 <input id="driver-expiry" type="date" className="app-input" value={form.cnh_validade} onChange={(event) => setForm({ ...form, cnh_validade: event.target.value })} />
               </div>
             </div>
-          </AccordionSection>
+          </GuidedSection>
 
           <div className="actions-inline modal-actions">
             <button className="app-button" type="submit" disabled={submitting}>{submitting ? 'Salvando...' : editingRecord ? 'Atualizar condutor' : 'Cadastrar condutor'}</button>
             <button className="ghost-button" type="button" disabled={submitting} onClick={closeModal}>Cancelar</button>
           </div>
-        </form>}
+        </GuidedForm>}
       </Modal>
     </div>
   )

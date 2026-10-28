@@ -1,3 +1,4 @@
+import GuidedForm from '../GuidedForm'
 import MoneyInput from '../MoneyInput'
 import { useEffect, useState } from 'react'
 import Modal from '../Modal'
@@ -34,7 +35,7 @@ export default function MaintenanceOrderActionDialog({ row, action, onClose, onS
         <div><dt>Orçamento previsto</dt><dd>{brl(row.estimated_cost)}</dd></div><div><dt>Custo realizado</dt><dd>{brl(row.total_cost)}</dd></div>
         <div><dt>Secretaria</dt><dd>{row.organization_name || 'Sem secretaria'}</dd></div></dl>
       {row.cancellation_reason ? <p>{row.cancellation_reason}</p> : null}
-    </> : <form className="contract-form" onSubmit={submit}>
+    </> : <GuidedForm busy={saving} className="contract-form" onSubmit={submit}>
       <p className="contract-form__wide">{row.vehicle_plate} · {row.provider_name}<br />{row.service_description}</p>
       {action === 'complete' ? <><label>Custo real (R$)<MoneyInput className="app-input" aria-label="Custo real" type="number" min="0" step=".01" readOnly={quantitative} value={quantitative ? itemLinesTotal(lines) : form.total_cost} onChange={(e) => setForm({ ...form, total_cost: e.target.value })} required /></label>
         <label>Conclusão (em branco: agora)<input className="app-input" type="datetime-local" value={form.end_date} onChange={(e) => setForm({ ...form, end_date: e.target.value })} /></label>
@@ -43,6 +44,6 @@ export default function MaintenanceOrderActionDialog({ row, action, onClose, onS
         <p className="muted contract-form__wide">Informe o valor do serviço realizado. A sobra da reserva será liberada; excedentes serão registrados e sinalizados.</p></> : null}
       {action === 'cancel' ? <label className="contract-form__wide">Justificativa<textarea className="app-textarea" minLength={10} required value={form.justification} onChange={(e) => setForm({ ...form, justification: e.target.value })} /></label> : null}
       <div className="actions-inline"><button type="button" className="ghost-button" onClick={onClose} disabled={saving}>Voltar</button><button className="app-button" disabled={saving}>{saving ? 'Salvando…' : 'Confirmar'}</button></div>
-    </form>}
+    </GuidedForm>}
   </Modal>
 }

@@ -1,3 +1,4 @@
+import GuidedForm, { FormSection as GuidedSection } from '../GuidedForm'
 import MoneyInput from '../MoneyInput'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { maintenanceOrdersAPI } from '../../api/contractControl'
@@ -33,18 +34,23 @@ export function MaintenanceOrderForm({ vehicles = [], onVehicleOptionsOpen, init
     } catch (err) { setError(getApiErrorMessage(err, 'Não foi possível autorizar a manutenção.')) }
     finally { setSaving(false) }
   }
-  return <form className="contract-form" onSubmit={submit}>
+  return <GuidedForm busy={saving} className="contract-form" onSubmit={submit}>
     <ContractReturnBanner returnTo={returnTo} compact saving={saving} />
     {error ? <div className="alert alert-error contract-form__wide" role="alert">{error}<button className="ghost-button" type="button" onClick={funding.refresh}>Atualizar saldo</button></div> : null}
-    <label>Veículo<SearchableSelect value={form.vehicle_id} onOpen={onVehicleOptionsOpen} ariaLabel="Veículo para manutenção"
+    <GuidedSection title="Serviço" description="Selecione o veículo e descreva o serviço solicitado.">
+<label>Veículo<SearchableSelect required value={form.vehicle_id} onOpen={onVehicleOptionsOpen} ariaLabel="Veículo para manutenção"
       onChange={(vehicle_id) => setForm((s) => ({ ...s, vehicle_id }))} placeholder="Selecione o veículo"
       options={vehicles.filter((v) => v.can_operate_vehicle !== false).map((v) => ({ value: v.id, label: `${v.plate} · ${v.brand || ''} ${v.model || ''}`, tags: v.tags || [] }))} /></label>
     <label>Orçamento previsto (R$)<MoneyInput className="app-input" aria-label="Orçamento previsto" type="number" min="0.01" step="0.01" required readOnly={funding.quantityEnabled} value={funding.quantityEnabled ? itemLinesTotal(lines) : form.estimated_cost} onChange={(e) => setForm((s) => ({ ...s, estimated_cost: e.target.value }))} /></label>
     <label className="contract-form__wide">Serviço solicitado<textarea className="app-textarea" minLength={10} maxLength={2000} required value={form.service_description} onChange={(e) => setForm((s) => ({ ...s, service_description: e.target.value }))} /></label>
-    <ContractFundingFields funding={{...funding,selectContract:(v)=>{setLines([]);funding.selectContract(v)},selectProvider:(v)=>{setLines([]);funding.selectProvider(v)}}} />
+
+</GuidedSection>
+<GuidedSection title="Contrato e itens" description="Confira a oficina, os itens e o orçamento antes de autorizar.">
+<ContractFundingFields funding={{...funding,selectContract:(v)=>{setLines([]);funding.selectContract(v)},selectProvider:(v)=>{setLines([]);funding.selectProvider(v)}}} />
     {funding.quantityEnabled && funding.contract && funding.provider ? <ContractItemLines items={funding.items} prices={funding.itemPrices} lines={lines} onChange={setLines} /> : null}
+</GuidedSection>
     <div className="actions-inline"><button type="button" className="ghost-button" onClick={onClose}>Cancelar</button><button className="app-button" disabled={saving || !funding.ready}>{saving ? 'Autorizando…' : 'Autorizar e reservar saldo'}</button></div>
-  </form>
+  </GuidedForm>
 }
 
 export default function MaintenanceOrdersPanel({ contractId = '', returnTo = '', hideCreate = false, vehicles: suppliedVehicles, onVehicleOptionsOpen, onChange, refreshKey }) {

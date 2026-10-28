@@ -1,3 +1,4 @@
+import GuidedForm, { FormSection as GuidedSection } from './GuidedForm'
 import { useMemo, useState } from 'react'
 import SearchableSelect from './SearchableSelect'
 import { VehicleTagBadges } from './VehicleTags'
@@ -205,12 +206,13 @@ export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organiza
   }))
 
   return (
-    <form onSubmit={reviewing ? handleCreate : handleReview} className="form-grid modal-form-grid fuel-batch-form">
+    <GuidedForm busy={submitting} onSubmit={reviewing ? handleCreate : handleReview} className="form-grid modal-form-grid fuel-batch-form">
       {error ? <div className="alert alert-error modal-field-span" role="alert">{error}</div> : null}
 
       {!reviewing ? (
         <>
-          <section className="fuel-batch-vehicle-picker modal-field-span" data-tour="fuel-batch-vehicles" aria-labelledby="fuel-batch-vehicles-title">
+          <GuidedSection title="Veículos" description="Selecione os veículos que receberão as ordens." requirement={{valid:selectedVehicleIds.length >= 2,message:"Selecione pelo menos dois veículos para o lote."}}>
+<section className="fuel-batch-vehicle-picker modal-field-span" data-tour="fuel-batch-vehicles" aria-labelledby="fuel-batch-vehicles-title">
             <div className="fuel-batch-section-heading">
               <div>
                 <label id="fuel-batch-vehicles-title" htmlFor="fuel-batch-vehicle-search">Veículos</label>
@@ -250,7 +252,10 @@ export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organiza
             </div>
           </section>
 
-          <div className="form-field">
+
+</GuidedSection>
+<GuidedSection title="Pedido" description="Confira posto, prazo e os litros de cada veículo.">
+<div className="form-field">
             <label>Posto</label>
             <SearchableSelect
               value={form.fuel_station_id}
@@ -368,11 +373,11 @@ export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organiza
             />
           </div>
 
-          <ContractFundingFields funding={funding} />
-          <div className="actions-inline modal-actions" data-tour="fuel-batch-review">
-            <button className="app-button" type="submit" disabled={submitting}>Revisar {selectedVehicleIds.length} {selectedVehicleIds.length === 1 ? 'ordem' : 'ordens'}</button>
-            <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>
-          </div>
+
+</GuidedSection>
+<GuidedSection title="Contrato e saldo" description="Confira a reserva do lote antes de revisar as ordens.">
+<ContractFundingFields funding={funding} />
+          </GuidedSection>
         </>
       ) : (
         <section className="fuel-batch-review modal-field-span" data-tour="fuel-batch-review" aria-labelledby="fuel-batch-review-title">
@@ -400,14 +405,18 @@ export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organiza
               </li>
             ))}
           </ul>
-          <div className="actions-inline modal-actions">
+
+        </section>
+      )}
+    {reviewing ? (<div className="actions-inline modal-actions">
             <button className="secondary-button" type="button" onClick={() => setReviewing(false)} disabled={submitting}>Voltar e editar</button>
             <button className="app-button" type="submit" data-tour="fuel-batch-submit" disabled={submitting || !funding.ready}>
               {submitting ? 'Emitindo ordens...' : `Emitir ${selectedVehicles.length} ${selectedVehicles.length === 1 ? 'ordem' : 'ordens'}`}
             </button>
-          </div>
-        </section>
-      )}
-    </form>
+          </div>) : (<div className="actions-inline modal-actions" data-tour="fuel-batch-review">
+            <button className="app-button" type="submit" disabled={submitting}>Revisar {selectedVehicleIds.length} {selectedVehicleIds.length === 1 ? 'ordem' : 'ordens'}</button>
+            <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>
+          </div>)}
+</GuidedForm>
   )
 }

@@ -1,10 +1,10 @@
+import GuidedForm, { FormSection as GuidedSection } from '../components/GuidedForm'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import { formatPrimeCardNumber } from '../utils/primeCard'
 import JustificationField from '../components/JustificationField'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
-import AccordionSection from '../components/AccordionSection'
 import BadgeOwnership from '../components/BadgeOwnership'
 import DriverBadge from '../components/DriverBadge'
 import Modal from '../components/Modal'
@@ -942,7 +942,7 @@ export default function VehiclesPage() {
         </div>
       ) : null}
 
-      {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
+      {error && !isModalOpen ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {catalogError || modalCatalogError ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{catalogError || modalCatalogError}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
@@ -1128,12 +1128,12 @@ export default function VehiclesPage() {
         description={editingId ? 'Toda alteração exige uma nova justificativa. Ela será registrada no histórico de edições e movimentações do veículo.' : 'Preencha os dados do veículo e vincule a lotação por órgão, departamento e lotação cadastrados.'}
         onClose={closeVehicleModal}
       >
-        <form onSubmit={handleSubmit} className="stack">
-          <AccordionSection title="Dados básicos" subtitle="Identificação e classificação" open>
+        <GuidedForm formError={error} busy={submitting} onSubmit={handleSubmit} className="stack">
+          <GuidedSection title="Dados básicos" description="Identificação e classificação">
             <div className="form-grid modal-form-grid">
               <div className="form-field">
                 <label htmlFor="plate">Placa</label>
-                <input id="plate" className="app-input" placeholder="ABC-1D23" value={form.plate} onChange={(event) => setForm({ ...form, plate: event.target.value })} />
+                <input required id="plate" className="app-input" placeholder="ABC-1D23" value={form.plate} onChange={(event) => setForm({ ...form, plate: event.target.value })} />
               </div>
               <div className="form-field">
                 <label htmlFor="chassis_number">Número do chassi</label>
@@ -1141,16 +1141,16 @@ export default function VehiclesPage() {
               </div>
               <div className="form-field">
                 <label htmlFor="prime_card_number">Número do cartão Prime</label>
-                <input id="prime_card_number" className="app-input" type="text" inputMode="numeric" autoComplete="off" maxLength={19} pattern="[0-9]{4} [0-9]{4} [0-9]{4} [0-9]{4}" placeholder="0000 0000 0000 0000" value={form.prime_card_number} onChange={(event) => setForm({ ...form, prime_card_number: formatPrimeCardNumber(event.target.value) })} aria-describedby="prime-card-help" />
+                <input id="prime_card_number" data-pattern-message="Número do cartão Prime deve conter exatamente 16 dígitos." className="app-input" type="text" inputMode="numeric" autoComplete="off" maxLength={19} pattern="[0-9]{4} [0-9]{4} [0-9]{4} [0-9]{4}" placeholder="0000 0000 0000 0000" value={form.prime_card_number} onChange={(event) => setForm({ ...form, prime_card_number: formatPrimeCardNumber(event.target.value) })} aria-describedby="prime-card-help" />
                 <small id="prime-card-help">Opcional. Informe os 16 dígitos do cartão de abastecimento.</small>
               </div>
               <div className="form-field">
                 <label htmlFor="brand">Marca</label>
-                <input id="brand" className="app-input" placeholder="Ex.: Ford" value={form.brand} onChange={(event) => setForm({ ...form, brand: event.target.value })} />
+                <input required id="brand" className="app-input" placeholder="Ex.: Ford" value={form.brand} onChange={(event) => setForm({ ...form, brand: event.target.value })} />
               </div>
               <div className="form-field">
                 <label htmlFor="model">Modelo</label>
-                <input id="model" className="app-input" placeholder="Ex.: Ranger" value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })} />
+                <input required id="model" className="app-input" placeholder="Ex.: Ranger" value={form.model} onChange={(event) => setForm({ ...form, model: event.target.value })} />
               </div>
               <div className="form-field">
                 <label htmlFor="vehicle_type">Categoria do veículo</label>
@@ -1177,9 +1177,9 @@ export default function VehiclesPage() {
                 </select>
               </div>
             </div>
-          </AccordionSection>
+          </GuidedSection>
 
-          <AccordionSection title="Lotação" subtitle="Órgão, departamento e lotação">
+          <GuidedSection title="Lotação" description="Órgão, departamento e lotação">
             <div className="form-grid modal-form-grid">
               <div className="form-field">
                 <label>Órgão</label>
@@ -1191,14 +1191,14 @@ export default function VehiclesPage() {
               </div>
               <div className="form-field modal-field-span">
                 <label>Lotação</label>
-                <SearchableSelect value={form.allocation_id} onChange={(value) => setForm({ ...form, allocation_id: value })} options={allocationOptions} placeholder={!form.department_id ? 'Selecione primeiro o departamento' : 'Selecione a lotação'} searchPlaceholder="Buscar lotação" disabled={!form.department_id || allocationOptions.length === 0} />
+                <SearchableSelect required={!editingId || Boolean(form.organization_id || form.department_id || form.allocation_id)} value={form.allocation_id} onChange={(value) => setForm({ ...form, allocation_id: value })} options={allocationOptions} placeholder={!form.department_id ? 'Selecione primeiro o departamento' : 'Selecione a lotação'} searchPlaceholder="Buscar lotação" disabled={!form.department_id || allocationOptions.length === 0} />
                 {editingId && !form.allocation_id && vehicles.find((vehicle) => vehicle.id === editingId)?.current_department ? <span className="helper-text">Registro legado atual: {vehicles.find((vehicle) => vehicle.id === editingId)?.current_department}</span> : null}
               </div>
             </div>
-          </AccordionSection>
+          </GuidedSection>
 
           {editingId ? (
-            <AccordionSection title="Justificativa" subtitle="Observação obrigatória da edição" open>
+            <GuidedSection title="Justificativa" description="Observação obrigatória da edição">
               <div className="form-grid modal-form-grid">
                 <div className="form-field modal-field-span">
                   <label htmlFor="edit_reason">Justificativa da edição</label>
@@ -1214,7 +1214,7 @@ export default function VehiclesPage() {
                   <span className="helper-text">Uma nova justificativa fica registrada em cada edição e em qualquer nova movimentação de lotação gerada pela alteração.</span>
                 </div>
               </div>
-            </AccordionSection>
+            </GuidedSection>
           ) : null}
 
           <div className="actions-inline modal-actions">
@@ -1223,7 +1223,7 @@ export default function VehiclesPage() {
             </button>
             <button className="ghost-button" type="button" onClick={closeVehicleModal}>Cancelar</button>
           </div>
-        </form>
+        </GuidedForm>
       </Modal>
     </div>
   )

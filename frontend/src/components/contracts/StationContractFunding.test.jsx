@@ -1,3 +1,4 @@
+import { reviewGuidedForm } from '../../test/guidedForms'
 import { act, fireEvent, render, renderHook, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import { contractControlAPI } from '../../api/contractControl'
@@ -66,7 +67,8 @@ it('permite definir a modalidade por valor mesmo depois da abertura sem alterar 
     stations={[]} providers={[]} onClose={() => {}} onSuccess={() => {}} />)
   fireEvent.change(screen.getByLabelText('Controle do abastecimento'), { target: { value: 'NETWORK_VALUE' } })
   expect(screen.getByText(/Somente o total real confirmado/)).toBeInTheDocument()
-  fireEvent.click(screen.getByRole('button', { name: 'Salvar' }))
+  reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button', { name: 'Salvar' , hidden: true }))
   await waitFor(() => expect(paymentContractsAPI.update).toHaveBeenCalledWith('contract', expect.objectContaining({ fuel_pricing_mode: 'NETWORK_VALUE', value_updated: '1000' })))
 })
 
