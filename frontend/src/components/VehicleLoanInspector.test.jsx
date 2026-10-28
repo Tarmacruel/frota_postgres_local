@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { render, screen, within } from '@testing-library/react'
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 import { expect, it, vi } from 'vitest'
@@ -106,9 +106,119 @@ it('preserva a identificação de regularização e os fatos de devolução, com
   editable: false, events: [{ id: 'event', event_type: 'CREATED', created_at: '2026-10-01T12:00:00Z', actor_name: 'Gestor', justification: 'Conferência documental' }] })
   const summary = screen.getByRole('tabpanel')
   expect(within(summary).getByText(/Não representam aceites ou assinaturas realizados no passado/)).toBeInTheDocument()
+  await actor.click(screen.getByRole('button', { name: /Uso: Concluída. Consultar detalhes/ }))
   expect(within(summary).getByText('Garagem central')).toBeInTheDocument()
   expect(within(summary).getByText('150 km')).toBeInTheDocument()
   expect(within(summary).getByText('Sem avarias')).toBeInTheDocument()
   await actor.click(screen.getByRole('tab', { name: 'Histórico' }))
   expect(screen.getByText('Conferência documental')).toBeInTheDocument()
+})
+
+it.each([
+  ['DRAFT', 0, 'Proposta'], ['AWAITING_RECEIPT', 1, 'Entrega'], ['ACTIVE', 2, 'Uso'],
+  ['AWAITING_RETURN_RECEIPT', 3, 'Devolução'], ['RETURNED', 4, null],
+  ['REJECTED', 1, null], ['CANCELLED', 0, null],
+])('mostra avanço operacional coerente com %s sem inferir documentos', (status, completed, current) => {
+  mount({ detail: { ...loan, status }, editable: false })
+  expect(screen.getByRole('progressbar', { name: 'Etapas operacionais concluídas' })).toHaveAttribute('aria-valuenow', String(completed))
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '4')
+  if (current) expect(screen.getByRole('button', { name: `${current}: Etapa atual. Consultar detalhes` }).closest('li')).toHaveAttribute('aria-current', 'step')
+  else expect(document.querySelector('.loan-journey [aria-current="step"]')).not.toBeInTheDocument()
+  expect(screen.queryByLabelText('Rascunho de documento')).not.toBeInTheDocument()
+  if (['CANCELLED', 'REJECTED'].includes(status)) expect(screen.queryByText('A seguir')).not.toBeInTheDocument()
+})
+
+it('preserva a proposta enviada no avanço de um cancelamento sem tratar a entrega como concluída', () => {
+  mount({ detail: { ...loan, status: 'CANCELLED' }, editable: false,
+    events: [{ id: 'submitted', event_type: 'SUBMITTED', created_at: '2026-10-01T12:00:00Z' }] })
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1')
+  expect(screen.getByRole('button', { name: 'Entrega: Interrompida. Consultar detalhes' })).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Uso: Não realizada. Consultar detalhes' })).toBeInTheDocument()
+})
+
+it.each([['ACTIVE', 1], ['RETURNED', 3]])('regularização em %s tem percurso próprio, sem proposta ou aceites retroativos', (status, completed) => {
+  mount({ detail: { ...loan, status, regularized_at: '2026-10-01T12:00:00Z', regularization_reference: 'Documento de teste' }, editable: false })
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '3')
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', String(completed))
+  expect(screen.queryByRole('button', { name: /^Proposta:/ })).not.toBeInTheDocument()
+  expect(screen.getByText(/Não representam aceites ou assinaturas realizados no passado/)).toBeVisible()
+})
+
+it('marcos navegam até entrega, devolução e lotações sem executar uma ação', async () => {
+  const actor = userEvent.setup()
+  const { props } = mount({ detail: { ...loan, status: 'RETURNED', return_allocation_id: 'garage', return_allocation_name: 'Garagem central' }, editable: false })
+  await waitFor(() => expect(document.querySelector('.loan-inspector__intro')).toHaveFocus())
+  await actor.click(screen.getByRole('button', { name: 'Entrega: Concluída. Consultar detalhes' }))
+  expect(screen.getByRole('article', { name: 'Entrega' })).toHaveFocus()
+  await actor.click(screen.getByRole('button', { name: 'Devolução: Concluída. Consultar detalhes' }))
+  expect(screen.getByRole('article', { name: 'Devolução' })).toHaveFocus()
+  const units = screen.getByText('Lotações e responsabilidade').closest('details')
+  expect(units).not.toHaveAttribute('open')
+  await actor.click(screen.getByRole('button', { name: 'Uso: Concluída. Consultar detalhes' }))
+  expect(units).toHaveAttribute('open')
+  expect(screen.getByText('Garagem central')).toBeVisible()
+  expect(units.querySelector('summary')).toHaveFocus()
+  expect(props.onAction).not.toHaveBeenCalled()
+})
+
+it('expande os textos originais e mantém zero como odômetro válido', async () => {
+  const actor = userEvent.setup()
+  const original = 'CONDIÇÕES ORIGINAIS COM ACENTUAÇÃO: VEÍCULO ENTREGUE SEM AVARIAS.\nSegunda linha com todas as informações do registro.'
+  mount({ detail: { ...loan, delivery_condition: original, delivery_odometer_km: 0 } })
+  expect(screen.getByText('0 km')).toBeInTheDocument()
+  const toggle = screen.getByRole('button', { name: 'Ler texto completo: Condições de entrega' })
+  expect(toggle).toHaveAttribute('aria-expanded', 'false')
+  const text = document.getElementById(toggle.getAttribute('aria-controls'))
+  expect(text.textContent).toBe(original)
+  await actor.click(toggle)
+  expect(toggle).toHaveAttribute('aria-expanded', 'true')
+  expect(text.textContent).toBe(original)
+  await actor.click(toggle)
+  expect(toggle).toHaveAttribute('aria-expanded', 'false')
+})
+
+it('oferece expansão somente quando o texto ultrapassa a prévia e reavalia a largura', async () => {
+  const width = vi.spyOn(Element.prototype, 'clientWidth', 'get').mockReturnValue(500)
+  const height = vi.spyOn(Element.prototype, 'clientHeight', 'get').mockReturnValue(40)
+  let scrollHeight = 40
+  const scroll = vi.spyOn(Element.prototype, 'scrollHeight', 'get').mockImplementation(() => scrollHeight)
+  let result
+  try {
+    result = mount({ detail: { ...loan, delivery_condition: 'Condições registradas do veículo. '.repeat(8) } })
+    expect(screen.queryByRole('button', { name: 'Ler texto completo: Condições de entrega' })).not.toBeInTheDocument()
+    scrollHeight = 120
+    fireEvent.resize(window)
+    expect(await screen.findByRole('button', { name: 'Ler texto completo: Condições de entrega' })).toBeInTheDocument()
+  } finally { result?.unmount(); width.mockRestore(); height.mockRestore(); scroll.mockRestore() }
+})
+
+it('a conclusão leva à consulta de documentos sem presumir assinaturas', async () => {
+  const actor = userEvent.setup(); const { props } = mount({ detail: { ...loan, status: 'RETURNED' }, editable: false })
+  expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuetext', '4 de 4 etapas operacionais concluídas')
+  await actor.click(screen.getByRole('button', { name: 'Conferir documentos e assinaturas' }))
+  expect(screen.getByRole('tab', { name: 'Documentos e assinaturas' })).toHaveAttribute('aria-selected', 'true')
+  expect(screen.getByLabelText('Rascunho de documento')).toBeVisible()
+  expect(props.onAction).not.toHaveBeenCalled()
+})
+
+it('recolhe a conferência sem pendências mantendo os dados acessíveis', async () => {
+  const actor = userEvent.setup(); mount()
+  const checks = screen.getByRole('region', { name: 'Pendências para a troca de responsabilidade' })
+  expect(within(checks).getByText('Sem pendências')).toBeVisible()
+  const reference = within(checks).getByText('Referência mínima do odômetro: 100 km.')
+  expect(reference).not.toBeVisible()
+  await actor.click(within(checks).getByText('Conferência operacional'))
+  expect(reference).toBeVisible()
+  expect(screen.getByRole('button', { name: 'Enviar para recebimento' })).toBeEnabled()
+})
+
+it('o atalho de pendências reabre a conferência e mantém a ação bloqueada', async () => {
+  const actor = userEvent.setup(); mount({ context: { ...context, blockers: { ...context.blockers, open_possessions: 1 } } })
+  const checks = screen.getByRole('region', { name: 'Pendências para a troca de responsabilidade' })
+  await actor.click(within(checks).getByText('Conferência operacional'))
+  expect(checks.querySelector('details')).not.toHaveAttribute('open')
+  await actor.click(screen.getByRole('button', { name: 'Ver pendências' }))
+  expect(checks.querySelector('details')).toHaveAttribute('open')
+  expect(checks).toHaveFocus()
+  expect(screen.getByRole('button', { name: 'Enviar para recebimento' })).toBeDisabled()
 })

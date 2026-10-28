@@ -1,7 +1,9 @@
 import { useEffect, useId, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { AppIcon } from './AppIcon'
 import Modal from './Modal'
 import VehicleLoanDocuments from './VehicleLoanDocuments'
+import VehicleLoanSummary from './VehicleLoanSummary'
 import { ActionMenu, StatusChip, VehicleThumbnail } from './ui'
 import { blockedLoanAction, formatLoanDate, getLoanStatusTone, loanEventLabels, loanStatuses } from '../utils/vehicleLoans'
 
@@ -46,6 +48,8 @@ export default function VehicleLoanInspector({ detail, context, events, loading,
   }
   useEffect(() => {
     if (!focusBlockers || tab !== 'summary') return
+    const checks = blockersRef.current?.querySelector('details')
+    if (checks) checks.open = true
     blockersRef.current?.focus({ preventScroll: true })
     blockersRef.current?.scrollIntoView?.({ block: 'nearest' })
     setFocusBlockers(false)
@@ -75,23 +79,18 @@ export default function VehicleLoanInspector({ detail, context, events, loading,
       </nav>
       <div className="loan-inspector__content" ref={contentRef}>
         {tab === 'summary' ? <section role="tabpanel" tabIndex={0} id={`${id}-summary-panel`} aria-labelledby={`${id}-summary-tab`}>
+          <VehicleLoanSummary detail={detail} events={events} onDocuments={() => selectTab('documents')}>
           {active && context ? <section ref={blockersRef} tabIndex={-1} className="loan-inspector__checks" data-attention={blockerCount > 0} aria-label="Pendências para a troca de responsabilidade">
+            <details open={blockerCount > 0 || undefined}>
+            <summary className="loan-inspector__checks-heading"><span>Conferência operacional<strong>{blockerCount ? `${blockerCount} pendência(s)` : 'Sem pendências'}</strong></span><AppIcon name="chevron-down" /></summary>
+            <div className="loan-inspector__checks-body">
             <h4>Pendências para a troca de responsabilidade</h4>
             <dl className="loan-inspector__counts"><div><dt>Posses abertas</dt><dd>{context.blockers?.open_possessions || 0}</dd></div><div><dt>Rotas abertas</dt><dd>{context.blockers?.open_trips || 0}</dd></div><div><dt>Ordens abertas</dt><dd>{context.blockers?.open_fuel_orders || 0}</dd></div></dl>
             <p>Referência mínima do odômetro: {context.minimum_odometer_km} km.</p><p>As pendências serão verificadas novamente ao confirmar a ação.</p>
             <div className="actions-inline">{canView('possession') && <Link className="ghost-button" to={`/posses?vehicle_id=${detail.vehicle_id}`}>Consultar posses do veículo</Link>}{canView('fuel_supply_orders') && <Link className="ghost-button" to="/abastecimentos?view=open">Consultar ordens abertas</Link>}</div>
+            </div></details>
           </section> : null}
-          {detail.regularized_at ? <div className="loan-notice"><strong>Regularização administrativa registrada em {formatLoanDate(detail.regularized_at)}</strong><p>Referência: {detail.regularization_reference}</p><p>As datas efetivas foram informadas na regularização. Não representam aceites ou assinaturas realizados no passado.</p></div> : null}
-          <dl className="loan-facts">
-            <div><dt>Secretaria de origem</dt><dd>{detail.origin_organization_name}</dd></div><div><dt>Secretaria recebedora</dt><dd>{detail.recipient_organization_name}</dd></div>
-            <div><dt>Lotação de origem</dt><dd>{detail.origin_allocation_name || 'Não identificada'}</dd></div><div><dt>Lotação de destino</dt><dd>{detail.destination_allocation_name}</dd></div>
-            <div><dt>Prazo previsto</dt><dd>{detail.expected_return_at ? formatLoanDate(detail.expected_return_at) : 'Indeterminado'}</dd></div><div><dt>Entrega efetiva</dt><dd>{formatLoanDate(detail.started_at)}</dd></div>
-            <div><dt>Odômetro de entrega</dt><dd>{detail.delivery_odometer_km == null ? 'Não informado' : `${detail.delivery_odometer_km} km`}</dd></div><div><dt>Devolução efetiva</dt><dd>{formatLoanDate(detail.returned_at)}</dd></div>
-            {detail.return_allocation_id ? <div><dt>Lotação de retorno</dt><dd>{detail.return_allocation_name}</dd></div> : null}
-            {detail.return_odometer_km != null ? <div><dt>Odômetro de devolução</dt><dd>{detail.return_odometer_km} km</dd></div> : null}
-          </dl>
-          <div className="loan-copy loan-inspector__copy"><h4>Motivo</h4><p>{detail.reason}</p><h4>Condições de entrega</h4><p>{detail.delivery_condition || 'Ainda não informadas'}</p>{detail.return_condition ? <><h4>Condições de devolução</h4><p>{detail.return_condition}</p></> : null}</div>
-          {detail.status === 'RETURNED' ? <p>A devolução foi concluída. A antiga recebedora conserva acesso aos registros até a data de devolução.</p> : null}
+          </VehicleLoanSummary>
           <div className="actions-inline">{canView('possession') && (!active || !context) && <Link className="ghost-button" to={`/posses?vehicle_id=${detail.vehicle_id}`}>Consultar posses do veículo</Link>}{canView('fuel_supplies') && <Link className="ghost-button" to={`/abastecimentos?vehicle_id=${detail.vehicle_id}`}>Consultar abastecimentos do veículo</Link>}</div>
         </section> : null}
         {documentsVisited || tab === 'documents' ? <section className="loan-inspector__panel" role="tabpanel" hidden={tab !== 'documents'} tabIndex={0} id={`${id}-documents-panel`} aria-labelledby={`${id}-documents-tab`}>
