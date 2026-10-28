@@ -21,7 +21,10 @@ export function validationMessage(control) {
 export function inspectForm(form) {
   if (!form) return { filled: 0, total: 0, issues: [], sections: [] }
   const controls = Array.from(form.querySelectorAll('input,select,textarea,button[data-form-required="true"]')).filter((control) => {
-    if (control.disabled || control.readOnly || control.type === 'hidden' || control.closest('fieldset[disabled]')) return false
+    if (control.readOnly || control.type === 'hidden') return false
+    // Dependent selectors are still required while waiting for their parent
+    // selection (for example, allocation after organization and department).
+    if ((control.disabled || control.closest('fieldset[disabled]')) && control.dataset.formRequired !== 'true') return false
     return control.willValidate || control.dataset.formRequired === 'true'
   })
   const required = controls.filter((control) => control.required || control.dataset.formRequired === 'true')

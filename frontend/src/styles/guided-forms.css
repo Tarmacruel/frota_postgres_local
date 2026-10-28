@@ -1,8 +1,8 @@
 .guided-form { --form-danger: #b73a3a; display: flex; flex-direction: column; min-height: 0; width: 100%; gap: 0; color: var(--ui-text, #14233a); }
 [data-theme="dark"] .guided-form { --form-danger: #ff7b7b; }
-.modal-shell:has(.modal-body > .guided-form) { width: min(960px, calc(100vw - 40px)); max-height: calc(100dvh - 40px); display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 16px; }
-.modal-shell:has(.modal-body > .guided-form) > .modal-header { flex: none; padding: 16px 24px; margin: 0; border-bottom: 1px solid var(--ui-border, #d7e0ed); }
-.modal-shell:has(.modal-body > .guided-form) > .modal-body { display: flex; min-height: 0; padding: 0; overflow: hidden; }
+body.internal-app-active .modal-shell:has(> .modal-body > .guided-form) { width: min(960px, calc(100vw - 40px)); max-height: calc(100dvh - 40px); display: flex; flex-direction: column; padding: 0; overflow: hidden; border-radius: 16px; background: var(--ui-surface); }
+body.internal-app-active .modal-shell:has(> .modal-body > .guided-form) > .modal-header { flex: none; padding: 16px 24px; margin: 0; border-bottom: 1px solid var(--ui-border, #d7e0ed); }
+body.internal-app-active .modal-shell:has(> .modal-body > .guided-form) > .modal-body { display: flex; min-height: 0; padding: 0; overflow: hidden; }
 .guided-form__progress { flex: none; padding: 16px 24px 0; background: var(--ui-surface-subtle, #f8fafd); border-bottom: 1px solid var(--ui-border, #d7e0ed); }
 .guided-form__caption { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: 12px; color: var(--ui-text-muted, #64748b); margin-bottom: 10px; }
 .guided-form__caption strong { font-weight: 600; text-align: right; }
@@ -47,9 +47,9 @@
 .guided-form[data-attempted="true"] button[data-form-required="true"][data-form-value=""] { border-color: var(--form-danger); box-shadow: 0 0 0 1px var(--form-danger); }
 .guided-form :is(input, select, textarea, button) { max-width: 100%; }
 @media (max-width: 700px) {
-  .modal-shell:has(.modal-body > .guided-form) { width: 100%; height: 100dvh; max-height: 100dvh; border-radius: 0; }
+  body.internal-app-active .modal-shell:has(> .modal-body > .guided-form) { width: 100%; height: 100dvh; max-height: 100dvh; border-radius: 0; }
   .modal-backdrop:has(> .modal-shell > .modal-body > .guided-form) { padding: 0; }
-  .modal-shell:has(.modal-body > .guided-form) > .modal-header { padding: 12px 16px; }
+  body.internal-app-active .modal-shell:has(> .modal-body > .guided-form) > .modal-header { padding: 12px 16px; }
   .guided-form__progress { padding: 12px 16px 0; }
   .guided-form__caption { font-size: 11px; }
   .guided-form__progress nav button { min-height: 58px; flex-direction: column; gap: 4px; font-size: 11px; }
@@ -63,3 +63,11 @@
   .guided-form__body :is(.contract-form__wide, .modal-field-span) { grid-column: 1/-1; }
 }
 @media (prefers-reduced-motion: reduce) { .guided-form__bar > span { transition: none; } }
+
+/* Keep legacy mobile sheet rules from adding spacing inside the guided footer. */
+body.internal-app-active .modal-shell .guided-form .guided-form__footer .modal-actions { position: static; padding: 0; margin: 0; border: 0; background: transparent; }
+body.internal-app-active .modal-shell .guided-form .guided-form__body .form-field { align-self: start; justify-content: start; }
+body.internal-app-active .modal-shell .guided-form .guided-form__body label { color: var(--ui-text); font-weight: 500; }
+body.internal-app-active .modal-shell .guided-form[data-attempted="true"] .guided-form__body .form-field:has(:invalid) > label,
+body.internal-app-active .modal-shell .guided-form[data-attempted="true"] .guided-form__body label:has(:invalid),
+body.internal-app-active .modal-shell .guided-form[data-attempted="true"] .guided-form__body .form-field:has(button[data-form-required="true"][data-form-value=""]) > label { color: var(--form-danger); }

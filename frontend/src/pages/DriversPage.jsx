@@ -394,7 +394,6 @@ export default function DriversPage() {
       <Modal
         open={isModalOpen}
         title={openingEdit ? 'Carregando condutor' : editingRecord ? 'Editar condutor' : 'Novo condutor'}
-        description="Agrupe os dados em blocos simples para manter o cadastro mais limpo e escalável."
         onClose={closeModal}
         canClose={!submitting}
         initialFocusRef={regularizingCnh && !openingEdit ? cnhNumberRef : undefined}

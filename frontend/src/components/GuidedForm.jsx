@@ -45,7 +45,11 @@ function labelsById(children, labels = new Map()) {
 function decorate(children, ids, labels, inheritedLabel = '') {
   return Children.map(children, (child) => {
     if (!isValidElement(child)) return child
-    const label = child.type === 'label' ? labelText(child.props.children) : inheritedLabel
+    const field = typeof child.type === 'string' && /(^|\s)form-field(\s|$)/.test(child.props.className || '')
+    const fieldChildren = field ? Children.toArray(child.props.children) : []
+    const fieldLabel = fieldChildren.find((node) => isValidElement(node) && node.type === 'label')
+    const fieldRequired = field && fieldChildren.some((node) => node !== fieldLabel && requiredDescendant(node))
+    const label = child.type === 'label' ? labelText(child.props.children) : fieldLabel ? labelText(fieldLabel.props.children) : inheritedLabel
     const attributes = {}
     const componentName = child.type?.render?.name || child.type?.name
     const inputControl = ['input', 'select', 'textarea'].includes(child.type) || ['MoneyInput', 'JustificationField'].includes(componentName)
@@ -53,9 +57,11 @@ function decorate(children, ids, labels, inheritedLabel = '') {
       const accessibleLabel = labels.get(child.props.id) || inheritedLabel
       if (accessibleLabel) attributes['aria-label'] = accessibleLabel
     }
+    if (['SearchableSelect', 'DriverSelect'].includes(componentName) && inheritedLabel && !child.props.ariaLabel) attributes.ariaLabel = inheritedLabel
     if (!child.props.children) return Object.keys(attributes).length ? cloneElement(child, attributes) : child
-    const content = decorate(child.props.children, ids, labels, label)
-    if (child.type === 'label' && (requiredDescendant(child) || ids.has(child.props.htmlFor))) {
+    const nested = fieldRequired ? Children.map(child.props.children, (node) => isValidElement(node) && node.type === 'label' ? cloneElement(node, { 'data-guided-required-label': true }) : node) : child.props.children
+    const content = decorate(nested, ids, labels, label)
+    if (child.type === 'label' && (child.props['data-guided-required-label'] || requiredDescendant(child) || ids.has(child.props.htmlFor))) {
       const parts = Children.toArray(content)
       const controlIndex = parts.findIndex(requiredDescendant)
       parts.splice(controlIndex < 0 ? parts.length : controlIndex, 0, <span key="required" className="guided-form__required" aria-hidden="true"> *</span>)
@@ -151,8 +157,10 @@ const GuidedForm = forwardRef(function GuidedForm({ children, onSubmit, classNam
     requestAnimationFrame(() => {
       let details = issue.control.closest('details')
       while (details) { details.open = true; details = details.parentElement?.closest('details') }
-      issue.control.focus()
-      issue.control.scrollIntoView?.({ block: 'center', behavior: 'auto' })
+      const region = issue.control.closest('[data-guided-step]') || localRef.current
+      const target = issue.control.disabled ? region?.querySelector('input:not([disabled]):not([hidden]),select:not([disabled]),button:not([disabled])') : issue.control
+      target?.focus()
+      target?.scrollIntoView?.({ block: 'center', behavior: 'auto' })
     })
   }
 

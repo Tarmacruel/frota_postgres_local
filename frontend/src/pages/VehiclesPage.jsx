@@ -1125,7 +1125,7 @@ export default function VehiclesPage() {
       <Modal
         open={isModalOpen}
         title={editingId ? 'Editar veículo' : 'Novo veículo'}
-        description={editingId ? 'Toda alteração exige uma nova justificativa. Ela será registrada no histórico de edições e movimentações do veículo.' : 'Preencha os dados do veículo e vincule a lotação por órgão, departamento e lotação cadastrados.'}
+        description={editingId ? 'A justificativa ficará no histórico de alterações do veículo.' : undefined}
         onClose={closeVehicleModal}
       >
         <GuidedForm formError={error} busy={submitting} onSubmit={handleSubmit} className="stack">
