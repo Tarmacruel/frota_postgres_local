@@ -116,6 +116,10 @@ export default function VehicleLoansPage() {
     detailPosition.current = { x: window.scrollX, y: window.scrollY }
     setFeedback(''); setModal(null); selectDetail(id)
   }
+  function openRowDetail(event, id) {
+    if (event.defaultPrevented || event.target.closest('button, a, input, select, textarea, label, summary, [role="button"]') || window.getSelection()?.toString()) return
+    openDetail(id, event.currentTarget.querySelector('[data-loan-detail-trigger]') || event.currentTarget)
+  }
   function closeDetail() {
     setModal(null)
     setParams((current) => { const next = new URLSearchParams(current); next.delete('id'); return next }, { replace: true })
@@ -163,12 +167,12 @@ export default function VehicleLoansPage() {
         <IndicatorBar state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={loading} error={listError} resultCount={pagination.total} />
       <div className="loan-table-wrap operation-table-card"><table className="loan-table data-table operation-table"><thead><tr><th>Veículo</th><th>Origem → recebedora</th><th>Situação</th><th>Prazo</th><th>Consulta</th></tr></thead><tbody>
           {rows.length === 0 && <tr><td colSpan={5}>Nenhum empréstimo encontrado para estes filtros.</td></tr>}
-          {rows.map((loan) => <ResponsiveRecord key={loan.id} className={loan.id === selectedId ? 'loan-selected' : ''} label={loan.vehicle_plate} identityLabel="Veículo" statusLabel="Situação" summaryLabels={["Origem → recebedora", "Prazo"]}>
+          {rows.map((loan) => <ResponsiveRecord key={loan.id} onClick={(event) => openRowDetail(event, loan.id)} className={`loan-open-row ${loan.id === selectedId ? 'loan-selected' : ''}`} label={loan.vehicle_plate} identityLabel="Veículo" statusLabel="Situação" summaryLabels={["Origem → recebedora", "Prazo"]}>
             <td data-label="Veículo"><div className="operation-vehicle-identity"><VehicleThumbnail vehicleType={loan.vehicle_type} plate={loan.vehicle_plate} /><span><strong>{loan.vehicle_plate}</strong></span></div></td>
             <td data-label="Origem → recebedora">{loan.origin_organization_name}<br /><span aria-label="para">→ </span>{loan.recipient_organization_name}</td>
             <td data-label="Situação"><StatusChip tone={getLoanStatusTone(loan.status)}>{loanStatuses[loan.status]}</StatusChip>{loan.regularized_at && <small className="loan-regularized">Inclusão retroativa</small>}</td>
             <td data-label="Prazo">{loan.expected_return_at ? formatLoanDate(loan.expected_return_at) : 'Indeterminado'}</td>
-            <td data-label="Consulta"><button className="mini-button" onClick={(event) => openDetail(loan.id, event.currentTarget)} aria-label={`Ver empréstimo de ${loan.vehicle_plate}`}>Ver detalhes</button></td>
+            <td data-label="Consulta"><button className="mini-button" data-loan-detail-trigger aria-haspopup="dialog" onClick={(event) => openDetail(loan.id, event.currentTarget)} aria-label={`Ver empréstimo de ${loan.vehicle_plate}`}>Ver detalhes</button></td>
           </ResponsiveRecord>)}
         </tbody></table></div>
         <Pagination currentPage={page} totalPages={pagination.pages} onPageChange={setPage} />

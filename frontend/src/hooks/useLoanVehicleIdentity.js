@@ -19,7 +19,7 @@ export default function useLoanVehicleIdentity(vehicles, enabled, scopeKey = '')
       const extra = byId.get(item.id)
       return extra ? { ...item, brand: item.brand || extra.brand, model: item.model || extra.model,
         ownership_type: extra.ownership_type, current_department: extra.current_department,
-        chassis_number: extra.chassis_number } : item
+        chassis_number: extra.chassis_number, current_location: extra.current_location } : item
     })
   }, [vehicles, details.rows, permitted])
   return { vehicles: result, status: !enabled ? 'idle' : permitted ? details.status : 'loading' }

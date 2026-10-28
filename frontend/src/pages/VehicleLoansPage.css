@@ -11,6 +11,8 @@
 .loan-table th, .loan-table td { text-align: left; padding: 14px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
 .loan-table th { font-size: .8rem; color: var(--ink-soft); background: var(--table-head); }
 .loan-selected { background: rgba(51, 99, 225, .06); }
+.loan-table .loan-open-row { cursor: pointer; }
+.vehicle-loans-page .loan-table .loan-open-row:is(:hover, :focus-within) > td { background: color-mix(in srgb, var(--navy) 7%, var(--surface)); }
 .loan-status { display: inline-block; padding: 4px 9px; border-radius: var(--radius-sm); background: #e8edf5; color: #344965; font-size: .78rem; white-space: nowrap; }
 .loan-status-ACTIVE { background: #ddf2e8; color: #176441; }
 .loan-status-AWAITING_RECEIPT, .loan-status-AWAITING_RETURN_RECEIPT { background: #fff0ce; color: #74510b; }

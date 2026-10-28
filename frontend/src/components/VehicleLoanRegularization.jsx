@@ -25,6 +25,7 @@ export default function VehicleLoanRegularization({ onClose, onSaved, canView, u
   const [errorReadOnly, setErrorReadOnly] = useState(true)
   const [retry, setRetry] = useState(0)
   const sending = useRef(false)
+  const originAllocationEdited = useRef(false)
   async function refreshVehicleCatalog() {
     const { data } = await vehicleLoansAPI.regularizationCatalog()
     setCatalog(data)
@@ -39,6 +40,8 @@ export default function VehicleLoanRegularization({ onClose, onSaved, canView, u
   function change(key, value) {
     setPreview(null); setReviewed(false)
     wizard.clear(key)
+    if (key === 'vehicle_id') originAllocationEdited.current = false
+    if (key === 'origin' || key === 'origin_allocation_id') originAllocationEdited.current = true
     setForm((previous) => {
       const next = { ...previous, [key]: value }
       if (key === 'vehicle_id') return { ...empty, vehicle_id: value, origin: catalog.vehicles.find((item) => item.id === value)?.owner_organization_id || '' }
@@ -90,9 +93,23 @@ export default function VehicleLoanRegularization({ onClose, onSaved, canView, u
     [...textIssue('reason', 'Motivo', 8), ...textIssue('document_reference', 'Referência documental', 8, 1000), ...textIssue('justification', 'Justificativa', 15, 1000)], [],
   ]
   const wizard = useLoanFormSteps(validation)
+  const selectedIdentity = identity.vehicles.find((item) => item.id === form.vehicle_id)
+  const suggestedOriginAllocation = allocations(form.origin).find((item) => item.id === selectedIdentity?.current_location?.allocation_id)
+  const suggestedOriginAllocationId = suggestedOriginAllocation?.id
+  const clearField = wizard.clear
+  useEffect(() => {
+    if (!suggestedOriginAllocationId || form.origin_allocation_id || originAllocationEdited.current) return
+    setForm((current) => current.vehicle_id === form.vehicle_id && current.origin === form.origin && !current.origin_allocation_id
+      ? { ...current, origin_allocation_id: suggestedOriginAllocationId } : current)
+    clearField('origin_allocation_id')
+  }, [suggestedOriginAllocationId, form.vehicle_id, form.origin, form.origin_allocation_id, clearField])
   function go(next) { if (!wizard.go(next)) setError('Revise os campos destacados para continuar.'); else setError('') }
+  const originAllocationHint = form.vehicle_id ? form.origin_allocation_id === suggestedOriginAllocationId
+    ? 'Sugerida pelo cadastro atual do veículo. Confira a lotação da época do empréstimo.'
+    : identity.status === 'loading' ? 'Consultando a lotação cadastrada do veículo…'
+      : 'Selecione a lotação de origem usada na época do empréstimo.' : undefined
   const select = (key, label, options) => <VehicleLoanSelect label={label} required options={options} value={form[key]} onOpen={key === 'vehicle_id' ? refreshVehicleCatalog : undefined}
-    hint={key === 'vehicle_id' && identity.status === 'loading' ? 'Carregando dados de identificação…' : key === 'vehicle_id' && identity.status === 'error' ? 'Os dados adicionais não puderam ser consultados. A lista mantém os dados disponíveis do empréstimo.' : undefined}
+    hint={key === 'origin_allocation_id' ? originAllocationHint : key === 'vehicle_id' && identity.status === 'loading' ? 'Carregando dados de identificação…' : key === 'vehicle_id' && identity.status === 'error' ? 'Os dados adicionais não puderam ser consultados. A lista mantém os dados disponíveis do empréstimo.' : undefined}
     searchPlaceholder={key === 'vehicle_id' ? 'Buscar por placa, marca ou modelo' : 'Digite para filtrar'}
     field={key} error={wizard.errors[key]} disabled={!catalog || busy || !options.length} onChange={(value) => change(key, value)} />
   const input = (key, label, type = 'text', required = true) => <LoanField name={key} label={label} error={wizard.errors[key]}><input className="app-input" type={type} required={required} min={type === 'number' ? 0 : undefined} step={type === 'number' ? '0.1' : undefined} value={form[key]} onChange={(event) => change(key, event.target.value)} /></LoanField>

@@ -1,4 +1,4 @@
-import { act, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { MemoryRouter, useLocation, useNavigate } from 'react-router-dom'
 import userEvent from '@testing-library/user-event'
 import { beforeEach, expect, it, vi } from 'vitest'
@@ -191,4 +191,46 @@ it('mantém o foco dentro do painel quando a consulta termina de carregar', asyn
   await waitFor(() => expect(dialog).toContainElement(document.activeElement))
   await act(async () => { resolve({ data: loan }) })
   expect(await screen.findByRole('dialog', { name: 'Empréstimo ABC1234' })).toContainElement(document.activeElement)
+})
+
+it('clique na célula da linha abre o detalhe e retorna ao botão preservando filtros e query', async () => {
+  const actor = userEvent.setup(); mount('/emprestimos?source=dashboard')
+  await actor.selectOptions(screen.getByLabelText('Situação'), 'DRAFT')
+  const trigger = await screen.findByRole('button', { name: 'Ver empréstimo de ABC1234' })
+  const row = trigger.closest('tr')
+  await actor.click(within(row).getByRole('cell', { name: /Saúde.*Educação/ }))
+  await screen.findByRole('dialog', { name: 'Empréstimo ABC1234' })
+  expect(vehicleLoansAPI.get).toHaveBeenCalledTimes(1)
+  expect(screen.getByLabelText('URL atual')).toHaveTextContent('source=dashboard&id=one')
+  await actor.keyboard('{Escape}')
+  await waitFor(() => expect(trigger).toHaveFocus())
+  expect(screen.getByLabelText('Situação')).toHaveValue('DRAFT')
+  expect(screen.getByLabelText('URL atual')).toHaveTextContent('?source=dashboard')
+})
+
+it('o botão da linha continua acessível por clique e Enter sem duplicar a abertura', async () => {
+  const actor = userEvent.setup(); mount()
+  const trigger = await screen.findByRole('button', { name: 'Ver empréstimo de ABC1234' })
+  await actor.click(trigger)
+  await screen.findByRole('dialog', { name: 'Empréstimo ABC1234' })
+  expect(vehicleLoansAPI.get).toHaveBeenCalledTimes(1)
+  await actor.keyboard('{Escape}')
+  await waitFor(() => expect(trigger).toHaveFocus())
+  await actor.keyboard('{Enter}')
+  await screen.findByRole('dialog', { name: 'Empréstimo ABC1234' })
+  expect(vehicleLoansAPI.get).toHaveBeenCalledTimes(2)
+})
+
+it('selecionar texto na linha não abre o painel; clique comum continua abrindo', async () => {
+  mount()
+  const trigger = await screen.findByRole('button', { name: 'Ver empréstimo de ABC1234' })
+  const cell = within(trigger.closest('tr')).getByRole('cell', { name: /Saúde.*Educação/ })
+  const range = document.createRange(); range.selectNodeContents(cell)
+  const selection = window.getSelection(); selection.removeAllRanges(); selection.addRange(range)
+  fireEvent.click(cell)
+  expect(vehicleLoansAPI.get).not.toHaveBeenCalled()
+  selection.removeAllRanges()
+  fireEvent.click(cell)
+  await screen.findByRole('dialog', { name: 'Empréstimo ABC1234' })
+  expect(vehicleLoansAPI.get).toHaveBeenCalledTimes(1)
 })

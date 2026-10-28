@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 
 export default function useLoanFormSteps(validation) {
   const [step, setStep] = useState(0)
@@ -37,5 +37,6 @@ export default function useLoanFormSteps(validation) {
     return false
   }
   function go(next) { if (next <= step || validate(next)) { show(next); return true } return false }
-  return { step, errors, formRef, visited, show, go, validate, clear: (field) => setErrors((current) => ({ ...current, [field]: undefined })) }
+  const clear = useCallback((field) => setErrors((current) => ({ ...current, [field]: undefined })), [])
+  return { step, errors, formRef, visited, show, go, validate, clear }
 }
