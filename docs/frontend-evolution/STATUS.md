@@ -443,6 +443,16 @@ Entrega e devolução agrupam datas, odômetros e prazo. Motivo/condições mant
 
 Fonte 9769af0 na branch isolada feature/loan-guided-progress-hml-20261028, publicada às 09:36:13 somente no frontend, sem reinício. Nove assets, 75 tabelas (38 de negócio/documentos), backend/configurações/PIDs preservados. Produção limpa em 31543d4; rotina 06h saudável, sem cópia extra. Backup, capturas e reversão privados em storage/backups/20261028-loan-guided-progress. [ExecPlan e evidências](../EXECPLAN_LOAN_GUIDED_PROGRESS_HML_20261028.md).
 
+## Formulários guiados e identificação dos veículos — 28/10/2026 — somente HML
+
+Proposta em três etapas e regularização em quatro, com progresso por preenchimento válido, revisão, foco na correção e navegação sem perder conteúdo. Ações e documentos recebem orientação de impedimentos, preservando a mensagem do servidor e oferecendo caminhos autorizados para consultar/corrigir. Prévia/token, versões, papéis, assinaturas e confirmação explícita mantidos. Rascunhos continuam aceitando odômetro e condições opcionais antes do envio.
+
+Complemento solicitado nas anotações: proposta nova consulta o último encerramento de posse para sugerir o odômetro, preserva valores digitados e ignora respostas antigas após troca do veículo. Mantém a leitura da edição e da regularização histórica. Seletor mostra marca/modelo, propriedade, lotação atual e final do chassi, sem ampliar os veículos autorizados. Obrigatórios usam asterisco vermelho; erros e labels inválidos usam vermelho e mensagem em negrito. Consultas auxiliares dependem das permissões existentes; ausência/falha mantém preenchimento manual e orientação.
+
+621 testes/86 arquivos; 51 direcionados finais/4 arquivos, lint zero erros/39 avisos anteriores e build HML aprovados. Desktop claro/escuro, mobile390×843/360×800, teclado, progresso, preservação de valores, referência automática e erros conferidos. Sem overflow horizontal, rodapé fixo e etapas de58px no celular; console final sem erros. Nenhum registro foi salvo pela QA; tema claro/viewport padrão restaurados e navegação atual do usuário preservada.
+
+Fonte final b5225e4 na branch feature/loan-guided-forms-hml-20261028, frontend publicado às11:45:58, entrada index-B6yz_Ygm.js e nove assets conferidos. Backend/schema/env e APIs6969/PID21432 e8000/PID2512 preservados; produção limpa31543d4. Banco em uso concorrente:67/75 tabelas idênticas, incluindo27 financeiras; diferenças em empréstimos/posses/lotação/termos/auditoria registradas separadamente, com baseline preservado e sem restauração. Backup/capturas/reversão privados em storage/backups/20261028-loan-guided-forms. [ExecPlan e evidências](../EXECPLAN_LOAN_GUIDED_FORMS_HML_20261028.md).
+
 
 ## Orientação de conflito temporal de posse — 28/10/2026 — somente HML
 
