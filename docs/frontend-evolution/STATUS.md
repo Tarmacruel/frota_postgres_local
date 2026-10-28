@@ -442,3 +442,10 @@ Entrega e devolução agrupam datas, odômetros e prazo. Motivo/condições mant
 595 testes/84 arquivos; lint zero erros/39 avisos anteriores e build HML aprovados. QA autenticada desktop 1600×900 e mobile 390×843/360×800, claro/escuro, empréstimos ativos/devolvidos/cancelados, expansão, documentos e teclado; sem overflow horizontal ou erros no console. Sem gravações de negócio na QA. Tema claro e viewport padrão restaurados; guia temporária fechada e navegação atual do usuário preservada.
 
 Fonte 9769af0 na branch isolada feature/loan-guided-progress-hml-20261028, publicada às 09:36:13 somente no frontend, sem reinício. Nove assets, 75 tabelas (38 de negócio/documentos), backend/configurações/PIDs preservados. Produção limpa em 31543d4; rotina 06h saudável, sem cópia extra. Backup, capturas e reversão privados em storage/backups/20261028-loan-guided-progress. [ExecPlan e evidências](../EXECPLAN_LOAN_GUIDED_PROGRESS_HML_20261028.md).
+
+
+## Orientação de conflito temporal de posse — 28/10/2026 — somente HML
+
+Coordenada com o agente da UI de empréstimos e baseada em c29fadb. Nova branch fix/possession-handoff-guidance-hml-20261028, implementação 9141ec3. Backend mantém a barreira de responsabilidade e informa os horários efetivos de entrega/devolução na mensagem 409. O caso TOB7D75 começa às14h16 e cruza devoluções/entrega até16h45min44s; as17h da imagem são previsão. Início real ainda depende da conferência com Ana; nenhum histórico ou posse alterado.
+
+35 testes backend +13 frontend aprovados; três falhas antigas reproduzidas no baseline e documentadas. Publicada somente API HML com reinício validado;75 tabelas/configurações/frontend inalterados. Entrada index-DCvH-SE2.js preservada; produção limpa31543d4/PID2512 e PostgreSQL5441 preservados. [Diagnóstico, validação e reversão](../CASE_POSSESSION_HANDOFF_HML_20261028.md).
