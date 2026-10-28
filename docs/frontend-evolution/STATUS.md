@@ -459,3 +459,13 @@ Fonte final b5225e4 na branch feature/loan-guided-forms-hml-20261028, frontend p
 Coordenada com o agente da UI de empréstimos e baseada em c29fadb. Nova branch fix/possession-handoff-guidance-hml-20261028, implementação 9141ec3. Backend mantém a barreira de responsabilidade e informa os horários efetivos de entrega/devolução na mensagem 409. O caso TOB7D75 começa às14h16 e cruza devoluções/entrega até16h45min44s; as17h da imagem são previsão. Início real ainda depende da conferência com Ana; nenhum histórico ou posse alterado.
 
 35 testes backend +13 frontend aprovados; três falhas antigas reproduzidas no baseline e documentadas. Publicada somente API HML com reinício validado;75 tabelas/configurações/frontend inalterados. Entrada index-DCvH-SE2.js preservada; produção limpa31543d4/PID2512 e PostgreSQL5441 preservados. [Diagnóstico, validação e reversão](../CASE_POSSESSION_HANDOFF_HML_20261028.md).
+
+## Lotação sugerida e linha clicável nos empréstimos — 28/10/2026 — somente HML
+
+Regularização sugere a lotação atual do veículo pelo allocation_id exato, apenas quando está no catálogo autorizado e pertence à origem. Consulta atrasada respeita o veículo atual e a escolha manual; alterar a origem limpa a seleção histórica. Ajuda curta pede conferir a lotação da época. Sem inferência por nome, confirmação automática ou alteração de payload/permissões.
+
+Clicar em uma célula da linha abre o painel de detalhes; botão e entrada por teclado permanecem. Cliques nos controles não duplicam a abertura, e selecionar texto não dispara navegação. Fechamento preserva filtros, query, posição e foco no botão de consulta. Realce discreto de hover/foco e cursor pointer; sem alterar a semântica da tabela.
+
+629 testes/86 arquivos, oito regressões adicionadas e 57 direcionados finais/4 arquivos aprovados; lint zero erros/39 avisos anteriores e build homologation aprovado. QA no veículo GTN8C43, edição manual da lotação, clique na célula do empréstimo cancelado TML4E34, retorno à lista e Enter. Desktop claro, formulário mobile claro390×843 e painel mobile escuro390×843/360×800, sem overflow e com rodapés visíveis. Console sem erros. Nenhum registro salvo na QA; tema/viewport restaurados e guia atual preservada.
+
+Fonte final bf8f794 na branch fix/loan-origin-location-row-open-hml-20261028, publicada às 13:56:26 só no frontend, entrada index-Cl_6b_nt.js e nove assets conferidos. 75 tabelas, backend/schema/configurações/PIDs preservados; produção limpa31543d4/PID2512. Backup/capturas/reversão privados em storage/backups/20261028-loan-location-row-open. [ExecPlan e evidências](../EXECPLAN_LOAN_LOCATION_ROW_OPEN_HML_20261028.md).
