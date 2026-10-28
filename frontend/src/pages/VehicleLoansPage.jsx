@@ -8,6 +8,7 @@ import { LoanActionForm, LoanProposalForm } from '../components/VehicleLoanForms
 import Pagination from '../components/Pagination'
 import VehicleLoanInspector from '../components/VehicleLoanInspector'
 import VehicleLoanRegularization from '../components/VehicleLoanRegularization'
+import LoanFeedback from '../components/LoanFeedback'
 import { getApiErrorMessage } from '../utils/apiError'
 import { availableLoanActions, canRepresent, formatLoanDate, getLoanStatusTone, loanStatuses } from '../utils/vehicleLoans'
 import './VehicleLoansPage.css'
@@ -140,7 +141,8 @@ export default function VehicleLoansPage() {
           </>
         )}
       />
-      {catalogError && <div role="alert" className="loan-error">{catalogError} <button className="ghost-button" onClick={loadCatalog}>Tentar carregar opções novamente</button></div>}
+      <LoanFeedback error={catalogError} readOnly><button className="ghost-button" onClick={loadCatalog}>Tentar carregar opções novamente</button></LoanFeedback>
+      {!catalogReady && !catalogError ? <p className="loan-editor__hint" role="status">Carregando veículos e lotações para liberar novas propostas…</p> : null}
       {feedback && !selectedId && <p role="status" className="loan-success">{feedback}</p>}
       <form className="loan-filters operation-toolbar" onSubmit={(event) => { event.preventDefault(); setPage(1); setAppliedSearch(search.trim()) }}>
         <label>Placa<input className="app-input" value={search} onChange={(e) => setSearch(e.target.value)} maxLength={100} placeholder="Buscar placa" /></label>
@@ -155,7 +157,7 @@ export default function VehicleLoansPage() {
         <button type="button" className="ghost-button" onClick={refresh}>Atualizar</button>
       </MobileFilters>
       </form>
-      {listError && <p role="alert" className="loan-error">{listError}</p>}
+      <LoanFeedback error={listError} readOnly><button type="button" className="ghost-button" onClick={refresh}>Tentar consultar empréstimos novamente</button></LoanFeedback>
       {loading ? <p role="status">Carregando empréstimos…</p> : <>
         <p className="section-copy">{pagination.total} registro(s). Devolvidos, rejeitados e cancelados permanecem no histórico.</p>
         <IndicatorBar state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={loading} error={listError} resultCount={pagination.total} />
@@ -178,7 +180,7 @@ export default function VehicleLoansPage() {
       editable={editable} actions={actions} user={user} canView={canView} orgName={orgName}
       onClose={closeDetail} onRefresh={refresh} onAction={setModal} feedback={feedback} returnFocusRef={detailTrigger} />}
     {(modal === 'new' || (modal === 'edit' && detail)) && <LoanProposalForm onVehicleOptionsOpen={refreshVehicleCatalog} key={modal === 'new' ? 'new' : `${detail.id}-${detail.version}`} loan={modal === 'edit' ? detail : null} catalog={catalog} user={user} onClose={() => setModal(null)} onSaved={saved} onRefresh={refresh} />}
-    {modal === 'regularization' && <VehicleLoanRegularization onClose={() => setModal(null)} onSaved={saved} />}
-    {modal && !['new', 'edit', 'regularization'].includes(modal) && detail && <LoanActionForm key={`${detail.id}-${detail.version}-${modal}`} operation={modal} loan={detail} context={context} catalog={catalog} user={user} onClose={() => setModal(null)} onSaved={saved} onRefresh={refresh} />}
+    {modal === 'regularization' && <VehicleLoanRegularization onClose={() => setModal(null)} onSaved={saved} canView={canView} />}
+    {modal && !['new', 'edit', 'regularization'].includes(modal) && detail && <LoanActionForm key={`${detail.id}-${detail.version}-${modal}`} operation={modal} loan={detail} context={context} catalog={catalog} user={user} onClose={() => setModal(null)} onSaved={saved} onRefresh={refresh} onEdit={editable ? () => setModal('edit') : undefined} canView={canView} />}
   </div>
 }

@@ -91,6 +91,18 @@ it('filtra arquivo de devolvidos e busca placa no servidor', async () => {
   await waitFor(() => expect(vehicleLoansAPI.list).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'RETURNED', search: 'ABC1234', page: 1 })))
 })
 
+it('oferece nova consulta após falha mantendo o filtro de situação', async () => {
+  const actor = userEvent.setup(); mount()
+  await screen.findByRole('button', { name: 'Ver empréstimo de ABC1234' })
+  vehicleLoansAPI.list.mockRejectedValueOnce(new Error('Conexão indisponível'))
+  await actor.selectOptions(screen.getByLabelText('Situação'), 'ACTIVE')
+  expect(await screen.findByRole('alert')).toHaveTextContent('atualizar a consulta')
+  await actor.click(screen.getByRole('button', { name: 'Tentar consultar empréstimos novamente' }))
+  await screen.findByRole('button', { name: 'Ver empréstimo de ABC1234' })
+  expect(screen.getByLabelText('Situação')).toHaveValue('ACTIVE')
+  expect(vehicleLoansAPI.list).toHaveBeenLastCalledWith(expect.objectContaining({ status: 'ACTIVE' }))
+})
+
 it('dados de contexto de outra versão bloqueiam envio até atualização', async () => {
   vehicleLoansAPI.context.mockResolvedValue({ data: { ...context, version: 2 } })
   mount('/emprestimos?id=one')

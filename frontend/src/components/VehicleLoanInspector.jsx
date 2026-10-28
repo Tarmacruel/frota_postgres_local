@@ -4,6 +4,8 @@ import { AppIcon } from './AppIcon'
 import Modal from './Modal'
 import VehicleLoanDocuments from './VehicleLoanDocuments'
 import VehicleLoanSummary from './VehicleLoanSummary'
+import LoanFeedback from './LoanFeedback'
+import { loanFeedback } from '../utils/loanFeedback'
 import { ActionMenu, StatusChip, VehicleThumbnail } from './ui'
 import { blockedLoanAction, formatLoanDate, getLoanStatusTone, loanEventLabels, loanStatuses } from '../utils/vehicleLoans'
 
@@ -16,6 +18,7 @@ export default function VehicleLoanInspector({ detail, context, events, loading,
   const [documentsVisited, setDocumentsVisited] = useState(false)
   const [focusBlockers, setFocusBlockers] = useState(false)
   const blockersRef = useRef(null)
+  const guidanceRef = useRef(null)
   const introRef = useRef(null)
   const contentRef = useRef(null)
   const tabRefs = useRef({})
@@ -48,18 +51,19 @@ export default function VehicleLoanInspector({ detail, context, events, loading,
   }
   useEffect(() => {
     if (!focusBlockers || tab !== 'summary') return
-    const checks = blockersRef.current?.querySelector('details')
+    const target = error ? introRef.current : blockerCount > 0 ? blockersRef.current : guidanceRef.current || blockersRef.current
+    const checks = target?.querySelector('details')
     if (checks) checks.open = true
-    blockersRef.current?.focus({ preventScroll: true })
-    blockersRef.current?.scrollIntoView?.({ block: 'nearest' })
+    target?.focus({ preventScroll: true })
+    target?.scrollIntoView?.({ block: 'nearest' })
     setFocusBlockers(false)
-  }, [focusBlockers, tab])
+  }, [focusBlockers, tab, blockerCount, error])
 
   return <Modal open title={detail ? `Empréstimo ${detail.vehicle_plate}` : 'Detalhes do empréstimo'}
     onClose={onClose} returnFocusRef={returnFocusRef} initialFocusRef={introRef} className="loan-inspector" backdropClassName="loan-inspector-backdrop">
     <div ref={introRef} tabIndex={-1} className="loan-inspector__intro">
     {loading && !detail ? <p className="loan-inspector__message" role="status">Carregando dados, pendências e histórico…</p> : null}
-    {error ? <div className="loan-error loan-inspector__message" role="alert">{error} <button type="button" className="ghost-button" onClick={onRefresh}>Recarregar detalhe</button></div> : null}
+    {error ? <div className="loan-inspector__message"><LoanFeedback error={error} readOnly><button type="button" className="ghost-button" onClick={onRefresh}>Recarregar detalhe</button></LoanFeedback></div> : null}
     {detail ? <>
       <div className="loan-inspector__identity">
         <div className="loan-inspector__status"><VehicleThumbnail vehicleType={detail.vehicle_type} plate={detail.vehicle_plate} /><StatusChip tone={getLoanStatusTone(detail.status)}>{loanStatuses[detail.status]}</StatusChip></div>
@@ -69,7 +73,7 @@ export default function VehicleLoanInspector({ detail, context, events, loading,
     </div>
     {detail ? <>
       {feedback ? <p className="loan-success loan-inspector__message" role="status">{feedback}</p> : null}
-      {catalogError ? <div className="loan-error loan-inspector__message" role="alert">As opções de operação não estão disponíveis. <button type="button" className="ghost-button" onClick={onRefresh}>Atualizar opções</button></div> : null}
+      {catalogError ? <div className="loan-inspector__message"><LoanFeedback error={`As opções de operação não estão disponíveis. ${catalogError}`} readOnly><button type="button" className="ghost-button" onClick={onRefresh}>Atualizar opções</button></LoanFeedback></div> : null}
       {active && blockerCount > 0 ? <div className="loan-inspector__attention"><span><strong>{blockerCount} {blockerCount === 1 ? 'pendência aberta' : 'pendências abertas'}</strong><small>Resolva antes de trocar a responsabilidade.</small></span><button type="button" className="ghost-button" onClick={() => { selectTab('summary'); setFocusBlockers(true) }}>Ver pendências</button></div> : null}
       <nav className="loan-inspector__tabs" role="tablist" aria-label="Detalhes do empréstimo">
         {tabs.map(([key, label], index) => <button key={key} type="button" role="tab" id={`${id}-${key}-tab`}
@@ -80,6 +84,7 @@ export default function VehicleLoanInspector({ detail, context, events, loading,
       <div className="loan-inspector__content" ref={contentRef}>
         {tab === 'summary' ? <section role="tabpanel" tabIndex={0} id={`${id}-summary-panel`} aria-labelledby={`${id}-summary-tab`}>
           <VehicleLoanSummary detail={detail} events={events} onDocuments={() => selectTab('documents')}>
+          {primaryBlocked && !error && loanFeedback(primaryBlocked).target !== 'operations' ? <div ref={guidanceRef} tabIndex={-1}><LoanFeedback error={primaryBlocked} tone="warning">{loanFeedback(primaryBlocked).target === 'refresh' ? <button type="button" className="ghost-button" onClick={onRefresh}>Atualizar dados do empréstimo</button> : null}</LoanFeedback></div> : null}
           {active && context ? <section ref={blockersRef} tabIndex={-1} className="loan-inspector__checks" data-attention={blockerCount > 0} aria-label="Pendências para a troca de responsabilidade">
             <details open={blockerCount > 0 || undefined}>
             <summary className="loan-inspector__checks-heading"><span>Conferência operacional<strong>{blockerCount ? `${blockerCount} pendência(s)` : 'Sem pendências'}</strong></span><AppIcon name="chevron-down" /></summary>
@@ -87,7 +92,8 @@ export default function VehicleLoanInspector({ detail, context, events, loading,
             <h4>Pendências para a troca de responsabilidade</h4>
             <dl className="loan-inspector__counts"><div><dt>Posses abertas</dt><dd>{context.blockers?.open_possessions || 0}</dd></div><div><dt>Rotas abertas</dt><dd>{context.blockers?.open_trips || 0}</dd></div><div><dt>Ordens abertas</dt><dd>{context.blockers?.open_fuel_orders || 0}</dd></div></dl>
             <p>Referência mínima do odômetro: {context.minimum_odometer_km} km.</p><p>As pendências serão verificadas novamente ao confirmar a ação.</p>
-            <div className="actions-inline">{canView('possession') && <Link className="ghost-button" to={`/posses?vehicle_id=${detail.vehicle_id}`}>Consultar posses do veículo</Link>}{canView('fuel_supply_orders') && <Link className="ghost-button" to="/abastecimentos?view=open">Consultar ordens abertas</Link>}</div>
+            {blockerCount > 0 ? <p className="loan-editor__hint">Conclua ou corrija as operações aplicáveis antes da troca. Confira as rotas no menu da posse correspondente e, depois, atualize os dados deste empréstimo. Se não tiver acesso, peça a conferência à gestão.</p> : null}
+            <div className="actions-inline">{canView('possession') && <Link className="ghost-button" to={`/posses?vehicle_id=${detail.vehicle_id}`}>Consultar posses do veículo</Link>}{canView('fuel_supply_orders') && <Link className="ghost-button" to={`/abastecimentos?view=open&vehicle_id=${detail.vehicle_id}`}>Consultar ordens abertas</Link>}{blockerCount > 0 ? <button type="button" className="ghost-button" onClick={onRefresh}>Atualizar conferência</button> : null}</div>
             </div></details>
           </section> : null}
           </VehicleLoanSummary>
@@ -102,7 +108,7 @@ export default function VehicleLoanInspector({ detail, context, events, loading,
       </div>
     </> : null}
     <footer className="loan-inspector__footer">
-      <div className="loan-inspector__action-note">{primaryBlocked || (!catalogReady && detail ? 'Atualize as opções antes de continuar.' : '')}</div>
+      <div className="loan-inspector__action-note">{primaryBlocked || (!catalogReady && detail ? 'Atualize as opções antes de continuar.' : '')}{primaryBlocked ? <button type="button" className="loan-summary__text-action" onClick={() => { selectTab('summary'); setFocusBlockers(true) }}>Como resolver</button> : null}</div>
       <div className="loan-inspector__footer-actions">
         {menuItems.length ? <ActionMenu label={`Mais ações do empréstimo de ${detail.vehicle_plate}`} items={menuItems} /> : null}
         {primary ? <button type="button" className="app-button" disabled={Boolean(primaryBlocked) || !catalogReady} onClick={() => onAction(primary[0])}>{primary[1].label}</button>

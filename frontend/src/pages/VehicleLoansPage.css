@@ -217,3 +217,104 @@ body.internal-app-active .loan-inspector :is(.loan-summary__text-action, .loan-s
 @media (prefers-reduced-motion: reduce) {
   .loan-journey__bar > span, .loan-journey__steps button, .loan-summary__units > summary > svg { transition: none; }
 }
+
+/* Local guided editors: fixed orientation/actions, one task per step. */
+body.internal-app-active .modal-backdrop.loan-editor-backdrop { display: flex; align-items: center; justify-content: center; padding: 24px; }
+body.internal-app-active .modal-shell.loan-editor { display: flex; flex-direction: column; width: min(960px, 100%); max-width: none; height: min(860px, calc(100dvh - 48px)); max-height: calc(100dvh - 48px); padding: 0; margin: 0; border-radius: var(--radius-lg); overflow: hidden; }
+body.internal-app-active .loan-editor > .modal-header { flex: 0 0 auto; padding: 18px 24px; border-bottom: 1px solid var(--line); }
+body.internal-app-active .loan-editor > .modal-body { display: flex; min-height: 0; flex: 1; overflow: hidden; padding: 0; }
+.loan-editor__form { display: flex; flex-direction: column; flex: 1; min-width: 0; min-height: 0; margin: 0; }
+.loan-editor__form fieldset { margin: 0; padding: 0; border: 0; min-width: 0; }
+.loan-editor__progress { flex: 0 0 auto; padding: 16px 24px 0; border-bottom: 1px solid var(--line); background: var(--surface-muted); }
+.loan-editor__progress-caption { display: flex; align-items: center; justify-content: space-between; gap: 12px; font-size: .76rem; color: var(--ink-soft); }
+.loan-editor__progress-caption strong { font-weight: 500; font-variant-numeric: tabular-nums; }
+.loan-editor__bar { display: grid; grid-auto-flow: column; grid-auto-columns: 1fr; gap: 4px; height: 4px; margin: 10px 0; }
+.loan-editor__bar span { border-radius: 3px; background: color-mix(in srgb, var(--ink-soft) 20%, var(--surface)); transition: background-color 160ms ease; }
+.loan-editor__bar [data-complete="true"] { background: var(--success); }
+.loan-editor__progress ol { display: grid; grid-auto-flow: column; grid-auto-columns: minmax(0, 1fr); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.loan-editor__progress li { min-width: 0; border-bottom: 2px solid transparent; }
+.loan-editor__progress li[aria-current="step"] { border-color: var(--navy); }
+body.internal-app-active .loan-editor .loan-editor__progress button { display: flex; align-items: center; justify-content: center; gap: 8px; min-height: 48px; width: 100%; padding: 8px 4px; border: 0; border-radius: 0; background: transparent; color: var(--ink-soft); font: inherit; font-size: .83rem; font-weight: 600; cursor: pointer; }
+.loan-editor__progress button > span { display: grid; place-items: center; width: 22px; height: 22px; border-radius: 50%; border: 1px solid var(--line); flex: 0 0 auto; font-size: .72rem; }
+.loan-editor__progress button svg { width: 14px; height: 14px; }
+.loan-editor__progress [data-complete="true"] button > span { border-color: var(--success); color: var(--success); background: color-mix(in srgb, var(--success) 8%, var(--surface)); }
+body.internal-app-active .loan-editor .loan-editor__progress [aria-current="step"] button { color: var(--navy); }
+.loan-editor__progress [aria-current="step"] button > span { background: var(--navy); color: var(--surface-strong); border-color: var(--navy); }
+.loan-editor__progress button:hover { background: color-mix(in srgb, var(--navy) 5%, var(--surface)); }
+.loan-editor__content { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 24px; }
+.loan-editor__step { display: grid; gap: 20px; animation: loan-editor-step-in 140ms ease-out; }
+.loan-editor__step[hidden] { display: none; }
+.loan-editor__step > header h4 { margin: 0; font-size: 1.1rem; }
+.loan-editor__step > header p { margin: 6px 0 0; max-width: 72ch; color: var(--ink-soft); font-size: .84rem; line-height: 1.5; }
+.loan-editor .loan-editor__grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px 24px; }
+.loan-editor__wide { grid-column: 1 / -1; }
+.loan-editor .loan-field { min-width: 0; gap: 7px; font-size: .85rem; }
+.loan-editor .loan-field :is(input, textarea) { min-width: 0; width: 100%; }
+.loan-editor .loan-field textarea { resize: vertical; }
+.loan-editor .loan-field small { color: var(--ink-soft); font-size: .76rem; line-height: 1.45; }
+.loan-editor [data-invalid="true"] :is(input, textarea, .searchable-select-trigger) { border-color: var(--danger); }
+.loan-editor .loan-editor__field-error { color: var(--danger); }
+.loan-editor__identity { display: grid; gap: 5px; margin: 0; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.loan-editor__identity span { color: var(--ink-soft); font-size: .76rem; }
+.loan-editor__identity strong { font-size: .9rem; }
+.loan-editor__choice { display: grid; gap: 7px; padding: 12px 0; border-block: 1px solid var(--line); }
+.loan-editor__choice label { display: flex; align-items: center; gap: 9px; min-height: 32px; font-size: .86rem; }
+.loan-editor__choice small { color: var(--ink-soft); font-size: .76rem; }
+.loan-editor__choice input, .loan-editor__review-check input { flex: 0 0 auto; width: 17px; height: 17px; accent-color: var(--navy); }
+.loan-editor__hint { color: var(--ink-soft); font-size: .81rem; line-height: 1.55; padding: 12px 0; margin: 0; }
+.loan-editor__route { color: var(--ink-soft); font-size: .84rem; margin: 0; }
+.loan-editor__review { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 24px; margin: 0; }
+.loan-editor__review > div { min-width: 0; padding: 12px 0; border-bottom: 1px solid var(--line); }
+.loan-editor__review > [data-long="true"] { grid-column: 1 / -1; }
+.loan-editor__review dt { color: var(--ink-soft); font-size: .76rem; }
+.loan-editor__review dd { margin: 5px 0 0; color: var(--ink-strong); font-size: .87rem; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; }
+.loan-editor__review-check { display: flex; align-items: flex-start; gap: 9px; margin-top: 18px; padding: 16px 0; font-size: .85rem; line-height: 1.5; }
+.loan-editor__review-check input { margin-top: 3px; }
+.loan-editor__warnings { padding: 12px 0; border-bottom: 1px solid var(--line); font-size: .82rem; }
+.loan-editor__warnings summary { cursor: pointer; min-height: 32px; }
+.loan-editor__warnings li { margin-block: 6px; }
+.loan-editor__blockers { margin-block: 18px; padding: 14px 16px; border-left: 3px solid var(--danger); background: color-mix(in srgb, var(--danger) 5%, var(--surface)); }
+.loan-editor__blockers h5 { margin: 0 0 12px; font-size: .9rem; }
+.loan-editor__blockers ul { padding: 0; margin: 0; list-style: none; }
+.loan-editor__blockers li + li { margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--line); }
+.loan-editor__blockers li > strong { font-size: .83rem; }
+.loan-editor__blockers p { font-size: .81rem; line-height: 1.5; color: var(--ink-soft); }
+.loan-editor__footer { display: flex; justify-content: space-between; align-items: center; gap: 16px; flex: 0 0 auto; padding: 14px 24px; border-top: 1px solid var(--line); background: var(--surface); }
+.loan-editor__footer > span { font-size: .76rem; line-height: 1.4; color: var(--ink-soft); max-width: 45ch; }
+.loan-editor__footer > div { display: flex; justify-content: flex-end; gap: 8px; }
+.loan-editor__footer button { min-height: 42px; }
+.loan-editor :is(button, input, textarea, summary):focus-visible, .loan-editor__step h4:focus { outline: 2px solid var(--navy); outline-offset: 3px; }
+.loan-feedback { display: flex; gap: 10px; padding: 14px 16px; margin-bottom: 18px; border-left: 3px solid var(--danger); background: color-mix(in srgb, var(--danger) 6%, var(--surface)); }
+.loan-feedback[data-tone="warning"] { border-color: var(--amber); background: color-mix(in srgb, var(--amber) 7%, var(--surface)); }
+.loan-feedback > svg { flex: 0 0 auto; width: 18px; height: 18px; margin-top: 2px; color: var(--danger); }
+.loan-feedback[data-tone="warning"] > svg { color: var(--amber); }
+.loan-feedback > div { min-width: 0; }
+.loan-feedback strong { font-size: .86rem; }
+.loan-feedback p { margin: 6px 0 0; line-height: 1.5; font-size: .82rem; overflow-wrap: anywhere; }
+.loan-feedback__guidance { color: var(--ink-soft); }
+.loan-feedback .actions-inline { margin-top: 12px; }
+.loan-recovery small { display: block; color: var(--ink-soft); margin-top: 8px; line-height: 1.4; font-size: .74rem; }
+.loan-document-progress { width: min(360px, 100%); height: 6px; border: 0; accent-color: var(--success); }
+.loan-document-progress::-webkit-progress-bar { background: var(--line); border-radius: 4px; }
+.loan-document-progress::-webkit-progress-value { background: var(--success); border-radius: 4px; }
+@keyframes loan-editor-step-in { from { opacity: .6; transform: translateY(3px); } to { opacity: 1; transform: translateY(0); } }
+@media (max-width: 720px) {
+  body.internal-app-active .modal-backdrop.loan-editor-backdrop { padding: 0; }
+  body.internal-app-active .modal-shell.loan-editor { width: 100%; height: 100dvh; max-height: 100dvh; border-radius: 0; }
+  body.internal-app-active .loan-editor > .modal-header { padding: 12px 16px; }
+  .loan-editor__progress { padding: 12px 16px 0; }
+  .loan-editor__progress-caption { font-size: .71rem; }
+  .loan-editor__progress ol { gap: 4px; }
+  body.internal-app-active .loan-editor .loan-editor__progress button { flex-direction: column; gap: 4px; min-height: 58px; font-size: .72rem; padding: 6px 0; }
+  .loan-editor__content { padding: 20px 16px; }
+  .loan-editor__step > header h4 { font-size: 1rem; }
+  .loan-editor .loan-editor__grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+  .loan-editor__review { grid-template-columns: minmax(0, 1fr); }
+  .loan-editor__footer { flex-direction: column; align-items: stretch; gap: 8px; padding: 10px 16px max(10px, env(safe-area-inset-bottom)); }
+  .loan-editor__footer > span { max-width: none; }
+  .loan-editor__footer > div { flex-wrap: wrap; }
+  .loan-editor__footer > div > :last-child { flex: 1; }
+  .loan-editor__footer button, body.internal-app-active .loan-editor :is(.app-input, .searchable-select-trigger, .ghost-button) { min-height: 44px; }
+  .loan-feedback { padding: 12px; }
+}
+@media (prefers-reduced-motion: reduce) { .loan-editor__step { animation: none; } .loan-editor__bar span { transition: none; } }

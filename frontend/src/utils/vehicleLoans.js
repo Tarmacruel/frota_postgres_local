@@ -42,3 +42,8 @@ export function blockedLoanAction(user, loan, action, context) {
 export function formatLoanDate(value) {
   return value ? new Date(value).toLocaleString('pt-BR') : '—'
 }
+export function validLoanOdometer(value, minimum = 0) {
+  if (value === '' || value == null) return false
+  const number = Number(value)
+  return Number.isFinite(number) && number >= Number(minimum) && Math.abs(number * 10 - Math.round(number * 10)) < 1e-7
+}

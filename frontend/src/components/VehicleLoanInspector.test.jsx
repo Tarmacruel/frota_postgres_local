@@ -84,7 +84,19 @@ it.each([
 it('não permite que o mesmo emissor confirme o recebimento', () => {
   mount({ detail: { ...loan, status: 'AWAITING_RECEIPT', submitted_by_user_id: user.id }, editable: false })
   expect(screen.getByRole('button', { name: 'Confirmar recebimento' })).toBeDisabled()
-  expect(screen.getByText('Outro usuário deve confirmar este recebimento.')).toBeInTheDocument()
+  expect(screen.getByRole('alert')).toHaveTextContent('Outro usuário deve confirmar este recebimento.')
+})
+
+it('Como resolver retorna à orientação de confirmação por outra pessoa sem executar ações', async () => {
+  const actor = userEvent.setup()
+  const { props } = mount({ detail: { ...loan, status: 'AWAITING_RECEIPT', submitted_by_user_id: user.id }, editable: false })
+  await actor.click(screen.getByRole('tab', { name: 'Histórico' }))
+  await actor.click(screen.getByRole('button', { name: 'Como resolver' }))
+  const alert = screen.getByRole('alert')
+  expect(alert).toHaveTextContent('Peça a outro usuário autorizado da secretaria responsável')
+  expect(document.activeElement).toContainElement(alert)
+  expect(screen.getByRole('button', { name: 'Confirmar recebimento' })).toBeDisabled()
+  expect(props.onAction).not.toHaveBeenCalled()
 })
 
 it.each(['RETURNED', 'REJECTED', 'CANCELLED'])('permite consultar documentos e histórico de %s sem ações operacionais', async (status) => {
