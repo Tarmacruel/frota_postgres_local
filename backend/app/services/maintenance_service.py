@@ -50,7 +50,10 @@ class MaintenanceService:
         if not record:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Registro de manutencao nao encontrado")
         await ensure_record_visible(self.db, record, current_user)
-        return self._serialize(record)
+        result = self._serialize(record)
+        if settings.CONTRACT_QUANTITY_ENABLED and record.contract_reservation_id:
+            result['contract_funding'] = await ContractBalanceService(self.db).funding(record.contract_reservation_id)
+        return result
 
     async def list_paginated(
         self,
@@ -136,7 +139,10 @@ class MaintenanceService:
         await attribute_operation(self.db, record, current_user)
 
         payload = data.model_dump(exclude_unset=True)
+        item_lines = payload.pop('item_lines', None)
         reason = payload.pop('reason', None)
+        if item_lines is not None and len((reason or '').strip()) < 10:
+            raise HTTPException(422, 'Justifique a retificação dos itens e quantidades (mínimo 10 caracteres)')
         previous_values = {
             "service_description": record.service_description,
             "parts_replaced": record.parts_replaced,
@@ -158,7 +164,7 @@ class MaintenanceService:
             setattr(record, field, value)
         if settings.CONTRACT_BALANCE_ENABLED and record.contract_reservation_id:
             await ContractBalanceService(self.db).rectify_operation('MAINTENANCE', record.id,
-                amount=record.total_cost, actor=current_user, reason=reason or 'Retificação dos dados da manutenção concluída', occurred_at=record.end_date)
+                amount=record.total_cost, actor=current_user, reason=reason or 'Retificação dos dados da manutenção concluída', occurred_at=record.end_date, item_lines=item_lines)
 
         try:
             await self.audit.record(

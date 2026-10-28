@@ -198,7 +198,6 @@ export default function AuditPage() {
     <div className="surface-panel operation-page management-page management-page--audit">
       <PageHeader
         title="Auditoria administrativa"
-        description="Acompanhe criações, edições e exclusões registradas nas áreas sensíveis do sistema."
         actions={<>
           <button className="secondary-button" type="button" onClick={handleExportPdf}>Pré-visualizar PDF</button>
           <button className="ghost-button" type="button" onClick={handleExportXlsx}>Exportar XLSX</button>

@@ -12,6 +12,8 @@ import ContractFundingFields from './ContractFundingFields'
 import { formatContractMoney as brl } from '../../utils/contractBalance'
 import ContractReturnBanner from './ContractReturnBanner'
 import MaintenanceOrderActionDialog from './MaintenanceOrderActionDialog'
+import ContractItemLines from './ContractItemLines'
+import { itemLinesPayload, itemLinesTotal } from '../../utils/contractItemLines'
 
 const states = { AUTHORIZED: 'Autorizadas', IN_PROGRESS: 'Em execução', COMPLETED: 'Concluídas', CANCELLED: 'Canceladas' }
 
@@ -19,13 +21,14 @@ export function MaintenanceOrderForm({ vehicles = [], onVehicleOptionsOpen, init
   const [form, setForm] = useState({ vehicle_id: '', estimated_cost: '', service_description: '' })
   const [error, setError] = useState('')
   const [saving, setSaving] = useState(false)
-  const funding = useContractFunding({ kind: 'MAINTENANCE', estimatedCost: form.estimated_cost, initialContractId })
+  const [lines, setLines] = useState([])
+  const funding = useContractFunding({ kind: 'MAINTENANCE', estimatedCost: form.estimated_cost, maintenanceLines: itemLinesPayload(lines), initialContractId })
   async function submit(event) {
     event.preventDefault()
     if (!funding.ready || !form.vehicle_id) { setError('Confira veículo, oficina, orçamento e saldo antes de autorizar.'); return }
     setSaving(true); setError('')
     try {
-      await maintenanceOrdersAPI.create({ ...form, ...funding.payload, provider_id: funding.provider.id, estimated_cost: form.estimated_cost })
+      await maintenanceOrdersAPI.create({ ...form, ...funding.payload, provider_id: funding.provider.id, estimated_cost: funding.quantityEnabled ? funding.quote.reserve_amount : form.estimated_cost })
       onSuccess?.('Pedido de manutenção autorizado e saldo reservado.'); onClose?.()
     } catch (err) { setError(getApiErrorMessage(err, 'Não foi possível autorizar a manutenção.')) }
     finally { setSaving(false) }
@@ -36,9 +39,10 @@ export function MaintenanceOrderForm({ vehicles = [], onVehicleOptionsOpen, init
     <label>Veículo<SearchableSelect value={form.vehicle_id} onOpen={onVehicleOptionsOpen} ariaLabel="Veículo para manutenção"
       onChange={(vehicle_id) => setForm((s) => ({ ...s, vehicle_id }))} placeholder="Selecione o veículo"
       options={vehicles.filter((v) => v.can_operate_vehicle !== false).map((v) => ({ value: v.id, label: `${v.plate} · ${v.brand || ''} ${v.model || ''}`, tags: v.tags || [] }))} /></label>
-    <label>Orçamento previsto (R$)<MoneyInput className="app-input" aria-label="Orçamento previsto" type="number" min="0.01" step="0.01" required value={form.estimated_cost} onChange={(e) => setForm((s) => ({ ...s, estimated_cost: e.target.value }))} /></label>
+    <label>Orçamento previsto (R$)<MoneyInput className="app-input" aria-label="Orçamento previsto" type="number" min="0.01" step="0.01" required readOnly={funding.quantityEnabled} value={funding.quantityEnabled ? itemLinesTotal(lines) : form.estimated_cost} onChange={(e) => setForm((s) => ({ ...s, estimated_cost: e.target.value }))} /></label>
     <label className="contract-form__wide">Serviço solicitado<textarea className="app-textarea" minLength={10} maxLength={2000} required value={form.service_description} onChange={(e) => setForm((s) => ({ ...s, service_description: e.target.value }))} /></label>
-    <ContractFundingFields funding={funding} />
+    <ContractFundingFields funding={{...funding,selectContract:(v)=>{setLines([]);funding.selectContract(v)},selectProvider:(v)=>{setLines([]);funding.selectProvider(v)}}} />
+    {funding.quantityEnabled && funding.contract && funding.provider ? <ContractItemLines items={funding.items} prices={funding.itemPrices} lines={lines} onChange={setLines} /> : null}
     <div className="actions-inline"><button type="button" className="ghost-button" onClick={onClose}>Cancelar</button><button className="app-button" disabled={saving || !funding.ready}>{saving ? 'Autorizando…' : 'Autorizar e reservar saldo'}</button></div>
   </form>
 }

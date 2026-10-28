@@ -240,7 +240,8 @@ describe('Layout mobile quick actions', () => {
     const operationalNavigation = screen.getByRole('navigation', { name: 'Operacional' })
     expect(within(operationalNavigation).getByRole('link', { name: 'Condutores. Motoristas' })).toHaveAttribute('href', '/condutores')
     expect(within(operationalNavigation).getByRole('link', { name: 'Manutenções. Custos' })).toHaveAttribute('href', '/manutencoes')
-    expect(within(operationalNavigation).getByRole('link', { name: 'Ordens abertas. Pendentes' })).toHaveAttribute('href', '/ordens-abastecimento')
+    expect(within(operationalNavigation).getByRole('link', { name: 'Abastecimentos. Consumo' })).toHaveAttribute('href', '/abastecimentos')
+    expect(within(operationalNavigation).queryByRole('link', { name: 'Ordens abertas. Pendentes' })).not.toBeInTheDocument()
   })
 
   it('mantém os atalhos condicionados às permissões de visualização', () => {

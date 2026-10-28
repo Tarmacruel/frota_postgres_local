@@ -88,7 +88,7 @@ export default function AdminAnalyticsDashboard() {
 
   return (
     <div className="surface-panel operation-page management-page management-page--analytics analytics-foundation">
-      <PageHeader title="Análises administrativas" description="Consulte os indicadores da frota e explore as análises por assunto." />
+      <PageHeader title="Análises administrativas" />
       <AnalyticsSubnav activeKey={view} onChange={changeView} />
       <AnalyticsOverview enabled={view === 'overview'} organizations={organizations} catalogError={catalogError} onOpenEntity={detail.open} />
       <AnalyticsCosts enabled={view === 'costs'} organizations={organizations} catalogError={catalogError} onOpenEntity={detail.open} />

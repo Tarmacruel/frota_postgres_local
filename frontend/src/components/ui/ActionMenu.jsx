@@ -2,7 +2,7 @@ import { useEffect, useId, useLayoutEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { AppIcon } from '../AppIcon'
 
-export default function ActionMenu({ items = [], label = 'Mais ações', className = '' }) {
+export default function ActionMenu({ items = [], label = 'Mais ações', triggerLabel, className = '' }) {
   const [open, setOpen] = useState(false)
   const [position, setPosition] = useState({ left: 0, top: 0 })
   const rootRef = useRef(null)
@@ -100,7 +100,7 @@ export default function ActionMenu({ items = [], label = 'Mais ações', classNa
 
   return (
     <div ref={rootRef} className={`ui-action-menu ${className}`.trim()}>
-      <button ref={triggerRef} id={triggerId} type="button" className="ui-icon-button"
+      <button ref={triggerRef} id={triggerId} type="button" className={`ui-icon-button${triggerLabel ? ' ui-action-menu__labeled-trigger' : ''}`}
         aria-label={label} title={label} aria-haspopup="menu" aria-expanded={expanded}
         aria-controls={expanded ? menuId : undefined} disabled={!available}
         onKeyDown={(event) => {
@@ -111,7 +111,7 @@ export default function ActionMenu({ items = [], label = 'Mais ações', classNa
           }
         }}
         onClick={() => { startAtEnd.current = false; setOpen(!expanded) }}>
-        <span className="ui-action-menu__dots" aria-hidden="true">•••</span>
+        {triggerLabel ? <span>{triggerLabel}</span> : <span className="ui-action-menu__dots" aria-hidden="true">•••</span>}
       </button>
       {expanded && createPortal(
         <>

@@ -4,15 +4,15 @@ function flattenActions(children) {
   return Children.toArray(children).flatMap((child) => isValidElement(child) && child.type === Fragment ? flattenActions(child.props.children) : [child])
 }
 
-export default function PageHeader({ title, description, actions, className = '' }) {
+export default function PageHeader({ title, description, actions, inlineActions = false, className = '' }) {
   const [moreOpen, setMoreOpen] = useState(false)
   const id = useId()
   const items = flattenActions(actions)
   const primary = items.find((item) => item.props?.className?.split(' ').includes('app-button'))
   const secondary = items.filter((item) => item !== primary)
-  const progressive = secondary.length > 0 && (Boolean(primary) || secondary.length > 1)
+  const progressive = !inlineActions && secondary.length > 0 && (Boolean(primary) || secondary.length > 1)
   return (
-    <header className={`ui-page-header ${className}`.trim()}>
+    <header className={`ui-page-header${!description ? ' ui-page-header--compact' : ''}${inlineActions ? ' ui-page-header--inline-actions' : ''} ${className}`.trim()}>
       <div className="ui-page-header__copy">
         <h2 className="ui-page-header__title">{title}</h2>
         {description ? <p className="ui-page-header__description">{description}</p> : null}

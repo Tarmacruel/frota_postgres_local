@@ -63,7 +63,7 @@ class FuelSupplyService:
         await self._ensure_supply_visible_to_user(supply, current_user)
         result = self._serialize(supply)
         if settings.CONTRACT_BALANCE_ENABLED:
-            result['contract_funding'] = await ContractBalanceService(self.db).funding(supply.contract_reservation_id)
+            result['contract_funding'] = await ContractBalanceService(self.db).funding(supply.contract_reservation_id, record=supply)
         return result
 
     async def rectify(
@@ -93,7 +93,7 @@ class FuelSupplyService:
             "notes",
         )
         before = {field: getattr(supply, field) for field in editable_fields}
-        new_values = payload.model_dump(exclude={"reason"})
+        new_values = payload.model_dump(exclude={"reason", "item_lines"})
         new_values["total_amount"] = Decimal(str(payload.total_amount))
         changes = {
             field: {"before": before[field], "after": new_values[field]}
@@ -101,7 +101,7 @@ class FuelSupplyService:
             if before[field] != new_values[field]
         }
         receipt_payload = await self._read_and_validate_receipt(receipt) if receipt is not None else None
-        if not changes and receipt_payload is None:
+        if not changes and receipt_payload is None and payload.item_lines is None:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Nenhuma alteracao foi informada")
 
         stored_receipt_path: Path | None = None
@@ -128,7 +128,7 @@ class FuelSupplyService:
             await attribute_operation(self.db, supply, current_user)
             if settings.CONTRACT_BALANCE_ENABLED:
                 await ContractBalanceService(self.db).rectify_operation('FUEL_SUPPLY', supply.id,
-                    amount=supply.total_amount, actor=current_user, reason=payload.reason, occurred_at=supply.supplied_at)
+                    amount=supply.total_amount, actor=current_user, reason=payload.reason, occurred_at=supply.supplied_at, item_lines=payload.item_lines)
             supply.updated_at = datetime.now(timezone.utc)
             consumption_inputs = {"supplied_at", "odometer_km", "liters"}
             recalculated_supply_ids = (
@@ -284,16 +284,17 @@ class FuelSupplyService:
                     await service.consume_unreserved(contract_id=data.contract_id, provider_id=data.contract_provider_id,
                         source_type='FUEL_SUPPLY', source_id=supply.id, amount=supply.total_amount,
                         occurred_at=supply.supplied_at, actor=current_user, vehicle_id=supply.vehicle_id,
-                        organization_id=supply.organization_id, station_id=supply.fuel_station_id)
+                        organization_id=supply.organization_id, station_id=supply.fuel_station_id, item_lines=data.item_lines)
                 else:
                     reservation = await service.reserve(contract_id=data.contract_id,
                         provider_id=data.contract_provider_id, source_type='FUEL_DIRECT', source_id=supply.id,
                         vehicle_id=supply.vehicle_id, organization_id=supply.organization_id, actor=current_user,
                         fuel_type=supply.fuel_type, liters=supply.liters, expected_price_id=data.expected_price_id,
-                        station_id=supply.fuel_station_id)
+                        station_id=supply.fuel_station_id,
+                        item_lines=[{**r.model_dump(), 'unit_price': None} for r in data.item_lines] if data.item_lines else None)
                     supply.contract_reservation_id = reservation.id
                     await service.settle(reservation.id, source_type='FUEL_SUPPLY',
-                        source_id=supply.id, amount=supply.total_amount, occurred_at=supply.supplied_at, actor=current_user)
+                        source_id=supply.id, amount=supply.total_amount, occurred_at=supply.supplied_at, actor=current_user, item_lines=data.item_lines)
             relative_receipt_path, stored_receipt_path = self._build_receipt_storage_paths(supply.id, receipt_payload["mime_type"])
             self._store_file(stored_receipt_path, receipt_payload["content"])
             supply.receipt_path = relative_receipt_path

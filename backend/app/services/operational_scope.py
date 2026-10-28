@@ -78,9 +78,39 @@ async def _attribute_locked(db, record, user, *, new):
         end = record.end_date or datetime.now(timezone.utc)
         start = occurred_at(record)
         periods = await repository.effective_periods(record.vehicle_id)
-        if any(start < boundary <= end for loan in periods
-               for boundary in (loan.started_at, loan.returned_at) if boundary is not None):
-            raise HTTPException(409, 'A posse não pode atravessar uma entrega ou devolução entre secretarias')
+        boundaries = sorted(
+            (boundary, kind) for loan in periods
+            for boundary, kind in ((loan.started_at, 'entrega'), (loan.returned_at, 'devolução'))
+            if boundary is not None and start < boundary <= end
+        )
+        if boundaries:
+            first, kind = boundaries[0]
+            latest = boundaries[-1][0]
+
+            def local(value):
+                return value.astimezone(INSTITUTIONAL_TIMEZONE).strftime('%d/%m/%Y às %H:%M:%S')
+
+            message = (
+                f'A posse iniciada em {local(start)} atravessa uma {kind} entre secretarias '
+                f'em {local(first)} (horário de Brasília). '
+                'O status atual do empréstimo não elimina as entregas e devoluções do histórico. '
+            )
+            if record.end_date is None:
+                message += (
+                    f'A última movimentação no intervalo ocorreu em {local(latest)}. '
+                    'Para uma nova posse após os empréstimos, confira o horário real de início. '
+                )
+            message += (
+                'Se os horários registrados estiverem incorretos, solicite revisão administrativa '
+                'do histórico dos empréstimos.'
+            )
+            raise HTTPException(409, {
+                'code': 'POSSESSION_CROSSES_HANDOFF',
+                'message': message,
+                'possession_start_at': start.isoformat(),
+                'first_handoff_at': first.isoformat(),
+                'last_handoff_at': latest.isoformat(),
+            })
     scoped = scoped_organization_id(user)
     if production_scope_is_empty(user) or (scoped is not None and scoped != organization):
         raise HTTPException(403, 'A operação pertence a outra secretaria ou não tem responsabilidade identificada')

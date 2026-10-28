@@ -95,6 +95,7 @@ class ContractReservation(Base):
 
 class ContractOperation(Base):
     __tablename__ = 'contract_operations'
+    item_revision: Mapped[int] = mapped_column(Integer, default=0, server_default=text('0'))
     __table_args__ = (UniqueConstraint('source_type', 'source_id', name='uq_contract_operation_source'),
                      CheckConstraint('amount >= 0', name='ck_contract_operation_nonnegative'))
     id: Mapped[UUID] = pk()

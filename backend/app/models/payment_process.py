@@ -6,7 +6,7 @@ from decimal import Decimal
 from uuid import UUID
 
 from sqlalchemy import Boolean, CheckConstraint, Date, DateTime, Enum, ForeignKey, Index, Numeric, String, Text, UniqueConstraint, text
-from sqlalchemy.dialects.postgresql import UUID as PGUUID
+from sqlalchemy.dialects.postgresql import JSONB, UUID as PGUUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
@@ -124,6 +124,16 @@ class PaymentContractAmendment(Base):
     value_delta: Mapped[Decimal | None] = mapped_column(Numeric(14, 2), nullable=True)
     valid_until: Mapped[date | None] = mapped_column(Date(), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    instrument_type: Mapped[str | None] = mapped_column(String(30), nullable=True)
+    change_types: Mapped[list | None] = mapped_column(JSONB, nullable=True)
+    effective_date: Mapped[date | None] = mapped_column(Date(), nullable=True)
+    document_reference: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    price_financial_delta: Mapped[Decimal | None] = mapped_column(Numeric(16, 2), nullable=True)
+    request_key: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), unique=True, nullable=True)
+    request_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    snapshot: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    attachment: Mapped[dict | None] = mapped_column(JSONB, nullable=True)
+    corrects_amendment_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
 

@@ -2,6 +2,7 @@ import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import EnvironmentBanner from './components/EnvironmentBanner'
 import ProtectedRoute from './components/ProtectedRoute'
+import FuelWorkspaceRoute, { FuelOpenOrdersRedirect } from './components/FuelWorkspaceRoute'
 import { AuthProvider, useAuth } from './context/AuthContext'
 import AuditPage from './pages/AuditPage'
 import AdminAnalyticsDashboard from './pages/AdminAnalyticsDashboard'
@@ -13,7 +14,6 @@ import DriversPage from './pages/DriversPage'
 import FinesPage from './pages/FinesPage'
 import FuelSuppliesPage from './pages/FuelSuppliesPage'
 import FuelStationsPage from './pages/FuelStationsPage'
-import FuelSupplyOrdersPage from './pages/FuelSupplyOrdersPage'
 import LoginPage from './pages/LoginPage'
 import MaintenancePage from './pages/MaintenancePage'
 import ContractBalancesPage from './pages/ContractBalancesPage'
@@ -27,7 +27,7 @@ import UnauthorizedPage from './pages/UnauthorizedPage'
 
 function HomeRoute() {
   const { canView } = useAuth()
-  if (!canView('vehicles') && canView('fuel_supply_orders')) return <Navigate to="/ordens-abastecimento" replace />
+  if (!canView('vehicles') && canView('fuel_supply_orders')) return <Navigate to="/abastecimentos?view=open" replace />
   return <DashboardPage />
 }
 
@@ -115,9 +115,9 @@ export default function App() {
             <Route
               path="abastecimentos"
               element={(
-                <ProtectedRoute permission={{ module: 'fuel_supplies', action: 'view' }}>
+                <FuelWorkspaceRoute>
                   <FuelSuppliesPage />
-                </ProtectedRoute>
+                </FuelWorkspaceRoute>
               )}
             />
             <Route
@@ -132,7 +132,7 @@ export default function App() {
               path="ordens-abastecimento"
               element={
                 <ProtectedRoute permission={{ module: 'fuel_supply_orders', action: 'view' }}>
-                  <FuelSupplyOrdersPage />
+                  <FuelOpenOrdersRedirect />
                 </ProtectedRoute>
               }
             />

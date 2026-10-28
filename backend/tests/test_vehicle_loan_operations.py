@@ -205,3 +205,56 @@ async def test_ambiguous_legacy_and_possession_crossing_handoff(api):
             start_date=datetime.now(timezone.utc) - timedelta(days=10))
         await attribute_operation(session, missing, admin, new=True)
         assert missing.responsible_organization_id is None and missing.vehicle_loan_id is None
+
+
+@pytest.mark.parametrize('actor', ['origin', 'admin'])
+async def test_returned_loan_allows_new_possession_but_explains_backdated_crossing(api, actor):
+    from app.models.user import User
+    from app.models.possession import VehiclePossession
+    from app.services.operational_scope import attribute_operation
+    from fastapi import HTTPException
+
+    active = await api.active()
+    closed = await returned(api, active)
+    delivered_at = datetime.fromisoformat(closed['started_at'])
+    returned_at = datetime.fromisoformat(closed['returned_at'])
+    async with api.sessions() as session:
+        user = await session.get(User, UUID(api.actors[actor]))
+        # An administrator can also have an organization in their profile.
+        user.organization_id = UUID(api.ids['origin'])
+        valid = VehiclePossession(vehicle_id=UUID(api.ids['vehicle']), driver_name='Teste',
+            start_date=returned_at)
+        await attribute_operation(session, valid, user, new=True)
+        assert valid.responsible_organization_id == UUID(api.ids['origin'])
+        assert valid.vehicle_loan_id is None
+
+        crossing = VehiclePossession(vehicle_id=valid.vehicle_id, driver_name='Teste',
+            start_date=delivered_at + (returned_at - delivered_at) / 2)
+        with pytest.raises(HTTPException) as error:
+            await attribute_operation(session, crossing, user, new=True)
+        assert error.value.status_code == 409
+        assert error.value.detail['code'] == 'POSSESSION_CROSSES_HANDOFF'
+        assert datetime.fromisoformat(error.value.detail['first_handoff_at']) == returned_at
+        assert 'devolução' in error.value.detail['message']
+
+
+async def test_http_possession_creation_after_return_and_conflict_message(api):
+    active = await api.active()
+    closed = await returned(api, active)
+    delivered_at = datetime.fromisoformat(closed['started_at'])
+    returned_at = datetime.fromisoformat(closed['returned_at'])
+    async with AsyncClient(transport=ASGITransport(app=app), base_url='http://localhost:8000',
+        cookies={'access_token': create_access_token(api.actors['admin'], 'ADMIN'), 'csrf_token': 'ops'},
+        headers={'Origin': 'http://localhost:8000', 'X-CSRF-Token': 'ops'}) as client:
+        body = {'vehicle_id': api.ids['vehicle'], 'driver_name': 'Condutor de teste',
+            'start_odometer_km': '120',
+            'start_date': (delivered_at + (returned_at - delivered_at) / 2).isoformat()}
+        blocked = await client.post('/api/possession', data=body)
+        assert blocked.status_code == 409, blocked.text
+        assert blocked.json()['detail']['code'] == 'POSSESSION_CROSSES_HANDOFF'
+        assert 'horário de Brasília' in blocked.json()['detail']['message']
+        body['start_date'] = returned_at.isoformat()
+        created = await client.post('/api/possession', data=body)
+        assert created.status_code == 200, created.text
+        assert created.json()['responsible_organization_id'] == api.ids['origin']
+        assert created.json()['vehicle_loan_id'] is None

@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom'
+import { useState } from 'react'
 import Modal from '../Modal'
 import { ActionMenu, StatusChip } from '../ui'
 import ContractPricesPanel from './ContractPricesPanel'
@@ -6,6 +7,8 @@ import ContractMovementBrowser from './ContractMovementBrowser'
 import ContractCommitmentsBrowser from './ContractCommitmentsBrowser'
 import MaintenanceOrdersPanel from './MaintenanceOrdersPanel'
 import ContractInvoicesPanel from './ContractInvoicesPanel'
+import ContractItemsPanel from './ContractItemsPanel'
+import { ContractAmendmentReport } from './ContractAmendmentEditor'
 import { formatContractMoney as brl, contractKinds, contractDate } from '../../utils/contractBalance'
 
 export function ContractState({ contract }) {
@@ -36,8 +39,9 @@ export function ContractMovementContent({ detail, mode, onMode, canViewMaintenan
   </>
 }
 
-export default function ContractInspector({ open, detail, row, loading, error, tab, onTab, onClose, onShow, onPayments, onMovements, movementMode, onMovementMode, manage, canCreateOrder, canViewMaintenance, orderPath, onOrder, onProviderToggle, revision, returnFocusRef, onRefresh }) {
+export default function ContractInspector({ open, detail, row, loading, error, tab, onTab, onClose, onShow, onPayments, onMovements, movementMode, onMovementMode, manage, canCreateOrder, canViewMaintenance, orderPath, onOrder, onProviderToggle, revision, returnFocusRef, onRefresh, quantityEnabled = false }) {
   const c = detail?.contract
+  const [report, setReport] = useState(null)
   const providers = detail?.providers || []
   const eligible = Boolean(row?.ready && c?.control_opened && !c.divergence_open)
   const tabs = [['summary', 'Resumo'], ['movements', 'Movimentações'], ['invoices', 'Faturas'], ['settings', 'Configuração']]
@@ -74,11 +78,12 @@ export default function ContractInspector({ open, detail, row, loading, error, t
           {row?.eligibility_errors?.length ? <ul className="contract-pending-list">{row.eligibility_errors.map((message) => <li key={message}>{message}</li>)}</ul> : null}
           <div className="contract-setup-list">{settings.map((step) => <div key={step.label}><span><strong>{step.label}</strong><small>{step.value}</small></span>{manage ? <button className="ghost-button" onClick={step.run}>{step.action}</button> : null}</div>)}
           {c.kind === 'FUEL' && c.fuel_pricing_mode !== 'NETWORK_VALUE' ? <div><span><strong>Preços dos combustíveis</strong><small>Conferir preços e vigências por posto</small></span><button className="ghost-button" onClick={() => onTab('settings')}>Conferir preços</button></div> : null}</div>
-        </section> : <p className="contract-ready-note">Contrato liberado. O saldo e o preço serão conferidos novamente ao emitir o pedido.</p>}
+        </section> : <p className="contract-ready-note">{c.kind === 'FUEL' && c.fuel_pricing_mode === 'NETWORK_VALUE' ? 'Contrato liberado. O pedido não reserva saldo; o valor real será descontado na confirmação do abastecimento.' : 'Contrato liberado. O saldo e o preço serão conferidos novamente ao emitir o pedido.'}</p>}
       </> : null}
       {tab === 'movements' ? <><p className="muted">Os filtros alteram os lançamentos consultados. O saldo representa a posição atual.</p><ContractMovementContent detail={detail} mode={movementMode} onMode={onMovementMode} canViewMaintenance={canViewMaintenance} revision={revision} onChange={onRefresh} /></> : null}
       {tab === 'invoices' ? <ContractInvoicesPanel key={c.id} contract={c} revision={revision} onOpen={(id) => onPayments({ focus_process: id })} onBrowse={(indicator) => onPayments({ indicator })} /> : null}
       {tab === 'settings' ? <>
+        {quantityEnabled ? <ContractItemsPanel contract={c} providers={providers} legacyPrices={detail.prices} manage={manage} revision={revision} onChange={onRefresh} /> : null}
         <section className="contract-detail__section"><h4>Cadastro e controle</h4><div className="contract-setup-list">{settings.map((step) => <div key={step.label}><span><strong>{step.label}</strong><small>{step.value}</small></span>{manage ? <button className="ghost-button" onClick={step.run}>{step.action}</button> : null}</div>)}</div></section>
         <section className="contract-detail__section"><div className="contract-order-panel__heading"><h4>Rede executante</h4>{manage ? <button className="secondary-button" onClick={() => onShow('provider')}>Vincular prestador</button> : null}</div>
           {providers.map((provider) => <div className="contract-provider-row" key={provider.id}><span><strong>{provider.station_name || provider.name}</strong><small>{provider.station_name ? provider.name : ''} · {provider.active ? 'Ativo' : 'Inativo'}</small></span>{manage ? <button className="ghost-button" onClick={() => onProviderToggle(provider)}>{provider.active ? 'Desativar vínculo' : 'Reativar vínculo'}</button> : null}</div>)}
@@ -86,8 +91,9 @@ export default function ContractInspector({ open, detail, row, loading, error, t
         </section>
         {c.kind === 'FUEL' && c.fuel_pricing_mode === 'NETWORK_VALUE' ? <p className="contract-ready-note">Rede credenciada por valor. Não é necessário cadastrar preço por litro. Cada abastecimento desconta somente o valor real do comprovante, após a confirmação, sem reserva prévia.</p> : null}
         {c.kind === 'FUEL' && (c.fuel_pricing_mode !== 'NETWORK_VALUE' || detail.prices?.length) ? <ContractPricesPanel prices={detail.prices} providers={providers} manage={manage && c.fuel_pricing_mode !== 'NETWORK_VALUE'} onCreate={() => onShow('price')} onEdit={(price) => onShow('priceEdit', { price })} onDelete={(price) => onShow('priceDelete', { price })} /> : null}
-        <section className="contract-detail__section"><div className="contract-order-panel__heading"><h4>Aditivos e dados do contrato</h4>{manage ? <button className="secondary-button" onClick={() => onShow('amend')}>Registrar aditivo</button> : null}</div><p>{c.object_description || c.contract_type || 'Objeto conforme cadastro contratual.'}</p>{c.notes ? <p>{c.notes}</p> : null}{c.amendments?.map((a) => <p key={a.id}><strong>Aditivo {a.number || 'sem número'}</strong> · {brl(a.value_delta)} · {a.valid_until ? `Vigência até ${contractDate(a.valid_until)}` : 'Sem alteração de vigência'}<br />{a.notes}</p>)}</section>
+        <section className="contract-detail__section"><div className="contract-order-panel__heading"><h4>Aditivos e dados do contrato</h4>{manage ? <button className="secondary-button" onClick={() => onShow('amend')}>Registrar aditivo</button> : null}</div><p>{c.object_description || c.contract_type || 'Objeto conforme cadastro contratual.'}</p>{c.notes ? <p>{c.notes}</p> : null}{c.amendments?.map((a) => <p key={a.id}><strong>Aditivo {a.number || 'sem número'}</strong> · {brl(a.value_delta)} · {a.valid_until ? `Vigência até ${contractDate(a.valid_until)}` : 'Sem alteração de vigência'}<br />{a.notes}{a.snapshot ? <button className="ghost-button" onClick={() => setReport(a)}>Ver demonstrativo</button> : null}</p>)}</section>
       </> : null}
+      {report ? <Modal open title={`Alteração ${report.number}`} onClose={() => setReport(null)} className="contract-amendment-editor"><ContractAmendmentReport record={report} onClose={() => setReport(null)} /></Modal> : null}
     </> : null}
   </Modal>
 }

@@ -3,14 +3,17 @@ import IndicatorBar from '../components/ui/IndicatorBar'
 import ContractReturnBanner from '../components/contracts/ContractReturnBanner'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import { useContractControl } from '../hooks/useContractFunding'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import FuelSupplyOrderCancelForm from '../components/FuelSupplyOrderCancelForm'
+import FuelSupplyOrdersPage from './FuelSupplyOrdersPage'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import FuelSupplyAlertBadge from '../components/FuelSupplyAlertBadge'
 import Pagination from '../components/Pagination'
-import SearchableSelect from '../components/SearchableSelect'
+import FuelEntityFilters from '../components/FuelEntityFilters'
+import { useFuelVehicleFilter } from '../hooks/useFuelVehicleFilter'
+import { fuelVehicleOptions } from '../utils/fuelWorkspaceFilters'
 import FuelSupplyOrderCreateForm from '../components/FuelSupplyOrderCreateForm'
 import FuelSupplyOrderBatchCreateForm from '../components/FuelSupplyOrderBatchCreateForm'
 import FuelSupplyOrderDeadlineForm from '../components/FuelSupplyOrderDeadlineForm'
@@ -106,20 +109,6 @@ function buildOrderMapsUrl(order) {
   return `https://www.openstreetmap.org/?mlat=${latitude}&mlon=${longitude}#map=18/${latitude}/${longitude}`
 }
 
-function buildStationOption(station) {
-  return {
-    value: station.id,
-    label: station.name,
-    description: [station.address, station.phone].filter(Boolean).join(' | '),
-    keywords: [station.name, station.cnpj, station.address, station.phone].filter(Boolean).join(' '),
-  }
-}
-
-function buildVehicleOption(vehicle) {
-  const locationLabel = vehicle.current_location?.display_name || vehicle.current_department || 'Sem lotação'
-  return { value: vehicle.id, tags: vehicle.tags || [], label: `${vehicle.plate} . ${vehicle.brand} ${vehicle.model}`, description: locationLabel }
-}
-
 function asArray(payload) {
   if (Array.isArray(payload)) return payload
   if (payload && Array.isArray(payload.data)) return payload.data
@@ -127,15 +116,29 @@ function asArray(payload) {
 }
 
 export default function FuelSuppliesPage() {
-  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
-  const { selected: orderIndicator, metadata: orderIndicatorMetadata, setMetadata: setOrderIndicators, select: selectOrderIndicator } = useInteractiveKpis('order_indicator')
+  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators } = useInteractiveKpis()
+  const { selected: orderIndicator, metadata: orderIndicatorMetadata, setMetadata: setOrderIndicators } = useInteractiveKpis('order_indicator')
   useEffect(() => { setCurrentHistoryPage(1) }, [indicator])
   useEffect(() => { setCurrentOrdersPage(1) }, [orderIndicator])
   const [searchParams, setSearchParams] = useSearchParams()
+  const navigate = useNavigate()
   const { canCreate, canEdit, canView, isAdmin, isProduction } = useAuth()
   const control = useContractControl()
   const canViewOrders = canView('fuel_supply_orders')
-  const canCreateOrder = canCreate('fuel_supply_orders')
+  const canViewSupplies = canView('fuel_supplies')
+  const canViewAllOrders = canViewSupplies && canViewOrders
+  const requestedView = searchParams.get('view')
+  const orderContext = searchParams.has('contract_id') || searchParams.has('order_indicator') || searchParams.has('acao') || searchParams.get('action') === 'create'
+  const historyContext = searchParams.has('indicator') || searchParams.has('vehicle_id')
+  const activeView = !canViewSupplies ? canViewOrders ? 'open' : 'none'
+    : !canViewOrders ? 'history' : requestedView === 'open' ? 'open'
+      : requestedView === 'history' ? 'history' : requestedView === 'orders' ? 'orders'
+        : searchParams.has('focus') ? 'open' : orderContext ? 'orders' : historyContext ? 'history' : 'orders'
+  const { vehicleId, selectVehicle } = useFuelVehicleFilter(activeView)
+  const canViewVehicles = canView('vehicles')
+  const canViewStations = canView('fuel_stations')
+  const canViewOrganizations = canView('master_data')
+  const canCreateOrder = canViewSupplies && canCreate('fuel_supply_orders')
   const canEditOrder = canEdit('fuel_supply_orders')
   const canRectifySupply = canEdit('fuel_supplies') && (isAdmin || isProduction)
   const canAdjustOrderDeadline = canEditOrder && (isAdmin || isProduction)
@@ -144,7 +147,10 @@ export default function FuelSuppliesPage() {
   const [vehicles, setVehicles] = useState([])
   const [organizations, setOrganizations] = useState([])
   const [fuelStations, setFuelStations] = useState([])
-  const [filters, setFilters] = useState(() => ({ vehicle_id: searchParams.get('vehicle_id') || '', organization_id: '', fuel_station_id: '', only_anomalies: '' }))
+  const [catalogLoaded, setCatalogLoaded] = useState(false)
+  const [openOrdersVisited, setOpenOrdersVisited] = useState(activeView === 'open')
+  const [openOrdersRevision, setOpenOrdersRevision] = useState(0)
+  const [filters, setFilters] = useState(() => ({ organization_id: '', fuel_station_id: '', only_anomalies: '' }))
   const [orderFilters, setOrderFilters] = useState({ status: 'TODOS', organization_id: '', fuel_station_id: '', created_from: '', created_to: '' })
   const [search, setSearch] = useState('')
   const [orderSearch, setOrderSearch] = useState('')
@@ -169,6 +175,44 @@ export default function FuelSuppliesPage() {
   const [orderToCancel, setOrderToCancel] = useState(null)
   const [cancellingOrder, setCancellingOrder] = useState(false)
 
+  function selectView(view) {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      next.set('view', view)
+      if (view !== 'open') next.delete('focus')
+      return next
+    })
+    setActiveAlertSummary(null)
+  }
+
+  function selectWorkspaceIndicator(parameter, key, view) {
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      next.set('view', view)
+      if (!key || key === 'total' || key === current.get(parameter)) next.delete(parameter)
+      else next.set(parameter, key)
+      next.delete('focus')
+      return next
+    })
+  }
+
+  function refreshOrdersAfterIssue() {
+    setOpenOrdersRevision((value) => value + 1)
+    if (activeView === 'open') return
+    if (canViewAllOrders && activeView !== 'orders') selectView('orders')
+    else if (canViewAllOrders) loadOrders()
+    else if (canViewOrders) selectView('open')
+  }
+
+  function refreshCurrentView() {
+    if (activeView === 'open') setOpenOrdersRevision((value) => value + 1)
+    else if (activeView === 'orders') loadOrders()
+    else if (activeView === 'history') loadRecords()
+  }
+
+  useEffect(() => { if (activeView === 'open') setOpenOrdersVisited(true) }, [activeView])
+  useEffect(() => { setError('') }, [activeView])
+
   useEffect(() => {
     const action = searchParams.get('acao') || (searchParams.get('action') === 'create' ? 'nova-ordem' : '')
     if (!['nova-ordem', 'nova-ordem-lote'].includes(action)) return
@@ -187,28 +231,51 @@ export default function FuelSuppliesPage() {
     setSearchParams(nextSearchParams, { replace: true })
   }, [canCreateOrder, searchParams, setSearchParams])
 
+  const needsCatalogs = (canViewSupplies && ['orders', 'history'].includes(activeView)) || isOrderModalOpen || isBatchOrderModalOpen
   useEffect(() => {
+    if (!needsCatalogs || catalogLoaded) return undefined
+    let mounted = true
     async function loadDependencies() {
       try {
         const [vehiclesResponse, organizationsResponse, stationsResponse] = await Promise.all([
-          api.get('/vehicles/options'),
-          masterDataAPI.listOrganizations(),
-          fuelStationsAPI.list({ active_only: true }),
+          canViewVehicles ? api.get('/vehicles/options') : Promise.resolve({ data: [] }),
+          canViewOrganizations ? masterDataAPI.listOrganizations() : Promise.resolve({ data: [] }),
+          canViewStations ? fuelStationsAPI.list({ active_only: true }) : Promise.resolve({ data: [] }),
         ])
+        if (!mounted) return
         setVehicles(asArray(vehiclesResponse.data))
         setOrganizations(asArray(organizationsResponse.data))
         setFuelStations(asArray(stationsResponse.data))
+        setCatalogLoaded(true)
       } catch (err) {
-        setError(getApiErrorMessage(err, 'Não foi possível carregar os cadastros de apoio.'))
+        if (mounted) setError(getApiErrorMessage(err, 'Não foi possível carregar os cadastros de apoio.'))
       }
     }
     loadDependencies()
-  }, [])
+    return () => { mounted = false }
+  }, [needsCatalogs, catalogLoaded, canViewVehicles, canViewStations, canViewOrganizations])
 
   async function refreshVehicleOptions() {
+    if (!canViewVehicles) return
     const { data } = await api.get('/vehicles/options')
     setVehicles(asArray(data))
   }
+
+  async function refreshStationOptions() {
+    if (!canViewStations) return
+    const { data } = await fuelStationsAPI.list({ active_only: true })
+    setFuelStations(asArray(data))
+  }
+
+  const selectedVehicleMissing = Boolean(vehicleId && !vehicles.some((vehicle) => String(vehicle.id) === String(vehicleId)))
+  useEffect(() => {
+    if (activeView !== 'open' || !selectedVehicleMissing || !canViewVehicles) return undefined
+    let current = true
+    api.get('/vehicles/options').then(({ data }) => { if (current) setVehicles(asArray(data)) })
+      // An older, scoped vehicle may be absent. Keep its filter visible and usable.
+      .catch(() => {})
+    return () => { current = false }
+  }, [activeView, vehicleId, selectedVehicleMissing, canViewVehicles])
 
   async function loadRecords(page = currentHistoryPage) {
     const request = ++historyRequest.current
@@ -216,7 +283,7 @@ export default function FuelSuppliesPage() {
       setHistoryLoading(true)
       setError('')
       const params = { limit: 10, page, search: search.trim() || undefined, indicator: indicator === 'total' ? undefined : indicator }
-      if (filters.vehicle_id) params.vehicle_id = filters.vehicle_id
+      if (vehicleId) params.vehicle_id = vehicleId
       if (filters.organization_id) params.organization_id = filters.organization_id
       if (filters.fuel_station_id) params.fuel_station_id = filters.fuel_station_id
       if (filters.only_anomalies === 'true') params.only_anomalies = true
@@ -266,19 +333,22 @@ export default function FuelSuppliesPage() {
 
   useEffect(() => {
     historyRequest.current += 1
+    if (activeView !== 'history') return undefined
     const timer = setTimeout(() => loadRecords(), search.trim() ? 250 : 0)
-    return () => clearTimeout(timer)
-  }, [filters, search, currentHistoryPage, indicator])
+    return () => { clearTimeout(timer); historyRequest.current += 1 }
+  }, [filters, search, currentHistoryPage, indicator, activeView, vehicleId])
 
   useEffect(() => {
     ordersRequest.current += 1
+    if (activeView !== 'orders') return undefined
     const timer = setTimeout(() => loadOrders(), orderSearch.trim() ? 250 : 0)
-    return () => clearTimeout(timer)
-  }, [orderFilters, orderSearch, currentOrdersPage, canViewOrders, orderIndicator])
+    return () => { clearTimeout(timer); ordersRequest.current += 1 }
+  }, [orderFilters, orderSearch, currentOrdersPage, canViewOrders, orderIndicator, activeView, vehicleId])
 
   function buildOrderQueryParams({ includePaging = false, page = currentOrdersPage } = {}) {
     const params = includePaging ? { limit: 10, page, search: orderSearch.trim() || undefined } : {}
     params.indicator = orderIndicator === 'total' ? undefined : orderIndicator
+    if (vehicleId) params.vehicle_id = vehicleId
     if (orderFilters.status !== 'TODOS') params.status = orderFilters.status
     if (orderFilters.organization_id) params.organization_id = orderFilters.organization_id
     if (orderFilters.fuel_station_id) params.fuel_station_id = orderFilters.fuel_station_id
@@ -334,18 +404,13 @@ export default function FuelSuppliesPage() {
     { header: 'Odômetro', value: (order) => formatNumber(order.supply_odometer_km, 1), align: 'right', width: 50 },
   ], [])
 
-  const organizationFilterOptions = useMemo(
-    () => [{ value: '', label: 'Todas as secretarias' }, ...organizations.map((org) => ({ value: org.id, label: org.name }))],
-    [organizations],
-  )
-
   useEffect(() => {
     setCurrentHistoryPage(1)
-  }, [search, filters])
+  }, [search, filters, vehicleId])
 
   useEffect(() => {
     setCurrentOrdersPage(1)
-  }, [orderSearch, orderFilters])
+  }, [orderSearch, orderFilters, vehicleId])
 
   async function handleCancelOrder(order) {
     if (!canEditOrder) {
@@ -357,6 +422,7 @@ export default function FuelSuppliesPage() {
 
   function buildOrderReportFilters() {
     return [
+      { label: 'Veículo', value: fuelVehicleOptions(vehicles, vehicleId).find((option) => String(option.value) === String(vehicleId))?.label },
       { label: 'Situação', value: orderFilters.status === 'TODOS' ? 'Todas as situações' : getOrderStatusLabel(orderFilters.status) },
       { label: 'Secretaria', value: organizations.find((org) => org.id === orderFilters.organization_id)?.name || 'Todas as secretarias' },
       { label: 'Posto', value: fuelStations.find((station) => station.id === orderFilters.fuel_station_id)?.name || 'Todos os postos' },
@@ -477,11 +543,13 @@ export default function FuelSuppliesPage() {
 
   function clearHistoryFilters() {
     setSearch('')
-    setFilters({ vehicle_id: '', organization_id: '', fuel_station_id: '', only_anomalies: '' })
+    selectVehicle('')
+    setFilters({ organization_id: '', fuel_station_id: '', only_anomalies: '' })
   }
 
   function clearOrderFilters() {
     setOrderSearch('')
+    selectVehicle('')
     setOrderFilters({ status: 'TODOS', organization_id: '', fuel_station_id: '', created_from: '', created_to: '' })
   }
 
@@ -495,7 +563,7 @@ export default function FuelSuppliesPage() {
     {
       selector: '[data-tour="fuel-batch-create"]',
       title: 'Nova ordem em lote',
-      description: 'Use este atalho para preparar várias ordens de abastecimento de uma vez, sem substituir a emissão individual.',
+      description: 'Abra Nova ordem em lote no menu de ações para preparar várias ordens, mantendo a emissão individual disponível.',
       placement: 'bottom',
     },
     {
@@ -518,19 +586,38 @@ export default function FuelSuppliesPage() {
   return (
     <div className="surface-panel operation-page operation-page--fuel-supplies">
       <PageHeader
-        title="Gestão de abastecimentos"
-        description="Emita ordens para os postos vinculados e acompanhe o histórico confirmado com comprovantes e alertas de consumo."
+        title="Abastecimentos"
+        inlineActions
         actions={<>
           {canCreateOrder ? <button className="app-button" type="button" onClick={() => setIsOrderModalOpen(true)}>Nova ordem</button> : null}
-          {canCreateOrder && !searchParams.get('contract_id') ? <button className="secondary-button" data-tour="fuel-batch-create" type="button" onClick={() => setIsBatchOrderModalOpen(true)}>Nova ordem em lote</button> : null}
-          {canCreateOrder && !searchParams.get('contract_id') ? <button className="ghost-button" type="button" onClick={openBatchOrderTour}>Ver guia rápido</button> : null}
-          {searchParams.get('contract_id') ? <Link className="secondary-button" to="/abastecimentos">Operação geral</Link> : null}
-          <button className="ghost-button" type="button" onClick={() => { loadOrders(); loadRecords() }}>Atualizar painel</button>
+          <span data-tour="fuel-batch-create"><ActionMenu label="Mais ações de abastecimentos" items={[
+            canCreateOrder && !searchParams.get('contract_id') && { label: 'Nova ordem em lote', onClick: () => setIsBatchOrderModalOpen(true) },
+            canCreateOrder && !searchParams.get('contract_id') && { label: 'Ver guia rápido', onClick: openBatchOrderTour },
+            { label: 'Atualizar listagem', onClick: refreshCurrentView },
+            activeView === 'orders' && { label: 'Pré-visualizar PDF das ordens', onClick: handlePreviewOrdersPdf },
+            activeView === 'orders' && { label: 'Exportar ordens em XLSX', onClick: handleExportOrdersXlsx },
+            canViewSupplies && { label: 'Consultar postos', onClick: () => navigate('/postos?indicator=active') },
+            searchParams.get('contract_id') && { label: 'Operação geral', onClick: () => navigate('/abastecimentos') },
+          ]} /></span>
         </>}
       />
 
       <ContractReturnBanner returnTo={searchParams.get('return_to')} />
-      <p className="interactive-kpis__context"><Link to="/postos?indicator=active">Consultar os {fuelStations.length} postos ativos</Link></p>
+
+      <div className="fuel-workspace-navigation">
+        <nav aria-label="Áreas de abastecimento" className="fuel-workspace-views">
+          {canViewAllOrders ? <button type="button" aria-pressed={activeView === 'orders'} aria-controls={activeView === 'orders' ? 'fuel-orders-workspace' : undefined} onClick={() => selectView('orders')}>Ordens</button> : null}
+          {canViewOrders ? <button type="button" aria-pressed={activeView === 'open'} aria-controls={activeView === 'open' ? 'fuel-open-orders-workspace' : undefined} onClick={() => selectView('open')}>Ordens abertas</button> : null}
+          {canViewSupplies ? <button type="button" aria-pressed={activeView === 'history'} aria-controls={activeView === 'history' ? 'fuel-history-workspace' : undefined} onClick={() => selectView('history')}>Histórico</button> : null}
+        </nav>
+        <div className="fuel-workspace-tools">
+          {canViewSupplies ? <Link className="fuel-stations-link" to="/postos?indicator=active">Postos{catalogLoaded ? ` (${fuelStations.length})` : ''}</Link> : null}
+          {activeView === 'orders' ? <ActionMenu label="Exportar ordens" triggerLabel="Exportar" items={[
+            { label: 'Pré-visualizar PDF', onClick: handlePreviewOrdersPdf },
+            { label: 'Exportar XLSX', onClick: handleExportOrdersXlsx },
+          ]} /> : null}
+        </div>
+      </div>
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
@@ -552,34 +639,18 @@ export default function FuelSuppliesPage() {
         </div>
       ) : null}
 
-      {canViewOrders ? <div className="surface-panel panel-nested operation-module operation-module--orders">
-        <PageHeader title="Ordens de abastecimento" description="Acompanhe o ciclo completo das ordens emitidas para os postos credenciados." actions={<>
-            <button className="secondary-button" type="button" onClick={handlePreviewOrdersPdf}>Pré-visualizar PDF</button>
-            <button className="ghost-button" type="button" onClick={handleExportOrdersXlsx}>Exportar XLSX</button>
-        </>} />
-
+      {activeView === 'orders' ? <section id="fuel-orders-workspace" aria-label="Ordens de abastecimento" className="fuel-workspace operation-module operation-module--orders">
         <div className="operation-toolbar filter-inline">
-          <input className="app-input" placeholder="Buscar ordem por placa, secretaria, posto, solicitante ou observação" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} />
-          <MobileFilters activeCount={Object.values(orderFilters).filter(Boolean).length}>
-          <select className="app-select" value={orderFilters.status} onChange={(event) => setOrderFilters((prev) => ({ ...prev, status: event.target.value }))}>
+          <input className="app-input" aria-label="Buscar ordens" placeholder="Buscar ordem por placa, secretaria, posto, solicitante ou observação" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} />
+          <MobileFilters collapsibleDesktop activeCount={Number(Boolean(vehicleId)) + Object.entries(orderFilters).filter(([key, value]) => value && !(key === 'status' && value === 'TODOS')).length}>
+          <FuelEntityFilters vehicleId={vehicleId} onVehicleChange={selectVehicle} filters={orderFilters}
+            onFilterChange={(key, value) => setOrderFilters((current) => ({ ...current, [key]: value }))}
+            vehicles={vehicles} organizations={organizations} stations={fuelStations} onVehiclesOpen={refreshVehicleOptions} onStationsOpen={refreshStationOptions} />
+          <select className="app-select" aria-label="Situação das ordens" value={orderFilters.status} onChange={(event) => setOrderFilters((prev) => ({ ...prev, status: event.target.value }))}>
             {ORDER_STATUS_OPTIONS.map((option) => (
               <option key={option.value} value={option.value}>{option.label}</option>
             ))}
           </select>
-          <SearchableSelect
-            value={orderFilters.organization_id}
-            onChange={(value) => setOrderFilters((prev) => ({ ...prev, organization_id: value }))}
-            options={organizationFilterOptions}
-            placeholder="Filtrar secretaria"
-            searchPlaceholder="Buscar secretaria"
-          />
-          <SearchableSelect
-            value={orderFilters.fuel_station_id}
-            onChange={(value) => setOrderFilters((prev) => ({ ...prev, fuel_station_id: value }))}
-            options={[{ value: '', label: 'Todos os postos' }, ...fuelStations.map(buildStationOption)]}
-            placeholder="Filtrar posto"
-            searchPlaceholder="Buscar posto"
-          />
           <label className="form-field filter-date-field">
             <span>Data inicial</span>
             <input
@@ -606,7 +677,7 @@ export default function FuelSuppliesPage() {
           </MobileFilters>
         </div>
 
-        <IndicatorBar label="Indicadores das ordens" state={{ selected: orderIndicator, metadata: orderIndicatorMetadata, select: selectOrderIndicator }} loading={ordersLoading} error={error} resultCount={ordersPagination.total} />
+        <IndicatorBar label="Indicadores das ordens" state={{ selected: orderIndicator, metadata: orderIndicatorMetadata, select: (key) => selectWorkspaceIndicator('order_indicator', key, 'orders') }} loading={ordersLoading} error={error} resultCount={ordersPagination.total} />
         <div className="table-wrap table-wrap-wide operation-table-card">
           <table className="data-table data-table-wide operation-table">
             <thead>
@@ -678,24 +749,20 @@ export default function FuelSuppliesPage() {
           </table>
         </div>
         <Pagination currentPage={currentOrdersPage} totalPages={totalOrdersPages} onPageChange={setCurrentOrdersPage} />
-      </div> : null}
+      </section> : null}
 
-      <div className="surface-panel panel-nested operation-module operation-module--fuel-history">
-        <IndicatorBar label="Indicadores dos abastecimentos" state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={historyLoading} error={error} resultCount={historyPagination.total} />
-        <div className="panel-heading">
-          <div>
-            <h3 className="section-title">Histórico de abastecimentos</h3>
-            <p className="section-copy">Consulta histórica dos abastecimentos confirmados, com comprovantes e alertas de consumo.</p>
-          </div>
-        </div>
+      {canViewOrders && (openOrdersVisited || activeView === 'open') ? <section id="fuel-open-orders-workspace" aria-label="Ordens abertas" className="fuel-workspace operation-module operation-module--open-orders" hidden={activeView !== 'open'}>
+        <FuelSupplyOrdersPage embedded active={activeView === 'open'} refreshKey={openOrdersRevision} indicatorParameter="open_indicator" vehicles={vehicles} fuelStations={fuelStations} onVehiclesOpen={refreshVehicleOptions} onStationsOpen={refreshStationOptions} />
+      </section> : null}
 
+      {activeView === 'history' ? <section id="fuel-history-workspace" aria-label="Histórico de abastecimentos" className="fuel-workspace operation-module operation-module--fuel-history">
         <div className="operation-toolbar filter-inline">
-          <input className="app-input" placeholder="Buscar por placa, secretaria, posto, combustível ou aditivo" value={search} onChange={(event) => setSearch(event.target.value)} />
-          <MobileFilters activeCount={Object.values(filters).filter(Boolean).length}>
-          <SearchableSelect value={filters.vehicle_id} onChange={(value) => setFilters((prev) => ({ ...prev, vehicle_id: value }))} options={[{ value: '', label: 'Todos os veículos' }, ...(filters.vehicle_id && !vehicles.some((item) => item.id === filters.vehicle_id) ? [{ value: filters.vehicle_id, label: 'Veiculo do historico de emprestimo' }] : []), ...vehicles.map(buildVehicleOption)]} onOpen={refreshVehicleOptions} placeholder="Filtrar veículo" />
-          <SearchableSelect value={filters.organization_id} onChange={(value) => setFilters((prev) => ({ ...prev, organization_id: value }))} options={organizationFilterOptions} placeholder="Filtrar secretaria" />
-          <SearchableSelect value={filters.fuel_station_id} onChange={(value) => setFilters((prev) => ({ ...prev, fuel_station_id: value }))} options={[{ value: '', label: 'Todos os postos' }, ...fuelStations.map(buildStationOption)]} placeholder="Filtrar posto" />
-          <select className="app-input" value={filters.only_anomalies} onChange={(event) => setFilters((prev) => ({ ...prev, only_anomalies: event.target.value }))}>
+          <input className="app-input" aria-label="Buscar abastecimentos confirmados" placeholder="Buscar por placa, secretaria, posto, combustível ou aditivo" value={search} onChange={(event) => setSearch(event.target.value)} />
+          <MobileFilters collapsibleDesktop activeCount={Number(Boolean(vehicleId)) + Object.values(filters).filter(Boolean).length}>
+          <FuelEntityFilters vehicleId={vehicleId} onVehicleChange={selectVehicle} filters={filters}
+            onFilterChange={(key, value) => setFilters((current) => ({ ...current, [key]: value }))}
+            vehicles={vehicles} organizations={organizations} stations={fuelStations} onVehiclesOpen={refreshVehicleOptions} onStationsOpen={refreshStationOptions} />
+          <select className="app-input" aria-label="Alertas de consumo" value={filters.only_anomalies} onChange={(event) => setFilters((prev) => ({ ...prev, only_anomalies: event.target.value }))}>
             <option value="">Todos</option>
             <option value="true">Somente alertas</option>
           </select>
@@ -703,6 +770,7 @@ export default function FuelSuppliesPage() {
           </MobileFilters>
         </div>
 
+        <IndicatorBar label="Indicadores dos abastecimentos" state={{ selected: indicator, metadata: indicatorMetadata, select: (key) => selectWorkspaceIndicator('indicator', key, 'history') }} loading={historyLoading} error={error} resultCount={historyPagination.total} />
         <div className="table-wrap table-wrap-wide operation-table-card">
           <table className="data-table data-table-wide operation-table">
             <thead>
@@ -750,7 +818,7 @@ export default function FuelSuppliesPage() {
           </table>
         </div>
         <Pagination currentPage={currentHistoryPage} totalPages={totalHistoryPages} onPageChange={setCurrentHistoryPage} />
-      </div>
+      </section> : null}
 
       <Modal open={Boolean(alertSupply)} onClose={() => setAlertSupply(null)}
         title={`Alerta de abastecimento${alertSupply?.vehicle_plate ? ` — ${alertSupply.vehicle_plate}` : ''}`}
@@ -786,7 +854,7 @@ export default function FuelSuppliesPage() {
           onSuccess={({ message, order }) => {
             setFeedback(message)
             setLastIssuedOrder(order || null)
-            loadOrders()
+            refreshOrdersAfterIssue()
           }}
         />
       </Modal>
@@ -798,7 +866,7 @@ export default function FuelSuppliesPage() {
           onClose={() => setOrderToCancel(null)} onSaved={() => {
             setFeedback(`Ordem ${formatOrderNumber(orderToCancel)} cancelada com sucesso.`)
             setOrderToCancel(null)
-            loadOrders()
+            refreshOrdersAfterIssue()
           }} />}
       </Modal>
       <Modal
@@ -815,7 +883,7 @@ export default function FuelSuppliesPage() {
           onSuccess={({ message }) => {
             setFeedback(message)
             setLastIssuedOrder(null)
-            loadOrders()
+            refreshOrdersAfterIssue()
           }}
         />
       </Modal>
@@ -841,7 +909,6 @@ export default function FuelSuppliesPage() {
             onSuccess={(message) => {
               setFeedback(message)
               loadRecords()
-              loadOrders()
             }}
           />
         ) : null}

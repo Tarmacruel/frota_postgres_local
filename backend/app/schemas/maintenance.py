@@ -6,6 +6,7 @@ from uuid import UUID
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 from app.schemas.common import PaginatedResponse
 from app.schemas.contract_balance import FundingFields
+from app.schemas.contract_item import ItemOrderLine
 
 
 class MaintenanceCreate(BaseModel):
@@ -40,6 +41,7 @@ class MaintenanceCreate(BaseModel):
 
 
 class MaintenanceUpdate(BaseModel):
+    item_lines: list[ItemOrderLine] | None = Field(default=None, max_length=100)
     reason: str | None = Field(default=None, min_length=10, max_length=2000)
     end_date: datetime | None = None
     service_description: str | None = Field(default=None, min_length=10, max_length=2000)

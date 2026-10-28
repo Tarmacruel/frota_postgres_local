@@ -2,6 +2,13 @@ export const loanStatuses = {
   DRAFT: 'Rascunho', AWAITING_RECEIPT: 'Aguardando recebimento', ACTIVE: 'Em andamento',
   AWAITING_RETURN_RECEIPT: 'Aguardando devolução', RETURNED: 'Devolvido', REJECTED: 'Rejeitado', CANCELLED: 'Cancelado',
 }
+export function getLoanStatusTone(status) {
+  if (status === 'ACTIVE') return 'success'
+  if (['AWAITING_RECEIPT', 'AWAITING_RETURN_RECEIPT'].includes(status)) return 'warning'
+  if (status === 'RETURNED') return 'info'
+  if (['REJECTED', 'CANCELLED'].includes(status)) return 'danger'
+  return 'neutral'
+}
 export const loanActions = {
   submit: { label: 'Enviar para recebimento', side: 'origin', statuses: ['DRAFT'], handoff: true },
   accept: { label: 'Confirmar recebimento', side: 'recipient', statuses: ['AWAITING_RECEIPT'], handoff: true, distinct: 'submitted_by_user_id' },
@@ -34,4 +41,9 @@ export function blockedLoanAction(user, loan, action, context) {
 }
 export function formatLoanDate(value) {
   return value ? new Date(value).toLocaleString('pt-BR') : '—'
+}
+export function validLoanOdometer(value, minimum = 0) {
+  if (value === '' || value == null) return false
+  const number = Number(value)
+  return Number.isFinite(number) && number >= Number(minimum) && Math.abs(number * 10 - Math.round(number * 10)) < 1e-7
 }

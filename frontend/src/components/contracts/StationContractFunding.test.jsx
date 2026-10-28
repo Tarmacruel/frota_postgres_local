@@ -39,6 +39,25 @@ it('libera pedido de rede por valor sem preços nem reserva e envia o combustív
   expect(screen.queryByText('Valor a reservar')).not.toBeInTheDocument()
 })
 
+it.each([false, true])('rede por valor com controle quantitativo ativo só acompanha a execução se a abertura existe: %s', async (opened) => {
+  contractControlAPI.config.mockResolvedValue({ data: { enabled: true, quantity_enabled: true } })
+  contractControlAPI.eligible.mockResolvedValue({ data: [{ ...contractFor('posto'), fuel_pricing_mode: 'NETWORK_VALUE',
+    prices: [], quantity_opened: opened, items: [], item_prices: [] }] })
+  contractControlAPI.quote.mockResolvedValue({ data: { price_id: null, reserve_amount: '0', sufficient: true,
+    available_balance: '1000', available_after: '1000', funding_mode: 'NETWORK_VALUE' } })
+  const { result } = renderHook(() => useContractFunding({ stationId: 'posto', liters: 30 }))
+  await waitFor(() => expect(result.current.networkValue).toBe(true))
+  act(() => result.current.selectFuel('Diesel S10'))
+  await waitFor(() => expect(result.current.ready).toBe(true))
+  expect(result.current.quantityEnabled).toBe(false)
+  expect(result.current.actualQuantityEnabled).toBe(opened)
+  expect(result.current.payload.item_lines).toBeUndefined()
+  expect(contractControlAPI.quote.mock.calls.at(-1)[1].item_lines).toBeUndefined()
+  render(<ContractFundingFields funding={result.current} />)
+  expect(screen.queryByLabelText('Item de combustível')).not.toBeInTheDocument()
+  expect(screen.getByText(/este pedido não reserva saldo/)).toBeInTheDocument()
+})
+
 it('permite definir a modalidade por valor mesmo depois da abertura sem alterar o saldo', async () => {
   paymentContractsAPI.update.mockResolvedValue({ data: {} })
   const c = { id: 'contract', number: 'TEST-01', supplier_id: 'supplier', kind: 'FUEL', status: 'ACTIVE',

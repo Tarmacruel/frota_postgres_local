@@ -1,11 +1,14 @@
 import MoneyInput from './MoneyInput'
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { maintenanceAPI } from '../api/maintenance'
 import SearchableSelect from './SearchableSelect'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
 import { useContractControl } from '../hooks/useContractFunding'
 import { MaintenanceOrderForm } from './contracts/MaintenanceOrdersPanel'
+import { contractControlAPI } from '../api/contractControl'
+import ContractItemLines from './contracts/ContractItemLines'
+import { itemLinesPayload, itemLinesTotal } from '../utils/contractItemLines'
 
 function buildInitialState(initialData, vehicles) {
   if (initialData) {
@@ -43,16 +46,33 @@ export default function MaintenanceForm(props) {
   const mode = useContractControl()
   if (!props.initialData && mode.enabled === null) return <p role="status">Conferindo controle contratual…</p>
   if (!props.initialData && mode.enabled) return <MaintenanceOrderForm {...props} />
-  return <LegacyMaintenanceForm {...props} />
+  return <LegacyMaintenanceForm {...props} quantityEnabled={mode.quantityEnabled} />
 }
 
-function LegacyMaintenanceForm({ vehicles, initialData = null, onClose, onSuccess, onVehicleOptionsOpen }) {
+function LegacyMaintenanceForm({ vehicles, initialData = null, onClose, onSuccess, onVehicleOptionsOpen, quantityEnabled = false }) {
   const isEdit = Boolean(initialData?.id)
   const [form, setForm] = useState(() => buildInitialState(initialData, vehicles))
   const [submitting, setSubmitting] = useState(false)
   const [error, setError] = useState('')
   const [reason, setReason] = useState('')
-  const changesFundedCost = Boolean(initialData?.contract_reservation_id) && Number(form.total_cost) !== Number(initialData.total_cost)
+  const [quantityContext, setQuantityContext] = useState({ loaded:false, tracked:false, items:[], prices:[] })
+  const [lines,setLines] = useState([])
+  const contextId=initialData?.id
+  const needsContext=Boolean(quantityEnabled&&initialData?.contract_reservation_id)
+  useEffect(()=>{
+    let active=true
+    if(needsContext) maintenanceAPI.getById(contextId).then(async({data})=>{
+      const funding=data.contract_funding
+      const tracked=Array.isArray(funding?.actual_item_lines)
+      let options={items:[],prices:[]}
+      if(tracked) options=(await contractControlAPI.itemOptions(data.contract_id,data.contract_provider_id)).data
+      if(active){setQuantityContext({...options,loaded:true,tracked});setLines((funding?.actual_item_lines||[]).map((r)=>({...r,key:crypto.randomUUID(),quantity:String(r.quantity),amount:String(r.amount)})))}
+    }).catch((err)=>{if(active)setError(getApiErrorMessage(err,'Não foi possível conferir os itens para retificação.'))})
+    return()=>{active=false}
+  },[needsContext,contextId])
+  const quantitative=quantityContext.tracked
+  const actualCost=quantitative?itemLinesTotal(lines):form.total_cost
+  const changesFundedCost = Boolean(initialData?.contract_reservation_id) && (quantitative||Number(actualCost) !== Number(initialData.total_cost))
 
   const submitLabel = useMemo(() => {
     if (submitting) return 'Salvando...'
@@ -76,7 +96,8 @@ function LegacyMaintenanceForm({ vehicles, initialData = null, onClose, onSucces
           end_date: form.end_date ? new Date(form.end_date).toISOString() : null,
           service_description: form.service_description,
           parts_replaced: form.parts_replaced || null,
-          total_cost: Number(form.total_cost),
+          total_cost: Number(actualCost),
+          ...(quantitative?{item_lines:itemLinesPayload(lines,true)}:{}),
           ...(changesFundedCost ? { reason: reason.trim() } : {}),
         })
         onSuccess?.('Manutenção atualizada com sucesso.')
@@ -149,7 +170,8 @@ function LegacyMaintenanceForm({ vehicles, initialData = null, onClose, onSucces
           step="0.01"
           className="app-input"
           placeholder="0,00"
-          value={form.total_cost}
+          value={actualCost}
+          readOnly={quantitative}
           onChange={(event) => setForm({ ...form, total_cost: event.target.value })}
         />
       </div>
@@ -178,9 +200,11 @@ function LegacyMaintenanceForm({ vehicles, initialData = null, onClose, onSucces
         />
       </div>
 
+      {quantitative?<ContractItemLines actual allowUnknown label="Itens e quantidades realizados" items={quantityContext.items} prices={quantityContext.prices} lines={lines} onChange={setLines}/>:null}
+      {needsContext&&!quantityContext.loaded?<p role="status">Conferindo itens da manutenção…</p>:null}
       <div className="actions-inline modal-actions">
         {changesFundedCost ? <div className="form-field modal-field-span"><label htmlFor="maintenance-correction-reason">Justificativa da alteração de custo</label><textarea id="maintenance-correction-reason" className="app-textarea" value={reason} onChange={(event) => setReason(event.target.value)} minLength={10} maxLength={2000} required /></div> : null}
-        <button className="app-button" type="submit" disabled={submitting || vehicles.length === 0}>
+        <button className="app-button" type="submit" disabled={submitting || vehicles.length === 0 || (needsContext&&!quantityContext.loaded)}>
           {submitLabel}
         </button>
         <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>

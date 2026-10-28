@@ -496,7 +496,6 @@ export default function CadastrosPage() {
     <div className="surface-panel operation-page management-page management-page--catalog">
       <PageHeader
         title="Cadastros"
-        description="Cadastre bases auxiliares para padronizar lotações, veículos e registros de multas."
         actions={<>
           <button className="ghost-button cadastros-toolbar-btn" type="button" onClick={resetForms}>Limpar formulários</button>
           <button className="ghost-button cadastros-toolbar-btn" type="button" onClick={() => setAdvancedFilterOpen(true)}>Filtros avançados</button>

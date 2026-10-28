@@ -878,7 +878,6 @@ export default function PossessionPage() {
     <div className="surface-panel operation-page operation-page--possessions">
       <PageHeader
         title="Posses de veículos"
-        description="Controle quem está com cada veículo, anexe evidências e mantenha um histórico simples de transferências."
         className="possession-page-header"
         actions={(
           <>

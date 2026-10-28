@@ -6,6 +6,7 @@ from uuid import UUID
 
 from typing import Annotated
 from pydantic import BaseModel, Field, field_validator
+from app.schemas.contract_item import ItemOrderLine
 
 
 class Justified(BaseModel):
@@ -43,6 +44,7 @@ class PriceUpdate(BaseModel):
 
 
 class ContractQuote(BaseModel):
+    item_lines: list[ItemOrderLine] | None = Field(default=None, max_length=100)
     provider_id: UUID
     fuel_type: str
     liters: Decimal = Field(gt=0, max_digits=12, decimal_places=3)
@@ -50,6 +52,7 @@ class ContractQuote(BaseModel):
 
 
 class FuelOrderFunding(BaseModel):
+    item_lines: list[ItemOrderLine] | None = Field(default=None, max_length=100)
     contract_id: UUID
     contract_provider_id: UUID
     requested_fuel_type: str = Field(min_length=1, max_length=80)
@@ -77,6 +80,7 @@ class ReconcileProcess(BaseModel):
 
 
 class MaintenanceOrderCreate(BaseModel):
+    item_lines: list[ItemOrderLine] | None = Field(default=None, max_length=100)
     vehicle_id: UUID
     contract_id: UUID
     provider_id: UUID
@@ -90,6 +94,7 @@ class MaintenanceOrderStart(BaseModel):
 
 
 class MaintenanceOrderComplete(BaseModel):
+    item_lines: list[ItemOrderLine] | None = Field(default=None, max_length=100)
     start_date: datetime | None = None
     end_date: datetime | None = None
     total_cost: Decimal = Field(ge=0, max_digits=16, decimal_places=2)

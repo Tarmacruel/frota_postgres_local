@@ -1,104 +1,24 @@
 import JustificationField from './JustificationField'
 import { useRef, useState } from 'react'
-import Modal from './Modal'
+import { LoanField, LoanFieldLabel, LoanFormLayout, LoanFormStep } from './LoanFormLayout'
+import LoanFeedback from './LoanFeedback'
+import LoanRecoveryLinks from './LoanRecoveryLinks'
+import useLoanFormSteps from '../hooks/useLoanFormSteps'
 import VehicleLoanSelect from './VehicleLoanSelect'
 import { vehicleLoansAPI } from '../api/vehicleLoans'
-import { getApiErrorMessage } from '../utils/apiError'
-import { toDateTimeLocalValue } from '../utils/datetime'
-import { blockedLoanAction, loanActions } from '../utils/vehicleLoans'
+import { loanFeedback } from '../utils/loanFeedback'
+import { blockedLoanAction, loanActions, validLoanOdometer } from '../utils/vehicleLoans'
 
-function Reason({ value, onChange, required, context, userId }) {
-  return <div className="loan-field">
-    <JustificationField label={`Justificativa ${required ? '(obrigatória)' : '(opcional)'}`} context={context} userId={userId} className="app-input" value={value} onChange={(e) => onChange(e.target.value)} required={required} minLength={8} maxLength={1000} rows={3} />
+function Reason({ value, onChange, required, context, userId, error }) {
+  return <div className="loan-field loan-editor__wide" data-loan-field="justification" data-invalid={Boolean(error)}>
+    <JustificationField label={<LoanFieldLabel label={`Justificativa ${required ? '(obrigatória)' : '(opcional)'}`} required={required} />} aria-label={`Justificativa ${required ? '(obrigatória)' : '(opcional)'}`} aria-invalid={Boolean(error)} context={context} userId={userId} className="app-input" value={value} onChange={(e) => onChange(e.target.value)} required={required} minLength={8} maxLength={1000} rows={3} />
+    {error ? <small className="loan-editor__field-error">{error}</small> : null}
   </div>
 }
 
-export function LoanProposalForm({ loan, catalog, user, onClose, onSaved, onRefresh, onVehicleOptionsOpen }) {
-  const [form, setForm] = useState({
-    vehicle_id: loan?.vehicle_id || '', destination_allocation_id: loan?.destination_allocation_id || '',
-    recipient: loan?.recipient_organization_id || '', reason: loan?.reason || '',
-    delivery_odometer_km: loan?.delivery_odometer_km ?? '', delivery_condition: loan?.delivery_condition || '',
-    expected_return_at: toDateTimeLocalValue(loan?.expected_return_at), justification: '',
-  })
-  const [indefinite, setIndefinite] = useState(!loan?.expected_return_at)
-  const [busy, setBusy] = useState(false)
-  const [error, setError] = useState('')
-  const [stale, setStale] = useState(false)
-  const sending = useRef(false)
-  const vehicle = catalog.vehicles.find((item) => item.id === form.vehicle_id)
-  const owner = loan?.origin_organization_id || vehicle?.owner_organization_id
-  const ownerName = catalog.organizations.find((item) => item.id === owner)?.name || loan?.origin_organization_name
-  const change = (key, value) => setForm((previous) => ({ ...previous, [key]: value }))
+export { default as LoanProposalForm } from './LoanProposalForm'
 
-  async function save(event) {
-    event.preventDefault()
-    if (sending.current || stale || !owner) return
-    if (!form.recipient || !catalog.allocations.some((item) => item.id === form.destination_allocation_id && item.organization_id === form.recipient)) {
-      setError('Selecione a secretaria recebedora e uma lotação de destino na lista de resultados.')
-      return
-    }
-    sending.current = true
-    setBusy(true)
-    setError('')
-    try {
-      const body = {
-        acting_organization_id: owner, destination_allocation_id: form.destination_allocation_id,
-        reason: form.reason.trim(), delivery_condition: form.delivery_condition.trim() || null,
-        delivery_odometer_km: form.delivery_odometer_km === '' ? null : form.delivery_odometer_km,
-        expected_return_at: indefinite ? null : new Date(form.expected_return_at).toISOString(),
-        ...(form.justification.trim() ? { justification: form.justification.trim() } : {}),
-      }
-      const response = loan
-        ? await vehicleLoansAPI.update(loan.id, { ...body, expected_version: loan.version })
-        : await vehicleLoansAPI.create({ ...body, vehicle_id: form.vehicle_id })
-      onSaved(response.data)
-    } catch (err) {
-      setError(getApiErrorMessage(err))
-      if (err.response?.status === 409) setStale(true)
-    } finally { sending.current = false; setBusy(false) }
-  }
-
-  return <Modal open title={loan ? 'Editar proposta de empréstimo' : 'Novo empréstimo entre secretarias'} onClose={onClose} canClose={!busy}>
-    <form onSubmit={save} className="loan-form">
-      <p>Salve a proposta e revise os dados antes de enviar. A responsabilidade muda somente após o aceite da recebedora.</p>
-      {loan?.status === 'AWAITING_RECEIPT' && <p className="loan-notice">Editar esta proposta retorna o empréstimo ao rascunho. Será necessário enviar novamente.</p>}
-      {error && <p role="alert" className="loan-error">{error}</p>}
-      <fieldset disabled={busy || stale}>
-        {loan ? <p><strong>Veículo:</strong> {loan.vehicle_plate}</p> : <VehicleLoanSelect label="Veículo" onOpen={onVehicleOptionsOpen}
-          value={form.vehicle_id} options={catalog.vehicles} disabled={busy || stale}
-          placeholder="Selecione um veículo da origem" searchPlaceholder="Buscar por placa, marca ou modelo"
-          onChange={(value) => setForm((prev) => ({ ...prev, vehicle_id: value, recipient: '', destination_allocation_id: '', delivery_odometer_km: '', delivery_condition: '' }))} />}
-        {!loan && !catalog.vehicles.length && <p role="status">Nenhum veículo disponível para proposta. Confira a origem, a lotação atual e os empréstimos em andamento.</p>}
-        <p><strong>Secretaria de origem:</strong> {ownerName || 'Selecione o veículo'}</p>
-        <VehicleLoanSelect label="Secretaria recebedora" value={form.recipient}
-          options={catalog.organizations.filter((item) => item.id !== owner)} disabled={!owner || busy || stale}
-          placeholder="Selecione a recebedora" searchPlaceholder="Buscar secretaria"
-          onChange={(value) => setForm((prev) => ({ ...prev, recipient: value, destination_allocation_id: '' }))} />
-        <VehicleLoanSelect label="Lotação de destino" value={form.destination_allocation_id}
-          options={catalog.allocations.filter((item) => item.organization_id === form.recipient)} disabled={!form.recipient || busy || stale}
-          placeholder="Selecione a lotação de destino" searchPlaceholder="Buscar lotação de destino"
-          onChange={(value) => change('destination_allocation_id', value)} />
-        <label className="loan-field">Motivo do empréstimo<textarea className="app-input" required minLength={8} maxLength={2000} value={form.reason} onChange={(e) => change('reason', e.target.value)} rows={3} /></label>
-        <label><input type="checkbox" checked={indefinite} onChange={(e) => setIndefinite(e.target.checked)} /> Prazo indeterminado</label>
-        {!indefinite && <label className="loan-field">Previsão de devolução<input className="app-input" type="datetime-local" required value={form.expected_return_at} onChange={(e) => change('expected_return_at', e.target.value)} /></label>}
-        <p className="section-copy">A previsão não devolve o veículo automaticamente.</p>
-        <label className="loan-field">Odômetro de entrega (km)<input className="app-input" type="number" min="0" step="0.1" value={form.delivery_odometer_km} onChange={(e) => change('delivery_odometer_km', e.target.value)} /></label>
-        <label className="loan-field">Condições de entrega<textarea className="app-input" minLength={3} maxLength={2000} value={form.delivery_condition} onChange={(e) => change('delivery_condition', e.target.value)} rows={3} /></label>
-        <p className="section-copy">Odômetro e condições são obrigatórios para enviar a proposta.</p>
-        {user.role === 'ADMIN' && <>
-          <p>Você representa <strong>{ownerName || 'a secretaria de origem'}</strong> nesta ação.</p>
-          <Reason context={loan ? "loan_proposal" : "loan_create"} userId={user.id} required value={form.justification} onChange={(value) => change('justification', value)} />
-        </>}
-      </fieldset>
-      <div className="actions-inline">
-        <button className="app-button" disabled={busy || stale || !owner}>{busy ? 'Salvando…' : 'Salvar rascunho'}</button>
-        {stale && <button type="button" className="ghost-button" onClick={onRefresh}>Recarregar dados e revisar</button>}
-      </div>
-    </form>
-  </Modal>
-}
-
-export function LoanActionForm({ operation, loan, context, catalog, user, onClose, onSaved, onRefresh }) {
+export function LoanActionForm({ operation, loan, context, catalog, user, onClose, onSaved, onRefresh, onEdit, canView }) {
   const action = loanActions[operation]
   const [justification, setJustification] = useState('')
   const [allocation, setAllocation] = useState(loan.origin_allocation_id || '')
@@ -111,13 +31,18 @@ export function LoanActionForm({ operation, loan, context, catalog, user, onClos
   const blocked = blockedLoanAction(user, loan, action, context)
   const returnRequest = operation === 'request-return'
   const represented = loan[`${action.side}_organization_name`]
+  const requiredReason = user.role === 'ADMIN' || action.reason
+  const validation = [
+    ...(returnRequest && !catalog.allocations.some((item) => item.id === allocation && item.organization_id === loan.origin_organization_id) ? [['return_allocation_id', 'Selecione uma lotação de retorno na lista de resultados.']] : []),
+    ...(returnRequest && !validLoanOdometer(odometer, context?.minimum_odometer_km ?? 0) ? [['return_odometer_km', `A referência mínima é ${context?.minimum_odometer_km ?? 0} km; use até uma casa decimal.`]] : []),
+    ...(returnRequest && (condition.trim().length < 3 || condition.length > 2000) ? [['return_condition', 'Descreva as condições de devolução com 3 a 2000 caracteres.']] : []),
+    ...((requiredReason || justification) && (justification.trim().length < 8 || justification.length > 1000) ? [['justification', 'Explique a ação com 8 a 1000 caracteres.']] : []),
+  ]
+  const wizard = useLoanFormSteps([validation])
   async function confirm(event) {
     event.preventDefault()
     if (sending.current || stale || blocked) return
-    if (returnRequest && !catalog.allocations.some((item) => item.id === allocation && item.organization_id === loan.origin_organization_id)) {
-      setError('Selecione uma lotação de retorno na lista de resultados.')
-      return
-    }
+    if (!wizard.validate()) { setError('Revise os campos destacados antes de confirmar.'); return }
     sending.current = true; setBusy(true); setError('')
     try {
       const { data } = await vehicleLoansAPI.act(loan.id, operation, {
@@ -127,32 +52,33 @@ export function LoanActionForm({ operation, loan, context, catalog, user, onClos
       })
       onSaved(data)
     } catch (err) {
-      setError(getApiErrorMessage(err))
+      setError(err)
       if (err.response?.status === 409) setStale(true)
     } finally { sending.current = false; setBusy(false) }
   }
-  return <Modal open title={action.label} onClose={onClose} canClose={!busy}>
-    <form className="loan-form" onSubmit={confirm}>
-      <p><strong>{loan.vehicle_plate}</strong> · {loan.origin_organization_name} → {loan.recipient_organization_name}</p>
-      <p>Secretaria representada: <strong>{represented}</strong></p>
-      {operation === 'accept' && <p>Ao confirmar, o veículo passa a ser operado pela recebedora e permanece pertencendo à origem.</p>}
-      {operation === 'accept-return' && <p>Ao confirmar, a responsabilidade operacional volta à origem. O histórico do empréstimo será preservado.</p>}
-      {action.reason && <p>A justificativa ficará registrada no histórico desta ação.</p>}
-      {blocked && <p role="alert" className="loan-notice">{blocked}</p>}
-      {error && <p role="alert" className="loan-error">{error}</p>}
-      <fieldset disabled={busy || stale || Boolean(blocked)}>
-        {returnRequest && <>
-          <VehicleLoanSelect label="Lotação de retorno" value={allocation} onChange={setAllocation}
-            options={catalog.allocations.filter((item) => item.organization_id === loan.origin_organization_id)}
-            disabled={busy || stale || Boolean(blocked)} placeholder="Selecione a lotação de retorno" searchPlaceholder="Buscar lotação de retorno" />
-          <label className="loan-field">Odômetro de devolução (km)<input className="app-input" type="number" required min={context?.minimum_odometer_km ?? 0} step="0.1" value={odometer} onChange={(e) => setOdometer(e.target.value)} /></label>
-          <p>Referência mínima: {context?.minimum_odometer_km ?? '—'} km. Confira o valor no veículo.</p>
-          <label className="loan-field">Condições de devolução<textarea className="app-input" required minLength={3} maxLength={2000} value={condition} onChange={(e) => setCondition(e.target.value)} rows={3} /></label>
-        </>}
-        <Reason context={`loan_${operation}`} userId={user.id} required={user.role === 'ADMIN' || action.reason} value={justification} onChange={setJustification} />
+  return <LoanFormLayout title={action.label} steps={['Dados da ação']} step={0} complete={[!validation.length && !blocked && !stale]} onStep={() => {}}
+    onSubmit={confirm} busy={busy} onClose={onClose} formRef={wizard.formRef}
+    footer={<><span>{blocked ? 'Resolva o impedimento antes de confirmar.' : 'A alteração só ocorre ao confirmar.'}</span><div><button type="button" className="ghost-button" disabled={busy} onClick={onClose}>Voltar aos detalhes</button>
+      {stale ? <button type="button" className="ghost-button" onClick={onRefresh}>Recarregar dados e revisar</button> : null}
+      <button className="app-button" disabled={busy || stale || Boolean(blocked)}>{busy ? 'Processando…' : action.label}</button></div></>}>
+    <LoanFeedback error={blocked} tone="warning"><LoanRecoveryLinks target={loanFeedback(blocked).target} vehicleId={loan.vehicle_id} canView={canView} />{['refresh', 'operations'].includes(loanFeedback(blocked).target) ? <button type="button" className="ghost-button" onClick={onRefresh}>Atualizar conferência</button> : null}</LoanFeedback>
+    <LoanFeedback error={error}><LoanRecoveryLinks target={loanFeedback(error).target} vehicleId={loan.vehicle_id} canView={canView} />{onEdit && loanFeedback(error).target === 'delivery' ? <button type="button" className="ghost-button" onClick={onEdit}>Editar dados de entrega</button> : null}</LoanFeedback>
+    {error && !onEdit && !returnRequest && loanFeedback(error).target === 'delivery' ? <p className="loan-editor__hint">Os dados de entrega são informados pela secretaria de origem. Volte aos detalhes e peça à origem para conferir a proposta.</p> : null}
+    {stale ? <p className="loan-editor__hint">Os dados desta tentativa foram mantidos. Recarregar fecha este formulário para consultar a situação atual antes de uma nova tentativa.</p> : null}
+    <LoanFormStep title={`${loan.vehicle_plate} · ${action.label}`} description={`Secretaria representada: ${represented}`}>
+      <p className="loan-editor__route">{loan.origin_organization_name}<span aria-hidden="true"> → </span>{loan.recipient_organization_name}</p>
+      {operation === 'accept' ? <p className="loan-editor__hint">Ao confirmar, o veículo passa a ser operado pela recebedora e permanece pertencendo à origem.</p> : null}
+      {operation === 'accept-return' ? <p className="loan-editor__hint">Ao confirmar, a responsabilidade operacional volta à origem. O histórico do empréstimo será preservado.</p> : null}
+      {action.reason ? <p className="loan-editor__hint">A justificativa ficará registrada no histórico desta ação.</p> : null}
+      <fieldset className="loan-editor__grid" disabled={busy || stale || Boolean(blocked)}>
+        {returnRequest ? <>
+          <div className="loan-editor__wide"><VehicleLoanSelect label="Lotação de retorno" required value={allocation} onChange={(value) => { setAllocation(value); wizard.clear('return_allocation_id') }} field="return_allocation_id" error={wizard.errors.return_allocation_id}
+            options={catalog.allocations.filter((item) => item.organization_id === loan.origin_organization_id)} disabled={busy || stale || Boolean(blocked)} placeholder="Selecione a lotação de retorno" searchPlaceholder="Buscar lotação de retorno" /></div>
+          <LoanField name="return_odometer_km" label="Odômetro de devolução (km)" error={wizard.errors.return_odometer_km} hint={`Referência mínima: ${context?.minimum_odometer_km ?? '—'} km. Confira o valor no veículo.`}><input className="app-input" type="number" required min={context?.minimum_odometer_km ?? 0} step="0.1" value={odometer} onChange={(e) => { setOdometer(e.target.value); wizard.clear('return_odometer_km') }} /></LoanField>
+          <LoanField wide name="return_condition" label="Condições de devolução" error={wizard.errors.return_condition}><textarea className="app-input" required minLength={3} maxLength={2000} value={condition} rows={3} onChange={(e) => { setCondition(e.target.value); wizard.clear('return_condition') }} /></LoanField>
+        </> : null}
+        <Reason context={`loan_${operation}`} userId={user.id} required={requiredReason} value={justification} onChange={(value) => { setJustification(value); wizard.clear('justification') }} error={wizard.errors.justification} />
       </fieldset>
-      <button className="app-button" disabled={busy || stale || Boolean(blocked)}>{busy ? 'Processando…' : action.label}</button>
-      {stale && <button type="button" className="ghost-button" onClick={onRefresh}>Recarregar dados e revisar</button>}
-    </form>
-  </Modal>
+    </LoanFormStep>
+  </LoanFormLayout>
 }

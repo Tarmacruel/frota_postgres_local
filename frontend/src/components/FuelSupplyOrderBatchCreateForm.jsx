@@ -176,6 +176,7 @@ export default function FuelSupplyOrderBatchCreateForm({ vehicles = [], organiza
           const item = { vehicle_id: vehicle.id }
           const requestedLiters = parseOptionalLiters(getEffectiveLiters(vehicle.id)).value
           if (requestedLiters !== null) item.requested_liters = requestedLiters
+          if(funding.quantityEnabled)item.item_lines=funding.buildItemLines(requestedLiters)
           return item
         }),
         fuel_station_id: form.fuel_station_id,

@@ -79,6 +79,19 @@ it('administrator who was not a representative cannot sign', async () => {
   expect(screen.queryByLabelText('Sua senha atual')).not.toBeInTheDocument()
 })
 
+it('orienta falha de consulta e recarrega termos sem inferir assinatura', async () => {
+  const actor = userEvent.setup()
+  vehicleLoansAPI.documents.mockRejectedValueOnce({ response: { status: 503, data: { detail: 'Serviço indisponível.', request_id: 'docs-ref' } } })
+  render(<VehicleLoanDocuments loanId="loan" />)
+  expect(await screen.findByRole('alert')).toHaveTextContent('atualizar a consulta')
+  expect(screen.getByRole('alert')).toHaveTextContent('docs-ref')
+  await actor.click(screen.getByRole('button', { name: 'Tentar consultar termos novamente' }))
+  const bar = await screen.findByRole('progressbar', { name: `Assinaturas de ${term.title}` })
+  expect(bar).toHaveAttribute('value', '0')
+  expect(screen.queryByRole('alert')).not.toBeInTheDocument()
+  expect(documentSignaturesAPI.sign).not.toHaveBeenCalled()
+})
+
 it('download failure does not enable signing and failure to sign clears password', async () => {
   const actor = userEvent.setup()
   vehicleLoansAPI.downloadTerm.mockRejectedValueOnce(new Error('Falha de download'))

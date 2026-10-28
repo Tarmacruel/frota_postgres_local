@@ -1,4 +1,6 @@
 from __future__ import annotations
+from pydantic import TypeAdapter
+from app.schemas.contract_item import ItemOrderLine
 
 from app.repositories.interactive_kpis import IndicatorRequest, indicator_context
 
@@ -32,6 +34,7 @@ public_router = APIRouter(prefix="/api/public/fuel-supply-orders", tags=["Public
 
 
 def parse_confirm_form(
+    item_lines: str | None = Form(default=None),
     supplied_at: datetime | None = Form(default=None),
     odometer_km: float = Form(...),
     liters: float = Form(...),
@@ -44,6 +47,7 @@ def parse_confirm_form(
 ) -> FuelSupplyOrderConfirm:
     try:
         return FuelSupplyOrderConfirm(
+            item_lines=TypeAdapter(list[ItemOrderLine]).validate_json(item_lines) if isinstance(item_lines, str) and item_lines else None,
             supplied_at=supplied_at,
             odometer_km=odometer_km,
             liters=liters,

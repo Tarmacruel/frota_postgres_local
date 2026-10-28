@@ -3,12 +3,13 @@ import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import { useContractControl } from '../hooks/useContractFunding'
 import FuelOrderFundingForm from '../components/contracts/FuelOrderFundingForm'
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
 import Modal from '../components/Modal'
 import DocumentSignaturePanel from '../components/DocumentSignaturePanel'
 import Pagination from '../components/Pagination'
-import SearchableSelect from '../components/SearchableSelect'
+import FuelEntityFilters from '../components/FuelEntityFilters'
+import { useFuelVehicleFilter } from '../hooks/useFuelVehicleFilter'
 import FuelSupplyOrderConfirmForm from '../components/FuelSupplyOrderConfirmForm'
 import { MobileFilters, ResponsiveRecord, ActionMenu, PageHeader, StatusChip, VehicleThumbnail } from '../components/ui'
 import { DIGITAL_DOCUMENT_TYPES } from '../api/documentSignatures'
@@ -71,12 +72,13 @@ function getDeadlineMeta(order) {
   return { label: `Restam ${hoursRemaining} h`, tone: 'success', minutesRemaining }
 }
 
-export default function FuelSupplyOrdersPage() {
-  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
+export default function FuelSupplyOrdersPage({ embedded = false, active = true, refreshKey = 0, indicatorParameter = 'indicator', vehicles = [], fuelStations = [], onVehiclesOpen, onStationsOpen }) {
+  const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis(indicatorParameter)
   useEffect(() => { setCurrentPage(1) }, [indicator])
 
   const [searchParams, setSearchParams] = useSearchParams()
   const focusedOrderId = searchParams.get('focus')
+  const { vehicleId, selectVehicle } = useFuelVehicleFilter('open')
   const { canEdit, isAdmin, isProduction } = useAuth()
   const control = useContractControl()
   const [fundingOrder, setFundingOrder] = useState(null)
@@ -87,17 +89,12 @@ export default function FuelSupplyOrdersPage() {
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
   const [search, setSearch] = useState('')
-  const [organizationFilter, setOrganizationFilter] = useState('')
+  const [filters, setFilters] = useState({ organization_id: '', fuel_station_id: '' })
   const [currentPage, setCurrentPage] = useState(1)
   const [pagination, setPagination] = useState({ pages: 1, total: 0 })
   const listRequest = useRef(0)
   const [selectedOrder, setSelectedOrder] = useState(null)
   const [signatureOrder, setSignatureOrder] = useState(null)
-
-  const organizationOptions = useMemo(
-    () => [{ value: '', label: 'Todas as secretarias' }, ...organizations.map((organization) => ({ value: organization.id, label: organization.name }))],
-    [organizations],
-  )
 
   async function loadOrders(page = currentPage) {
     const request = ++listRequest.current
@@ -107,7 +104,9 @@ export default function FuelSupplyOrdersPage() {
       const { data } = await fuelSupplyOrdersAPI.listOpen({ indicator: indicator === 'total' ? undefined : indicator,
         limit: 10,
         page,
-        organization_id: organizationFilter || undefined,
+        organization_id: filters.organization_id || undefined,
+        vehicle_id: vehicleId || undefined,
+        fuel_station_id: filters.fuel_station_id || undefined,
         search: search.trim() || undefined,
       })
       if (request !== listRequest.current) return
@@ -126,12 +125,13 @@ export default function FuelSupplyOrdersPage() {
 
   useEffect(() => {
     listRequest.current += 1
+    if (!active) return undefined
     const timer = setTimeout(() => loadOrders(), search.trim() ? 250 : 0)
-    return () => clearTimeout(timer)
-  }, [currentPage, organizationFilter, search, indicator])
+    return () => { clearTimeout(timer); listRequest.current += 1 }
+  }, [currentPage, filters, vehicleId, search, indicator, active, refreshKey])
 
   useEffect(() => {
-    if (!focusedOrderId) return undefined
+    if (!active || !focusedOrderId) return undefined
     let mounted = true
     fuelSupplyOrdersAPI.getById(focusedOrderId)
       .then(({ data }) => {
@@ -143,14 +143,21 @@ export default function FuelSupplyOrdersPage() {
     return () => {
       mounted = false
     }
-  }, [focusedOrderId])
+  }, [focusedOrderId, active])
+
+  useEffect(() => {
+    if (active) return
+    setSelectedOrder(null)
+    setSignatureOrder(null)
+    setFundingOrder(null)
+  }, [active])
 
   const totalPages = pagination.pages
   const paginatedOrders = orders
 
   useEffect(() => {
     setCurrentPage(1)
-  }, [search, organizationFilter, indicator])
+  }, [search, filters, vehicleId, indicator])
 
   async function handlePreviewOrderDocument(order) {
     try {
@@ -177,38 +184,33 @@ export default function FuelSupplyOrdersPage() {
   }
 
   return (
-    <div className="surface-panel operation-page operation-page--open-orders">
-      <PageHeader
+    <div className={embedded ? 'fuel-open-orders-workspace operation-page--open-orders' : 'surface-panel operation-page operation-page--open-orders'}>
+      {!embedded ? <PageHeader
         title="Ordens de abastecimento abertas"
-        description="Confirme abastecimentos pendentes e acompanhe prazos em tempo real."
-      />
+      /> : null}
 
-      <div className="toolbar-card operation-toolbar">
-        <div className="filter-inline">
+      <div className="operation-toolbar filter-inline">
           <input
             className="app-input"
+            aria-label="Buscar ordens abertas"
             placeholder="Buscar por placa, secretaria, solicitante, posto ou número"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
-          <MobileFilters activeCount={organizationFilter ? 1 : 0}>
-          <SearchableSelect
-            value={organizationFilter}
-            onChange={setOrganizationFilter}
-            options={organizationOptions}
-            placeholder="Filtrar secretaria"
-            searchPlaceholder="Buscar secretaria"
-          />
-          <button className="ghost-button" type="button" onClick={loadOrders}>Atualizar</button>
+          <MobileFilters collapsibleDesktop={embedded} activeCount={Number(Boolean(vehicleId)) + Object.values(filters).filter(Boolean).length}>
+          <FuelEntityFilters vehicleId={vehicleId} onVehicleChange={selectVehicle} filters={filters}
+            onFilterChange={(key, value) => setFilters((current) => ({ ...current, [key]: value }))}
+            vehicles={vehicles} organizations={organizations} stations={fuelStations} onVehiclesOpen={onVehiclesOpen} onStationsOpen={onStationsOpen} />
+          <button className="ghost-button" type="button" onClick={() => { setSearch(''); selectVehicle(''); setFilters({ organization_id: '', fuel_station_id: '' }) }}>Limpar filtros</button>
+          <button className="ghost-button" type="button" onClick={() => loadOrders()}>Atualizar</button>
           </MobileFilters>
-        </div>
       </div>
 
       {error ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
-      <div className="surface-panel panel-nested operation-module">
-        <IndicatorBar state={{ selected: indicator, metadata: indicatorMetadata ? { ...indicatorMetadata, items: indicatorMetadata.items.filter((item) => ['total', 'open', 'due_today', 'expires_soon'].includes(item.key)) } : null, select: selectIndicator }} loading={loading} error={error} resultCount={pagination.total} />
+      <div className={embedded ? 'fuel-open-orders-content' : 'surface-panel panel-nested operation-module'}>
+        <IndicatorBar label="Indicadores das ordens abertas" state={{ selected: indicator, metadata: indicatorMetadata ? { ...indicatorMetadata, items: indicatorMetadata.items.filter((item) => ['total', 'open', 'due_today', 'expires_soon'].includes(item.key)) } : null, select: selectIndicator }} loading={loading} error={error} resultCount={pagination.total} />
       <div className="table-wrap table-wrap-wide operation-table-card">
           <table className="data-table data-table-wide operation-table">
             <thead>
@@ -288,7 +290,7 @@ export default function FuelSupplyOrdersPage() {
       </div>
 
       <Modal
-        open={Boolean(selectedOrder) && canConfirmOrder}
+        open={active && Boolean(selectedOrder) && canConfirmOrder}
         onClose={() => setSelectedOrder(null)}
         title="Confirmar abastecimento"
         description="Informe os dados reais do abastecimento para concluir a ordem."
@@ -305,12 +307,12 @@ export default function FuelSupplyOrdersPage() {
         ) : null}
       </Modal>
 
-      <Modal open={Boolean(fundingOrder)} onClose={() => setFundingOrder(null)} title="Vincular contrato e reservar">
+      <Modal open={active && Boolean(fundingOrder)} onClose={() => setFundingOrder(null)} title="Vincular contrato e reservar">
         {fundingOrder ? <FuelOrderFundingForm order={fundingOrder} onClose={() => setFundingOrder(null)} onSuccess={(message) => { setFeedback(message); loadOrders() }} /> : null}
       </Modal>
 
       <Modal
-        open={Boolean(signatureOrder)}
+        open={active && Boolean(signatureOrder)}
         onClose={closeSignatureOrder}
         title="Assinatura da ordem"
         description={signatureOrder ? `Assinatura eletrônica institucional da ordem ${formatOrderNumber(signatureOrder)}.` : ''}
