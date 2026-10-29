@@ -1,6 +1,6 @@
 import GuidedForm, { FormSection as GuidedSection } from './GuidedForm'
 import MoneyInput from './MoneyInput'
-import { useId, useMemo, useRef, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
@@ -8,9 +8,8 @@ import { ADDITIVE_TYPE_OPTIONS, FUEL_TYPE_OPTIONS, resolveOptionValue } from '..
 import { formatContractMoney as brl } from '../utils/contractBalance'
 import useFuelItemAllocation from '../hooks/useFuelItemAllocation'
 import FuelItemAllocationFields from './contracts/FuelItemAllocationFields'
+import ReceiptAttachmentField from './ReceiptAttachmentField'
 
-const MAX_RECEIPT_SIZE_BYTES = 8 * 1024 * 1024
-const ALLOWED_RECEIPT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
 const fuelKey = (value) => String(value || '').trim().replace(/\s+/g, ' ').toUpperCase()
 
 export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }) {
@@ -32,38 +31,11 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
   const [receiptError, setReceiptError] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const receiptRef = useRef(null)
   const fuelType = resolveOptionValue(form.fuel_type, form.fuel_type_other)
   const fuelChanged = Boolean(order?.requested_fuel_type && fuelType && fuelKey(fuelType) !== fuelKey(order.requested_fuel_type))
   const allocation=useFuelItemAllocation({funding:order?.contract_funding,contractId:order?.contract_id,providerId:order?.contract_provider_id,fuelType,liters:form.liters,totalAmount:form.total_amount,additiveType:form.additive_enabled?resolveOptionValue(form.additive_type,form.additive_type_other):'',additiveLiters:form.additive_enabled?form.additive_quantity_liters:''})
 
   const submitLabel = useMemo(() => (submitting ? 'Confirmando...' : 'Confirmar abastecimento'), [submitting])
-
-  function handleReceiptChange(event) {
-    const file = event.target.files?.[0] || null
-    if (!file) {
-      setReceiptFile(null)
-      setReceiptError('')
-      return
-    }
-
-    if (!ALLOWED_RECEIPT_TYPES.includes(file.type)) {
-      setReceiptFile(null)
-      setReceiptError('Comprovante deve ser PDF, JPG, PNG ou WEBP.')
-      if (receiptRef.current) receiptRef.current.value = ''
-      return
-    }
-
-    if (file.size > MAX_RECEIPT_SIZE_BYTES) {
-      setReceiptFile(null)
-      setReceiptError('Comprovante deve ter no máximo 8 MB.')
-      if (receiptRef.current) receiptRef.current.value = ''
-      return
-    }
-
-    setReceiptFile(file)
-    setReceiptError('')
-  }
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -225,11 +197,7 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
 
 </GuidedSection>
 <GuidedSection title="Comprovante e itens" description="Anexe o documento e confira os itens realizados antes de confirmar.">
-<div className="form-field modal-field-span">
-        <label htmlFor={`${formId}-receipt`}>Comprovante</label>
-        <input id={`${formId}-receipt`} ref={receiptRef} data-required-message="Envie o comprovante para confirmar o abastecimento." type="file" accept=".pdf,image/jpeg,image/png,image/webp" onChange={handleReceiptChange} required />
-        {receiptError ? <small className="form-error">{receiptError}</small> : null}
-      </div>
+<ReceiptAttachmentField id={`${formId}-receipt`} required file={receiptFile} error={receiptError} disabled={submitting} onChange={(file) => { setReceiptFile(file); setReceiptError('') }} />
 
       <div className="form-field modal-field-span">
         <label htmlFor={`${formId}-notes`}>Observações</label>
