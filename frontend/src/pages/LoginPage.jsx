@@ -1,4 +1,3 @@
-import GuidedForm from '../components/GuidedForm'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -25,6 +24,7 @@ export default function LoginPage() {
 
   async function handleSubmit(e) {
     e.preventDefault()
+    if (submitting) return
     setError('')
     setSubmitting(true)
     try {
@@ -85,7 +85,7 @@ export default function LoginPage() {
               <p className="panel-subtitle">Entre com a conta vinculada ao ambiente institucional da Prefeitura Municipal de Teixeira de Freitas.</p>
             </div>
 
-            <GuidedForm busy={submitting} onSubmit={handleSubmit} className="form-grid">
+            <form onSubmit={handleSubmit} className="form-grid">
               <div className="form-field">
                 <label htmlFor="email">Login institucional</label>
                 <div className="login-input-shell">
@@ -115,12 +115,12 @@ export default function LoginPage() {
                 </div>
               </div>
 
-              {error ? <div className="alert alert-error">{error}</div> : null}
+              {error ? <div className="alert alert-error" role="alert">{error}</div> : null}
 
               <button className="app-button login-submit-button" type="submit" disabled={submitting}>
                 {submitting ? 'Entrando...' : 'Entrar no sistema'}
               </button>
-            </GuidedForm>
+            </form>
 
             <div className="login-demo-block">
               <strong>Orientações de acesso</strong>
