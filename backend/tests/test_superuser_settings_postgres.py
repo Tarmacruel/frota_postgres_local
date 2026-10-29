@@ -327,3 +327,31 @@ async def test_refresh_overlay_normalizes_only_the_exact_audited_role_delta(cont
         assert fingerprints(db, names=['users', 'audit_logs'], admin_overlay=applied) != before
         with pytest.raises(RuntimeError):
             admin_overlay.apply(db, {'principals': [{'id': str(uuid4()), 'login': 'missing@test.local'}]}, database_name=url.database)
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize('source_has_settings', [False, True])
+async def test_refresh_preserves_hml_parameters_when_production_has_the_same_schema(context, source_has_settings):
+    import importlib.util
+    from pathlib import Path
+    import psycopg
+    from psycopg.types.json import Jsonb
+    root = Path(__file__).resolve().parents[2]
+    spec = importlib.util.spec_from_file_location('tested_hml_refresh_config', root / 'scripts/homologation/refresh_data.py')
+    refresh = importlib.util.module_from_spec(spec); spec.loader.exec_module(refresh)
+    c = context; url = make_url(URL)
+    source_values = deepcopy(DEFAULT_SETTINGS)
+    source_values['identity']['systemName'] = 'Frota origem fictícia'
+    hml_values = deepcopy(DEFAULT_SETTINGS)
+    hml_values['identity']['systemName'] = 'Frota homologação fictícia'
+    overlay = {'principals': [{'id': str(c.superuser.id), 'login': 'jonatas@sousa'}],
+        'settings': {'revision': 5, 'values': hml_values, 'updated_by': str(c.superuser.id), 'updated_at': datetime.now(timezone.utc)}}
+    with psycopg.connect(host=url.host, port=url.port, dbname=url.database, user=url.username, password=url.password) as db:
+        if source_has_settings:
+            db.execute('INSERT INTO system_settings(id,revision,"values") VALUES(1,2,%s)', (Jsonb(source_values),))
+        before = refresh.fingerprints(db, names=['system_settings'])
+        applied = refresh.overlay_service.apply(db, overlay, database_name=url.database)
+        assert db.execute('SELECT "values" FROM system_settings WHERE id=1').fetchone()[0] == hml_values
+        assert refresh.fingerprints(db, names=['system_settings'], admin_overlay=applied) == before
+        db.execute('INSERT INTO system_settings(id,revision,"values") VALUES(2,1,%s)', (Jsonb(source_values),))
+        assert refresh.fingerprints(db, names=['system_settings'], admin_overlay=applied) != before

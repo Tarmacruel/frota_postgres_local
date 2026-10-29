@@ -18,7 +18,9 @@ try {
         if ($LASTEXITCODE -ne 0) { throw 'Não foi possível carregar a entrega preparada.' }
         $switched=$true
     }
-    $releaseRunner=Start-Process -FilePath $releasePython -ArgumentList @('-X','utf8',$releaseScript,'activate') -WorkingDirectory $releaseRoot -WindowStyle Hidden -RedirectStandardOutput (Join-Path $releaseFolder 'activation.log') -RedirectStandardError (Join-Path $releaseFolder 'activation.err.log') -Wait -PassThru
+    $releaseRunner=Start-Process -FilePath $releasePython -ArgumentList @('-X','utf8',$releaseScript,'activate') -WorkingDirectory $releaseRoot -WindowStyle Hidden -RedirectStandardOutput (Join-Path $releaseFolder 'activation.log') -RedirectStandardError (Join-Path $releaseFolder 'activation.err.log') -PassThru
+    # Wait only for the publisher, not the API it intentionally leaves running.
+    $releaseRunner.WaitForExit()
     $resultCode=$releaseRunner.ExitCode
 } finally {
     $releaseStatePath=Join-Path $releaseFolder 'release\state.json'

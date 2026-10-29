@@ -64,7 +64,7 @@ def apply(db, overlay, *, database_name):
             or database_name.startswith('frota_contract_tests_'), 'Overlay destination must be an isolated HML database.')
     require(db.execute('SELECT current_database()').fetchone()[0] == database_name, 'Overlay database mismatch.')
     require(exists(db, 'system_settings') and exists(db, 'record_controls'), 'Apply HML migrations before preserving settings.')
-    result = {'roles_before': {}, 'users_before': {}, 'user_rows': {}, 'audit_rows': {}, 'settings_sha256': None, 'principals': []}
+    result = {'roles_before': {}, 'users_before': {}, 'user_rows': {}, 'audit_rows': {}, 'settings_sha256': None, 'settings_before': None, 'principals': []}
     for principal in overlay['principals']:
         row = db.execute('SELECT id,email::text,role::text,name FROM users WHERE id=%s FOR UPDATE', (principal['id'],)).fetchone()
         require(row and str(row[0]) == principal['id'], 'A preserved superuser does not match the copied account. Current HML was retained.')
@@ -85,6 +85,8 @@ def apply(db, overlay, *, database_name):
             result['audit_rows'][str(audit_id)] = row_digest(db, 'audit_logs', audit_id)
     config = overlay.get('settings')
     if config:
+        prior_settings = db.execute('SELECT to_jsonb(s) FROM system_settings s WHERE id=1').fetchone()
+        result['settings_before'] = prior_settings[0] if prior_settings else None
         # Strict product validation prevents a copied draft from becoming code/markup.
         from app.schemas.system_settings import SettingsValues
         SettingsValues.model_validate(config['values'])
@@ -123,5 +125,11 @@ def fingerprint_query(table, excluded, overlay=None):
     elif overlay and table == 'audit_logs' and overlay['audit_rows']:
         where = sql.SQL(' WHERE NOT(t.id=ANY(%s::uuid[]))')
         parameters.append(list(overlay['audit_rows']))
+    elif overlay and table == 'system_settings' and overlay.get('settings_sha256'):
+        if overlay.get('settings_before') is None:
+            where = sql.SQL(' WHERE t.id<>1')
+        else:
+            payload = sql.SQL('CASE WHEN t.id=1 THEN (%s::jsonb - %s::text[]) ELSE {} END').format(payload)
+            parameters = [Jsonb(overlay['settings_before']), excluded, excluded]
     query = sql.SQL('SELECT payload FROM (SELECT ({})::text AS payload FROM {} t{}) rows ORDER BY payload COLLATE "C"').format(payload, sql.Identifier(table), where)
     return query, parameters
