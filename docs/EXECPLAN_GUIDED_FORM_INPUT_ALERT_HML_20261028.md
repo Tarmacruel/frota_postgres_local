@@ -19,9 +19,9 @@ Sem backend/schema/dados/configurações/API/payloads/permissões/regras finance
 ## Passos de implementação
 - [x] Reproduzir no navegador sem tocar no rascunho do usuário.
 - [x] Regressão para o intervalo capture→change, correção de agendamento e tamanho dos ícones compartilhados.
-- [ ] Testes, lint e build homologation.
-- [ ] Backup/reversão, publicação somente de frontend HML e QA real de digitação isolada, alerta, temas e mobile.
-- [ ] Registrar resultado, integridade e evidências.
+- [x] Testes, lint e build homologation.
+- [x] Backup/reversão, publicação somente de frontend HML e QA real de digitação isolada, alerta, temas e mobile.
+- [x] Registrar resultado, integridade e evidências.
 
 ## Validação visual
 Digitar uma tecla por vez desde o campo vazio, com observação entre teclas; apagar/recomeçar, editar outros campos e manter posição do cursor. Conferir erro local, feedback de servidor e ícone de etapa concluída. Desktop/mobile claro/escuro, teclado e retorno de foco. Não enviar o formulário.
@@ -32,12 +32,20 @@ Teste de regressão com fronteira entre captura nativa e mudança React, preserv
 ## Resultado
 Correção implementada. Os dois novos casos falharam na base anterior: caractere A desaparecia antes de change, e SVG do alerta não tinha a classe de tamanho. Após a mudança, os 16 testes do componente passaram. A inspeção de progresso usa um único requestAnimationFrame após a propagação do evento, com leitura atualizada e cancelamento ao desmontar. O próprio campo continua atualizando imediatamente no onChange.
 
-Os três usos de AppIcon no componente agora recebem app-icon: alerta local, feedback de servidor e marco de etapa concluída. Dimensões existentes de18px/12px preservadas. Nenhuma alteração no componente global de ícones ou nos handlers/payloads dos formulários. Lint zero erros/39 avisos anteriores; build HML candidato index-CexbYAw6.js aprovado. Suíte completa e publicação em andamento.
+Os três usos de AppIcon no componente agora recebem app-icon: alerta local, feedback de servidor e marco de etapa concluída. Dimensões existentes de18px/12px preservadas. Nenhuma alteração no componente global de ícones ou nos handlers/payloads dos formulários. Gates finais:645 testes aprovados/87 arquivos, zero falhas, lint zero erros/39 avisos anteriores e build homologation aprovado.
 
 Backup/reversão próprios em storage/backups/20261028-guided-form-input-alert; a referência do banco é somente leitura e não sobrescreve a referência da entrega anterior. Publicador confere produção/configurações/backend preservados e exige645 testes aprovados antes de trocar os assets/index HML.
 
+Fonte115a6d7 publicada somente no frontend HML em28/10/2026 às23:35:48 (Brasília), entrada index-CexbYAw6.js e nove assets conferidos. Sem reinício de API ou restauração de dados. APIs6969/PID21432 e8000/PID5804, PostgreSQL5441/PID15100 e5432/PID5764 preservados. Produção limpa0cd053c; configurações e rotina06h intactas.
+
+QA Chromium autenticada: primeira tecla T preservada; S digitado em chamada separada produziu TS; apagar e iniciar novamente preservou B. Marca/Modelo preservaram F/R desde a primeira tecla. Seletor nativo manteve SUV, avançar/voltar reteve os valores. Campo Nome do condutor manteve A e depois An, mesmo ainda incompleto. Nenhum cadastro foi salvo.
+
+O alerta mediu18px por18px (17,99 por arredondamento do zoom) e o check de etapa12px. Desktop1280×900, mobile390×843 claro e360×800 escuro, sem overflow e com rodapé acessível. Capturas vehicle-corrected-desktop.png, vehicle-corrected-mobile-light.png e vehicle-corrected-mobile-dark.png. Console sem erros; tema claro/viewport padrão restaurados e guia temporária fechada. A navegação/rascunhos do usuário foram preservados, sem recarregar sua guia.
+
+Sessão expirada retomada pelo fluxo normal de acesso salvo do navegador. Verificação final após QA:75/75 tabelas idênticas à referência desta correção, arquivos protegidos intactos e serviços saudáveis. Relatórios e capturas privados na pasta de backup indicada.
+
 ## Pendências / decisões
-Preservar a digitação, sem atrasos artificiais na atualização do próprio campo; adiar apenas a inspeção de progresso até o evento terminar.
+Sem pendências de implementação ou validação. Preservar a digitação, sem atrasos artificiais na atualização do próprio campo; adiar apenas a inspeção de progresso até o evento terminar. Uma guia que já estava aberta precisa carregar a nova entrada para usar a correção.
 
 ## Rollback
 Conservar dist anterior antes de publicar; copiar assets antes da troca atômica do index. Reverter somente frontend, sem restaurar banco ou alterar APIs.

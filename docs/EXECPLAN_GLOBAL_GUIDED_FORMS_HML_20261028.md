@@ -52,3 +52,6 @@ Sem trabalho de implementação pendente nesta entrega. Busca, filtros e autenti
 
 ## Rollback
 Backup local de dist e referência de fonte0cd053c. Publicação de assets antes da troca atômica do index; conservar assets anteriores e script de reversão. Nenhuma restauração de banco ou modificação de configurações.
+
+## Correção posterior — 28/10/2026
+As anotações do usuário revelaram duas regressões não capturadas na conferência inicial: AppIcon sem classe gerava um X gigante no alerta; microtask na captura de input podia apagar a primeira letra antes de onChange no Chromium. Dois novos testes falharam na base anterior e passaram com a correção, confirmada por teclas isoladas no navegador. Fonte115a6d7,645 testes e publicação somente HML. [Diagnóstico, validação e reversão](EXECPLAN_GUIDED_FORM_INPUT_ALERT_HML_20261028.md).
