@@ -27,7 +27,7 @@ Revisar Identidade, Aparência, Formulários e Registros, corrigindo defeitos re
 - [x] Reproduzir e corrigir defeitos de prévia, contraste, validação, conflitos e identificação dos campos.
 - [x] Conferir administração de registros, recuperação e dados preservados.
 - [x] Validar quatro áreas desktop/mobile, claro/escuro e teclado; executar gates.
-- [ ] Publicar frontend HML com backup, conferir versão servida e preservar configurações existentes.
+- [x] Publicar frontend HML com backup, conferir versão servida e preservar configurações existentes.
 
 ## Validação visual
 Desktop 1280/1600 e celular 360/390, claro/escuro. Prévia de logo, nome, cores, densidade e ícones; tabelas de campos, conferência e painel administrativo. Capturas privadas sem dados pessoais.
@@ -40,7 +40,9 @@ Testes significativos de persistência, conflito entre sessões, validação ocu
 
 QA de logo válida/inválida, persistência, edição simultânea em duas abas, prévia local de cores/densidade, revisão antes/depois, nove catálogos e campos protegidos. Correção, valor adicional booleano, inativação e reativação testados com veículo fictício. ADMIN fictício impedido de entrar em parâmetros. Teclado/Escape e desktop 1280/1600 e mobile 360/390 conferidos, claro/escuro, sem overflow horizontal. Conferido um asterisco por campo no editor mobile. Lista de ícones recolhida para aproximar prévia e controles; controles de visibilidade com alvo de toque maior.
 
-Produção e configurações HML permanecem idênticas ao fingerprint inicial (revisão 3). APIs 6969/PID2096 e 8000/PID5804 preservadas. Publicação do frontend aguardando conferência final; roteiro privado valida gates, copia assets antes de substituir a entrada e oferece `--rollback`.
+Produção e configurações HML permanecem idênticas ao fingerprint inicial (revisão 3). APIs 6969/PID2096 e 8000/PID5804 preservadas. Fonte `3c28261` publicada às 19:21:06 de 29/10/2026, somente frontend, entrada `index-C2Ck_Gb6.js`. SHA256 servido `0db166b05c924495ae1de05318f5e91669970782e612f4bd1af0768891137f8c`, conferido com o candidato. Tela autenticada HML, nova prévia compacta e retorno à revisão 3 sem publicação de preferências de teste conferidos. Console da guia nova sem erros/avisos.
+
+Captura da publicação: `storage/backups/20261029-parameters-review/parameters-published.png`. Demais capturas identificam QA fictícia e estão na mesma pasta. Roteiro privado `publish-frontend.py --rollback` restaura o frontend anterior sem reiniciar APIs ou tocar em banco. Ambiente temporário encerrado ao concluir; guias originais do usuário preservadas.
 
 ## Pendências / decisões
 A confirmação deve mostrar valores anteriores/novos e preservar edições quando outra sessão modifica parâmetros. A prévia deve ser local; nenhuma preferência escolhida no teste será publicada no HML ativo.
