@@ -487,3 +487,13 @@ Reproduzidas as duas falhas informadas: SVG sem classe media546px; a inspeção 
 Dois novos testes reproduziram as falhas antes da correção;16 direcionados e645 completos/87 arquivos aprovados, lint zero erros/39 avisos anteriores e build HML. QA real com teclas isoladas, limpar/reiniciar, Marca/Modelo, seletor SUV, avançar/voltar e Nome do condutor. Desktop1280×900, mobile390×843 claro/360×800 escuro, alertas compactos, sem overflow, rodapé acessível e console sem erros. Nenhum cadastro salvo; tema/viewport restaurados e guias do usuário preservadas.
 
 Fonte115a6d7 na branch fix/guided-form-input-alert-hml-20261028, publicada às23:35:48 só no frontend, entrada index-CexbYAw6.js e nove assets conferidos.75/75 tabelas idênticas após QA; configurações, backend, APIs6969/PID21432 e8000/PID5804, PostgreSQL e rotina06h intactos. Produção limpa0cd053c. Backup/reversão/capturas em storage/backups/20261028-guided-form-input-alert. [ExecPlan e evidências](../EXECPLAN_GUIDED_FORM_INPUT_ALERT_HML_20261028.md).
+
+## Comprovante com foto e remoção — 29/10/2026 — somente HML
+
+Confirmação de abastecimento ganhou Anexar arquivo/Trocar arquivo, Tirar foto em dispositivo compatível, prévia ampliável, nome/tamanho e Remover. A seleção permanece local até a confirmação existente; cancelar seletor mantém o arquivo, remover devolve foco e torna o comprovante pendente. PDF/JPG/PNG/WEBP e8MB mantidos, com mensagem para arquivo vazio/inválido. Um comprovante por confirmação, sem excluir documento salvo ou alterar API/saldo/permissões.
+
+Obrigatório acompanha as duas entradas sem duplicar contagem:5/6 sem anexo,6/6 com foto e5/6 ao remover; bloqueio sem arquivo e FormData receipt com somente o arquivo atual cobertos por regressões.654 testes/88 arquivos,14 direcionados (nove novos), lint zero erros/39 avisos anteriores e build HML aprovados.
+
+QA com fixtures fictícias PNG/JPEG, prévia/ampliação, remover, orientação de obrigatório, entrada da câmera por seletor sem captura física e substituição. Desktop1280×900 e mobile390×843 claro/360×800 escuro, ações acessíveis, sem overflow e console sem erros. Nenhuma operação confirmada ou arquivo salvo no servidor. Tema/viewport restaurados e guia do usuário preservada.
+
+Fonte2200b69 em feature/fuel-receipt-picker-hml-20261029, publicada às07:15:58 só no frontend, entrada index-C8K7OL_1.js e nove assets conferidos.75/75 tabelas idênticas após QA, backend/configurações/PIDs preservados; HML6969/PID5344 após rotina06h, produção limpa0cd053c/8000/PID5804. Backup/reversão/capturas em storage/backups/20261029-fuel-receipt-picker. [ExecPlan e evidências](../EXECPLAN_FUEL_RECEIPT_PICKER_HML_20261029.md).
