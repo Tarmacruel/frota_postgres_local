@@ -6,6 +6,8 @@ import { useSystemSettings } from '../hooks/useSystemSettings'
 import { getApiErrorMessage } from '../utils/apiError'
 import SearchableSelect from './SearchableSelect'
 import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
+import { mergeSettingsDraft } from '../utils/settingsDraft'
+import { SettingsConflictChoices } from './SettingsComparison'
 
 function errorText(error) { return getApiErrorMessage(error, 'Não foi possível concluir. Confira os dados e tente novamente.') }
 
@@ -23,13 +25,40 @@ function RecordEditor({ module, record, onClose, onSaved }) {
   const [history, setHistory] = useState(null)
   const [effectConfirmed, setEffectConfirmed] = useState(false)
   const [currentRecord, setCurrentRecord] = useState(record)
+  const [stale, setStale] = useState(false)
+  const [refreshing, setRefreshing] = useState(false)
+  const [conflict, setConflict] = useState(null)
+  const [choices, setChoices] = useState({})
+  const [historyError, setHistoryError] = useState('')
   const lifecycle = currentRecord.lifecycle || { steps: [], can_confirm: true, has_effects: false }
-  const changingVisibility = inactive !== record.inactive
+  const changingVisibility = inactive !== currentRecord.inactive
   const customDefinitions = settings.forms?.[module]?.custom?.filter((field) => field.active !== false) || []
-  const changes = Object.fromEntries(Object.entries(draft).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(record.values[key])))
+  const changes = Object.fromEntries(Object.entries(draft).filter(([key, value]) => JSON.stringify(value) !== JSON.stringify(currentRecord.values[key])))
+  function applyReference(data, merged) {
+    setCurrentRecord(data); setDraft(merged.values); setCustom(merged.custom_fields || {}); setInactive(merged.inactive)
+    setEffectConfirmed(false); setStale(false); setConflict(null); setError('')
+  }
+  async function refresh() {
+    setRefreshing(true)
+    try {
+      const { data } = await api.get(`/record-admin/${module}/${record.id}`)
+      const base = { values: currentRecord.values, custom_fields: currentRecord.custom_fields || {}, inactive: currentRecord.inactive }
+      const local = { values: draft, custom_fields: custom, inactive }
+      const remote = { values: data.values, custom_fields: data.custom_fields || {}, inactive: data.inactive }
+      const merged = mergeSettingsDraft(base, local, remote)
+      if (merged.conflicts.length) { setConflict({ data, base, local, remote, conflicts: merged.conflicts }); setChoices({}) }
+      else applyReference(data, merged.values)
+    } catch (cause) { setError(errorText(cause)) }
+    finally { setRefreshing(false) }
+  }
+  async function loadHistory() {
+    setHistoryError('')
+    try { const { data } = await api.get(`/record-admin/${module}/${record.id}/history`); setHistory(data) }
+    catch { setHistoryError('Não foi possível carregar o histórico. Tente novamente.'); setHistory(null) }
+  }
   async function save(event) {
     event.preventDefault()
-    if (saving) return
+    if (saving || stale || conflict) return
     setSaving(true); setError('')
     const body = { expected_revision: currentRecord.revision, expected_updated_at: currentRecord.updated_at,
       justification: reason, inactive, changes,
@@ -41,7 +70,7 @@ function RecordEditor({ module, record, onClose, onSaved }) {
       if (deleting) await api.delete(`/record-admin/${module}/${record.id}`, { data: body })
       else await api.patch(`/record-admin/${module}/${record.id}`, body)
       onSaved(deleting ? 'Registro excluído.' : inactive !== record.inactive ? inactive ? 'Registro inativado. Agora somente o superusuário pode consultá-lo.' : 'Registro reativado.' : 'Correção registrada no histórico.')
-    } catch (cause) { setError(errorText(cause)) }
+    } catch (cause) { setError(errorText(cause)); setStale(cause.response?.status === 409); setEffectConfirmed(false) }
     finally { setSaving(false) }
   }
   function control(field, value, onChange) {
@@ -65,14 +94,17 @@ function RecordEditor({ module, record, onClose, onSaved }) {
         <p className="helper-text">{record.protected_hint}</p>
         <div className="settings-field-grid">
           {record.fields.map((field) => <label className="form-field" key={field.key}>
-            <span className="record-editor__label">{field.label}{!field.required && draft[field.key] != null && draft[field.key] !== '' ? <button className="record-editor__clear" type="button" onClick={() => setDraft({ ...draft, [field.key]: null })} aria-label={`Limpar ${field.label}`}>Limpar</button> : null}</span>
+            <span className="record-editor__label"><span>{field.label}{field.required ? <span className="guided-form__required"> *</span> : null}</span>{!field.required && draft[field.key] != null && draft[field.key] !== '' ? <button className="record-editor__clear" type="button" onClick={() => setDraft({ ...draft, [field.key]: null })} aria-label={`Limpar ${field.label}`}>Limpar</button> : null}</span>
             {control(field, draft[field.key], (value) => setDraft({ ...draft, [field.key]: value }))}
           </label>)}
-          {customDefinitions.map((field) => <label className="form-field" key={field.key}>{field.label}
+          {customDefinitions.map((field) => <label className="form-field" key={field.key}><span>{field.label}{field.required ? <span className="guided-form__required"> *</span> : null}</span>
             {control(field, custom[field.key], (value) => setCustom({ ...custom, [field.key]: value }))}</label>)}
         </div>
       </FormSection>
       <FormSection title="Visibilidade e conferência">
+        {stale ? <div className="settings-recovery"><p>O registro mudou desde a abertura. Confira a versão atual sem perder suas edições.</p><button type="button" className="secondary-button" disabled={refreshing} onClick={refresh}>{refreshing ? 'Consultando…' : 'Atualizar registro preservando edições'}</button></div> : null}
+        {conflict ? <section className="settings-recovery"><p>Escolha os valores dos campos alterados pelas duas sessões.</p><SettingsConflictChoices conflicts={conflict.conflicts} choices={choices} onChoose={(key, value) => setChoices((current) => ({ ...current, [key]: value }))} describe={(entry) => record.fields.find((field) => field.key === entry.path.at(-1))?.label || customDefinitions.find((field) => field.key === entry.path.at(-1))?.label || 'Visibilidade do registro'} />
+          <button className="secondary-button" type="button" disabled={conflict.conflicts.some((entry) => !choices[entry.key])} onClick={() => applyReference(conflict.data, mergeSettingsDraft(conflict.base, conflict.local, conflict.remote, choices).values)}>Aplicar escolhas e conferir novamente</button></section> : null}
         <label className="settings-toggle"><input type="checkbox" checked={inactive} onChange={(event) => setInactive(event.target.checked)} />
           <span><strong>Inativar registro</strong><small>Confira os efeitos abaixo. O registro será ocultado dos demais perfis após resolver entregas, reservas e gastos.</small></span></label>
         {changingVisibility ? <section className="record-lifecycle" aria-label="Conferência dos efeitos">
@@ -89,24 +121,21 @@ function RecordEditor({ module, record, onClose, onSaved }) {
             {Number(lifecycle.reserved) > 0 ? <p>Reserva a liberar: {Number(lifecycle.reserved).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}. O pedido será cancelado; uma reativação posterior mantém o cancelamento até nova emissão.</p> : null}
             {lifecycle.quantities?.length ? <ul>{lifecycle.quantities.map((item) => <li key={`${item.item_id}-${item.effect}`}><strong>{item.label}</strong>: {Number(item.quantity).toLocaleString('pt-BR')} {item.unit} · {item.effect === 'reservation' ? 'reserva a liberar' : lifecycle.restoring ? 'consumo a restabelecer' : 'consumo a estornar'}</li>)}</ul> : null}
             <label className="settings-checkbox"><input type="checkbox" required checked={effectConfirmed} onChange={(event) => setEffectConfirmed(event.target.checked)} />Conferi o efeito financeiro e as quantidades. Autorizo {lifecycle.restoring ? 'restabelecer o consumo' : 'o estorno e a liberação das reservas'} junto com esta alteração.</label></> : <p>Sem reserva ou consumo de contrato a alterar. {inactive ? 'O registro será ocultado dos demais perfis.' : 'O registro voltará a aparecer na situação atual, sem recriar entregas ou pedidos já cancelados.'}</p>}
-          {lifecycle.steps.length ? <button className="secondary-button" type="button" onClick={async () => { try { const { data } = await api.get(`/record-admin/${module}/${record.id}`); setCurrentRecord(data); setEffectConfirmed(false) } catch (cause) { setError(errorText(cause)) } }}>Atualizar conferência após resolver as pendências</button> : null}
+          {lifecycle.steps.length ? <button className="secondary-button" type="button" disabled={refreshing} onClick={refresh}>Atualizar conferência após resolver as pendências</button> : null}
         </section> : null}
         <label className="form-field">Justificativa<input required minLength={8} maxLength={1000} className="app-input" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="O que está sendo corrigido e por quê?" /></label>
         <p className="helper-text">{Object.keys(changes).length} campo(s) alterado(s) · {inactive ? 'Acesso exclusivo do superusuário' : 'Visibilidade normal conforme permissões'}</p>
-        <details className="record-editor__history" onToggle={async (event) => {
-          if (event.currentTarget.open && history === null) {
-            try { const { data } = await api.get(`/record-admin/${module}/${record.id}/history`); setHistory(data) }
-            catch { setHistory([]) }
-          }
+        <details className="record-editor__history" onToggle={(event) => {
+          if (event.currentTarget.open && history === null && !historyError) loadHistory()
         }}><summary>Histórico administrativo</summary>
-          {history === null ? <p>Carregando…</p> : history.length ? history.map((item) => <article key={item.id}><strong>{item.action}</strong><span>{new Date(item.created_at).toLocaleString('pt-BR')} · {item.actor_name}</span><p>{item.justification}</p></article>) : <p>Sem alterações administrativas registradas.</p>}
+          {historyError ? <><p role="alert">{historyError}</p><button type="button" className="secondary-button" onClick={loadHistory}>Recarregar histórico</button></> : history === null ? <p>Carregando…</p> : history.length ? history.map((item) => <article key={item.id}><strong>{item.action}</strong><span>{new Date(item.created_at).toLocaleString('pt-BR')} · {item.actor_name}</span><p>{item.justification}</p></article>) : <p>Sem alterações administrativas registradas.</p>}
         </details>
         <details className="record-editor__danger" open={deleting}><summary onClick={(event) => { event.preventDefault(); setDeleting(!deleting) }}>Excluir permanentemente</summary>
           <p>A exclusão verifica vínculos e histórico. Registros vinculados podem ser inativados.</p>
           {deleting ? <label className="form-field">Digite EXCLUIR para confirmar<input required pattern="EXCLUIR" className="app-input" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></label> : null}
         </details>
       </FormSection>
-      <div className="modal-actions"><button className="secondary-button" type="button" disabled={saving} onClick={onClose}>Cancelar</button><button className={deleting ? 'danger-button' : 'primary-button'} disabled={saving || (!deleting && changingVisibility && (!lifecycle.can_confirm || lifecycle.has_effects && !effectConfirmed))} type="submit">{saving ? 'Salvando…' : deleting ? 'Excluir registro' : changingVisibility ? inactive ? 'Concluir inativação' : 'Concluir reativação' : 'Salvar alterações'}</button></div>
+      <div className="modal-actions"><button className="secondary-button" type="button" disabled={saving} onClick={onClose}>Cancelar</button><button className={deleting ? 'danger-button' : 'primary-button'} disabled={saving || stale || Boolean(conflict) || (!deleting && changingVisibility && (!lifecycle.can_confirm || lifecycle.has_effects && !effectConfirmed))} type="submit">{saving ? 'Salvando…' : deleting ? 'Excluir registro' : changingVisibility ? inactive ? 'Concluir inativação' : 'Concluir reativação' : 'Salvar alterações'}</button></div>
     </GuidedForm>
   </Modal>
 }
@@ -123,6 +152,14 @@ export default function RecordAdministration({ initialModule = 'vehicles', initi
   const [error, setError] = useState('')
   const [feedback, setFeedback] = useState('')
   const requestId = useRef(0)
+  const detailRequestId = useRef(0)
+  const [opening, setOpening] = useState(false)
+  const [catalogError, setCatalogError] = useState('')
+  function changeFilter(update) {
+    requestId.current += 1; detailRequestId.current += 1
+    setSelected(null); setOpening(false); setRecords({ data: [], total: 0 }); setLoading(true); setFeedback('')
+    update()
+  }
   const load = useCallback(async () => {
     const id = ++requestId.current
     setLoading(true)
@@ -133,12 +170,19 @@ export default function RecordAdministration({ initialModule = 'vehicles', initi
     } catch (cause) { if (id === requestId.current) setError(errorText(cause)) }
     finally { if (id === requestId.current) setLoading(false) }
   }, [module, search, scope, page])
-  useEffect(() => { api.get('/record-admin/catalog').then(({ data }) => setCatalog(data)).catch((cause) => setError(errorText(cause))) }, [])
-  useEffect(() => { const timer = setTimeout(load, 300); return () => clearTimeout(timer) }, [load])
+  const loadCatalog = useCallback(async () => {
+    try { const { data } = await api.get('/record-admin/catalog'); setCatalog(data); setCatalogError('') }
+    catch (cause) { setCatalogError(errorText(cause)) }
+  }, [])
+  useEffect(() => { loadCatalog() }, [loadCatalog])
+  useEffect(() => { const timer = setTimeout(load, 300); return () => { clearTimeout(timer); requestId.current += 1 } }, [load])
+  useEffect(() => () => { detailRequestId.current += 1 }, [])
   const open = useCallback(async (id) => {
-    setError('')
-    try { const { data } = await api.get(`/record-admin/${module}/${id}`); setSelected(data) }
-    catch (cause) { setError(errorText(cause)) }
+    const request = ++detailRequestId.current
+    setError(''); setOpening(true)
+    try { const { data } = await api.get(`/record-admin/${module}/${id}`); if (request === detailRequestId.current) setSelected(data) }
+    catch (cause) { if (request === detailRequestId.current) setError(errorText(cause)) }
+    finally { if (request === detailRequestId.current) setOpening(false) }
   }, [module])
   const initialOpen = useRef(initialRecordId)
   useEffect(() => {
@@ -147,18 +191,20 @@ export default function RecordAdministration({ initialModule = 'vehicles', initi
   return <section className="record-administration">
     <header className="settings-section-heading"><h3>Registros do sistema</h3><p>Localize um registro para corrigir informações, inativar, reativar ou excluir.</p></header>
     <div className="record-admin-filters">
-      <label>Módulo<select className="app-select" value={module} onChange={(event) => { setModule(event.target.value); setPage(1) }}>{catalog.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
-      <label>Buscar<input className="app-input" value={search} onChange={(event) => { setSearch(event.target.value); setPage(1) }} placeholder="Placa, nome, informação ou ID" /></label>
-      <label>Visibilidade<select className="app-select" value={scope} onChange={(event) => { setScope(event.target.value); setPage(1) }}><option value="all">Todos</option><option value="active">Visibilidade normal</option><option value="inactive">Somente superusuário</option></select></label>
+      <label>Módulo<select aria-label="Módulo" className="app-select" value={module} onChange={(event) => changeFilter(() => { setModule(event.target.value); setPage(1) })}>{catalog.map((item) => <option key={item.key} value={item.key}>{item.label}</option>)}</select></label>
+      <label>Buscar<input className="app-input" value={search} onChange={(event) => changeFilter(() => { setSearch(event.target.value); setPage(1) })} placeholder="Placa, nome, informação ou ID" /></label>
+      <label>Visibilidade<select className="app-select" value={scope} onChange={(event) => changeFilter(() => { setScope(event.target.value); setPage(1) })}><option value="all">Todos</option><option value="active">Visibilidade normal</option><option value="inactive">Somente superusuário</option></select></label>
     </div>
-    {error ? <div className="alert alert-error" role="alert">{error}</div> : null}
+    {catalogError ? <div className="alert alert-error" role="alert">{catalogError}<button type="button" className="secondary-button" onClick={loadCatalog}>Recarregar módulos</button></div> : null}
+    {error ? <div className="alert alert-error" role="alert">{error}<button type="button" className="secondary-button" onClick={load}>Consultar novamente</button></div> : null}
     {feedback ? <div className="alert alert-success" role="status">{feedback}</div> : null}
     <p className="helper-text">{loading ? 'Consultando…' : `${records.total} registro(s)`}</p>
-    <div className="record-admin-list">{records.data.map((record) => <button type="button" key={record.id} onClick={() => open(record.id)}>
-      <span><strong>{record.label}</strong><small>{record.id}</small></span><span className={record.inactive ? 'settings-badge settings-badge--private' : 'settings-badge'}>{record.inactive ? 'Somente superusuário' : 'Ativo'}</span><span aria-hidden="true">›</span>
+    {opening ? <p role="status">Abrindo registro…</p> : null}
+    <div className="record-admin-list" aria-busy={loading || opening}>{records.data.map((record) => <button type="button" disabled={loading || opening} key={record.id} onClick={() => open(record.id)}>
+      <span><strong>{record.label}</strong><small>{record.id}</small></span><span className={record.inactive ? 'settings-badge settings-badge--private' : 'settings-badge'}>{record.inactive ? 'Somente superusuário' : 'Visibilidade normal'}</span><span aria-hidden="true">›</span>
     </button>)}</div>
     {!loading && !records.data.length ? <p className="empty-state">Nenhum registro neste filtro.</p> : null}
-    <div className="settings-pagination"><button type="button" className="secondary-button" disabled={page <= 1 || loading} onClick={() => setPage(page - 1)}>Anterior</button><span>Página {page} de {Math.max(1, Math.ceil(records.total / 20))}</span><button type="button" className="secondary-button" disabled={page * 20 >= records.total || loading} onClick={() => setPage(page + 1)}>Próxima</button></div>
+    <div className="settings-pagination"><button type="button" className="secondary-button" disabled={page <= 1 || loading} onClick={() => changeFilter(() => setPage(page - 1))}>Anterior</button><span>Página {page} de {Math.max(1, Math.ceil(records.total / 20))}</span><button type="button" className="secondary-button" disabled={page * 20 >= records.total || loading} onClick={() => changeFilter(() => setPage(page + 1))}>Próxima</button></div>
     {selected ? <RecordEditor key={`${module}-${selected.id}`} module={module} record={selected} onClose={() => setSelected(null)} onSaved={(message) => { setSelected(null); setFeedback(message); load() }} /> : null}
   </section>
 }

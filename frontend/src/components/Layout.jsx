@@ -49,6 +49,7 @@ export default function Layout() {
   const [passwordModalOpen, setPasswordModalOpen] = useState(false)
   const [passwordForm, setPasswordForm] = useState({ current_password: '', new_password: '', confirm_password: '' })
   const [passwordFeedback, setPasswordFeedback] = useState('')
+  const [logoutError, setLogoutError] = useState('')
   const [cpfForm, setCpfForm] = useState({ cpf: '' })
   const [cpfFeedback, setCpfFeedback] = useState('')
   const [notificationsOpen, setNotificationsOpen] = useState(false)
@@ -413,8 +414,9 @@ export default function Layout() {
   }
 
   async function handleLogout() {
-    await logout()
-    navigate('/login')
+    setLogoutError('')
+    try { await logout(); navigate('/login') }
+    catch { setLogoutError('Não foi possível encerrar a sessão. Sua tela foi preservada; tente sair novamente.') }
   }
 
   async function handlePasswordChange(event) {
@@ -616,6 +618,7 @@ export default function Layout() {
         </header>
 
         <main className="app-main" ref={mainRef}>
+          {logoutError ? <div className="alert alert-error" role="alert">{logoutError}<button type="button" className="secondary-button" onClick={handleLogout}>Tentar sair novamente</button></div> : null}
           {passwordChangeRequired ? (
             <div className="surface-panel">
               <div className="empty-state">Altere sua senha provisória para continuar usando o sistema.</div>

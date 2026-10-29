@@ -1,6 +1,6 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import userEvent from '@testing-library/user-event'
-import { MemoryRouter } from 'react-router-dom'
+import { Link, MemoryRouter } from 'react-router-dom'
 import { beforeEach, expect, it, vi } from 'vitest'
 import SystemSettingsPage from './SystemSettingsPage'
 import { officialBrand } from '../constants/officialBrand'
@@ -66,4 +66,105 @@ it('preserva o rascunho quando outra sessão já mudou a configuração', async 
   await screen.findByText('A configuração mudou. Atualize a referência.', { selector: '.settings-review .form-error' })
   expect(screen.getByLabelText(/Nome do sistema/)).toHaveValue('Rascunho preservado')
   expect(publish).not.toHaveBeenCalled()
+})
+
+it('exibe a densidade selecionada apenas na prévia até publicar', async () => {
+  const actor = userEvent.setup(); mount('?section=appearance')
+  await actor.selectOptions(await screen.findByLabelText('Densidade da interface'), 'compact')
+  expect(screen.getByLabelText('Prévia da identidade do sistema')).toHaveAttribute('data-preview-density', 'compact')
+  expect(document.documentElement.dataset.density).not.toBe('compact')
+  expect(api.put).not.toHaveBeenCalled()
+})
+
+it('permite abrir a personalização de ícones e conferir os nomes da troca', async () => {
+  const actor = userEvent.setup(); mount('?section=appearance')
+  await actor.click(await screen.findByText('Ícones de cada aba'))
+  await actor.selectOptions(screen.getByLabelText('Ícone de Veículos'), 'home')
+  await actor.click(screen.getByRole('button', { name: 'Conferir e publicar' }))
+  const comparison = screen.getByLabelText('Alterações antes e depois')
+  expect(comparison).toHaveTextContent('Ícones · Veículos')
+  expect(comparison).toHaveTextContent('PublicadoVeículos')
+  expect(comparison).toHaveTextContent('Após publicarInício')
+  expect(api.put).not.toHaveBeenCalled()
+})
+
+it('valida também as abas ocultas e conduz à correção sem perder o formulário', async () => {
+  const actor = userEvent.setup(); mount('?section=appearance')
+  await actor.clear(await screen.findByLabelText('Código de Cor principal'))
+  await actor.click(screen.getByRole('button', { name: 'Identidade', exact: true }))
+  fireEvent.change(screen.getByLabelText(/Nome do sistema/), { target: { value: 'Rascunho válido' } })
+  await actor.click(screen.getByRole('button', { name: 'Conferir e publicar' }))
+  expect(screen.getByText('Revise os campos antes de publicar')).toBeInTheDocument()
+  expect(screen.getByLabelText('Código de Cor principal')).toHaveAttribute('aria-invalid', 'true')
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+  expect(api.put).not.toHaveBeenCalled()
+  await actor.click(screen.getByRole('button', { name: 'Identidade', exact: true }))
+  expect(screen.getByLabelText(/Nome do sistema/)).toHaveValue('Rascunho válido')
+})
+
+it('oferece nova tentativa após falha de carregamento', async () => {
+  api.get.mockRejectedValueOnce(new Error('offline'))
+  const actor = userEvent.setup(); mount()
+  await actor.click(await screen.findByRole('button', { name: 'Tentar carregar novamente' }))
+  expect(await screen.findByLabelText(/Nome do sistema/)).toHaveValue(identity.systemName)
+})
+
+it('concilia uma referência nova preservando alterações independentes das duas sessões', async () => {
+  const actor = userEvent.setup(); mount()
+  fireEvent.change(await screen.findByLabelText(/Nome do sistema/), { target: { value: 'Minha edição' } })
+  await actor.click(screen.getByRole('button', { name: 'Conferir e publicar' }))
+  expect(screen.getByLabelText('Alterações antes e depois')).toHaveTextContent('Minha edição')
+  await actor.type(screen.getByLabelText(/Justificativa/), 'Teste de alterações concorrentes')
+  api.put.mockRejectedValueOnce({ response: { status: 409, data: { detail: 'Outra sessão publicou.' } } })
+  await actor.click(screen.getByRole('button', { name: 'Publicar parâmetros' }))
+  const next = structuredClone(config); next.revision = 3; next.values.identity.city = 'Cidade da outra sessão'
+  api.get.mockResolvedValueOnce({ data: next })
+  await actor.click(await screen.findByRole('button', { name: 'Atualizar referência sem perder rascunho' }))
+  expect(screen.getByLabelText(/Nome do sistema/)).toHaveValue('Minha edição')
+  expect(screen.getByLabelText(/Município/)).toHaveValue('Cidade da outra sessão')
+  await actor.click(screen.getByRole('button', { name: 'Conferir e publicar' }))
+  await actor.click(screen.getByRole('button', { name: 'Publicar parâmetros' }))
+  expect(api.put.mock.lastCall[1]).toMatchObject({ expected_revision: 3, values: { identity: { city: 'Cidade da outra sessão', systemName: 'Minha edição' } } })
+})
+
+it('pede escolha quando as duas sessões editaram o mesmo parâmetro', async () => {
+  const actor = userEvent.setup(); mount()
+  fireEvent.change(await screen.findByLabelText(/Nome do sistema/), { target: { value: 'Minha edição' } })
+  await actor.click(screen.getByRole('button', { name: 'Conferir e publicar' }))
+  await actor.type(screen.getByLabelText(/Justificativa/), 'Conferência das versões')
+  api.put.mockRejectedValueOnce({ response: { status: 409, data: { detail: 'Outra sessão publicou.' } } })
+  await actor.click(screen.getByRole('button', { name: 'Publicar parâmetros' }))
+  const next = structuredClone(config); next.revision = 3; next.values.identity.systemName = 'Publicado por outra sessão'
+  api.get.mockResolvedValueOnce({ data: next })
+  await actor.click(await screen.findByRole('button', { name: 'Atualizar referência sem perder rascunho' }))
+  const dialog = screen.getByRole('dialog', { name: 'Conciliar versões dos parâmetros' })
+  expect(within(dialog).getByRole('button', { name: 'Aplicar escolhas ao rascunho' })).toBeDisabled()
+  await actor.click(within(dialog).getByRole('radio', { name: /Manter meu preenchimento/ }))
+  await actor.click(within(dialog).getByRole('button', { name: 'Aplicar escolhas ao rascunho' }))
+  expect(screen.getByLabelText(/Nome do sistema/)).toHaveValue('Minha edição')
+  expect(api.put).toHaveBeenCalledTimes(1)
+})
+
+it('não recicla o identificador de um campo removido e apresenta o impacto na conferência', async () => {
+  const start = structuredClone(config)
+  start.values.forms.vehicles = { fields: {}, custom: [{ key: 'campo_1', label: 'Informação anterior', type: 'text', required: false }] }
+  api.get.mockResolvedValueOnce({ data: start })
+  const actor = userEvent.setup(); mount('?section=forms')
+  await actor.click(await screen.findByRole('button', { name: 'Excluir campo Informação anterior' }))
+  await actor.click(screen.getByRole('button', { name: '+ Adicionar campo' }))
+  await actor.click(screen.getByRole('button', { name: 'Conferir e publicar' }))
+  expect(screen.getByText(/Os valores já registrados serão preservados/)).toBeInTheDocument()
+  await actor.type(screen.getByLabelText(/Justificativa/), 'Troca de campos em teste')
+  await actor.click(screen.getByRole('button', { name: 'Publicar parâmetros' }))
+  expect(api.put.mock.lastCall[1].values.forms.vehicles.custom[0].key).not.toBe('campo_1')
+})
+
+it('impede sair por um link interno sem confirmar o descarte do rascunho', async () => {
+  const actor = userEvent.setup()
+  render(<MemoryRouter initialEntries={['/parametros']}><Link to="/vehicles">Abrir veículos</Link><SystemSettingsPage /></MemoryRouter>)
+  fireEvent.change(await screen.findByLabelText(/Nome do sistema/), { target: { value: 'Meu rascunho' } })
+  await actor.click(screen.getByRole('link', { name: 'Abrir veículos' }))
+  expect(screen.getByRole('dialog', { name: 'Sair com alterações não publicadas?' })).toBeInTheDocument()
+  await actor.click(screen.getByRole('button', { name: 'Continuar editando' }))
+  expect(screen.getByLabelText(/Nome do sistema/)).toHaveValue('Meu rascunho')
 })

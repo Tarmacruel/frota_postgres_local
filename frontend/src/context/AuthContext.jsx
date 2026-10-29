@@ -40,9 +40,10 @@ export function AuthProvider({ children }) {
 
   async function logout() {
     setLoading(true)
-    await api.post('/auth/logout')
-    setUser(null)
-    setLoading(false)
+    try {
+      await api.post('/auth/logout')
+      setUser(null)
+    } finally { setLoading(false) }
   }
 
   async function changePassword({ current_password, new_password }) {

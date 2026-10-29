@@ -18,6 +18,13 @@ function Example({ saved = vi.fn(), busy = false }) {
 }
 
 describe('GuidedForm', () => {
+  it('preserves a required marker already nested in a caption without duplicating it', () => {
+    render(<GuidedForm><FormSection title="Cadastro"><label className="form-field"><span className="record-editor__label"><span>Placa<span className="guided-form__required"> *</span></span></span><input required /></label></FormSection><button type="submit">Salvar</button></GuidedForm>)
+    const label = screen.getByRole('textbox', { name: /Placa/ }).closest('label')
+    expect(label.querySelectorAll('.guided-form__required')).toHaveLength(1)
+    expect(label.querySelector('.record-editor__label')).toHaveTextContent('Placa *')
+    expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuemax', '1')
+  })
   it('keeps the first typed character through the native capture-to-change boundary', async () => {
     render(<Example />)
     const input = screen.getByLabelText('Nome')

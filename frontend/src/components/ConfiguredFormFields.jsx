@@ -25,7 +25,7 @@ export function CustomFormFields({ module, recordId = null }) {
     {loading ? <p role="status">Carregando informações…</p> : null}
     {error ? <p className="form-error" role="alert">{error}</p> : null}
     <div className="configured-fields__grid">
-      {definitions.map((field) => <label key={field.key} className="form-field">{field.label}{field.required ? <span className="guided-form__required"> *</span> : null}
+      {definitions.map((field) => <label key={field.key} className="form-field"><span>{field.label}{field.required ? <span className="guided-form__required"> *</span> : null}</span>
         {field.type === 'boolean' ? <select className="app-select" data-custom-key={field.key} data-custom-type={field.type}
           required={field.required} disabled={loading || Boolean(error)} value={entries[field.key] === undefined ? '' : String(entries[field.key])}
           onChange={(event) => setEntries({ ...entries, [field.key]: event.target.value === '' ? undefined : event.target.value === 'true' })}>

@@ -64,9 +64,16 @@ api.interceptors.request.use(async (config) => {
 
 api.interceptors.response.use(
   (response) => response,
-  (error) => {
-    if (error?.response?.status === 403 && String(error?.response?.data?.detail || '').includes('CSRF')) {
+  async (error) => {
+    // Only this explicit middleware rejection guarantees that no endpoint ran.
+    // A second tab may rotate the shared cookie while this tab caches its token.
+    if (error?.response?.status === 403 && error.response.data?.code === 'CSRF_TOKEN_INVALID') {
       csrfToken = ''
+      const config = error.config
+      if (config && isUnsafeMethod(config.method) && !config.csrfRetried && !isCsrfExempt(config.url)) {
+        await getCsrfToken()
+        return api.request({ ...config, csrfRetried: true })
+      }
     }
     throw error
   },

@@ -55,3 +55,48 @@ it('explica o impedimento e oferece acesso ao fluxo de solução sem permitir oc
   expect(screen.getByRole('button', { name: 'Concluir inativação' })).toBeDisabled()
   expect(api.patch).not.toHaveBeenCalled()
 })
+
+it('descarta uma resposta de detalhe que chegou depois da troca de módulo', async () => {
+  let finishDetail
+  api.get.mockImplementation(async (path) => {
+    if (path.endsWith('/catalog')) return { data: [{ key: 'maintenance', label: 'Manutenções' }, { key: 'vehicles', label: 'Veículos' }] }
+    if (path.endsWith('/example')) return new Promise((resolve) => { finishDetail = resolve })
+    if (path === '/record-admin/vehicles') return { data: { data: [{ id: 'vehicle', label: 'Veículo fictício', inactive: false }], total: 1 } }
+    return { data: { data: [{ id: 'example', label: detail.label, inactive: false }], total: 1 } }
+  })
+  const actor = userEvent.setup()
+  render(<RecordAdministration initialModule="maintenance" />)
+  await actor.click(await screen.findByRole('button', { name: /Manutenção fictícia/ }))
+  await actor.selectOptions(screen.getByLabelText('Módulo'), 'vehicles')
+  finishDetail({ data: detail })
+  expect(await screen.findByRole('button', { name: /Veículo fictício/ })).toBeInTheDocument()
+  expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+})
+
+it('recupera conflito preservando correção local e informações recentes, sem repetir estorno', async () => {
+  detail = { ...detail, values: { ...detail.values, parts: 'Peça anterior' }, fields: [...detail.fields, { key: 'parts', label: 'Peças', type: 'text', required: false }] }
+  api.patch.mockRejectedValueOnce({ response: { status: 409, data: { detail: 'O registro foi atualizado.' } } }).mockResolvedValue({ data: {} })
+  const actor = await open()
+  await actor.clear(screen.getByRole('textbox', { name: /Serviço/ }))
+  await actor.type(screen.getByRole('textbox', { name: /Serviço/ }), 'Correção local')
+  await actor.click(screen.getByRole('button', { name: 'Continuar', exact: true }))
+  await actor.type(screen.getByRole('textbox', { name: 'Justificativa' }), 'Revisão de cadastro em teste')
+  await actor.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+  detail = { ...detail, revision: 3, updated_at: '2026-10-29T13:00:00Z', values: { ...detail.values, parts: 'Peça da outra sessão' } }
+  await actor.click(await screen.findByRole('button', { name: 'Atualizar registro preservando edições' }))
+  await actor.click(screen.getByRole('button', { name: 'Salvar alterações' }))
+  await waitFor(() => expect(api.patch).toHaveBeenCalledTimes(2))
+  expect(api.patch.mock.lastCall[1]).toMatchObject({ expected_revision: 3, expected_updated_at: detail.updated_at,
+    changes: { service_description: 'Correção local' }, effect_action: 'none' })
+  expect(api.patch.mock.lastCall[1].changes).not.toHaveProperty('parts')
+})
+
+it('oferece repetição quando o histórico falha em vez de afirmar que não existe histórico', async () => {
+  const previous = api.get.getMockImplementation()
+  api.get.mockImplementation((path, ...args) => path.endsWith('/history') ? Promise.reject(new Error('offline')) : previous(path, ...args))
+  const actor = await open()
+  await actor.click(screen.getByRole('button', { name: 'Continuar', exact: true }))
+  await actor.click(screen.getByText('Histórico administrativo'))
+  expect(await screen.findByRole('button', { name: 'Recarregar histórico' })).toBeInTheDocument()
+  expect(screen.queryByText('Sem alterações administrativas registradas.')).not.toBeInTheDocument()
+})

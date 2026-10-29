@@ -19,6 +19,10 @@ function requiredDescendant(node) {
   return isValidElement(node) && (node.props.required || Children.toArray(node.props.children).some(requiredDescendant))
 }
 
+function hasRequiredMarker(node) {
+  return isValidElement(node) && (node.props.className?.split(' ').includes('guided-form__required') || Children.toArray(node.props.children).some(hasRequiredMarker))
+}
+
 function requiredIds(children, result = new Set()) {
   Children.forEach(children, (child) => {
     if (!isValidElement(child)) return
@@ -65,6 +69,7 @@ function decorate(children, ids, labels, inheritedLabel = '') {
     const nested = fieldRequired ? Children.map(child.props.children, (node) => isValidElement(node) && node.type === 'label' ? cloneElement(node, { 'data-guided-required-label': true }) : node) : child.props.children
     const content = decorate(nested, ids, labels, label)
     if (child.type === 'label' && (child.props['data-guided-required-label'] || requiredDescendant(child) || ids.has(child.props.htmlFor))) {
+      if (Children.toArray(content).some(hasRequiredMarker)) return cloneElement(child, attributes, content)
       const parts = Children.toArray(content)
       const controlIndex = parts.findIndex(requiredDescendant)
       const marker = <span className="guided-form__required" aria-hidden="true"> *</span>
