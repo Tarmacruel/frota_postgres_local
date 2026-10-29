@@ -94,7 +94,7 @@ export function FormFeedback({ children, className = '', id }) {
         ? 'O preenchimento foi mantido. Confira a pendência na configuração do contrato e atualize a consulta deste formulário antes de tentar novamente.'
         : 'O preenchimento foi mantido. Corrija a informação indicada; se depender de outro cadastro, peça a correção ao responsável e depois retome esta ação.'
   return <div id={id} className={`guided-feedback ${className}`} role="alert" tabIndex={-1}>
-    <AppIcon name="close" /><div><strong>Confira antes de continuar</strong><div className="guided-feedback__message">{children}</div><p>{guidance}</p></div>
+    <AppIcon name="close" className="app-icon" /><div><strong>Confira antes de continuar</strong><div className="guided-feedback__message">{children}</div><p>{guidance}</p></div>
   </div>
 }
 
@@ -109,6 +109,8 @@ export function FormSection({ title, description, children, requirement: _requir
 const GuidedForm = forwardRef(function GuidedForm({ children, onSubmit, className = '', title = 'Preenchimento', busy = false, initialStep = 0, formError = '', blockedMessage = '', requirements = [], onChangeCapture, onInputCapture, ...props }, forwardedRef) {
   const localRef = useRef(null)
   const bodyRef = useRef(null)
+  const scanFrameRef = useRef(null)
+  const latestScanRef = useRef(null)
   const [step, setStep] = useState(initialStep)
   const [attempted, setAttempted] = useState(false)
   const [issues, setIssues] = useState([])
@@ -146,7 +148,10 @@ const GuidedForm = forwardRef(function GuidedForm({ children, onSubmit, classNam
     })
   }
   // Controlled selectors, conditional fields and catalog responses may change without a native input event.
-  useEffect(scan)
+  useEffect(() => { latestScanRef.current = scan; scan() })
+  useEffect(() => () => {
+    if (scanFrameRef.current !== null) cancelAnimationFrame(scanFrameRef.current)
+  }, [])
 
   function goTo(index) {
     setStep(index)
@@ -199,19 +204,24 @@ const GuidedForm = forwardRef(function GuidedForm({ children, onSubmit, classNam
   const ids = requiredIds(children)
   const labels = labelsById(children)
   function scheduleScan() {
-    // A select dispatches input before change. Updating during input capture would
-    // restore its old controlled value before the parent's onChange can read it.
-    queueMicrotask(() => { if (localRef.current) scan() })
+    // Chromium can run microtasks between capture and bubble listeners. Wait
+    // until the event finishes so React receives the first character before any
+    // progress render can restore the previous controlled value.
+    if (scanFrameRef.current !== null) return
+    scanFrameRef.current = requestAnimationFrame(() => {
+      scanFrameRef.current = null
+      if (localRef.current) latestScanRef.current?.()
+    })
   }
   return <form {...props} ref={(node) => { localRef.current = node; if (typeof forwardedRef === 'function') forwardedRef(node); else if (forwardedRef) forwardedRef.current = node }} className="guided-form" data-attempted={attempted} data-final={final} onSubmit={submit} noValidate onChangeCapture={(event) => { onChangeCapture?.(event); scheduleScan() }} onInputCapture={(event) => { onInputCapture?.(event); scheduleScan() }}>
     <header className="guided-form__progress">
       <div className="guided-form__caption"><span>{title}</span><strong aria-live="polite">{progress.total ? `${progress.filled} de ${progress.total} obrigatórios preenchidos` : 'Revise os dados antes de confirmar'}</strong></div>
       {progress.total ? <div className="guided-form__bar" role="progressbar" aria-label="Preenchimento dos campos obrigatórios" aria-valuemin={0} aria-valuemax={progress.total} aria-valuenow={progress.filled}><span style={{ width: `${progress.filled / progress.total * 100}%` }} /></div> : null}
-      {sections.length > 1 ? <nav aria-label="Etapas do formulário"><ol>{sections.map((section, index) => <li key={section.props.title} aria-current={activeStep === index ? 'step' : undefined}><button type="button" disabled={busy} onClick={() => { if (index <= activeStep || validate()) goTo(index) }}><span aria-hidden="true">{progress.sections[index]?.complete ? <AppIcon name="check" /> : index + 1}</span>{section.props.title}</button></li>)}</ol></nav> : null}
+      {sections.length > 1 ? <nav aria-label="Etapas do formulário"><ol>{sections.map((section, index) => <li key={section.props.title} aria-current={activeStep === index ? 'step' : undefined}><button type="button" disabled={busy} onClick={() => { if (index <= activeStep || validate()) goTo(index) }}><span aria-hidden="true">{progress.sections[index]?.complete ? <AppIcon name="check" className="app-icon" /> : index + 1}</span>{section.props.title}</button></li>)}</ol></nav> : null}
     </header>
     <div className={`guided-form__body ${className}`} ref={bodyRef}>
       {formError ? <FormFeedback>{formError}</FormFeedback> : null}
-      {issues.length ? <div className="guided-feedback guided-form__errors" role="alert" id={`${id}-errors`}><AppIcon name="close" /><div><strong>Revise {issues.length === 1 ? 'o campo indicado' : 'os campos indicados'}</strong><p>Selecione uma pendência para ir ao campo. Seus dados continuam preenchidos.</p><ul>{issues.map((issue, index) => <li key={index}><button type="button" onClick={() => focusIssue(issue)}><strong>{issue.label || describeFormField(issue.control)}</strong>{': '}<span>{issue.message || validationMessage(issue.control)}</span></button></li>)}</ul></div></div> : null}
+      {issues.length ? <div className="guided-feedback guided-form__errors" role="alert" id={`${id}-errors`}><AppIcon name="close" className="app-icon" /><div><strong>Revise {issues.length === 1 ? 'o campo indicado' : 'os campos indicados'}</strong><p>Selecione uma pendência para ir ao campo. Seus dados continuam preenchidos.</p><ul>{issues.map((issue, index) => <li key={index}><button type="button" onClick={() => focusIssue(issue)}><strong>{issue.label || describeFormField(issue.control)}</strong>{': '}<span>{issue.message || validationMessage(issue.control)}</span></button></li>)}</ul></div></div> : null}
       {blockedMessage && !busy ? <p className="guided-form__blocker" role="note">{blockedMessage}</p> : null}
       {content.map((node) => {
         if (isValidElement(node) && node.type === FormSection) { sectionIndex += 1; return cloneElement(node, { 'data-guided-step': sectionIndex, hidden: sectionIndex !== activeStep, children: decorate(node.props.children, ids, labels) }) }

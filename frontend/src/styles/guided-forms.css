@@ -33,6 +33,7 @@ body.internal-app-active .modal-shell:has(> .modal-body > .guided-form) > .modal
 .guided-form[data-attempted="true"] label:has(:invalid), .guided-form[data-attempted="true"] .form-field:has(:invalid) > label { color: var(--form-danger); }
 .guided-feedback { display: flex; align-items: start; gap: 12px; grid-column: 1/-1; border: 0; border-left: 3px solid var(--form-danger, #b73a3a); background: color-mix(in srgb, var(--form-danger, #b73a3a) 6%, var(--ui-surface, white)); color: var(--ui-text, #14233a); padding: 16px; margin-bottom: 16px; min-width: 0; overflow-wrap: anywhere; }
 .guided-feedback > .app-icon { flex: none; width: 18px; height: 18px; color: var(--form-danger, #b73a3a); }
+.guided-feedback > div { min-width: 0; }
 .guided-feedback strong { font-size: 13px; }
 .guided-feedback p, .guided-feedback__message { font-size: 13px; line-height: 1.5; margin: 6px 0 0; }
 .guided-feedback p { color: var(--ui-text-muted, #64748b); }

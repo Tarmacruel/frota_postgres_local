@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
 import userEvent from '@testing-library/user-event'
 import GuidedForm, { FormSection } from './GuidedForm'
@@ -18,6 +18,30 @@ function Example({ saved = vi.fn(), busy = false }) {
 }
 
 describe('GuidedForm', () => {
+  it('keeps the first typed character through the native capture-to-change boundary', async () => {
+    render(<Example />)
+    const input = screen.getByLabelText('Nome')
+    // Chromium can run a microtask between the root capture and bubble listeners.
+    // Model that boundary before React receives the controlled field change.
+    fireEvent.input(input, { target: { value: 'A' }, bubbles: false })
+    await act(async () => { await Promise.resolve() })
+    expect(input).toHaveValue('A')
+    fireEvent.change(input)
+    await waitFor(() => expect(screen.getByRole('progressbar')).toHaveAttribute('aria-valuenow', '1'))
+    fireEvent.change(input, { target: { value: '' } })
+    fireEvent.input(input, { target: { value: 'B' }, bubbles: false })
+    await act(async () => { await Promise.resolve() })
+    expect(input).toHaveValue('B')
+    fireEvent.change(input)
+    expect(input).toHaveValue('B')
+  })
+  it('marks every feedback and completed-step icon for the shared size rules', () => {
+    render(<Example />)
+    fireEvent.click(screen.getByRole('button', { name: 'Continuar' }))
+    expect(screen.getByRole('alert').querySelector('svg')).toHaveClass('app-icon')
+    fireEvent.change(screen.getByLabelText('Nome'), { target: { value: 'Cadastro' } })
+    expect(screen.getByRole('button', { name: 'Cadastro' }).querySelector('svg')).toHaveClass('app-icon')
+  })
   it('shows real required progress and prevents continuing with a missing field', async () => {
     const saved = vi.fn()
     render(<Example saved={saved} />)
