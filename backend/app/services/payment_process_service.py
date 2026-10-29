@@ -16,17 +16,8 @@ from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.organization_scope import is_production_user, production_scope_is_empty, scoped_organization_id
-from app.core.official_identity import (
-    ADMINISTRATION_SECRETARIAT,
-    COLOR_BORDER,
-    COLOR_NAVY,
-    COLOR_SURFACE,
-    FLEET_DEPARTMENT,
-    MUNICIPALITY_ADDRESS,
-    MUNICIPALITY_CNPJ,
-    MUNICIPALITY_NAME,
-    institutional_datetime,
-)
+from app.core.official_identity import COLOR_BORDER, COLOR_SURFACE, institutional_datetime
+from app.core import official_identity
 from app.models.master_data import Organization
 from app.models.payment_process import (
     PaymentChecklistStatus,
@@ -2368,7 +2359,7 @@ class PaymentProcessService:
         for row in rows:
             sheet.append([self._neutralize_workbook_text(value) for value in row])
 
-        navy = COLOR_NAVY.removeprefix("#")
+        navy = official_identity.COLOR_NAVY.removeprefix("#")
         border_color = COLOR_BORDER.removeprefix("#")
         surface = COLOR_SURFACE.removeprefix("#")
         thin_border = Border(
@@ -2403,11 +2394,11 @@ class PaymentProcessService:
         metadata["A1"].alignment = Alignment(horizontal="left", vertical="center")
         metadata.row_dimensions[1].height = 24
         institutional_metadata = [
-            ("Instituição", MUNICIPALITY_NAME),
-            ("Secretaria", ADMINISTRATION_SECRETARIAT),
-            ("Unidade responsável", FLEET_DEPARTMENT),
-            ("CNPJ", MUNICIPALITY_CNPJ),
-            ("Endereço", MUNICIPALITY_ADDRESS),
+            ("Instituição", official_identity.MUNICIPALITY_NAME),
+            ("Secretaria", official_identity.ADMINISTRATION_SECRETARIAT),
+            ("Unidade responsável", official_identity.FLEET_DEPARTMENT),
+            ("CNPJ", official_identity.MUNICIPALITY_CNPJ),
+            ("Endereço", official_identity.MUNICIPALITY_ADDRESS),
             ("Documento", "Planilha institucional de processos de pagamento"),
             ("Conteúdo", sheet_name),
             ("Emissão", generated_at),
@@ -2433,12 +2424,12 @@ class PaymentProcessService:
         metadata.freeze_panes = "A2"
         metadata.sheet_view.showGridLines = False
 
-        workbook.properties.creator = MUNICIPALITY_NAME
-        workbook.properties.lastModifiedBy = MUNICIPALITY_NAME
+        workbook.properties.creator = official_identity.MUNICIPALITY_NAME
+        workbook.properties.lastModifiedBy = official_identity.MUNICIPALITY_NAME
         workbook.properties.title = "Processos de pagamento"
         workbook.properties.subject = "Documento institucional de processos de pagamento"
         workbook.properties.description = (
-            f"{MUNICIPALITY_NAME} — {ADMINISTRATION_SECRETARIAT} — {FLEET_DEPARTMENT}"
+            f"{official_identity.MUNICIPALITY_NAME} — {official_identity.ADMINISTRATION_SECRETARIAT} — {official_identity.FLEET_DEPARTMENT}"
         )
         workbook.properties.category = "Documento institucional"
         workbook.properties.keywords = "processos de pagamento, frota municipal"

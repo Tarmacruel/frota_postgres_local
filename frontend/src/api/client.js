@@ -1,3 +1,4 @@
+import { captureCustomFields } from '../utils/formCustomization'
 import axios from 'axios'
 
 function resolveApiBaseUrl() {
@@ -49,6 +50,8 @@ async function getCsrfToken() {
 }
 
 api.interceptors.request.use(async (config) => {
+  const fields = captureCustomFields(config)
+  if (fields) { config.headers = config.headers || {}; config.headers['X-Form-Fields'] = fields }
   if (isUnsafeMethod(config.method) && !isCsrfExempt(config.url)) {
     const token = await getCsrfToken()
     if (token) {

@@ -143,7 +143,7 @@ async def test_repository_acknowledge_is_idempotent_when_unique_row_exists():
 @pytest.mark.asyncio
 async def test_get_current_user_reads_the_configured_cookie_name(monkeypatch):
     user_id = uuid4()
-    expected_user = SimpleNamespace(id=user_id)
+    expected_user = SimpleNamespace(id=user_id, role=UserRole.SUPERUSER, organization_id=None)
     token = create_access_token(subject=str(user_id), role="ADMIN")
     monkeypatch.setattr(settings, "COOKIE_NAME", "frota_homolog_access")
     lookup = AsyncMock(return_value=expected_user)
@@ -151,7 +151,7 @@ async def test_get_current_user_reads_the_configured_cookie_name(monkeypatch):
 
     user = await get_current_user(
         request=_request_with_cookie(f"access_token=ignored; frota_homolog_access={token}"),
-        db=SimpleNamespace(),
+        db=SimpleNamespace(info={}, scalar=AsyncMock(return_value=None)),
     )
 
     assert user is expected_user
@@ -168,7 +168,7 @@ async def test_get_current_user_does_not_fall_back_to_default_cookie_name(monkey
     with pytest.raises(HTTPException) as exc:
         await get_current_user(
             request=_request_with_cookie(f"access_token={token}"),
-            db=SimpleNamespace(),
+            db=SimpleNamespace(info={}),
         )
 
     assert exc.value.status_code == 401

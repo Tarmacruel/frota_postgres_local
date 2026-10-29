@@ -1,3 +1,4 @@
+import SystemSettingsPage from './pages/SystemSettingsPage'
 import { BrowserRouter, Navigate, Routes, Route } from 'react-router-dom'
 import Layout from './components/Layout'
 import EnvironmentBanner from './components/EnvironmentBanner'
@@ -144,6 +145,7 @@ export default function App() {
                 </ProtectedRoute>
               }
             />
+            <Route path="parametros" element={<ProtectedRoute superOnly><SystemSettingsPage /></ProtectedRoute>} />
             <Route
               path="users"
               element={

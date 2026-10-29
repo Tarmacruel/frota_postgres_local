@@ -5,7 +5,7 @@ from app.repositories.interactive_kpis import IndicatorRequest, indicator_contex
 from uuid import UUID
 from fastapi import APIRouter, Depends, Query, status
 from sqlalchemy.ext.asyncio import AsyncSession
-from app.api.deps import require_admin, require_permission
+from app.api.deps import require_superuser, require_permission
 from app.db.session import get_db_session
 from app.models.user import User
 from app.schemas.auth import MessageOut
@@ -76,7 +76,7 @@ async def delete_fuel_station(
     return {"message": "Removido"}
 
 
-@router.get("/{fuel_station_id}/users", response_model=list[FuelStationUserOut], dependencies=[Depends(require_admin)])
+@router.get("/{fuel_station_id}/users", response_model=list[FuelStationUserOut], dependencies=[Depends(require_superuser)])
 async def list_fuel_station_users(
     fuel_station_id: UUID,
     active_only: bool | None = Query(default=None),
@@ -90,7 +90,7 @@ async def create_fuel_station_user(
     fuel_station_id: UUID,
     data: FuelStationUserCreate,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_superuser),
 ):
     return await FuelStationService(db).create_user_link(fuel_station_id, data, current_user)
 
@@ -101,7 +101,7 @@ async def update_fuel_station_user(
     link_id: UUID,
     data: FuelStationUserUpdate,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_superuser),
 ):
     return await FuelStationService(db).update_user_link(fuel_station_id, link_id, data, current_user)
 
@@ -111,7 +111,7 @@ async def delete_fuel_station_user(
     fuel_station_id: UUID,
     link_id: UUID,
     db: AsyncSession = Depends(get_db_session),
-    current_user: User = Depends(require_admin),
+    current_user: User = Depends(require_superuser),
 ):
     await FuelStationService(db).delete_user_link(fuel_station_id, link_id, current_user)
     return {"message": "Removido"}

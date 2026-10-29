@@ -8,6 +8,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.organization_scope import ensure_organization_access, production_scope_is_empty, scoped_organization_id
 from app.models.master_data import Allocation, Department, Organization
 from app.models.user import User
+from app.core.roles import is_superuser
 from app.repositories.master_data_repository import MasterDataRepository
 from app.schemas.master_data import (
     AllocationCreate,
@@ -30,7 +31,7 @@ class MasterDataService:
         if production_scope_is_empty(current_user):
             return {"organizations": []}
         organizations = await self.repo.list_catalog(
-            organization_id=None if include_all else scoped_organization_id(current_user)
+            organization_id=None if include_all and is_superuser(current_user) else scoped_organization_id(current_user)
         )
         return {"organizations": organizations}
 
@@ -57,6 +58,8 @@ class MasterDataService:
         return await self.repo.list_allocations(organization_id=organization_id, department_id=department_id)
 
     async def create_organization(self, data: OrganizationCreate, current_user: User) -> Organization:
+        if not is_superuser(current_user):
+            raise HTTPException(403, 'A criação de secretarias é exclusiva do superusuário. Para sua secretaria, utilize departamentos e lotações.')
         organization = Organization(name=data.name.strip())
         try:
             organization = await self.repo.create_organization(organization)

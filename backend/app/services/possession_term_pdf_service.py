@@ -25,21 +25,8 @@ from reportlab.platypus import (
 from reportlab.pdfgen.canvas import Canvas
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.official_identity import (
-    ADMINISTRATION_SECRETARIAT,
-    COLOR_BORDER,
-    COLOR_INK,
-    COLOR_MUTED,
-    COLOR_NAVY,
-    COLOR_SURFACE,
-    FLEET_DEPARTMENT,
-    MUNICIPALITY_ADDRESS,
-    MUNICIPALITY_CNPJ,
-    MUNICIPALITY_NAME,
-    crest_path,
-    ensure_pdf_fonts,
-    institutional_datetime,
-)
+from app.core.official_identity import COLOR_BORDER, COLOR_INK, COLOR_MUTED, COLOR_SURFACE, crest_path, ensure_pdf_fonts, institutional_datetime
+from app.core import official_identity
 from app.core.possession_responsibility import (
     RESPONSIBILITY_ACCEPTANCE_TEXT,
     RESPONSIBILITY_ACCEPTANCE_VERSION,
@@ -147,7 +134,7 @@ class PossessionTermPdfService:
     ) -> tuple[bytes, str]:
         if disposition not in {"inline", "attachment"}:
             raise HTTPException(status_code=422, detail="Disposição do PDF inválida")
-        if disposition == "attachment" and current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
+        if disposition == "attachment" and current_user.role not in {UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO}:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={
@@ -161,7 +148,7 @@ class PossessionTermPdfService:
             raise HTTPException(status_code=404, detail="Registro de posse não encontrado")
         possession_service = PossessionService(self.db)
         await possession_service._ensure_possession_visible_to_user(precheck, current_user)
-        include_personal = current_user.role in {UserRole.ADMIN, UserRole.PRODUCAO}
+        include_personal = current_user.role in {UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO}
         await self.signatures.lock_source_for_consistent_read(
             DigitalDocumentType.POSSESSION_RESPONSIBILITY_TERM,
             possession_id,
@@ -212,6 +199,7 @@ class PossessionTermPdfService:
         return pdf, filename
 
     @classmethod
+    @official_identity.frozen_document_brand
     def build_canonical_delivery_pdf(
         cls,
         snapshot: dict,
@@ -254,9 +242,9 @@ class PossessionTermPdfService:
             topMargin=20 * mm,
             bottomMargin=22 * mm,
             title=f"Termo canonico de entrega e responsabilidade nº {term_number}",
-            author=MUNICIPALITY_NAME,
+            author=official_identity.MUNICIPALITY_NAME,
             subject="Escopo congelado de entrega e responsabilidade para assinatura digital",
-            creator="Sistema de Frota PMTF",
+            creator=official_identity.SYSTEM_NAME,
             invariant=1,
             pageCompression=1,
         )
@@ -314,12 +302,12 @@ class PossessionTermPdfService:
                 canvas.drawCentredString(0, 0, "HOMOLOGAÇÃO — SEM VALIDADE OPERACIONAL")
                 canvas.rotate(-35)
                 canvas.translate(-A4[0] / 2, -A4[1] / 2)
-            canvas.setStrokeColor(colors.HexColor(COLOR_NAVY))
+            canvas.setStrokeColor(colors.HexColor(official_identity.COLOR_NAVY))
             canvas.setLineWidth(0.5)
             canvas.line(17 * mm, 16 * mm, A4[0] - 17 * mm, 16 * mm)
             canvas.setFillColor(colors.HexColor(COLOR_MUTED))
             canvas.setFont(font_regular, 6.4)
-            canvas.drawString(17 * mm, 12.5 * mm, f"{MUNICIPALITY_NAME} · CNPJ {MUNICIPALITY_CNPJ}")
+            canvas.drawString(17 * mm, 12.5 * mm, f"{official_identity.MUNICIPALITY_NAME} · CNPJ {official_identity.MUNICIPALITY_CNPJ}")
             canvas.drawRightString(
                 A4[0] - 17 * mm,
                 12.5 * mm,
@@ -368,7 +356,7 @@ class PossessionTermPdfService:
             topMargin=20 * mm,
             bottomMargin=22 * mm,
             title=f"Termo de Posse e Responsabilidade nº {possession.public_number}",
-            author=MUNICIPALITY_NAME,
+            author=official_identity.MUNICIPALITY_NAME,
             subject="Registro oficial de entrega, responsabilidade, rotas e devolução de veículo",
         )
         styles = self._styles(font_regular=font_regular, font_bold=font_bold)
@@ -386,7 +374,7 @@ class PossessionTermPdfService:
             ),
             Spacer(1, 4 * mm),
             Paragraph(
-                "Por este instrumento, o Município de Teixeira de Freitas registra a entrega do veículo "
+                f"Por este instrumento, o Município de {official_identity.MUNICIPALITY_CITY} registra a entrega do veículo "
                 "abaixo identificado à pessoa responsável pela condução, para utilização exclusiva no interesse "
                 "do serviço público, sob os deveres de guarda, conservação e correta utilização.",
                 styles["BodyCompact"],
@@ -560,25 +548,25 @@ class PossessionTermPdfService:
         def footer(canvas, doc):
             canvas.saveState()
             if doc.page > 1:
-                canvas.setFillColor(colors.HexColor(COLOR_NAVY))
+                canvas.setFillColor(colors.HexColor(official_identity.COLOR_NAVY))
                 canvas.setFont(font_bold, 7.2)
-                canvas.drawString(17 * mm, A4[1] - 12 * mm, MUNICIPALITY_NAME.upper())
+                canvas.drawString(17 * mm, A4[1] - 12 * mm, official_identity.MUNICIPALITY_NAME.upper())
                 canvas.setFont(font_regular, 7.2)
                 canvas.drawRightString(
                     A4[0] - 17 * mm,
                     A4[1] - 12 * mm,
                     f"TERMO DE POSSE Nº {possession.public_number} · CONTINUAÇÃO",
                 )
-                canvas.setStrokeColor(colors.HexColor(COLOR_NAVY))
+                canvas.setStrokeColor(colors.HexColor(official_identity.COLOR_NAVY))
                 canvas.setLineWidth(0.45)
                 canvas.line(17 * mm, A4[1] - 15 * mm, A4[0] - 17 * mm, A4[1] - 15 * mm)
-            canvas.setStrokeColor(colors.HexColor(COLOR_NAVY))
+            canvas.setStrokeColor(colors.HexColor(official_identity.COLOR_NAVY))
             canvas.setLineWidth(0.5)
             canvas.line(17 * mm, 16 * mm, A4[0] - 17 * mm, 16 * mm)
             canvas.setFillColor(colors.HexColor(COLOR_MUTED))
             canvas.setFont(font_regular, 6.4)
-            canvas.drawString(17 * mm, 12.5 * mm, f"{MUNICIPALITY_NAME} · CNPJ {MUNICIPALITY_CNPJ}")
-            canvas.drawString(17 * mm, 9.5 * mm, MUNICIPALITY_ADDRESS)
+            canvas.drawString(17 * mm, 12.5 * mm, f"{official_identity.MUNICIPALITY_NAME} · CNPJ {official_identity.MUNICIPALITY_CNPJ}")
+            canvas.drawString(17 * mm, 9.5 * mm, official_identity.MUNICIPALITY_ADDRESS)
             canvas.drawRightString(
                 A4[0] - 17 * mm,
                 12.5 * mm,
@@ -600,7 +588,7 @@ class PossessionTermPdfService:
                 fontName=font_bold,
                 fontSize=9.5,
                 leading=11.5,
-                textColor=colors.HexColor(COLOR_NAVY),
+                textColor=colors.HexColor(official_identity.COLOR_NAVY),
             )
         )
         styles.add(
@@ -621,7 +609,7 @@ class PossessionTermPdfService:
                 fontSize=14,
                 leading=17,
                 alignment=TA_CENTER,
-                textColor=colors.HexColor(COLOR_NAVY),
+                textColor=colors.HexColor(official_identity.COLOR_NAVY),
                 spaceAfter=3 * mm,
             )
         )
@@ -632,7 +620,7 @@ class PossessionTermPdfService:
                 fontName=font_bold,
                 fontSize=10.5,
                 leading=13,
-                textColor=colors.HexColor(COLOR_NAVY),
+                textColor=colors.HexColor(official_identity.COLOR_NAVY),
                 spaceBefore=4 * mm,
                 spaceAfter=2 * mm,
             )
@@ -692,10 +680,10 @@ class PossessionTermPdfService:
     def _institutional_header(styles):
         crest = Image(str(crest_path()), width=14.3 * mm, height=18 * mm)
         identity = [
-            Paragraph(MUNICIPALITY_NAME.upper(), styles["Institution"]),
-            Paragraph(ADMINISTRATION_SECRETARIAT, styles["InstitutionDetail"]),
-            Paragraph(FLEET_DEPARTMENT, styles["InstitutionDetail"]),
-            Paragraph(f"CNPJ {MUNICIPALITY_CNPJ}", styles["InstitutionDetail"]),
+            Paragraph(escape(official_identity.MUNICIPALITY_NAME.upper()), styles["Institution"]),
+            Paragraph(escape(official_identity.ADMINISTRATION_SECRETARIAT), styles["InstitutionDetail"]),
+            Paragraph(escape(official_identity.FLEET_DEPARTMENT), styles["InstitutionDetail"]),
+            Paragraph(f"CNPJ {official_identity.MUNICIPALITY_CNPJ}", styles["InstitutionDetail"]),
         ]
         table = Table([[crest, identity]], colWidths=[19 * mm, 141 * mm], hAlign="LEFT")
         table.setStyle(
@@ -706,7 +694,7 @@ class PossessionTermPdfService:
                     ("RIGHTPADDING", (0, 0), (-1, -1), 0),
                     ("TOPPADDING", (0, 0), (-1, -1), 0),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 3 * mm),
-                    ("LINEBELOW", (0, 0), (-1, -1), 0.9, colors.HexColor(COLOR_NAVY)),
+                    ("LINEBELOW", (0, 0), (-1, -1), 0.9, colors.HexColor(official_identity.COLOR_NAVY)),
                 ]
             )
         )
@@ -901,7 +889,7 @@ class PossessionTermPdfService:
                 [
                     Paragraph("Pessoa responsável pela condução", styles["Small"]),
                     "",
-                    Paragraph(f"{ADMINISTRATION_SECRETARIAT} / {FLEET_DEPARTMENT}", styles["Small"]),
+                    Paragraph(f"{official_identity.ADMINISTRATION_SECRETARIAT} / {official_identity.FLEET_DEPARTMENT}", styles["Small"]),
                 ],
             ],
             colWidths=[72 * mm, 10 * mm, 72 * mm],
@@ -927,7 +915,7 @@ class PossessionTermPdfService:
                 KeepTogether(
                     [
                         Paragraph(
-                            f"Teixeira de Freitas - BA, {_fmt_date(possession.start_date)}.",
+                            f"{official_identity.MUNICIPALITY_CITY} - {official_identity.MUNICIPALITY_STATE}, {_fmt_date(possession.start_date)}.",
                             styles["BodyCompact"],
                         ),
                         Spacer(1, 2 * mm),
@@ -975,7 +963,7 @@ class PossessionTermPdfService:
         table.setStyle(
             TableStyle(
                 [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(COLOR_NAVY)),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(official_identity.COLOR_NAVY)),
                     ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
                     ("GRID", (0, 0), (-1, -1), 0.3, colors.HexColor(COLOR_BORDER)),
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),

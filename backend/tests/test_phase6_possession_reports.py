@@ -45,7 +45,7 @@ def _user(role: UserRole) -> SimpleNamespace:
         name=f"Usuário {role.value}",
         email=f"{role.value.lower()}@example.test",
         role=role,
-        organization_id=None,
+        organization_id=uuid4(),
     )
 
 
@@ -60,7 +60,7 @@ def test_phase6_migration_has_confirmed_parent_and_scoped_preference_payload():
 
 
 def test_summary_preset_is_minimized_and_registry_is_typed():
-    columns = preset_columns(UserRole.ADMIN, PossessionReportMode.POSSESSION, PossessionReportPreset.SUMMARY)
+    columns = preset_columns(UserRole.SUPERUSER, PossessionReportMode.POSSESSION, PossessionReportPreset.SUMMARY)
     keys = [column.key for column in columns]
     assert keys == [
         "possession_number",
@@ -89,7 +89,7 @@ def test_summary_preset_is_minimized_and_registry_is_typed():
 def test_metadata_varies_by_role_and_never_sends_forbidden_columns():
     standard = PossessionReportService.metadata(_user(UserRole.PADRAO))
     production = PossessionReportService.metadata(_user(UserRole.PRODUCAO))
-    admin = PossessionReportService.metadata(_user(UserRole.ADMIN))
+    admin = PossessionReportService.metadata(_user(UserRole.SUPERUSER))
     standard_mode = standard["modes"][0]
     production_mode = production["modes"][0]
     admin_mode = admin["modes"][0]
@@ -115,13 +115,13 @@ def test_backend_rejects_unknown_restricted_and_mode_incompatible_columns():
     with pytest.raises(HTTPException) as unknown:
         service._resolve_columns(
             PossessionReportRequest(mode="POSSESSION", preset="CUSTOM", column_keys=["sql_expression"]),
-            UserRole.ADMIN,
+            UserRole.SUPERUSER,
         )
     assert unknown.value.detail["code"] == "REPORT_COLUMN_UNKNOWN"
     with pytest.raises(HTTPException) as mismatch:
         service._resolve_columns(
             PossessionReportRequest(mode="POSSESSION", preset="CUSTOM", column_keys=["trip_origin"]),
-            UserRole.ADMIN,
+            UserRole.SUPERUSER,
         )
     assert mismatch.value.detail["code"] == "REPORT_COLUMN_MODE_MISMATCH"
 
@@ -169,8 +169,8 @@ def test_pdf_and_xlsx_use_same_prepared_column_order_and_dataset():
         rows=((PreparedCell(raw="ABC1D23", display="ABC1D23"), PreparedCell(raw="Condutor teste", display="Condutor teste")),),
     )
     service = PossessionReportService(AsyncMock())
-    pdf = service._build_pdf(prepared, _user(UserRole.ADMIN))
-    xlsx = service._build_xlsx(prepared, _user(UserRole.ADMIN))
+    pdf = service._build_pdf(prepared, _user(UserRole.SUPERUSER))
+    xlsx = service._build_xlsx(prepared, _user(UserRole.SUPERUSER))
     workbook = load_workbook(filename=__import__("io").BytesIO(xlsx), read_only=True)
     worksheet = workbook["Posses"]
     assert pdf.startswith(b"%PDF-")
@@ -217,7 +217,7 @@ def test_formula_injection_is_neutralized_in_generated_workbook():
         columns=(REPORT_COLUMN_BY_KEY["driver_name"],),
         rows=((PreparedCell(raw="=HYPERLINK(\"https://invalid.test\")", display="texto"),),),
     )
-    xlsx = PossessionReportService(AsyncMock())._build_xlsx(prepared, _user(UserRole.ADMIN))
+    xlsx = PossessionReportService(AsyncMock())._build_xlsx(prepared, _user(UserRole.SUPERUSER))
     workbook = load_workbook(filename=__import__("io").BytesIO(xlsx), read_only=True)
     assert workbook["Posses"]["A2"].value.startswith("'=")
 
@@ -241,7 +241,7 @@ async def test_prepare_forwards_normalized_filters_to_bounded_server_query():
             has_return_confirmation=True,
         )
     )
-    prepared = await service.prepare(request, _user(UserRole.ADMIN), row_limit=42)
+    prepared = await service.prepare(request, _user(UserRole.SUPERUSER), row_limit=42)
     assert prepared.row_count == 0
     kwargs = service.reports.load.await_args.kwargs
     assert kwargs["filters"] is request.filters
@@ -306,13 +306,13 @@ async def test_preview_audit_contains_metadata_without_report_rows(monkeypatch):
     service = PossessionReportService(AsyncMock())
     prepared = PreparedReport(
         request=PossessionReportRequest(),
-        columns=tuple(preset_columns(UserRole.ADMIN, PossessionReportMode.POSSESSION, PossessionReportPreset.SUMMARY)),
+        columns=tuple(preset_columns(UserRole.SUPERUSER, PossessionReportMode.POSSESSION, PossessionReportPreset.SUMMARY)),
         rows=((PreparedCell(raw="segredo-da-linha", display="segredo-da-linha"),) * 8,),
     )
     service.prepare = AsyncMock(return_value=prepared)
     service._build_pdf = lambda *_args: b"%PDF-test"
     service.audit.record = AsyncMock()
-    await service.render_pdf(PossessionReportRequest(), _user(UserRole.ADMIN))
+    await service.render_pdf(PossessionReportRequest(), _user(UserRole.SUPERUSER))
     details = service.audit.record.await_args.kwargs["details"]
     serialized = str(details)
     assert details["record_count"] == 1
@@ -333,7 +333,7 @@ async def test_pdf_preview_includes_all_possessions_above_previous_1500_row_limi
         mode="POSSESSION", preset="CUSTOM", column_keys=["possession_number"]
     )
 
-    content, filename = await service.render_pdf(request, _user(UserRole.ADMIN))
+    content, filename = await service.render_pdf(request, _user(UserRole.SUPERUSER))
 
     assert content.startswith(b"%PDF-")
     assert filename.endswith(".pdf")
@@ -343,7 +343,7 @@ async def test_pdf_preview_includes_all_possessions_above_previous_1500_row_limi
 
 @pytest.mark.asyncio
 async def test_preference_persists_only_mode_preset_and_authorized_keys():
-    user = _user(UserRole.ADMIN)
+    user = _user(UserRole.SUPERUSER)
     service = PossessionReportService(AsyncMock())
     service.preferences.upsert = AsyncMock(return_value=SimpleNamespace())
     service.audit.record = AsyncMock()
@@ -379,7 +379,7 @@ async def test_report_route_has_no_store_and_protected_content_disposition(monke
     response = await possession_routes.preview_possession_report_pdf(
         PossessionReportRequest(),
         db=AsyncMock(),
-        current_user=_user(UserRole.ADMIN),
+        current_user=_user(UserRole.SUPERUSER),
     )
     assert response.headers["cache-control"].startswith("private, no-store")
     assert response.headers["content-disposition"] == 'inline; filename="relatorio-posses.pdf"'
@@ -390,6 +390,6 @@ async def test_report_route_has_no_store_and_protected_content_disposition(monke
 def test_security_metadata_columns_are_admin_manual_only():
     technical = REPORT_COLUMN_BY_KEY["return_request_id"]
     assert technical.classification == ReportDataClassification.SECURITY_METADATA
-    assert technical.roles == frozenset({UserRole.ADMIN})
+    assert technical.roles == frozenset({UserRole.SUPERUSER, UserRole.ADMIN})
     assert technical.manual_only is True
     assert technical.presets == frozenset()

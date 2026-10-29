@@ -643,7 +643,7 @@ class FuelSupplyOrderService:
         await ensure_record_visible(self.db, order, current_user)
 
     def _ensure_operational_adjustment_role(self, current_user: User) -> None:
-        if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
+        if current_user.role not in {UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO}:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Ajuste de prazo restrito a administradores e operadores de producao",

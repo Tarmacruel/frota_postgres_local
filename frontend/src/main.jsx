@@ -11,12 +11,14 @@ import './styles/navigation.css'
 import './styles/kpi-tones.css'
 import './styles/operation-workspaces.css'
 import './styles/guided-forms.css'
+import './styles/system-settings.css'
+import { SystemSettingsProvider } from './context/SystemSettingsContext'
 
 const savedTheme = window.localStorage.getItem('frota-theme') === 'dark' ? 'dark' : 'light'
 document.documentElement.dataset.theme = savedTheme
 
 ReactDOM.createRoot(document.getElementById('root')).render(
   <React.StrictMode>
-    <App />
+    <SystemSettingsProvider><App /></SystemSettingsProvider>
   </React.StrictMode>,
 )

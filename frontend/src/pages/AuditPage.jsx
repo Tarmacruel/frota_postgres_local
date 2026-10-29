@@ -1,3 +1,4 @@
+import { officialBrand } from '../constants/officialBrand'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import PageHeader from '../components/ui/PageHeader'
@@ -132,7 +133,7 @@ export default function AuditPage() {
       setFeedback('')
       const reportRows = await allFilteredLogs()
       await previewRowsToPdf({
-        title: 'Frota PMTF - Auditoria',
+        title: `${officialBrand.systemName} - Auditoria`,
         fileName: 'frota-pmtf-auditoria',
         subtitle: 'Relatório administrativo da trilha de auditoria filtrada.',
         columns: exportColumns,

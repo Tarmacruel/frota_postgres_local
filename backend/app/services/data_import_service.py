@@ -1,4 +1,5 @@
 from __future__ import annotations
+from app.core.organization_scope import ensure_organization_access, scoped_organization_id, production_scope_is_empty
 
 from app.repositories.interactive_kpis import populate_indicators, filter_indicator
 
@@ -206,7 +207,7 @@ class DataImportService:
         if not raw_records:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Arquivo não possui linhas de dados")
 
-        analysis_context = await self._build_analysis_context()
+        analysis_context = await self._build_analysis_context(current_user)
         key_counts = self._build_key_counts(entity_type, raw_records)
         mapped_rows = []
         for row_number, raw_data in raw_records:
@@ -223,6 +224,7 @@ class DataImportService:
             triage_extra_fields=self._triage_extra_fields(entity_type),
             summary=self._build_summary(mapped_rows),
             created_by_id=current_user.id,
+            organization_id=scoped_organization_id(current_user),
         )
         self.db.add(batch)
         await self.db.flush()
@@ -406,7 +408,7 @@ class DataImportService:
                 records.append((row_offset, raw))
         return records
 
-    async def _build_analysis_context(self) -> dict:
+    async def _build_analysis_context(self, current_user=None) -> dict:
         vehicles = list((await self.db.execute(select(Vehicle))).scalars().all())
         drivers = list((await self.db.execute(select(Driver))).scalars().all())
         fines = list((await self.db.execute(select(Fine))).scalars().all())
@@ -422,6 +424,13 @@ class DataImportService:
             .all()
         )
         organizations = list((await self.db.execute(select(Organization))).scalars().all())
+        if current_user and (scoped_organization_id(current_user) is not None or production_scope_is_empty(current_user)):
+            org = scoped_organization_id(current_user)
+            vehicles = [v for v in vehicles if org and v.owner_organization_id == org]
+            drivers = [v for v in drivers if org and v.organization_id == org]
+            fines = [v for v in fines if org and v.responsible_organization_id == org]
+            allocations = [v for v in allocations if org and v.organization_id == org]
+            organizations = [v for v in organizations if org and v.id == org]
         return {
             "vehicles_by_plate": {self._norm_key(vehicle.plate): vehicle for vehicle in vehicles if vehicle.plate},
             "vehicles_by_chassis": {self._norm_key(vehicle.chassis_number): vehicle for vehicle in vehicles if vehicle.chassis_number},
@@ -679,6 +688,8 @@ class DataImportService:
         vehicle = await self._find_vehicle_for_apply(data)
         action = "UPDATE" if vehicle else "CREATE"
         allocation_id = UUID(str(data["allocation_id"]))
+        target_org = await self.db.scalar(select(Department.organization_id).join(Allocation, Allocation.department_id == Department.id).where(Allocation.id == allocation_id))
+        ensure_organization_access(current_user, target_org)
 
         if vehicle is None:
             vehicle = Vehicle(
@@ -728,6 +739,9 @@ class DataImportService:
         driver = await self._find_driver_for_apply(data)
         action = "UPDATE" if driver else "CREATE"
         payload = self._driver_payload_for_model(data)
+        ensure_organization_access(current_user, payload["organization_id"])
+        if driver:
+            ensure_organization_access(current_user, driver.organization_id)
 
         if driver is None:
             driver = Driver(**payload)

@@ -137,7 +137,7 @@ def route_app(role=UserRole.ADMIN, organization=None, allowed=True):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("role,org,expected", [(UserRole.ADMIN, None, "requested"), (UserRole.PRODUCAO, UUID(int=1), UUID(int=1)),
+@pytest.mark.parametrize("role,org,expected", [(UserRole.SUPERUSER, None, "requested"), (UserRole.ADMIN, UUID(int=1), UUID(int=1)), (UserRole.ADMIN, None, UUID(int=0)), (UserRole.PRODUCAO, UUID(int=1), UUID(int=1)),
     (UserRole.PRODUCAO, None, UUID(int=0))])
 async def test_route_preserves_organization_scope(monkeypatch, role, org, expected):
     requested = uuid4()
@@ -159,7 +159,7 @@ async def test_route_preserves_organization_scope(monkeypatch, role, org, expect
 
 @pytest.mark.asyncio
 async def test_route_requires_permission_and_authentication():
-    async with AsyncClient(transport=ASGITransport(app=route_app(allowed=False)), base_url="http://test") as client:
+    async with AsyncClient(transport=ASGITransport(app=route_app(role=UserRole.PADRAO, allowed=False)), base_url="http://test") as client:
         response = await client.get("/api/analytics/v2/summary?date_from=2026-09-01&date_to=2026-09-30")
         assert response.status_code == 403
     app = FastAPI()

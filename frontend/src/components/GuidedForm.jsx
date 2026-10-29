@@ -1,6 +1,9 @@
 import { Children, Fragment, cloneElement, forwardRef, isValidElement, useEffect, useId, useRef, useState } from 'react'
 import { AppIcon } from './AppIcon'
 import { describeFormField, inspectForm, validationMessage } from '../utils/formExperience'
+import { useSystemSettings } from '../hooks/useSystemSettings'
+import { CustomFormFields } from './ConfiguredFormFields'
+import { configureFields, formRoutes } from '../utils/formConfiguration'
 
 function flatten(children, prefix = '') {
   return Children.toArray(children).flatMap((child) => {
@@ -81,7 +84,10 @@ function decorate(children, ids, labels, inheritedLabel = '') {
 
 // Adds the same labels and feedback to controls inside an existing guided editor.
 export function FormFields({ children }) {
-  return decorate(children, requiredIds(children), labelsById(children))
+  const settings = useSystemSettings()
+  const module = formRoutes[window.location.pathname]
+  const content = configureFields(children, settings.values.forms?.[module]?.fields, settings.form_catalog?.[module])
+  return decorate(content, requiredIds(content), labelsById(content))
 }
 
 export function FormFeedback({ children, className = '', id }) {
@@ -106,7 +112,11 @@ export function FormSection({ title, description, children, requirement: _requir
 }
 
 /** Keeps the original submit handler and mounted controls, including files and preview tokens. */
-const GuidedForm = forwardRef(function GuidedForm({ children, onSubmit, className = '', title = 'Preenchimento', busy = false, initialStep = 0, formError = '', blockedMessage = '', requirements = [], onChangeCapture, onInputCapture, ...props }, forwardedRef) {
+const GuidedForm = forwardRef(function GuidedForm({ children, onSubmit, className = '', title = 'Preenchimento', busy = false, initialStep = 0, formError = '', blockedMessage = '', requirements = [], onChangeCapture, onInputCapture, module: configuredModule, recordId, ...props }, forwardedRef) {
+  const settings = useSystemSettings()
+  const module = configuredModule || formRoutes[window.location.pathname]
+  const customized = configureFields(children, settings.values.forms?.[module]?.fields, settings.form_catalog?.[module])
+  const hasCustom = Boolean(configuredModule && settings.values.forms?.[module]?.custom?.some((field) => field.active !== false))
   const localRef = useRef(null)
   const bodyRef = useRef(null)
   const scanFrameRef = useRef(null)
@@ -116,7 +126,7 @@ const GuidedForm = forwardRef(function GuidedForm({ children, onSubmit, classNam
   const [issues, setIssues] = useState([])
   const [progress, setProgress] = useState({ filled: 0, total: 0, sections: [] })
   const id = useId()
-  const nodes = flatten(children)
+  const nodes = flatten(hasCustom ? <>{customized}<FormSection title="Informações adicionais"><CustomFormFields module={module} recordId={recordId} /></FormSection></> : customized)
   const sections = nodes.filter((node) => isValidElement(node) && node.type === FormSection)
   const lastStep = Math.max(0, sections.length - 1)
   const activeStep = Math.min(step, lastStep)

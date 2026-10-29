@@ -63,7 +63,7 @@ async def api(workflow_database):
             ids[side + '_allocation'] = str(allocation)
         actors = {}
         for role_name, role, org in [('origin', 'PRODUCAO', ids['origin']), ('recipient', 'PRODUCAO', ids['recipient']),
-                                     ('outsider', 'PRODUCAO', ids['outsider']), ('admin', 'ADMIN', None), ('admin2', 'ADMIN', None),
+                                     ('outsider', 'PRODUCAO', ids['outsider']), ('admin', 'SUPERUSER', None), ('admin2', 'SUPERUSER', None),
                                      ('standard', 'PADRAO', ids['origin']), ('station', 'POSTO', ids['origin'])]:
             uid = connection.execute("INSERT INTO users(name,email,password_hash,role,organization_id,cpf,must_change_password) VALUES (%s,%s,'unused',%s,%s,%s,false) RETURNING id",
                 (role_name, f'{role_name}-{suffix}@example.test', role, org, str(uuid4().int % 100000000000).zfill(11))).fetchone()[0]
@@ -85,7 +85,7 @@ async def api(workflow_database):
             self.ids, self.actors, self.db, self.sessions = ids, actors, db, sessions
 
         async def request(self, actor, method, path='', body=None):
-            token = create_access_token(actors[actor], 'ADMIN' if actor.startswith('admin') else 'PRODUCAO')
+            token = create_access_token(actors[actor], 'SUPERUSER' if actor.startswith('admin') else 'PRODUCAO')
             async with AsyncClient(transport=ASGITransport(app=app), base_url='http://localhost:8000',
                 cookies={'access_token': token, 'csrf_token': 'loan-csrf'},
                 headers={'Origin': 'http://localhost:8000', 'X-CSRF-Token': 'loan-csrf'}) as client:
@@ -365,7 +365,8 @@ async def test_new_vehicle_inherits_origin_and_can_be_loaned(api):
     from app.services.vehicle_service import VehicleService
 
     async with api.sessions() as session:
-        user = await session.get(User, UUID(api.actors['origin']))
+        from app.repositories.user_repository import UserRepository
+        user = await UserRepository(session).get_by_id(UUID(api.actors['origin']))
         vehicle = await VehicleService(session).create(VehicleCreate(
             plate=uuid4().hex[:8].upper(), brand='Teste', model='Teste', vehicle_type='SEDAN',
             allocation_id=UUID(api.ids['origin_allocation'])), user)

@@ -1,3 +1,4 @@
+import { officialBrand } from '../constants/officialBrand'
 import GuidedForm, { FormSection as GuidedSection } from '../components/GuidedForm'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
@@ -737,7 +738,7 @@ export default function VehiclesPage() {
       setFeedback('')
       const rows = await loadAllFilteredVehicles()
       await previewRowsToPdf({
-        title: 'Frota PMTF - Veículos',
+        title: `${officialBrand.systemName} - Veículos`,
         fileName: 'frota-pmtf-veículos',
         subtitle: 'Relatório dos veículos filtrados no painel operacional.',
         columns: pdfExportColumns,
@@ -831,7 +832,7 @@ export default function VehiclesPage() {
       setError('')
       setFeedback('')
       await previewRowsToPdf({
-        title: `Frota PMTF - Histórico ${selectedVehicle.plate}`,
+        title: `${officialBrand.systemName} - Histórico ${selectedVehicle.plate}`,
         fileName: `frota-pmtf-histórico-${selectedVehicle.plate.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
         subtitle: `Histórico de edições e movimentações do veículo ${selectedVehicle.plate} | ${selectedVehicle.brand} ${selectedVehicle.model} | ${historyPeriodLabel}.`,
         columns: historyColumns,
@@ -1128,7 +1129,7 @@ export default function VehiclesPage() {
         description={editingId ? 'A justificativa ficará no histórico de alterações do veículo.' : undefined}
         onClose={closeVehicleModal}
       >
-        <GuidedForm formError={error} busy={submitting} onSubmit={handleSubmit} className="stack">
+        <GuidedForm module="vehicles" recordId={editingId} formError={error} busy={submitting} onSubmit={handleSubmit} className="stack">
           <GuidedSection title="Dados básicos" description="Identificação e classificação">
             <div className="form-grid modal-form-grid">
               <div className="form-field">

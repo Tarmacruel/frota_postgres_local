@@ -1,3 +1,4 @@
+import { officialBrand } from '../constants/officialBrand'
 import GuidedForm, { FormSection as GuidedSection } from '../components/GuidedForm'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { useSearchParams } from 'react-router-dom'
@@ -236,7 +237,7 @@ export default function DriversPage() {
   async function handlePreviewPdf() {
     if (!records.length) return
     await previewRowsToPdf({
-      title: 'Frota PMTF - Condutores cadastrados',
+      title: `${officialBrand.systemName} - Condutores cadastrados`,
       fileName: 'frota-pmtf-condutores-cadastrados',
       subtitle: 'Relatório da página atual dos condutores cadastrados.',
       columns: exportColumns,
@@ -398,7 +399,7 @@ export default function DriversPage() {
         canClose={!submitting}
         initialFocusRef={regularizingCnh && !openingEdit ? cnhNumberRef : undefined}
       >
-        {openingEdit ? <p role="status">Carregando o cadastro do condutor…</p> : <GuidedForm busy={submitting} initialStep={regularizingCnh ? 1 : 0} onSubmit={handleSubmit} className="stack">
+        {openingEdit ? <p role="status">Carregando o cadastro do condutor…</p> : <GuidedForm module="drivers" recordId={editingRecord?.id} busy={submitting} initialStep={regularizingCnh ? 1 : 0} onSubmit={handleSubmit} className="stack">
           {error ? <div className="alert alert-error" role="alert">{error}</div> : null}
           <GuidedSection title="Dados básicos" description="Identificação e contato">
             <div className="form-grid modal-form-grid">

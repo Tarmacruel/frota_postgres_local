@@ -1,3 +1,5 @@
+import { officialBrand } from '../constants/officialBrand'
+import { useAuth } from '../context/AuthContext'
 import GuidedForm, { FormSection as GuidedSection } from '../components/GuidedForm'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
@@ -24,9 +26,14 @@ const initialForm = {
   role: 'PADRAO',
 }
 
-const roleOptions = ['ADMIN', 'PRODUCAO', 'POSTO', 'PADRAO']
+const scopedRoleOptions = ['ADMIN', 'PRODUCAO', 'POSTO', 'PADRAO']
+
+const requiredProfileView = (module, action, role) => role === 'ADMIN' && action === 'view' && ['analytics', 'payment_processes'].includes(module)
 
 function permissionExceedsPossessionCeiling(moduleKey, actionKey, role) {
+  if (role === 'SUPERUSER') return true
+  if (role === 'POSTO') return moduleKey !== 'fuel_supply_orders' || !['view', 'edit'].includes(actionKey)
+  if (requiredProfileView(moduleKey, actionKey, role)) return true
   if (moduleKey === 'vehicle_loans') return actionKey === 'delete' || !['ADMIN', 'PRODUCAO'].includes(role)
   if (moduleKey !== 'possession') return false
   if (actionKey === 'delete') return true
@@ -41,12 +48,14 @@ function formatDate(value) {
 }
 
 export default function UsersPage() {
+  const { isSuperUser, user: actor } = useAuth()
+  const roleOptions = isSuperUser ? ['SUPERUSER', ...scopedRoleOptions] : scopedRoleOptions
   const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
 
   const [users, setUsers] = useState([])
   const [pagination, setPagination] = useState({ page: 1, pages: 1, total: 0 })
   const requestId = useRef(0)
-  const [form, setForm] = useState(initialForm)
+  const [form, setForm] = useState(() => ({ ...initialForm, organization_id: isSuperUser ? '' : actor?.organization_id || '' }))
   const [editingUser, setEditingUser] = useState(null)
   const [search, setSearch] = useState('')
   const [roleFilter, setRoleFilter] = useState('TODOS')
@@ -129,7 +138,7 @@ export default function UsersPage() {
     setCpfError('')
     setFormError('')
     setEditingUser(null)
-    setForm(initialForm)
+    setForm({ ...initialForm, organization_id: isSuperUser ? '' : actor?.organization_id || '' })
     setIsModalOpen(true)
   }
 
@@ -152,7 +161,7 @@ export default function UsersPage() {
     setCpfError('')
     setFormError('')
     setEditingUser(null)
-    setForm(initialForm)
+    setForm({ ...initialForm, organization_id: isSuperUser ? '' : actor?.organization_id || '' })
     setIsModalOpen(false)
   }
 
@@ -193,7 +202,7 @@ export default function UsersPage() {
     setPermissionsForm((current) => ({
       ...current,
       [moduleKey]: PERMISSION_ACTIONS.reduce((flags, action) => {
-        flags[action.field] = value && !permissionExceedsPossessionCeiling(moduleKey, action.key, permissionsUser?.role)
+        flags[action.field] = requiredProfileView(moduleKey, action.key, permissionsUser?.role) || value && !permissionExceedsPossessionCeiling(moduleKey, action.key, permissionsUser?.role)
         return flags
       }, {}),
     }))
@@ -294,7 +303,7 @@ export default function UsersPage() {
       setFeedback('')
       const reportRows = await allFilteredUsers()
       await previewRowsToPdf({
-        title: 'Frota PMTF - Usuários',
+        title: `${officialBrand.systemName} - Usuários`,
         fileName: 'frota-pmtf-usuários',
         subtitle: 'Relatório dos perfis administrativos, de produção, posto e consulta.',
         columns: exportColumns,
@@ -364,6 +373,7 @@ export default function UsersPage() {
     <div className="surface-panel operation-page management-page management-page--users">
       <PageHeader
         title="Gestão de usuários"
+        description={isSuperUser ? "Administração de todas as secretarias" : `Secretaria: ${actor?.organization_name || "Vínculo pendente — solicite a configuração ao superusuário"}`}
         actions={<>
           <button className="app-button" type="button" onClick={openCreateModal}>Novo usuário</button>
           <button className="secondary-button" type="button" onClick={handleExportPdf}>Pré-visualizar PDF</button>
@@ -380,8 +390,8 @@ export default function UsersPage() {
             onChange={(event) => setSearch(event.target.value)}
           />
           <select className="app-select" value={organizationFilter} onChange={(event) => setOrganizationFilter(event.target.value)}>
-            <option value="TODAS">Todas as secretarias</option>
-            <option value="SEM_SECRETARIA">Sem secretaria</option>
+            <option value="TODAS">{isSuperUser ? "Todas as secretarias" : "Minha secretaria"}</option>
+            {isSuperUser ? <option value="SEM_SECRETARIA">Sem secretaria</option> : null}
             {organizations.map((organization) => (
               <option key={organization.id} value={organization.id}>{organization.name}</option>
             ))}
@@ -442,7 +452,7 @@ export default function UsersPage() {
                     <td data-label="CPF">{user.cpf_masked || 'Pendente'}</td>
                     <td data-label="Secretaria">{user.organization_name || 'Não informada'}</td>
                     <td data-label="Perfil">
-                      <StatusChip tone={user.role === 'ADMIN' ? 'success' : user.role === 'PRODUCAO' ? 'info' : user.role === 'POSTO' ? 'warning' : 'neutral'}>
+                      <StatusChip tone={['ADMIN', 'SUPERUSER'].includes(user.role) ? 'success' : user.role === 'PRODUCAO' ? 'info' : user.role === 'POSTO' ? 'warning' : 'neutral'}>
                         {getRoleLabel(user.role)}
                       </StatusChip>
                     </td>
@@ -566,6 +576,7 @@ export default function UsersPage() {
 
       <Modal
         open={permissionsModalOpen}
+        className="permissions-modal"
         title={permissionsUser ? `Permissões de ${permissionsUser.name}` : 'Permissões'}
         description="Defina acesso por módulo e ação operacional."
         onClose={closePermissionsModal}
@@ -575,8 +586,10 @@ export default function UsersPage() {
         {permissionsLoading ? (
           <div className="empty-state">Carregando permissões...</div>
         ) : (
-          <GuidedForm title="Revisão de acessos" busy={permissionsSaving} formError={permissionsError} className="stack" onSubmit={(event) => { event.preventDefault(); savePermissions() }}>
-            <GuidedSection title="Permissões" description="Marque os acessos permitidos para este usuário. Os limites do perfil continuam se aplicando.">
+          <form className="permissions-editor" onSubmit={(event) => { event.preventDefault(); savePermissions() }}>
+            <p className="helper-text">Marque os acessos por módulo. Administradores operam somente na própria secretaria; superusuários têm acesso integral.</p>
+            {permissionsUser?.role === 'SUPERUSER' ? <p className="alert alert-info">Este perfil possui todas as permissões. Para limitar acessos, altere o perfil no cadastro do usuário.</p> : null}
+            {permissionsError ? <div className="alert alert-error" role="alert">{permissionsError}</div> : null}
             <div className="table-wrap table-wrap-wide">
               <table className="data-table data-table-wide management-table">
                 <thead>
@@ -595,10 +608,11 @@ export default function UsersPage() {
                           <label className="checkbox-field">
                             <input
                               type="checkbox"
+                              aria-label={`${module.label}: ${action.label}`}
                               checked={Boolean(permissionsForm[module.key]?.[action.field])}
                               onChange={() => togglePermission(module.key, action.field)}
                               disabled={permissionExceedsPossessionCeiling(module.key, action.key, permissionsUser?.role)}
-                              title={permissionExceedsPossessionCeiling(module.key, action.key, permissionsUser?.role) ? 'Ação acima do teto deste perfil' : undefined}
+                              title={permissionsUser?.role === 'SUPERUSER' ? 'Acesso integral do superusuário' : requiredProfileView(module.key, action.key, permissionsUser?.role) ? 'Consulta incluída neste perfil, limitada à própria secretaria' : permissionExceedsPossessionCeiling(module.key, action.key, permissionsUser?.role) ? 'Ação não permitida para este perfil' : undefined}
                             />
                             <span>{action.label}</span>
                           </label>
@@ -606,8 +620,8 @@ export default function UsersPage() {
                       ))}
                       <td data-label="Atalhos">
                         <div className="actions-inline">
-                          <button type="button" className="mini-button" onClick={() => setModulePermissions(module.key, true)}>Tudo</button>
-                          <button type="button" className="mini-button" onClick={() => setModulePermissions(module.key, false)}>Limpar</button>
+                          <button type="button" className="mini-button" disabled={permissionsUser?.role === "SUPERUSER"} onClick={() => setModulePermissions(module.key, true)}>Tudo</button>
+                          <button type="button" className="mini-button" disabled={permissionsUser?.role === "SUPERUSER"} onClick={() => setModulePermissions(module.key, false)}>Limpar</button>
                         </div>
                       </td>
                     </tr>
@@ -615,20 +629,13 @@ export default function UsersPage() {
                 </tbody>
               </table>
             </div>
-            </GuidedSection>
-            <GuidedSection title="Conferência" description="Confira as opções marcadas antes de salvar. Nenhuma permissão foi alterada ainda.">
-              <dl className="guided-form__review">{PERMISSION_MODULES.map((module) => {
-                const selected = PERMISSION_ACTIONS.filter((action) => permissionsForm[module.key]?.[action.field])
-                return <div key={module.key}><dt>{module.label}</dt><dd>{selected.map((action) => action.label).join(' · ') || 'Nenhuma opção marcada'}</dd></div>
-              })}</dl>
-            </GuidedSection>
             <div className="actions-inline modal-actions">
-              <button className="app-button" type="submit" disabled={permissionsSaving}>
+              <button className="app-button" type="submit" disabled={permissionsSaving || permissionsUser?.role === 'SUPERUSER'}>
                 {permissionsSaving ? 'Salvando...' : 'Salvar permissões'}
               </button>
               <button className="ghost-button" type="button" onClick={closePermissionsModal}>Cancelar</button>
             </div>
-          </GuidedForm>
+          </form>
         )}
       </Modal>
     </div>

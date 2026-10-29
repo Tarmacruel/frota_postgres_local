@@ -6,6 +6,7 @@ import UsersPage from './UsersPage'
 import { exportRowsToXlsx } from '../utils/exportData'
 
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn() }))
+vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ isSuperUser: true, user: { id: 'actor', role: 'SUPERUSER' } }) }))
 vi.mock('../api/client', () => ({ default: api }))
 vi.mock('../hooks/useMasterDataCatalog', () => ({
   useMasterDataCatalog: () => ({ organizations: [{ id: 'org', name: 'Secretaria teste' }] }),
@@ -114,4 +115,22 @@ it('filtra pelo KPI na API, mantém os totais completos e permite limpar', async
   expect(button).toHaveAttribute('aria-pressed', 'true')
   fireEvent.click(screen.getByRole('button', { name: 'Limpar indicador' }))
   await waitFor(() => expect(api.get).toHaveBeenLastCalledWith('/users/paginated', { params: expect.objectContaining({ page: 1, indicator: undefined }) }))
+})
+
+it('edita permissões em uma única tela, sem etapas ou conferência duplicada', async () => {
+  api.get.mockImplementation(async (path) => ({ data: path.endsWith('/permissions')
+    ? { permissions: { vehicles: { can_view: true, can_create: true, can_edit: false, can_delete: false } } }
+    : { data: [{ id: 'operator', name: 'Operador exemplo', email: 'operador@test.local', role: 'PRODUCAO', organization_id: 'org' }], pagination: { page: 1, pages: 1, total: 1 }, summary: {} } }))
+  api.put.mockResolvedValue({ data: {} })
+  render(<MemoryRouter><UsersPage /></MemoryRouter>)
+  await screen.findByText('Operador exemplo')
+  fireEvent.click(screen.getByRole('button', { name: 'Permissões' }))
+  const dialog = await screen.findByRole('dialog', { name: /Permissões de Operador exemplo/ })
+  await within(dialog).findByRole('table')
+  expect(within(dialog).queryByRole('progressbar')).not.toBeInTheDocument()
+  expect(within(dialog).queryByRole('button', { name: 'Continuar' })).not.toBeInTheDocument()
+  expect(within(dialog).queryByText('Conferência')).not.toBeInTheDocument()
+  fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Veículos: Editar' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar permissões' }))
+  await waitFor(() => expect(api.put).toHaveBeenCalledWith('/users/operator/permissions', { permissions: expect.objectContaining({ vehicles: expect.objectContaining({ can_edit: true }) }) }))
 })

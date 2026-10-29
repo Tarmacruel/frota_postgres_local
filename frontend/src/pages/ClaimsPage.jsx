@@ -1,3 +1,4 @@
+import { officialBrand } from '../constants/officialBrand'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import { useEffect, useRef, useState } from 'react'
@@ -133,7 +134,7 @@ export default function ClaimsPage() {
   async function handlePreviewPdf() {
     if (!records.length) return
     await previewRowsToPdf({
-      title: 'Frota PMTF - Sinistros',
+      title: `${officialBrand.systemName} - Sinistros`,
       fileName: 'frota-pmtf-sinistros',
       subtitle: 'Relatório da página atual de sinistros.',
       columns: exportColumns,

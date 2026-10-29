@@ -59,9 +59,9 @@ class ReportColumn:
     manual_only: bool = False
 
 
-ALL_REPORT_ROLES = frozenset({UserRole.ADMIN, UserRole.PRODUCAO, UserRole.PADRAO})
-OPERATIONAL_REPORT_ROLES = frozenset({UserRole.ADMIN, UserRole.PRODUCAO})
-ADMIN_REPORT_ROLES = frozenset({UserRole.ADMIN})
+ALL_REPORT_ROLES = frozenset({UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO, UserRole.PADRAO})
+OPERATIONAL_REPORT_ROLES = frozenset({UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO})
+ADMIN_REPORT_ROLES = frozenset({UserRole.SUPERUSER, UserRole.ADMIN})
 ALL_MODES = frozenset({PossessionReportMode.POSSESSION, PossessionReportMode.TRIP})
 POSSESSION_MODE = frozenset({PossessionReportMode.POSSESSION})
 TRIP_MODE = frozenset({PossessionReportMode.TRIP})

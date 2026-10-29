@@ -72,7 +72,7 @@ export default function PublicFuelSupplyOrderPage() {
             <h1>Comprovante institucional de ordem de abastecimento</h1>
             <p>
               Este ambiente permite consultar e baixar novamente o documento oficial emitido pela Prefeitura Municipal de
-              Teixeira de Freitas, sem necessidade de login.
+              {officialBrand.city}, sem necessidade de login.
             </p>
           </div>
           <div className="public-order-brand">

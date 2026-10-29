@@ -41,9 +41,30 @@ def migrated_database():
             actor = connection.execute("INSERT INTO users(name,email,password_hash) VALUES ('Operador teste','loan-test@example.test','not-a-password') RETURNING id").fetchone()[0]
         command.upgrade(config, 'head')
         yield credentials, database, (origin, recipient, vehicle, unknown, actor)
-        command.downgrade(config, '0043_certificate_foundation')
+        # Financial migrations deliberately prohibit destructive downgrades.
+        # Exercise this additive release's roundtrip only on the disposable DB.
+        command.downgrade(config, '0062_items_network_merge')
         command.upgrade(config, 'head')
-        command.check(config)
+        from alembic.autogenerate import compare_metadata
+        from alembic.migration import MigrationContext
+        from sqlalchemy import create_engine
+        from app.db.base import Base
+        engine = create_engine(settings.DATABASE_URL)
+        try:
+            with engine.connect() as connection:
+                diffs = compare_metadata(MigrationContext.configure(connection), Base.metadata)
+            # Existing schema/model naming differences predate this release.
+            allowed = {
+                ('remove_constraint', 'contract_item_movements', ('event_key',)),
+                ('add_constraint', 'contract_item_movements', ('event_key',)),
+                ('remove_index', 'payment_contract_amendments', ('request_key',)),
+                ('add_constraint', 'payment_contract_amendments', ('request_key',)),
+                ('remove_index', 'vehicle_possession_photos', ('return_confirmation_id',)),
+            }
+            observed = {(kind, obj.table.name, tuple(column.name for column in obj.columns)) for kind, obj in diffs}
+            assert observed == allowed  # No drift in the new tables or attribution columns.
+        finally:
+            engine.dispose()
     finally:
         settings.DATABASE_URL = previous_url
         with psycopg.connect(**credentials, dbname='postgres', autocommit=True) as admin:
@@ -67,7 +88,7 @@ def test_owner_backfill_and_nullable_attribution(database):
     assert connection.execute('SELECT owner_organization_id FROM vehicles WHERE id=%s', (vehicle,)).fetchone()[0] == origin
     assert connection.execute('SELECT owner_organization_id FROM vehicles WHERE id=%s', (unknown,)).fetchone()[0] is None
     columns = connection.execute("SELECT table_name,column_name,is_nullable FROM information_schema.columns WHERE column_name IN ('vehicle_loan_id','responsible_organization_id') AND table_schema='public'").fetchall()
-    assert len(columns) == 10
+    assert len(columns) == 12  # Includes the two attribution columns added to maintenance orders.
     assert all(row[2] == 'YES' for row in columns)
 
 

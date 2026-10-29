@@ -1,3 +1,4 @@
+import { officialBrand } from '../constants/officialBrand'
 import GuidedForm, { FormSection as GuidedSection } from '../components/GuidedForm'
 import MoneyInput from '../components/MoneyInput'
 import IndicatorBar from '../components/ui/IndicatorBar'
@@ -274,7 +275,7 @@ export default function FinesPage() {
     if (!pagination.total) return
     const reportRows = await allFilteredFines()
     await previewRowsToPdf({
-      title: 'Frota PMTF - Multas',
+      title: `${officialBrand.systemName} - Multas`,
       fileName: 'frota-pmtf-multas',
       subtitle: 'Relatório das multas filtradas.',
       columns: exportColumns,
@@ -373,7 +374,7 @@ export default function FinesPage() {
       <Pagination currentPage={pagination.page} totalPages={pagination.pages} onPageChange={loadFines} />
 
       <Modal open={isModalOpen} title={editingRecord ? 'Editar multa' : 'Nova multa'} onClose={() => setIsModalOpen(false)}>
-        <GuidedForm formError={error} busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid">
+        <GuidedForm module="fines" recordId={editingRecord?.id} formError={error} busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid">
           <GuidedSection title="Identificação" description="Identifique o veículo, o condutor e o enquadramento.">
 <div className="form-field">
             <label>Veículo</label>

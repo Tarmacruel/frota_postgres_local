@@ -22,21 +22,8 @@ from reportlab.platypus import (
     TableStyle,
 )
 
-from app.core.official_identity import (
-    ADMINISTRATION_SECRETARIAT,
-    COLOR_BORDER,
-    COLOR_INK,
-    COLOR_MUTED,
-    COLOR_NAVY,
-    COLOR_SURFACE,
-    FLEET_DEPARTMENT,
-    MUNICIPALITY_ADDRESS,
-    MUNICIPALITY_CNPJ,
-    MUNICIPALITY_NAME,
-    crest_path,
-    ensure_pdf_fonts,
-    institutional_datetime,
-)
+from app.core.official_identity import COLOR_BORDER, COLOR_INK, COLOR_MUTED, COLOR_SURFACE, crest_path, ensure_pdf_fonts, institutional_datetime
+from app.core import official_identity
 from app.models.document_signature import DigitalDocumentType
 
 
@@ -90,6 +77,7 @@ class FuelSupplyOrderPdfService:
     """Build the immutable official fuel-order PDF solely from its frozen snapshot."""
 
     @classmethod
+    @official_identity.frozen_document_brand
     def build_canonical_pdf(
         cls,
         snapshot: dict,
@@ -128,9 +116,9 @@ class FuelSupplyOrderPdfService:
             topMargin=19 * mm,
             bottomMargin=23 * mm,
             title=f"Ordem canônica de abastecimento {request_number}",
-            author=MUNICIPALITY_NAME,
+            author=official_identity.MUNICIPALITY_NAME,
             subject="Ordem oficial de abastecimento congelada para assinatura digital",
-            creator="Sistema de Frota PMTF",
+            creator=official_identity.SYSTEM_NAME,
             invariant=1,
             pageCompression=1,
         )
@@ -203,12 +191,12 @@ class FuelSupplyOrderPdfService:
                 canvas.drawCentredString(0, 0, "HOMOLOGAÇÃO — SEM VALIDADE OPERACIONAL")
                 canvas.rotate(-35)
                 canvas.translate(-A4[0] / 2, -A4[1] / 2)
-            canvas.setStrokeColor(colors.HexColor(COLOR_NAVY))
+            canvas.setStrokeColor(colors.HexColor(official_identity.COLOR_NAVY))
             canvas.setLineWidth(0.5)
             canvas.line(17 * mm, 16 * mm, A4[0] - 17 * mm, 16 * mm)
             canvas.setFillColor(colors.HexColor(COLOR_MUTED))
             canvas.setFont(font_regular, 6.4)
-            canvas.drawString(17 * mm, 12.5 * mm, f"{MUNICIPALITY_NAME} · CNPJ {MUNICIPALITY_CNPJ}")
+            canvas.drawString(17 * mm, 12.5 * mm, f"{official_identity.MUNICIPALITY_NAME} · CNPJ {official_identity.MUNICIPALITY_CNPJ}")
             canvas.drawRightString(A4[0] - 17 * mm, 12.5 * mm, f"{request_number} · Página {doc.page}")
             canvas.drawString(17 * mm, 9.5 * mm, "Artefato canônico imutável")
             canvas.drawRightString(A4[0] - 17 * mm, 9.5 * mm, content_hash)
@@ -232,7 +220,7 @@ class FuelSupplyOrderPdfService:
                 fontName=font_bold,
                 fontSize=9.5,
                 leading=11.5,
-                textColor=colors.HexColor(COLOR_NAVY),
+                textColor=colors.HexColor(official_identity.COLOR_NAVY),
             )
         )
         styles.add(
@@ -253,7 +241,7 @@ class FuelSupplyOrderPdfService:
                 fontSize=15,
                 leading=18,
                 alignment=TA_CENTER,
-                textColor=colors.HexColor(COLOR_NAVY),
+                textColor=colors.HexColor(official_identity.COLOR_NAVY),
                 spaceAfter=4 * mm,
             )
         )
@@ -264,7 +252,7 @@ class FuelSupplyOrderPdfService:
                 fontName=font_bold,
                 fontSize=9.5,
                 leading=12,
-                textColor=colors.HexColor(COLOR_NAVY),
+                textColor=colors.HexColor(official_identity.COLOR_NAVY),
                 spaceBefore=4 * mm,
                 spaceAfter=2 * mm,
             )
@@ -308,9 +296,9 @@ class FuelSupplyOrderPdfService:
     def _institutional_header(styles) -> Table:
         logo = Image(str(crest_path()), width=13 * mm, height=16 * mm)
         identity = Paragraph(
-            f"{escape(MUNICIPALITY_NAME.upper())}<br/>"
-            f"<font name='PMTF-Roboto' size='7.6'>{escape(ADMINISTRATION_SECRETARIAT)} · "
-            f"{escape(FLEET_DEPARTMENT)}<br/>{escape(MUNICIPALITY_ADDRESS)}</font>",
+            f"{escape(official_identity.MUNICIPALITY_NAME.upper())}<br/>"
+            f"<font name='PMTF-Roboto' size='7.6'>{escape(official_identity.ADMINISTRATION_SECRETARIAT)} · "
+            f"{escape(official_identity.FLEET_DEPARTMENT)}<br/>{escape(official_identity.MUNICIPALITY_ADDRESS)}</font>",
             styles["Institution"],
         )
         table = Table([[logo, identity]], colWidths=[17 * mm, 154 * mm])

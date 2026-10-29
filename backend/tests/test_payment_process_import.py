@@ -302,7 +302,7 @@ def test_contract_loaded_balance_is_always_calculated_from_processes():
 async def test_import_xlsx_creates_updates_skips_duplicates_and_reports_errors(monkeypatch):
     service = PaymentProcessService(db=FakeDb())
     service.audit = FakeAudit()
-    actor = SimpleNamespace(id=uuid4(), role=UserRole.ADMIN)
+    actor = SimpleNamespace(id=uuid4(), role=UserRole.SUPERUSER)
 
     create_data = {
         "process_number": "PMTF-PR-1/2026",
@@ -391,7 +391,7 @@ async def test_delete_payment_process_requires_reason_records_audit_and_removes(
         stage_events=[],
     )
     service.repository = FakeDeletePaymentProcessRepository(record)
-    actor = SimpleNamespace(id=uuid4(), role=UserRole.ADMIN)
+    actor = SimpleNamespace(id=uuid4(), role=UserRole.SUPERUSER)
 
     result = await service.delete(process_id, PaymentProcessDelete(reason="Cadastro duplicado na importação"), actor)
 

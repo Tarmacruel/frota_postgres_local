@@ -1,6 +1,7 @@
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
+from uuid import uuid4
 
 import pytest
 from fastapi import HTTPException
@@ -204,6 +205,7 @@ async def test_standard_global_search_does_not_return_driver_identity():
     service.search_repo.search_maintenances = AsyncMock(return_value=[])
     current_user = SimpleNamespace(
         role=UserRole.PADRAO,
+        organization_id=uuid4(),
         permissions={
             "vehicles": {"can_view": True},
             "possession": {"can_view": True},
@@ -216,13 +218,13 @@ async def test_standard_global_search_does_not_return_driver_identity():
     service.search_repo.search_possessions.assert_awaited_once_with(
         "%ABC%",
         10,
-        organization_id=None,
+        organization_id=current_user.organization_id,
         include_personal_data=False,
     )
     service.search_repo.search_vehicles.assert_awaited_once_with(
         "%ABC%",
         10,
-        organization_id=None,
+        organization_id=current_user.organization_id,
         include_personal_data=False,
     )
     rendered = repr(payload)

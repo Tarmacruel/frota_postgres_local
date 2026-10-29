@@ -58,10 +58,10 @@ class VehicleLoanService:
             raise
 
     def is_admin(self, user):
-        return user.role == UserRole.ADMIN
+        return user.role == UserRole.SUPERUSER
 
     def visible(self, loan, user):
-        if not self.is_admin(user) and (user.role != UserRole.PRODUCAO or not user.organization_id
+        if not self.is_admin(user) and (user.role not in (UserRole.ADMIN, UserRole.PRODUCAO) or not user.organization_id
                 or user.organization_id not in (loan.origin_organization_id, loan.recipient_organization_id)):
             raise HTTPException(404, 'Empréstimo não encontrado')
 
@@ -71,7 +71,7 @@ class VehicleLoanService:
         if self.is_admin(user):
             if not data.justification:
                 raise HTTPException(422, 'Administrador deve justificar a representação da secretaria')
-        elif user.role != UserRole.PRODUCAO or user.organization_id != organization_id:
+        elif user.role not in (UserRole.ADMIN, UserRole.PRODUCAO) or user.organization_id != organization_id:
             raise HTTPException(403, 'Você não representa a secretaria responsável por esta ação')
 
     async def locked_vehicle(self, vehicle_id):
@@ -87,6 +87,11 @@ class VehicleLoanService:
         if loan is None:
             raise HTTPException(404, 'Empréstimo não encontrado')
         self.visible(loan, user)
+        from app.models.system_settings import RecordControl
+        if user.role != UserRole.SUPERUSER and await self.db.scalar(select(RecordControl.record_id).where(
+                RecordControl.module == 'vehicle_loans', RecordControl.record_id == loan_id,
+                RecordControl.inactive.is_(True))):
+            raise HTTPException(404, 'Empréstimo não encontrado')
         if lock:
             await self.locked_vehicle(loan.vehicle_id)
             loan = await self.db.scalar(select(VehicleLoan).where(VehicleLoan.id == loan_id)
@@ -97,7 +102,9 @@ class VehicleLoanService:
     async def list(self, user, *, page=1, limit=20, vehicle_id=None, status=None, search=None, direction=None):
         filters = []
         if not self.is_admin(user):
-            if user.role != UserRole.PRODUCAO or not user.organization_id:
+            from app.core.record_visibility import visible_record
+            filters.append(visible_record(VehicleLoan, 'vehicle_loans'))
+            if user.role not in (UserRole.ADMIN, UserRole.PRODUCAO) or not user.organization_id:
                 return {'data': [], 'pagination': build_pagination(page, limit, 0)}
             filters.append(or_(VehicleLoan.origin_organization_id == user.organization_id,
                                VehicleLoan.recipient_organization_id == user.organization_id))
@@ -126,7 +133,7 @@ class VehicleLoanService:
         """Unresolved incoming handoffs; viewing them never acknowledges them."""
         receipts = VehicleLoan.status == 'AWAITING_RECEIPT'
         returns = VehicleLoan.status == 'AWAITING_RETURN_RECEIPT'
-        if not user.organization_id or user.role not in (UserRole.ADMIN, UserRole.PRODUCAO):
+        if not user.organization_id or user.role not in (UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO):
             return {'total': 0, 'receipts': 0, 'returns': 0}
         receipts = and_(receipts, VehicleLoan.recipient_organization_id == user.organization_id)
         returns = and_(returns, VehicleLoan.origin_organization_id == user.organization_id)

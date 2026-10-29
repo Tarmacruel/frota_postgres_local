@@ -1,3 +1,4 @@
+import { officialBrand } from '../constants/officialBrand'
 import { hasContractFunding } from '../utils/contractBalance'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import ContractReturnBanner from '../components/contracts/ContractReturnBanner'
@@ -461,7 +462,7 @@ export default function FuelSuppliesPage() {
         return
       }
       await previewRowsToPdf({
-        title: 'Frota PMTF - Ordens de abastecimento',
+        title: `${officialBrand.systemName} - Ordens de abastecimento`,
         fileName: 'frota-pmtf-ordens-abastecimento',
         subtitle: 'Relatório institucional das ordens emitidas para os postos credenciados.',
         columns: orderReportColumns,

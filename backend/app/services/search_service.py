@@ -167,4 +167,4 @@ class SearchService:
         return bool(current_user.permissions.get(module, {}).get("can_view"))
 
     def _can_view_personal_data(self, current_user: User) -> bool:
-        return current_user.role in {UserRole.ADMIN, UserRole.PRODUCAO}
+        return current_user.role in {UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO}

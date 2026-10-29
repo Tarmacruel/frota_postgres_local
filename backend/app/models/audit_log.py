@@ -20,6 +20,7 @@ class AuditLog(Base):
     actor_name: Mapped[str] = mapped_column(String(150), nullable=False)
     actor_email = mapped_column(String(255), nullable=True)
     actor_role = mapped_column(String(30), nullable=True)
+    organization_id = mapped_column(PGUUID(as_uuid=True), ForeignKey('master_organizations.id', ondelete='SET NULL'), nullable=True, index=True)
     action: Mapped[str] = mapped_column(String(30), nullable=False)
     entity_type: Mapped[str] = mapped_column(String(50), nullable=False)
     entity_id: Mapped[UUID] = mapped_column(PGUUID(as_uuid=True), nullable=False)

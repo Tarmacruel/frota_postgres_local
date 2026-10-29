@@ -57,6 +57,7 @@ class DataImportBatch(Base):
     summary = mapped_column(JSONB, nullable=False, default=dict)
     notes = mapped_column(Text, nullable=True)
     created_by_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
+    organization_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey('master_organizations.id', ondelete='SET NULL'), nullable=True, index=True)
     applied_by_id: Mapped[UUID | None] = mapped_column(PGUUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))
     updated_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False, server_default=text("NOW()"))

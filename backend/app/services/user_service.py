@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import datetime, timezone
 from uuid import UUID
 from fastapi import HTTPException, status
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.cpf import mask_cpf
@@ -15,6 +15,8 @@ from app.repositories.master_data_repository import MasterDataRepository
 from app.repositories.user_repository import UserRepository
 from app.schemas.user import UserCreate, UserPermissionsUpdate, UserUpdate
 from app.services.audit_service import AuditService
+from app.core.roles import is_superuser
+from app.core.organization_scope import ensure_organization_access, production_scope_is_empty, scoped_organization_id
 
 
 class UserService:
@@ -24,15 +26,24 @@ class UserService:
         self.master_data = MasterDataRepository(db)
         self.audit = AuditService(db)
 
-    async def list(self, skip: int, limit: int):
-        return await self.users.list(skip=skip, limit=limit)
+    async def list(self, skip: int, limit: int, current_user: User | None = None):
+        if production_scope_is_empty(current_user):
+            return []
+        return await self.users.list(skip=skip, limit=limit, organization_id=scoped_organization_id(current_user),
+                                     exclude_superuser=bool(current_user and not is_superuser(current_user)))
 
-    async def list_paginated(self, **filters):
+    async def list_paginated(self, current_user: User | None = None, **filters):
+        if production_scope_is_empty(current_user):
+            return [], 0, {}
+        filters['organization_id'] = scoped_organization_id(current_user, filters.get('organization_id'))
+        if current_user and not is_superuser(current_user):
+            filters['without_organization'] = False
+            filters['exclude_superuser'] = True
         return await self.users.list_paginated(**filters)
 
     async def list_signers(self, current_user: User) -> list[User]:
-        organization_id = None if current_user.role == UserRole.ADMIN else current_user.organization_id
-        if current_user.role == UserRole.PRODUCAO and organization_id is None:
+        organization_id = None if is_superuser(current_user) else current_user.organization_id
+        if not is_superuser(current_user) and organization_id is None:
             return []
         return await self.users.list_signers(
             organization_id=organization_id,
@@ -41,6 +52,7 @@ class UserService:
         )
 
     async def create(self, data: UserCreate, current_user: User) -> User:
+        self._authorize_change(current_user, next_role=data.role, organization_id=data.organization_id)
         existing = await self.users.get_by_email(data.email.lower())
         if existing:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Este e-mail já está cadastrado. Localize o usuário na lista para editar o cadastro ou informe outro e-mail.")
@@ -91,6 +103,10 @@ class UserService:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
 
         payload = data.model_dump(exclude_unset=True)
+        self._authorize_change(current_user, target=user, next_role=payload.get('role', user.role),
+                               organization_id=payload.get('organization_id', user.organization_id))
+        if user.role == UserRole.SUPERUSER and payload.get('role', user.role) != UserRole.SUPERUSER:
+            await self._keep_superuser()
         previous_values = {
             "name": user.name,
             "email": user.email,
@@ -164,10 +180,12 @@ class UserService:
         updated = await self.users.get_by_id(user.id)
         return updated or user
 
-    async def get_permissions(self, user_id: UUID) -> dict[str, dict[str, bool]]:
+    async def get_permissions(self, user_id: UUID, current_user: User | None = None) -> dict[str, dict[str, bool]]:
         user = await self.users.get_by_id(user_id)
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+        if current_user:
+            self._authorize_change(current_user, target=user)
         return self._complete_permissions(user.permissions)
 
     async def update_permissions(
@@ -179,6 +197,10 @@ class UserService:
         user = await self.users.get_by_id(user_id)
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+
+        self._authorize_change(current_user, target=user)
+        if is_superuser(user):
+            raise HTTPException(409, 'O superusuário possui acesso integral. Altere o perfil antes de limitar suas permissões.')
 
         previous_permissions = self._complete_permissions(user.permissions)
         next_permissions = self._normalize_permissions(data.permissions, role=user.role.value)
@@ -221,6 +243,9 @@ class UserService:
         user = await self.users.get_by_id(user_id)
         if not user:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Usuário não encontrado")
+        self._authorize_change(current_user, target=user)
+        if is_superuser(user):
+            await self._keep_superuser()
         if user.id == current_user.id:
             raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Não é permitido excluir o próprio usuário")
 
@@ -243,6 +268,27 @@ class UserService:
         except IntegrityError as exc:
             await self.db.rollback()
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Não foi possível remover o usuário") from exc
+
+    def _authorize_change(self, actor, *, target=None, next_role=None, organization_id=None):
+        if is_superuser(actor):
+            return
+        if (target and is_superuser(target)) or next_role == UserRole.SUPERUSER:
+            raise HTTPException(403, 'Somente um superusuário pode administrar este perfil')
+        if target:
+            ensure_organization_access(actor, target.organization_id)
+        if organization_id is not None or target is None:
+            ensure_organization_access(actor, organization_id)
+        elif next_role is not None:
+            ensure_organization_access(actor, organization_id)
+
+    async def _keep_superuser(self):
+        # Serialize demotions/deletions, including concurrent attempts.
+        from app.core.record_visibility import visible_record
+        await self.db.execute(text('SELECT pg_advisory_xact_lock(630029002)'))
+        rows = (await self.db.scalars(select(User.id).where(User.role == UserRole.SUPERUSER, visible_record(User, 'users'))
+                                      .order_by(User.id).with_for_update())).all()
+        if len(rows) <= 1:
+            raise HTTPException(409, 'Mantenha ao menos um superusuário ativo. Cadastre outro antes de remover este perfil.')
 
     async def _require_organization(self, organization_id: UUID):
         organization = await self.master_data.get_organization(organization_id)

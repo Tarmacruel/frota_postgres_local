@@ -1,3 +1,4 @@
+import { officialBrand } from '../constants/officialBrand'
 import GuidedForm from '../components/GuidedForm'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
@@ -605,7 +606,7 @@ export default function DataImportsPage() {
       const options = {
         fileName: entityType === 'VEHICLE' ? 'frota-veiculos-oficiais' : 'frota-condutores-oficiais',
         sheetName: entityType === 'VEHICLE' ? 'Veículos' : 'Condutores',
-        title: entityType === 'VEHICLE' ? 'Frota PMTF - Veículos oficiais' : 'Frota PMTF - Condutores oficiais',
+        title: entityType === 'VEHICLE' ? `${officialBrand.systemName} - Veículos oficiais` : `${officialBrand.systemName} - Condutores oficiais`,
         columns,
         rows: rowsToExport,
       }
@@ -642,7 +643,7 @@ export default function DataImportsPage() {
     const options = {
       fileName: 'frota-revisao-importacao',
       sheetName: 'Revisão',
-      title: 'Frota PMTF - Revisão de importação',
+      title: `${officialBrand.systemName} - Revisão de importação`,
       columns,
       rows: reportRows,
     }

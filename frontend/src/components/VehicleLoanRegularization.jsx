@@ -1,3 +1,4 @@
+import { CustomFormFields } from './ConfiguredFormFields'
 import JustificationField from './JustificationField'
 import { useEffect, useRef, useState } from 'react'
 import { LoanField, LoanFieldLabel, LoanFormLayout, LoanFormStep, LoanReview } from './LoanFormLayout'
@@ -166,7 +167,7 @@ export default function VehicleLoanRegularization({ onClose, onSaved, canView, u
           <details className="loan-editor__warnings"><summary>Registros encontrados no período</summary><div className="loan-table-wrap"><table className="loan-table"><thead><tr><th>Registros no período</th><th>Total</th><th>Sem responsável</th><th>Outra responsável</th></tr></thead><tbody>{preview.impact.map((item) => <tr key={item.module}><td>{item.module}</td><td>{item.records}</td><td>{item.without_responsibility}</td><td>{item.other_responsibility}</td></tr>)}</tbody></table></div></details>
           {preview.can_confirm ? <label className="loan-editor__review-check"><input type="checkbox" checked={reviewed} disabled={busy} onChange={(event) => setReviewed(event.target.checked)} /><span><LoanFieldLabel label="Conferi as datas, a referência e os efeitos. Os registros antigos permanecerão com seus vínculos atuais." required /></span></label> : null}
         </section> : <p className="loan-editor__hint">A prévia ainda não está disponível. Clique em Conferir prévia da regularização para verificar os efeitos, sem registrar o empréstimo.</p>}
-      </LoanFormStep>
+      <CustomFormFields module="vehicle_loans" /></LoanFormStep>
     </fieldset>
   </LoanFormLayout>
 }

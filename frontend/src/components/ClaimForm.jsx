@@ -121,7 +121,7 @@ export default function ClaimForm({
   }
 
   return (
-    <GuidedForm busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid">
+    <GuidedForm module="claims" recordId={initialData?.id} busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid">
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
 
       <GuidedSection title="Identificação" description="Identifique o veículo, o condutor e quando ocorreu.">

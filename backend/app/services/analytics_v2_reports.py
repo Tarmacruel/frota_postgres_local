@@ -13,10 +13,8 @@ from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
 from reportlab.lib.units import mm
 from reportlab.platypus import Image, LongTable, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from app.core.official_identity import (
-    ADMINISTRATION_SECRETARIAT, COLOR_NAVY, FLEET_DEPARTMENT, MUNICIPALITY_NAME,
-    crest_path, ensure_pdf_fonts,
-)
+from app.core.official_identity import crest_path, ensure_pdf_fonts
+from app.core import official_identity
 from app.services.analytics_service import ANALYTICS_EXPORT_NO_CACHE_HEADERS, _analytics_xlsx_value, _institutional_timestamp
 
 
@@ -256,22 +254,22 @@ def _header_lines(profile, filters, issued_at):
 
 def _xlsx(profile, filters, sections, issued_at):
     workbook = Workbook()
-    workbook.properties.creator = MUNICIPALITY_NAME
+    workbook.properties.creator = official_identity.MUNICIPALITY_NAME
     workbook.properties.title = f'Relatório de {PROFILE_NAMES[profile]}'
     sheet = workbook.active
     sheet.title = 'Relatório'
     sheet.sheet_view.showGridLines = False
     row = 1
-    for line in (MUNICIPALITY_NAME, f'{ADMINISTRATION_SECRETARIAT} · {FLEET_DEPARTMENT}', *_header_lines(profile, filters, issued_at)):
+    for line in (official_identity.MUNICIPALITY_NAME, f'{official_identity.ADMINISTRATION_SECRETARIAT} · {official_identity.FLEET_DEPARTMENT}', *_header_lines(profile, filters, issued_at)):
         cell = sheet.cell(row=row, column=1, value=_analytics_xlsx_value(line))
-        cell.font = Font(bold=row in (1, 3), color=COLOR_NAVY.lstrip('#'))
+        cell.font = Font(bold=row in (1, 3), color=official_identity.COLOR_NAVY.lstrip('#'))
         sheet.merge_cells(start_row=row, start_column=1, end_row=row, end_column=3)
         row += 1
     row += 1
     for title, entries in sections:
         sheet.cell(row=row, column=1, value=_analytics_xlsx_value(title)).font = Font(bold=True, color='FFFFFF')
         for column in range(1, 4):
-            sheet.cell(row=row, column=column).fill = PatternFill('solid', fgColor=COLOR_NAVY.lstrip('#'))
+            sheet.cell(row=row, column=column).fill = PatternFill('solid', fgColor=official_identity.COLOR_NAVY.lstrip('#'))
         row += 1
         for column, label in enumerate(('Indicador / entidade', 'Valor', 'Fonte / contexto'), 1):
             sheet.cell(row=row, column=column, value=label).font = Font(bold=True)
@@ -297,16 +295,16 @@ def _pdf(profile, filters, sections, issued_at):
     styles = getSampleStyleSheet()
     body = ParagraphStyle('ReportBody', parent=styles['BodyText'], fontName=regular, fontSize=8, leading=11)
     heading = ParagraphStyle('ReportHeading', parent=body, fontName=bold, fontSize=11, leading=14,
-                             textColor=colors.HexColor(COLOR_NAVY), spaceBefore=5 * mm, keepWithNext=True)
+                             textColor=colors.HexColor(official_identity.COLOR_NAVY), spaceBefore=5 * mm, keepWithNext=True)
     small = ParagraphStyle('ReportSmall', parent=body, fontSize=7, leading=9)
     table_header = ParagraphStyle('ReportTableHeader', parent=small, fontName=bold, textColor=colors.white)
     title = ParagraphStyle('ReportTitle', parent=heading, fontSize=15, leading=18)
     document = SimpleDocTemplate(output, pagesize=A4, leftMargin=14 * mm, rightMargin=14 * mm,
                                  topMargin=12 * mm, bottomMargin=15 * mm,
-                                 title=f'Relatório de {PROFILE_NAMES[profile]}', author=MUNICIPALITY_NAME)
+                                 title=f'Relatório de {PROFILE_NAMES[profile]}', author=official_identity.MUNICIPALITY_NAME)
     story = [Image(str(crest_path()), width=10 * mm, height=12.6 * mm),
-             Paragraph(escape(MUNICIPALITY_NAME), heading),
-             Paragraph(escape(f'{ADMINISTRATION_SECRETARIAT} · {FLEET_DEPARTMENT}'), small)]
+             Paragraph(escape(official_identity.MUNICIPALITY_NAME), heading),
+             Paragraph(escape(f'{official_identity.ADMINISTRATION_SECRETARIAT} · {official_identity.FLEET_DEPARTMENT}'), small)]
     for index, line in enumerate(_header_lines(profile, filters, issued_at)):
         story.append(Paragraph(escape(line), title if index == 0 else small))
     for section_title, entries in sections:
@@ -317,7 +315,7 @@ def _pdf(profile, filters, sections, issued_at):
                      for entry in (entries or [('Sem registros no recorte', '', '')])])
         table = LongTable(rows, colWidths=[48 * mm, 40 * mm, 94 * mm], repeatRows=1, hAlign='LEFT')
         table.setStyle(TableStyle([
-            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(COLOR_NAVY)),
+            ('BACKGROUND', (0, 0), (-1, 0), colors.HexColor(official_identity.COLOR_NAVY)),
             ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
             ('GRID', (0, 0), (-1, -1), 0.3, colors.HexColor('#D7E0ED')),
             ('VALIGN', (0, 0), (-1, -1), 'TOP'),

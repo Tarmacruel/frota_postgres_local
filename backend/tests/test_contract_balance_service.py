@@ -36,7 +36,7 @@ async def context():
         await conn.run_sync(lambda sync: portable.create_all(sync, tables=[portable.tables[t.__tablename__] for t in tables]))
     async with AsyncSession(engine, expire_on_commit=False) as db:
         now = datetime.now(timezone.utc)
-        actor = SimpleNamespace(id=uuid4(), role=UserRole.ADMIN, organization_id=None)
+        actor = SimpleNamespace(id=uuid4(), role=UserRole.SUPERUSER, organization_id=None)
         supplier = PaymentSupplier(id=uuid4(), name='Prestador Teste', active=True, created_at=now, updated_at=now)
         station = FuelStation(id=uuid4(), name='Posto Teste', address='Endereço de teste', active=True,
                               created_at=now, updated_at=now)

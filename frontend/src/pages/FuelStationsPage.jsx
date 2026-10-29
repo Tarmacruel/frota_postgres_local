@@ -1,3 +1,4 @@
+import { officialBrand } from '../constants/officialBrand'
 import GuidedForm, { FormSection as GuidedSection } from '../components/GuidedForm'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
@@ -49,7 +50,7 @@ function formatFormCoordinate(value) {
 export default function FuelStationsPage() {
   const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
 
-  const { canCreate, canEdit, canDeleteModule, isAdmin } = useAuth()
+  const { canCreate, canEdit, canDeleteModule, isSuperUser } = useAuth()
   const canCreateStation = canCreate('fuel_stations')
   const canEditStation = canEdit('fuel_stations')
   const canDeleteStation = canDeleteModule('fuel_stations')
@@ -149,12 +150,12 @@ export default function FuelStationsPage() {
   }, [loadStations])
 
   useEffect(() => {
-    if (!isAdmin) {
+    if (!isSuperUser) {
       setLinks([])
       return
     }
     loadLinks(selectedStationId).catch((err) => setError(getApiErrorMessage(err, 'Não foi possível carregar vínculos do posto.')))
-  }, [selectedStationId, isAdmin])
+  }, [selectedStationId, isSuperUser])
 
   function openCreateModal() {
     setStationForm(initialStationForm)
@@ -296,7 +297,7 @@ export default function FuelStationsPage() {
       setFeedback('')
       const reportRows = await allFilteredStations()
       await previewRowsToPdf({
-        title: 'Frota PMTF - Postos de combustível',
+        title: `${officialBrand.systemName} - Postos de combustível`,
         fileName: 'frota-pmtf-postos-combustivel',
         subtitle: 'Relatório institucional dos postos credenciados no módulo de abastecimentos.',
         columns: exportColumns,
@@ -376,7 +377,7 @@ export default function FuelStationsPage() {
         </div>
       </div>
 
-      {isAdmin && selectedStationId ? <button type="button" className="secondary-button" onClick={() => { const target = document.getElementById('station-user-links'); target?.scrollIntoView({ block: 'start', behavior: 'smooth' }); target?.focus({ preventScroll: true }) }}>{links.length} vínculo(s) de usuário no posto selecionado · consultar</button> : null}
+      {isSuperUser && selectedStationId ? <button type="button" className="secondary-button" onClick={() => { const target = document.getElementById('station-user-links'); target?.scrollIntoView({ block: 'start', behavior: 'smooth' }); target?.focus({ preventScroll: true }) }}>{links.length} vínculo(s) de usuário no posto selecionado · consultar</button> : null}
       <IndicatorBar state={{ selected: indicator, metadata: indicatorMetadata, select: selectIndicator }} loading={loading} error={error} resultCount={pagination.total} />
 
       {error && !isModalOpen ? <div className="alert alert-error" style={{ marginBottom: 16 }}>{error}</div> : null}
@@ -435,7 +436,7 @@ export default function FuelStationsPage() {
                   <td data-label="Ações">
                     <div className="actions-inline">
                       {canEditStation ? <button type="button" className="mini-button" onClick={() => openEditModal(station)}>Editar</button> : null}
-                      {isAdmin ? <button type="button" className="mini-button" onClick={() => setSelectedStationId(station.id)}>Vínculos</button> : null}
+                      {isSuperUser ? <button type="button" className="mini-button" onClick={() => setSelectedStationId(station.id)}>Vínculos</button> : null}
                       {canDeleteStation ? <button type="button" className="mini-button danger" onClick={() => removeStation(station.id)}>Excluir</button> : null}
                     </div>
                   </td>
@@ -448,7 +449,7 @@ export default function FuelStationsPage() {
 
       <Pagination currentPage={pagination.page} totalPages={pagination.pages} onPageChange={(page) => loadStations({ page })} />
 
-      {isAdmin ? <div className="surface-panel panel-nested" id="station-user-links" tabIndex={-1}>
+      {isSuperUser ? <div className="surface-panel panel-nested" id="station-user-links" tabIndex={-1}>
         <div className="panel-heading">
           <div>
             <h3 className="section-title">Vínculos de usuários {selectedStation ? `- ${selectedStation.name}` : ''}</h3>

@@ -687,7 +687,7 @@ class CertificateSigningSessionService:
 
     async def get_pairing(self, pairing_id: UUID, current_user: User) -> dict:
         pairing = await self._require_pairing(pairing_id, for_update=True)
-        if pairing.user_id != current_user.id and current_user.role != UserRole.ADMIN:
+        if pairing.user_id != current_user.id and current_user.role != UserRole.SUPERUSER:
             self._raise(status.HTTP_404_NOT_FOUND, "PAIRING_NOT_FOUND", "Pareamento não encontrado.")
         now = datetime.now(UTC)
         if pairing.status == SignatureAgentPairingStatus.CREATED and self._deadline(pairing.expires_at) <= now:
@@ -830,7 +830,7 @@ class CertificateSigningSessionService:
             external_device_id.lower(), for_update=True
         )
         if device is None or (
-            device.user_id != current_user.id and current_user.role != UserRole.ADMIN
+            device.user_id != current_user.id and current_user.role != UserRole.SUPERUSER
         ):
             self._raise(status.HTTP_404_NOT_FOUND, "DEVICE_NOT_FOUND", "Dispositivo não encontrado.")
         now = datetime.now(UTC)
@@ -906,7 +906,7 @@ class CertificateSigningSessionService:
     def _authorize_session_user(
         self, signing_session: CertificateSigningSession, current_user: User
     ) -> None:
-        if signing_session.signer_user_id != current_user.id and current_user.role != UserRole.ADMIN:
+        if signing_session.signer_user_id != current_user.id and current_user.role != UserRole.SUPERUSER:
             self._raise(status.HTTP_404_NOT_FOUND, "CERTIFICATE_SESSION_NOT_FOUND", "Sessão não encontrada.")
 
     def _assert_session_state(self, signing_session: CertificateSigningSession, expected: str) -> None:

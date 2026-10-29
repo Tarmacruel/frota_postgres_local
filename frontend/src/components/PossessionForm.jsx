@@ -537,7 +537,7 @@ export default function PossessionForm({ vehicles, onVehicleOptionsOpen, onClose
         : 'Capturar foto e localização'
 
   return (
-    <GuidedForm busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid">
+    <GuidedForm module="possession" busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid">
       <div className="sr-status" aria-live="assertive" aria-atomic="true">{error}</div>
       {error ? <div className="alert alert-error modal-field-span" role="alert">{error}</div> : null}
 

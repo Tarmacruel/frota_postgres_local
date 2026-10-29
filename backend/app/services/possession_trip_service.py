@@ -411,7 +411,7 @@ class PossessionTripService:
         return possession
 
     def _serialize(self, trip: VehiclePossessionTrip, *, current_user: User) -> dict:
-        operational_details_restricted = current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}
+        operational_details_restricted = current_user.role not in {UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO}
         destinations = [] if operational_details_restricted else [
             {
                 "id": destination.id,

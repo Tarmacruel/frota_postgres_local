@@ -123,7 +123,7 @@ function LegacyMaintenanceForm({ vehicles, initialData = null, onClose, onSucces
   }
 
   return (
-    <GuidedForm busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid">
+    <GuidedForm module="maintenance" recordId={initialData?.id} busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid">
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
 
       <GuidedSection title="Execução" description="Confira o veículo, as datas e o custo realizado.">

@@ -11,7 +11,7 @@ from app.services.vehicle_service import VehicleService
 from app.models.user import UserRole
 
 
-def card_user(role=UserRole.ADMIN, organization_id=None, can_edit=True):
+def card_user(role=UserRole.SUPERUSER, organization_id=None, can_edit=True):
     return SimpleNamespace(role=role, organization_id=organization_id, permissions={'vehicles': {'can_view': True, 'can_edit': can_edit}})
 
 
@@ -52,8 +52,8 @@ async def test_update_preserves_clears_or_changes_card_and_audits(monkeypatch, v
 
 
 @pytest.mark.parametrize('role,can_edit,own_org,expected', [
-    (UserRole.ADMIN, True, False, True),
-    (UserRole.ADMIN, False, False, False),
+    (UserRole.SUPERUSER, True, False, True),
+    (UserRole.SUPERUSER, False, False, False),
     (UserRole.PADRAO, False, False, False),
     (UserRole.PRODUCAO, True, True, True),
     (UserRole.PRODUCAO, True, False, False),

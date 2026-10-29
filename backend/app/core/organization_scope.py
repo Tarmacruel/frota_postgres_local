@@ -5,14 +5,16 @@ from uuid import UUID
 from fastapi import HTTPException, status
 
 from app.models.user import User, UserRole
+from app.core.roles import has_organization_scope
 
 
 def is_production_user(current_user: User | None) -> bool:
-    return bool(current_user and getattr(current_user, "role", None) == UserRole.PRODUCAO)
+    # Legacy name retained for service compatibility. ADMIN now shares this scope.
+    return bool(current_user and has_organization_scope(current_user))
 
 
 def production_scope_is_empty(current_user: User | None) -> bool:
-    return is_production_user(current_user) and current_user.organization_id is None
+    return is_production_user(current_user) and getattr(current_user, "organization_id", None) is None
 
 
 def scoped_organization_id(current_user: User | None, requested_organization_id: UUID | None = None) -> UUID | None:

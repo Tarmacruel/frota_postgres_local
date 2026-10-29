@@ -40,9 +40,9 @@ async def authorize(db, user, context):
         raise HTTPException(422, "Finalidade de justificativa desconhecida")
     module, action, _, _, writer = config
     role = getattr(user.role, "value", user.role)
-    if writer and role not in {"ADMIN", "PRODUCAO"}:
+    if writer and role not in {"SUPERUSER", "ADMIN", "PRODUCAO"}:
         raise HTTPException(403, "Permissão insuficiente")
-    if context == "loan_regularization" and role != "ADMIN":
+    if context == "loan_regularization" and role not in {"SUPERUSER", "ADMIN"}:
         raise HTTPException(403, "Acesso restrito a administradores")
     if action == "write":
         try:

@@ -140,7 +140,7 @@ export default function VehicleLoansPage() {
         title="Empréstimos entre secretarias"
         actions={(
           <>
-          {user.role === 'ADMIN' && canCreate('vehicle_loans') && <button className="ghost-button" onClick={() => { setFeedback(''); setModal('regularization') }}>Regularizar empréstimo anterior</button>}
+          {['SUPERUSER', 'ADMIN'].includes(user.role) && canCreate('vehicle_loans') && <button className="ghost-button" onClick={() => { setFeedback(''); setModal('regularization') }}>Regularizar empréstimo anterior</button>}
           {canCreate('vehicle_loans') && <button className="app-button" disabled={!catalogReady} onClick={() => { setFeedback(''); setModal('new') }}>Novo empréstimo</button>}
           </>
         )}
@@ -155,7 +155,7 @@ export default function VehicleLoansPage() {
         <label>Situação<select className="app-input" value={status} onChange={(e) => { setStatus(e.target.value); setPage(1) }}>
           <option value="">Todas as situações</option>{Object.entries(loanStatuses).map(([value, label]) => <option key={value} value={value}>{label}</option>)}
         </select></label>
-        {user.role !== 'ADMIN' && <label>Participação<select className="app-input" value={direction} onChange={(e) => { setDirection(e.target.value); setPage(1) }}>
+        {user.role !== 'SUPERUSER' && <label>Participação<select className="app-input" value={direction} onChange={(e) => { setDirection(e.target.value); setPage(1) }}>
           <option value="">Enviados e recebidos</option><option value="sent">Minha secretaria é a origem</option><option value="received">Minha secretaria é a recebedora</option>
         </select></label>}
         <button type="button" className="ghost-button" onClick={refresh}>Atualizar</button>

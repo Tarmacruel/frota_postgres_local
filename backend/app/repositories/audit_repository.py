@@ -26,6 +26,7 @@ class AuditRepository:
         entity_type: str | None = None,
         action: str | None = None,
         actor_user_id: UUID | None = None,
+        organization_id: UUID | None = None,
     ) -> list[AuditLog]:
         stmt = select(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit)
 
@@ -35,6 +36,8 @@ class AuditRepository:
             stmt = stmt.where(AuditLog.action == action.upper())
         if actor_user_id:
             stmt = stmt.where(AuditLog.actor_user_id == actor_user_id)
+        if organization_id:
+            stmt = stmt.where(AuditLog.organization_id == organization_id)
 
         result = await self.db.execute(stmt)
         return list(result.scalars().all())
@@ -52,7 +55,7 @@ class AuditRepository:
         if entity_type:
             base = base.where(AuditLog.entity_type == entity_type.upper())
         if organization_id:
-            base = base.where(Organization.id == organization_id)
+            base = base.where(AuditLog.organization_id == organization_id)
         if without_organization:
             base = base.where(Organization.id.is_(None))
         if search and search.strip():

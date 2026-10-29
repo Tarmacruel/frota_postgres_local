@@ -1,3 +1,4 @@
+import { useSystemSettings } from '../hooks/useSystemSettings'
 import { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
@@ -11,6 +12,7 @@ const accessNotes = [
 ]
 
 export default function LoginPage() {
+  useSystemSettings()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -45,7 +47,7 @@ export default function LoginPage() {
             <div className="login-brand-header">
               <span className="eyebrow">Acesso institucional protegido</span>
               <div className="login-brandline">
-                <img className="login-brand-logo" src={officialBrand.logoPath} alt="Brasão oficial da Prefeitura Municipal de Teixeira de Freitas" />
+                <img className="login-brand-logo" src={officialBrand.logoPath} alt={`Logo de ${officialBrand.municipality}`} />
                 <div>
                   <strong>{officialBrand.systemName}</strong>
                   <span>{officialBrand.subtitle}</span>
@@ -56,7 +58,7 @@ export default function LoginPage() {
             <div className="login-brand-stage">
               <div className="login-brand-stage-copy">
                 <strong>Prefeitura Municipal</strong>
-                <span className="login-brand-stage-city">Teixeira de Freitas</span>
+                <span className="login-brand-stage-city">{officialBrand.city}</span>
                 <p className="login-brand-stage-note">
                   Plataforma oficial para acompanhamento da frota, condutores e manutenções em um fluxo mais ágil para operação e gestão.
                 </p>
@@ -82,7 +84,7 @@ export default function LoginPage() {
 
             <div>
               <h2 className="panel-title">Bem-vindo de volta</h2>
-              <p className="panel-subtitle">Entre com a conta vinculada ao ambiente institucional da Prefeitura Municipal de Teixeira de Freitas.</p>
+              <p className="panel-subtitle">Entre com a conta vinculada ao ambiente institucional de {officialBrand.municipality}.</p>
             </div>
 
             <form onSubmit={handleSubmit} className="form-grid">

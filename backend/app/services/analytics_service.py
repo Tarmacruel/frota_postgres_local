@@ -24,20 +24,8 @@ from sqlalchemy import case, func, select
 from app.repositories.vehicle_scope import responsible_to, fine_occurred_at
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.official_identity import (
-    ADMINISTRATION_SECRETARIAT,
-    COLOR_BORDER,
-    COLOR_MUTED,
-    COLOR_NAVY,
-    COLOR_SURFACE,
-    FLEET_DEPARTMENT,
-    MUNICIPALITY_ADDRESS,
-    MUNICIPALITY_CNPJ,
-    MUNICIPALITY_NAME,
-    crest_path,
-    ensure_pdf_fonts,
-    institutional_datetime,
-)
+from app.core.official_identity import COLOR_BORDER, COLOR_MUTED, COLOR_SURFACE, crest_path, ensure_pdf_fonts, institutional_datetime
+from app.core import official_identity
 from app.models.claim import Claim
 from app.models.driver import Driver
 from app.models.fine import Fine
@@ -685,9 +673,9 @@ class AnalyticsService:
     @staticmethod
     def _build_export_xlsx(insights: list[dict], period_days: int, issued_at: datetime) -> bytes:
         workbook = Workbook()
-        workbook.properties.creator = MUNICIPALITY_NAME
+        workbook.properties.creator = official_identity.MUNICIPALITY_NAME
         workbook.properties.title = "Relatório de análises da frota"
-        workbook.properties.subject = f"{ADMINISTRATION_SECRETARIAT} · {FLEET_DEPARTMENT}"
+        workbook.properties.subject = f"{official_identity.ADMINISTRATION_SECRETARIAT} · {official_identity.FLEET_DEPARTMENT}"
         workbook.properties.description = "Documento oficial de gestão da frota municipal"
 
         worksheet = workbook.active
@@ -706,15 +694,15 @@ class AnalyticsService:
         worksheet.row_dimensions[1].height = 24
         worksheet.row_dimensions[2].height = 21
         worksheet.row_dimensions[3].height = 8
-        worksheet["B1"] = MUNICIPALITY_NAME.upper()
-        worksheet["B1"].font = Font(name="Roboto", size=13, bold=True, color=COLOR_NAVY.lstrip("#"))
+        worksheet["B1"] = official_identity.MUNICIPALITY_NAME.upper()
+        worksheet["B1"].font = Font(name="Roboto", size=13, bold=True, color=official_identity.COLOR_NAVY.lstrip("#"))
         worksheet["B1"].alignment = Alignment(vertical="bottom")
-        worksheet["B2"] = f"{ADMINISTRATION_SECRETARIAT} · {FLEET_DEPARTMENT}"
+        worksheet["B2"] = f"{official_identity.ADMINISTRATION_SECRETARIAT} · {official_identity.FLEET_DEPARTMENT}"
         worksheet["B2"].font = Font(name="Roboto", size=9, color=COLOR_MUTED.lstrip("#"))
         worksheet["B2"].alignment = Alignment(vertical="top")
 
         worksheet["A4"] = "RELATÓRIO DE ANÁLISES DA FROTA"
-        worksheet["A4"].font = Font(name="Roboto", size=16, bold=True, color=COLOR_NAVY.lstrip("#"))
+        worksheet["A4"].font = Font(name="Roboto", size=16, bold=True, color=official_identity.COLOR_NAVY.lstrip("#"))
         worksheet["A4"].alignment = Alignment(horizontal="left")
         worksheet["A5"] = f"Período analisado: últimos {period_days} dias"
         worksheet["A6"] = f"Emissão: {_institutional_timestamp(issued_at)} · Alertas identificados: {len(insights)}"
@@ -722,7 +710,7 @@ class AnalyticsService:
             worksheet[coordinate].font = Font(name="Roboto", size=9, color=COLOR_MUTED.lstrip("#"))
 
         header_row = 8
-        navy_fill = PatternFill("solid", fgColor=COLOR_NAVY.lstrip("#"))
+        navy_fill = PatternFill("solid", fgColor=official_identity.COLOR_NAVY.lstrip("#"))
         alternate_fill = PatternFill("solid", fgColor=COLOR_SURFACE.lstrip("#"))
         border = Border(
             left=Side(style="thin", color=COLOR_BORDER.lstrip("#")),
@@ -759,16 +747,16 @@ class AnalyticsService:
         worksheet.page_setup.orientation = "landscape"
         worksheet.page_setup.fitToWidth = 1
         worksheet.sheet_properties.pageSetUpPr.fitToPage = True
-        worksheet.oddFooter.center.text = f"{MUNICIPALITY_NAME} · CNPJ {MUNICIPALITY_CNPJ}"
+        worksheet.oddFooter.center.text = f"{official_identity.MUNICIPALITY_NAME} · CNPJ {official_identity.MUNICIPALITY_CNPJ}"
         worksheet.oddFooter.right.text = "Página &P de &N"
 
         metadata = workbook.create_sheet("Informações")
         metadata.sheet_view.showGridLines = False
         metadata_rows = (
-            ("Órgão emissor", MUNICIPALITY_NAME),
-            ("Unidade", f"{ADMINISTRATION_SECRETARIAT} · {FLEET_DEPARTMENT}"),
-            ("CNPJ", MUNICIPALITY_CNPJ),
-            ("Endereço", MUNICIPALITY_ADDRESS),
+            ("Órgão emissor", official_identity.MUNICIPALITY_NAME),
+            ("Unidade", f"{official_identity.ADMINISTRATION_SECRETARIAT} · {official_identity.FLEET_DEPARTMENT}"),
+            ("CNPJ", official_identity.MUNICIPALITY_CNPJ),
+            ("Endereço", official_identity.MUNICIPALITY_ADDRESS),
             ("Documento", "Relatório de análises da frota"),
             ("Período", f"Últimos {period_days} dias"),
             ("Emissão", _institutional_timestamp(issued_at)),
@@ -777,7 +765,7 @@ class AnalyticsService:
         for row_index, (label, value) in enumerate(metadata_rows, start=1):
             label_cell = metadata.cell(row=row_index, column=1, value=label)
             value_cell = metadata.cell(row=row_index, column=2, value=_analytics_xlsx_value(value))
-            label_cell.font = Font(name="Roboto", size=9, bold=True, color=COLOR_NAVY.lstrip("#"))
+            label_cell.font = Font(name="Roboto", size=9, bold=True, color=official_identity.COLOR_NAVY.lstrip("#"))
             value_cell.font = Font(name="Roboto", size=9, color="20304A")
             value_cell.alignment = Alignment(wrap_text=True, vertical="top")
         metadata.column_dimensions["A"].width = 24
@@ -800,8 +788,8 @@ class AnalyticsService:
             topMargin=11 * mm,
             bottomMargin=21 * mm,
             title="Relatório de análises da frota",
-            author=MUNICIPALITY_NAME,
-            subject=f"{ADMINISTRATION_SECRETARIAT} · {FLEET_DEPARTMENT}",
+            author=official_identity.MUNICIPALITY_NAME,
+            subject=f"{official_identity.ADMINISTRATION_SECRETARIAT} · {official_identity.FLEET_DEPARTMENT}",
         )
         styles = getSampleStyleSheet()
         body_style = ParagraphStyle(
@@ -825,7 +813,7 @@ class AnalyticsService:
             fontName=font_bold,
             fontSize=9,
             leading=11,
-            textColor=colors.HexColor(COLOR_NAVY),
+            textColor=colors.HexColor(official_identity.COLOR_NAVY),
         )
         header_style = ParagraphStyle(
             "AnalyticsHeader",
@@ -839,15 +827,15 @@ class AnalyticsService:
             fontName=font_bold,
             fontSize=15,
             leading=18,
-            textColor=colors.HexColor(COLOR_NAVY),
+            textColor=colors.HexColor(official_identity.COLOR_NAVY),
             spaceAfter=2 * mm,
         )
         available_width = page_size[0] - 24 * mm
         crest = Image(str(crest_path()), width=10 * mm, height=12.6 * mm)
         identity = [
-            Paragraph(MUNICIPALITY_NAME.upper(), institution_style),
+            Paragraph(official_identity.MUNICIPALITY_NAME.upper(), institution_style),
             Paragraph(
-                _analytics_pdf_text(f"{ADMINISTRATION_SECRETARIAT} · {FLEET_DEPARTMENT}"),
+                _analytics_pdf_text(f"{official_identity.ADMINISTRATION_SECRETARIAT} · {official_identity.FLEET_DEPARTMENT}"),
                 small_style,
             ),
         ]
@@ -860,7 +848,7 @@ class AnalyticsService:
                     ("RIGHTPADDING", (0, 0), (-1, -1), 0),
                     ("TOPPADDING", (0, 0), (-1, -1), 0),
                     ("BOTTOMPADDING", (0, 0), (-1, -1), 3 * mm),
-                    ("LINEBELOW", (0, 0), (-1, -1), 0.8, colors.HexColor(COLOR_NAVY)),
+                    ("LINEBELOW", (0, 0), (-1, -1), 0.8, colors.HexColor(official_identity.COLOR_NAVY)),
                 ]
             )
         )
@@ -915,7 +903,7 @@ class AnalyticsService:
             table.setStyle(
                 TableStyle(
                     [
-                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(COLOR_NAVY)),
+                        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(official_identity.COLOR_NAVY)),
                         ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor(COLOR_BORDER)),
                         ("VALIGN", (0, 0), (-1, -1), "TOP"),
                         ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor(COLOR_SURFACE)]),
@@ -937,13 +925,13 @@ class AnalyticsService:
 
         def footer(canvas, doc):
             canvas.saveState()
-            canvas.setStrokeColor(colors.HexColor(COLOR_NAVY))
+            canvas.setStrokeColor(colors.HexColor(official_identity.COLOR_NAVY))
             canvas.setLineWidth(0.45)
             canvas.line(12 * mm, 15 * mm, page_size[0] - 12 * mm, 15 * mm)
             canvas.setFillColor(colors.HexColor(COLOR_MUTED))
             canvas.setFont(font_regular, 6.2)
-            canvas.drawString(12 * mm, 11.5 * mm, f"{MUNICIPALITY_NAME} · CNPJ {MUNICIPALITY_CNPJ}")
-            canvas.drawString(12 * mm, 8.5 * mm, MUNICIPALITY_ADDRESS)
+            canvas.drawString(12 * mm, 11.5 * mm, f"{official_identity.MUNICIPALITY_NAME} · CNPJ {official_identity.MUNICIPALITY_CNPJ}")
+            canvas.drawString(12 * mm, 8.5 * mm, official_identity.MUNICIPALITY_ADDRESS)
             canvas.drawRightString(page_size[0] - 12 * mm, 11.5 * mm, f"Página {doc.page}")
             canvas.restoreState()
 

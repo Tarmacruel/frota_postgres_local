@@ -7,6 +7,7 @@ from app.models.audit_log import AuditLog
 from app.models.user import User
 from app.repositories.audit_repository import AuditRepository
 from app.core.request_context import RequestAuditContext, get_request_audit_context
+from app.core.roles import is_superuser
 
 
 _SECRET_KEYS = {
@@ -88,12 +89,14 @@ class AuditService:
         entity_type: str | None = None,
         action: str | None = None,
         actor_user_id: UUID | None = None,
+        organization_id: UUID | None = None,
     ) -> list[AuditLog]:
         return await self.audit_logs.list(
             limit=limit,
             entity_type=entity_type,
             action=action,
             actor_user_id=actor_user_id,
+            organization_id=organization_id,
         )
 
     async def list_paginated(self, **filters):
@@ -121,6 +124,7 @@ class AuditService:
             actor_name=actor.name,
             actor_email=actor.email,
             actor_role=actor.role.value,
+            organization_id=None if is_superuser(actor) else getattr(actor, 'organization_id', None),
             action=action.upper(),
             entity_type=entity_type.upper(),
             entity_id=entity_id,

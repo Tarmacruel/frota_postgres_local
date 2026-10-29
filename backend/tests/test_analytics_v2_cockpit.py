@@ -74,5 +74,5 @@ async def test_cockpit_routes_permissions_and_fixed_organization(monkeypatch, en
         assert response.status_code == 200
         assert response.headers['cache-control'] == 'private, no-store'
     assert captured == [org]
-    async with AsyncClient(transport=ASGITransport(app=route_app(allowed=False)), base_url='http://test') as client:
+    async with AsyncClient(transport=ASGITransport(app=route_app(role=UserRole.PADRAO, allowed=False)), base_url='http://test') as client:
         assert (await client.get(path)).status_code == 403

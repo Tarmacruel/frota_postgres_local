@@ -1,3 +1,4 @@
+import { CustomFormFields } from './ConfiguredFormFields'
 import { useEffect, useRef, useState } from 'react'
 import VehicleLoanSelect from './VehicleLoanSelect'
 import JustificationField from './JustificationField'
@@ -36,7 +37,7 @@ export default function LoanProposalForm({ loan, catalog, user, onClose, onSaved
   const ownerName = catalog.organizations.find((item) => item.id === owner)?.name || loan?.origin_organization_name
   const recipientName = catalog.organizations.find((item) => item.id === form.recipient)?.name
   const destination = catalog.allocations.find((item) => item.id === form.destination_allocation_id && item.organization_id === form.recipient)
-  const admin = user.role === 'ADMIN'
+  const admin = user.role === 'SUPERUSER'
   const validation = [
     [...(!form.vehicle_id || !owner ? [['vehicle_id', 'Selecione um veículo com secretaria de origem identificada.']] : []),
       ...(!form.recipient ? [['recipient', 'Selecione a secretaria recebedora na lista de resultados.']] : !destination ? [['destination_allocation_id', 'Selecione a secretaria recebedora e uma lotação de destino na lista de resultados.']] : [])],
@@ -126,7 +127,7 @@ export default function LoanProposalForm({ loan, catalog, user, onClose, onSaved
           <JustificationField label={<LoanFieldLabel label="Justificativa (obrigatória)" required />} aria-label="Justificativa (obrigatória)" aria-invalid={Boolean(wizard.errors.justification)} context={loan ? 'loan_proposal' : 'loan_create'} userId={user.id} className="app-input" required minLength={8} maxLength={1000} rows={3} value={form.justification} onChange={(e) => change('justification', e.target.value)} />
           {wizard.errors.justification ? <small className="loan-editor__field-error">{wizard.errors.justification}</small> : null}
         </div> : null}
-      </LoanFormStep>
+      <CustomFormFields module="vehicle_loans" recordId={loan?.id} /></LoanFormStep>
     </fieldset>
   </LoanFormLayout>
 }

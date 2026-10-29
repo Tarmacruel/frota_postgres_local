@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import api from '../api/client'
 import { hasPermission } from '../utils/permissions'
-import { getRoleLabel, isAdmin, isFuelStation, isPosto } from '../utils/roles'
+import { getRoleLabel, isAdmin, isFuelStation, isPosto, isSuperUser, isOrganizationScoped } from '../utils/roles'
 
 const AuthContext = createContext(null)
 
@@ -69,6 +69,8 @@ export function AuthProvider({ children }) {
       mustChangePassword: Boolean(user?.must_change_password),
       mustRegisterCpf: Boolean(user?.must_register_cpf),
       isAdmin: isAdmin(user?.role),
+      isSuperUser: isSuperUser(user?.role),
+      isOrganizationScoped: isOrganizationScoped(user?.role),
       isProduction: user?.role === 'PRODUCAO',
       isPosto: isPosto(user?.role),
       can,

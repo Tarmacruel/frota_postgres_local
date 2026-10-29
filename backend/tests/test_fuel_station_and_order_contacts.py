@@ -317,7 +317,7 @@ async def test_create_order_audits_loaded_order_to_avoid_async_lazy_load():
 
     service.get_order = fake_get_order
     service._serialize_order = serialize_spy
-    current_user = SimpleNamespace(id=uuid4(), role=UserRole.ADMIN, name="Admin", email="admin@example.test")
+    current_user = SimpleNamespace(id=uuid4(), role=UserRole.SUPERUSER, name="Admin", email="admin@example.test")
     data = FuelSupplyOrderCreate(
         vehicle_id=vehicle.id,
         organization_id=organization.id,
@@ -389,7 +389,7 @@ async def test_confirm_order_links_created_supply_and_serializes_real_values(mon
     service._store_file = lambda path, content: None
     service._build_receipt_storage_paths = lambda supply_id, mime_type: ("fuel_receipts/test.pdf", None)
 
-    user = SimpleNamespace(id=uuid4(), role=UserRole.ADMIN, name="Admin", email="admin@example.test")
+    user = SimpleNamespace(id=uuid4(), role=UserRole.SUPERUSER, name="Admin", email="admin@example.test")
     data = FuelSupplyOrderConfirm(
         supplied_at=datetime(2026, 6, 10, 9, 30, tzinfo=timezone.utc),
         odometer_km=12345,

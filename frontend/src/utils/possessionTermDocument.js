@@ -295,7 +295,7 @@ async function buildDocument(record, termType = 'loan') {
   cursorY += 14
   cursorY = addParagraph('Por estarem de comum acordo, firmam o presente termo.', cursorY, { align: 'left' })
   cursorY += 19
-  cursorY = addParagraph(`Teixeira de Freitas-BA, ${formatDate(termType === 'return' ? record.end_date : record.start_date)}.`, cursorY, { align: 'left' })
+  cursorY = addParagraph(`${officialBrand.city}-${officialBrand.state}, ${formatDate(termType === 'return' ? record.end_date : record.start_date)}.`, cursorY, { align: 'left' })
 
   const signatureY = Math.min(Math.max(cursorY + 38, 578), validationBlockY - 110)
   doc.setDrawColor(31, 41, 55)

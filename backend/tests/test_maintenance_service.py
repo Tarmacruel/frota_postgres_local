@@ -17,7 +17,7 @@ from app.schemas.maintenance import MaintenanceCreate, MaintenanceUpdate
 from app.services.maintenance_service import MaintenanceService
 
 
-def _user(role: UserRole = UserRole.ADMIN, organization_id=None):
+def _user(role: UserRole = UserRole.SUPERUSER, organization_id=None):
     return SimpleNamespace(
         id=uuid4(),
         name="Usuario de teste",

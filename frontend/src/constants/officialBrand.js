@@ -1,4 +1,6 @@
 export const officialBrand = {
+  city: 'Teixeira de Freitas',
+  state: 'BA',
   municipality: 'Prefeitura Municipal de Teixeira de Freitas',
   systemName: 'Frota PMTF',
   subtitle: 'Sistema oficial de gestão da frota municipal',
@@ -15,4 +17,11 @@ export const officialBrand = {
     ink: '#20304a',
     softInk: '#66758c',
   },
+}
+
+export function applyOfficialBrand(values) {
+  if (!values?.identity) return
+  Object.assign(officialBrand, values.identity)
+  officialBrand.reportFooter = `${officialBrand.municipality} | ${officialBrand.addressLine} | CNPJ ${officialBrand.cnpj}`
+  officialBrand.colors.royalBlue = values.appearance?.primary || '#2452e8'
 }

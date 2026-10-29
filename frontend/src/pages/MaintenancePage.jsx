@@ -1,3 +1,4 @@
+import { officialBrand } from '../constants/officialBrand'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import ContractReturnBanner from '../components/contracts/ContractReturnBanner'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
@@ -291,7 +292,7 @@ export default function MaintenancePage() {
       setFeedback('')
       const rows = await loadAllFilteredRecords()
       await previewRowsToPdf({
-        title: 'Frota PMTF - Manutenções',
+        title: `${officialBrand.systemName} - Manutenções`,
         fileName: 'frota-pmtf-manutenções',
         subtitle: 'Relatório das manutenções filtradas no painel operacional.',
         columns: exportColumns,

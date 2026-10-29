@@ -19,7 +19,7 @@ function Term({ document, loanId, onChanged, onRefresh }) {
   const rep = document.snapshot?.representatives?.find((item) => item.user_id === user.id)
   const signed = document.signatures.some((item) => item.signer_user_id === user.id)
   const allowed = canEdit('vehicle_loans') && rep && !signed && document.status === 'PENDING'
-    && (user.role === 'ADMIN' || (user.role === 'PRODUCAO' && user.organization_id === rep.organization_id))
+    && (user.role === 'SUPERUSER' || (['ADMIN', 'PRODUCAO'].includes(user.role) && user.organization_id === rep.organization_id))
 
   async function download(original = false) {
     if (busyRef.current) return

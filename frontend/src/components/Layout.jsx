@@ -1,3 +1,4 @@
+import { useSystemSettings } from '../hooks/useSystemSettings'
 import GuidedForm from './GuidedForm'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -23,7 +24,8 @@ function readStorage(key, fallback) {
 }
 
 export default function Layout() {
-  const { user, logout, changePassword, registerCpf, mustChangePassword, mustRegisterCpf, isAdmin, canView, canCreate, roleLabel } = useAuth()
+  const { values: systemSettings } = useSystemSettings()
+  const { user, logout, changePassword, registerCpf, mustChangePassword, mustRegisterCpf, isAdmin, isSuperUser, canView, canCreate, roleLabel } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
   const passwordChangeRequired = Boolean(mustChangePassword)
@@ -132,8 +134,12 @@ export default function Layout() {
       })
     }
 
-    return sections
-  }, [isAdmin, canView])
+    if (isSuperUser) {
+      const management = sections.find((entry) => entry.title === 'Gestão')
+      management?.items.push({ to: '/parametros', label: 'Parâmetros', description: 'Identidade e administração', icon: 'settings' })
+    }
+    return sections.map((entry) => ({ ...entry, items: entry.items.map((item) => ({ ...item, icon: systemSettings.icons[item.icon] || item.icon })) }))
+  }, [isAdmin, isSuperUser, canView, systemSettings.icons])
 
   const mobileTabs = navSections.flatMap((section) => section.items).filter((item) =>
     ['/', '/vehicles', '/posses', '/condutores'].includes(item.to),
@@ -311,7 +317,7 @@ export default function Layout() {
 
 
   useEffect(() => {
-    if (!isAdmin || accessBlocked) return
+    if (!isSuperUser || accessBlocked) return
 
     let mounted = true
     async function loadUnreadCount() {
@@ -331,7 +337,7 @@ export default function Layout() {
       mounted = false
       window.clearInterval(timer)
     }
-  }, [isAdmin, accessBlocked])
+  }, [isSuperUser, accessBlocked])
 
   useEffect(() => {
     if (accessBlocked) return
@@ -355,7 +361,7 @@ export default function Layout() {
   }, [accessBlocked])
 
   async function openNotificationsCenter() {
-    if (!isAdmin || accessBlocked) return
+    if (!isSuperUser || accessBlocked) return
     setNotificationsOpen(true)
     try {
       const { data } = await adminNotificationsAPI.list({ limit: 80 })
@@ -497,11 +503,11 @@ export default function Layout() {
         <div className="sidebar-head">
           <div className="brand-block">
             <div className="brand-mark brand-mark-official">
-              <img src={officialBrand.logoPath} alt="Brasão oficial da Prefeitura Municipal de Teixeira de Freitas" />
+              <img src={officialBrand.logoPath} alt={`Logo de ${officialBrand.municipality}`} />
             </div>
             <div className="brand-copy">
               <strong className="brand-name">{officialBrand.systemName}</strong>
-              <span className="brand-subtitle">Teixeira de Freitas</span>
+              <span className="brand-subtitle">{officialBrand.city}</span>
             </div>
           </div>
           <button type="button" className="icon-button desktop-only" aria-label={sidebarCompact ? 'Expandir menu lateral' : 'Rebater menu lateral'} onClick={() => setSidebarCompact((current) => !current)}>
@@ -549,7 +555,7 @@ export default function Layout() {
 
             <span className="topbar-module-mark" aria-hidden="true"><ModuleIcon name={currentItem?.icon} /></span>
             <div className="topbar-route">
-              <span className="topbar-kicker">Frota PMTF . acompanhamento operacional</span>
+              <span className="topbar-kicker">{officialBrand.systemName} · acompanhamento operacional</span>
               <h1 className="page-title topbar-route-title">{currentItem?.label || 'Início'}</h1>
             </div>
           </div>
@@ -575,7 +581,7 @@ export default function Layout() {
             <button ref={accountTriggerRef} type="button" className="mobile-account-trigger" aria-label="Abrir ações da conta" aria-expanded={accountOpen} aria-controls="mobile-account-actions" onClick={() => setAccountOpen(!accountOpen)}>{getInitials(user?.name)}</button>
             <div ref={accountRef} id="mobile-account-actions" className={`topbar-system-actions${accountOpen ? ' is-open' : ''}`} aria-label="Ações do sistema" onClick={(event) => { if (event.target.closest('button')) setAccountOpen(false) }}>
               {!accessBlocked ? <button type="button" className="icon-button theme-button" data-tour="vehicle-tags-help" aria-label="Rever tour das etiquetas" title="Como usar etiquetas" onClick={() => window.dispatchEvent(new Event('vehicle-tags-guide:replay'))}><AppIcon name="catalog" className="app-icon" /></button> : null}
-              {isAdmin && !accessBlocked ? (
+              {isSuperUser && !accessBlocked ? (
                 <button
                   type="button"
                   className="icon-button theme-button"
@@ -641,9 +647,9 @@ export default function Layout() {
       </nav>
 
       <Modal open={notificationsOpen} title="Central de notificações" description="Ocorrências administrativas de divergência de quilometragem entre posses." onClose={() => setNotificationsOpen(false)}>
-        {!isAdmin ? <div className="alert alert-info">Acesso restrito a administradores.</div> : null}
-        {isAdmin && adminNotifications.length === 0 ? <div className="empty-state">Nenhuma notificação registrada até o momento.</div> : null}
-        {isAdmin && adminNotifications.length > 0 ? (
+        {!isSuperUser ? <div className="alert alert-info">Acesso exclusivo do superusuário.</div> : null}
+        {isSuperUser && adminNotifications.length === 0 ? <div className="empty-state">Nenhuma notificação registrada até o momento.</div> : null}
+        {isSuperUser && adminNotifications.length > 0 ? (
           <div className="stack" style={{ maxHeight: '60vh', overflowY: 'auto' }}>
             {adminNotifications.map((notification) => (
               <div key={notification.id} className="surface-panel panel-nested">
