@@ -497,3 +497,11 @@ Obrigatório acompanha as duas entradas sem duplicar contagem:5/6 sem anexo,6/6 
 QA com fixtures fictícias PNG/JPEG, prévia/ampliação, remover, orientação de obrigatório, entrada da câmera por seletor sem captura física e substituição. Desktop1280×900 e mobile390×843 claro/360×800 escuro, ações acessíveis, sem overflow e console sem erros. Nenhuma operação confirmada ou arquivo salvo no servidor. Tema/viewport restaurados e guia do usuário preservada.
 
 Fonte2200b69 em feature/fuel-receipt-picker-hml-20261029, publicada às07:15:58 só no frontend, entrada index-C8K7OL_1.js e nove assets conferidos.75/75 tabelas idênticas após QA, backend/configurações/PIDs preservados; HML6969/PID5344 após rotina06h, produção limpa0cd053c/8000/PID5804. Backup/reversão/capturas em storage/backups/20261029-fuel-receipt-picker. [ExecPlan e evidências](../EXECPLAN_FUEL_RECEIPT_PICKER_HML_20261029.md).
+
+## Login direto — 29/10/2026 — somente HML
+
+Exceção solicitada pelo usuário para a tela de acesso: LoginPage.jsx voltou ao form nativo compacto, sem GuidedForm, barra/contador de preenchimento, rodapé ou Rever obrigatórios. Identidade institucional e campos permanecem. Obrigatórios nativos, mensagem de erro acessível por role=alert e bloqueio de reenvio enquanto submitting preservados; serviço de autenticação, payload e permissões intactos. Nenhum componente compartilhado ou CSS alterado.
+
+654 testes/88 arquivos, lint zero erros/39 avisos anteriores e build homologation aprovados. QA do acesso público sem efetuar login: ausência de todos os elementos guiados, dois campos com required/validity.valueMissing, desktop1600×900 e mobile390×843 sem overflow. Estilos/temas existentes preservados. Console sem erros; viewport restaurado, guia temporária fechada e guias/preenchimentos do usuário mantidos. Capturas login-desktop.png/login-mobile.png, com campos vazios.
+
+Fonte03a2b8a em fix/login-simple-hml-20261029, publicada às09:36:47 só no frontend, entrada index-RpX_Zbx1.js e nove assets conferidos.75/75 tabelas idênticas após QA; APIs6969/PID5344 e8000/PID5804, backend/configurações/rotina06h intactos. Produção limpa0cd053c. Backup, capturas, gates e reversão em storage/backups/20261029-login-simple; retorno disponível ao frontend anterior index-C8K7OL_1.js.
