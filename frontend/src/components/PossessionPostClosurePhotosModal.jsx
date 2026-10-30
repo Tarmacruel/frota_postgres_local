@@ -1,3 +1,4 @@
+import GuidedForm from './GuidedForm'
 import Modal from './Modal'
 import PossessionReturnPhotos from './PossessionReturnPhotos'
 
@@ -5,7 +6,7 @@ export default function PossessionPostClosurePhotosModal({ record, files, onFile
   if (!record) return null
   return (
     <Modal open title="Adicionar fotos à posse encerrada" description={`Posse nº ${record.public_number} · ${record.vehicle_plate} · ${record.driver_name}`} onClose={onClose} canClose={!saving}>
-      <form className="form-grid modal-form-grid possession-return-form" onSubmit={onSubmit}>
+      <GuidedForm requirements={[{label: "Fotos", valid: files.length > 0, message: "Selecione pelo menos uma foto para anexar à posse encerrada."}]} busy={saving} className="form-grid modal-form-grid possession-return-form" onSubmit={onSubmit}>
         <p className="helper-text modal-field-span">As fotos serão anexadas à posse com a data do envio. Os dados, a declaração e a versão do encerramento serão preservados.</p>
         <PossessionReturnPhotos supplemental files={files} onChange={onFilesChange} disabled={saving} />
         <div className="modal-field-span" role="status" aria-live="polite">
@@ -16,7 +17,7 @@ export default function PossessionPostClosurePhotosModal({ record, files, onFile
           <button type="submit" className="app-button" disabled={saving || !files.length}>{saving ? 'Salvando…' : 'Salvar fotos'}</button>
           <button type="button" className="ghost-button" onClick={onClose} disabled={saving}>Cancelar</button>
         </div>
-      </form>
+      </GuidedForm>
     </Modal>
   )
 }

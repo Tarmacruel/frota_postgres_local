@@ -1,3 +1,4 @@
+import GuidedForm, { FormFields, FormSection } from '../components/GuidedForm'
 import MoneyInput from '../components/MoneyInput'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
@@ -909,7 +910,7 @@ export default function PaymentProcessesPage({ embedded = false, initialView = '
         onClose={closeDeleteProcessModal}
         canClose={!deletingProcess}
       >
-        <form className="payment-process-form payment-delete-form" onSubmit={confirmDeleteProcess}>
+        <GuidedForm className="payment-process-form payment-delete-form" onSubmit={confirmDeleteProcess}>
           <div className="alert alert-info">
             {deleteProcessTarget ? (
               <>Processo <strong>{deleteProcessTarget.process_number}</strong> será removido definitivamente.</>
@@ -934,7 +935,7 @@ export default function PaymentProcessesPage({ embedded = false, initialView = '
               {deletingProcess ? 'Excluindo...' : 'Excluir processo'}
             </button>
           </div>
-        </form>
+        </GuidedForm>
       </Modal>
     </div>
   )
@@ -943,21 +944,13 @@ export default function PaymentProcessesPage({ embedded = false, initialView = '
 
 function Field({ label, children }) {
   return (
-    <label className="form-field">
+    <FormFields><label className="form-field">
       <span>{label}</span>
       {children}
-    </label>
+    </label></FormFields>
   )
 }
 
-function FormSection({ title, children }) {
-  return (
-    <section className="payment-form-section">
-      <h3>{title}</h3>
-      {children}
-    </section>
-  )
-}
 
 function ProcessDetail({
   canManage,
@@ -1112,7 +1105,7 @@ function ImportsView({
           </button>
         </div>
 
-        <form className="payment-process-import-form payment-workflow-import" onSubmit={handleImport}>
+        <GuidedForm className="payment-process-import-form payment-workflow-import" onSubmit={handleImport}>
           <Field label="Planilha">
             <input
               type="file"
@@ -1124,7 +1117,7 @@ function ImportsView({
           <button className="app-button" type="submit" disabled={uploading || !canManage || !uploadFile}>
             {uploading ? 'Importando...' : 'Importar e atualizar'}
           </button>
-        </form>
+        </GuidedForm>
       </div>
 
       <div className="toolbar-card payment-process-panel payment-import-result-card">
@@ -1644,7 +1637,7 @@ function ContractsView({
                 ) : <div className="empty-state">Nenhum aditivo registrado.</div>}
 
                 {canManage ? (
-                  <form className="payment-amendment-form" onSubmit={createAmendment}>
+                  <GuidedForm className="payment-amendment-form" onSubmit={createAmendment}>
                     <h3 className="section-title">Novo aditivo</h3>
                     <div className="payment-form-grid two">
                       <Field label="Tipo"><input className="app-input" value={amendmentForm.amendment_type} onChange={(event) => setAmendmentForm((current) => ({ ...current, amendment_type: event.target.value }))} /></Field>
@@ -1657,7 +1650,7 @@ function ContractsView({
                       <textarea className="app-textarea" value={amendmentForm.notes} onChange={(event) => setAmendmentForm((current) => ({ ...current, notes: event.target.value }))} />
                     </Field>
                     <button className="secondary-button" type="submit">Registrar aditivo</button>
-                  </form>
+                  </GuidedForm>
                 ) : null}
               </div>
             </>
@@ -1714,8 +1707,8 @@ function ContractFormDrawer({
           </button>
         </div>
 
-        <form className="payment-process-form payment-structured-form" onSubmit={saveContract}>
-          <FormSection title="Dados basicos">
+        <GuidedForm className="payment-process-form payment-structured-form" onSubmit={saveContract}>
+          <FormSection title="Dados básicos">
             <Field label="Fornecedor">
               <select className="app-select" value={contractForm.supplier_id} onChange={(event) => setContractForm((current) => ({ ...current, supplier_id: event.target.value }))} required disabled={!canManage}>
                 <option value="">Selecione</option>
@@ -1745,7 +1738,7 @@ function ContractFormDrawer({
             </div>
           </FormSection>
 
-          <FormSection title="Vigencia e valores">
+          <FormSection title="Vigência e valores">
             <div className="payment-form-grid two">
               <Field label="Inicio">
                 <input className="app-input" type="date" value={contractForm.valid_from} onChange={(event) => setContractForm((current) => ({ ...current, valid_from: event.target.value }))} disabled={!canManage} />
@@ -1786,7 +1779,7 @@ function ContractFormDrawer({
               <button className="app-button" type="submit">{editingContractId ? 'Atualizar contrato' : 'Criar contrato'}</button>
             </div>
           ) : null}
-        </form>
+        </GuidedForm>
       </aside>
     </div>
   )
@@ -1829,7 +1822,7 @@ function SuppliersView({
 
       <aside className="toolbar-card payment-process-panel payment-detail-panel">
         <h2 className="section-title">{editingSupplierId ? 'Editar fornecedor' : 'Novo fornecedor'}</h2>
-        <form className="payment-process-form" onSubmit={saveSupplier}>
+        <GuidedForm className="payment-process-form" onSubmit={saveSupplier}>
           <Field label="Nome">
             <input className="app-input" value={supplierForm.name} onChange={(event) => setSupplierForm((current) => ({ ...current, name: event.target.value }))} required disabled={!canManage} />
           </Field>
@@ -1845,7 +1838,7 @@ function SuppliersView({
               {editingSupplierId ? <button className="ghost-button" type="button" onClick={() => { setEditingSupplierId(''); setSupplierForm(emptySupplierForm) }}>Novo</button> : null}
             </div>
           ) : null}
-        </form>
+        </GuidedForm>
       </aside>
     </section>
   )

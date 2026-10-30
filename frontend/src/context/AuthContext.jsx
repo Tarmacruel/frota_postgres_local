@@ -1,7 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 import api from '../api/client'
 import { hasPermission } from '../utils/permissions'
-import { getRoleLabel, isAdmin, isFuelStation, isPosto } from '../utils/roles'
+import { getRoleLabel, isAdmin, isFuelStation, isPosto, isSuperUser, isOrganizationScoped } from '../utils/roles'
 
 const AuthContext = createContext(null)
 
@@ -40,9 +40,10 @@ export function AuthProvider({ children }) {
 
   async function logout() {
     setLoading(true)
-    await api.post('/auth/logout')
-    setUser(null)
-    setLoading(false)
+    try {
+      await api.post('/auth/logout')
+      setUser(null)
+    } finally { setLoading(false) }
   }
 
   async function changePassword({ current_password, new_password }) {
@@ -69,6 +70,8 @@ export function AuthProvider({ children }) {
       mustChangePassword: Boolean(user?.must_change_password),
       mustRegisterCpf: Boolean(user?.must_register_cpf),
       isAdmin: isAdmin(user?.role),
+      isSuperUser: isSuperUser(user?.role),
+      isOrganizationScoped: isOrganizationScoped(user?.role),
       isProduction: user?.role === 'PRODUCAO',
       isPosto: isPosto(user?.role),
       can,

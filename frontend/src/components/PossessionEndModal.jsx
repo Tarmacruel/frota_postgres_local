@@ -1,3 +1,4 @@
+import GuidedForm, { FormSection as GuidedSection } from './GuidedForm'
 import { useRef } from 'react'
 import Modal from './Modal'
 import PossessionReturnPhotos from './PossessionReturnPhotos'
@@ -34,14 +35,15 @@ export default function PossessionEndModal({
       canClose={!ending}
       initialFocusRef={dateInputRef}
     >
-      <form onSubmit={onSubmit} className="form-grid modal-form-grid possession-return-form">
+      <GuidedForm busy={ending} onSubmit={onSubmit} className="form-grid modal-form-grid possession-return-form">
         <div className="possession-return-context modal-field-span" aria-label="Contexto da devolução">
           <span>Entrega: {new Date(record.start_date).toLocaleString('pt-BR')}</span>
           <span>Hodômetro mínimo: {Number(context?.minimum_end_odometer_km || 0).toLocaleString('pt-BR', { minimumFractionDigits: 1 })} km</span>
           <span>Status das rotas: {context?.has_open_trip ? 'há rota em andamento' : 'nenhuma rota em andamento'}</span>
         </div>
 
-        <div className="form-field">
+        <GuidedSection title="Devolução" description="Informe a data, a quilometragem final e as condições do veículo.">
+<div className="form-field">
           <label htmlFor="end-possession-date">Data e hora da devolução</label>
           <input
             ref={dateInputRef}
@@ -85,7 +87,10 @@ export default function PossessionEndModal({
           <span className="helper-text">Registre avarias, ressalvas ou “Sem ressalvas”, conforme a conferência realizada.</span>
         </div>
 
-        <PossessionReturnPhotos files={photos} onChange={onPhotosChange} disabled={ending} />
+
+</GuidedSection>
+<GuidedSection title="Fotos e declaração" description="Acrescente fotos, se necessário, e confira a declaração antes de encerrar.">
+<PossessionReturnPhotos files={photos} onChange={onPhotosChange} disabled={ending} />
 
         <section className="possession-return-declaration modal-field-span" aria-labelledby="return-declaration-title">
           <div className="possession-return-declaration-heading">
@@ -108,6 +113,7 @@ export default function PossessionEndModal({
           {ending ? <span className="helper-text">Registrando confirmação e encerramento em uma única operação…</span> : null}
           {error ? <div className="alert alert-error">{error}</div> : null}
         </div>
+</GuidedSection>
 
         <div className="actions-inline modal-actions modal-field-span">
           <button className="app-button" type="submit" disabled={ending || !ready || context?.has_open_trip}>
@@ -115,7 +121,7 @@ export default function PossessionEndModal({
           </button>
           <button className="ghost-button" type="button" onClick={onClose} disabled={ending}>Cancelar</button>
         </div>
-      </form>
+      </GuidedForm>
     </Modal>
   )
 }

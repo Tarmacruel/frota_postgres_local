@@ -33,13 +33,13 @@ async def describe_loans(db, records):
 
 
 async def loan_catalog(db, user):
-    if user.role != UserRole.ADMIN and (user.role != UserRole.PRODUCAO or not user.organization_id):
+    if user.role != UserRole.SUPERUSER and (user.role not in (UserRole.ADMIN, UserRole.PRODUCAO) or not user.organization_id):
         return {'vehicles': [], 'allocations': [], 'organizations': []}
     statement = select(Vehicle).where(Vehicle.owner_organization_id.is_not(None),
         current_operator(Vehicle.id, Vehicle.owner_organization_id),
         ~select(VehicleLoan.id).where(VehicleLoan.vehicle_id == Vehicle.id,
             VehicleLoan.status.in_(('AWAITING_RECEIPT', 'ACTIVE', 'AWAITING_RETURN_RECEIPT'))).exists())
-    if user.role != UserRole.ADMIN:
+    if user.role != UserRole.SUPERUSER:
         statement = statement.where(Vehicle.owner_organization_id == user.organization_id)
     vehicles = (await db.scalars(statement.order_by(Vehicle.plate))).all()
     orgs = (await db.scalars(select(Organization).order_by(Organization.name))).all()

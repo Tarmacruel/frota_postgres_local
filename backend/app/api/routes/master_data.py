@@ -25,7 +25,7 @@ router = APIRouter(prefix="/api/master-data", tags=["MasterData"])
 
 
 def require_structure_delete(user: User = Depends(require_permission("master_data", "edit"))) -> User:
-    if user.role not in (UserRole.ADMIN, UserRole.PRODUCAO):
+    if user.role not in (UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO):
         raise HTTPException(status_code=403, detail="Exclusão restrita aos perfis Admin e Produção")
     return user
 

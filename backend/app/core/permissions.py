@@ -43,6 +43,9 @@ def blank_permissions() -> dict[str, dict[str, bool]]:
 def default_permissions_for_role(role: str) -> dict[str, dict[str, bool]]:
     permissions = blank_permissions()
 
+    if role == "SUPERUSER":
+        return {module: {f"can_{action}": True for action in PERMISSION_ACTIONS} for module in permissions}
+
     if role == "ADMIN":
         for module in permissions:
             permissions[module] = {
@@ -90,6 +93,13 @@ def apply_role_permission_ceiling(
     module: str,
     flags: dict[str, bool],
 ) -> dict[str, bool]:
+    if role == "SUPERUSER":
+        return {f"can_{action}": True for action in PERMISSION_ACTIONS}
+    if role == 'POSTO':
+        return {f'can_{action}': bool(module == 'fuel_supply_orders' and action in {'view', 'edit'} and flags.get(f'can_{action}'))
+                for action in PERMISSION_ACTIONS}
+    if role == "ADMIN" and module in {"analytics", "payment_processes"}:
+        return {**flags, "can_view": True}
     if module == "vehicle_loans":
         allowed = role in {"ADMIN", "PRODUCAO"}
         return {key: bool(value and allowed and key != "can_delete") for key, value in flags.items()}

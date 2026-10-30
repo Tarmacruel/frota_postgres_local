@@ -1,4 +1,5 @@
 export const ROLE_LABELS = {
+  SUPERUSER: 'Superusuário',
   ADMIN: 'Administrador',
   PRODUCAO: 'Produção',
   POSTO: 'Posto',
@@ -6,31 +7,34 @@ export const ROLE_LABELS = {
 }
 
 export function isAdmin(role) {
-  return role === 'ADMIN'
+  return role === 'ADMIN' || role === 'SUPERUSER'
 }
+
+export function isSuperUser(role) { return role === 'SUPERUSER' }
+export function isOrganizationScoped(role) { return ['ADMIN', 'PRODUCAO', 'PADRAO'].includes(role) }
 
 export function isPosto(role) {
   return role === 'POSTO'
 }
 
 export function canWrite(role) {
-  return role === 'ADMIN' || role === 'PRODUCAO'
+  return isAdmin(role) || role === 'PRODUCAO'
 }
 
 export function canDelete(role) {
-  return role === 'ADMIN'
+  return isAdmin(role)
 }
 
 export function canManageCadastros(role) {
-  return role === 'ADMIN' || role === 'PRODUCAO'
+  return isAdmin(role) || role === 'PRODUCAO'
 }
 
 export function canAccessFuelSupplies(role) {
-  return role === 'ADMIN' || role === 'PRODUCAO'
+  return isAdmin(role) || role === 'PRODUCAO'
 }
 
 export function canManageFuelSupplyOrders(role) {
-  return role === 'ADMIN' || role === 'PRODUCAO'
+  return isAdmin(role) || role === 'PRODUCAO'
 }
 
 export function getRoleLabel(role) {

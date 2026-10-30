@@ -20,7 +20,7 @@ class VehicleTagService:
 
     @staticmethod
     def _editor(user):
-        if user.role != UserRole.ADMIN and not getattr(user, 'permissions', {}).get('vehicles', {}).get('can_edit'):
+        if user.role not in (UserRole.SUPERUSER, UserRole.ADMIN) and not getattr(user, 'permissions', {}).get('vehicles', {}).get('can_edit'):
             raise HTTPException(403, 'Você não tem permissão para gerenciar etiquetas de veículos.')
 
     def _scope(self, statement, user, vehicle_id=Vehicle.id):
@@ -159,7 +159,7 @@ class VehicleTagService:
                 VehicleTagAssignment.id == assignment_id, VehicleTagAssignment.vehicle_id == vehicle_id).with_for_update())
             if not mark:
                 raise HTTPException(404, 'Marcação não encontrada.')
-            if mark.applied_by_user_id != user.id and user.role != UserRole.ADMIN:
+            if mark.applied_by_user_id != user.id and user.role not in (UserRole.SUPERUSER, UserRole.ADMIN):
                 raise HTTPException(403, 'Somente o autor ou um administrador pode retirar esta etiqueta.')
             reason = (data.reason or '').strip() or None
             if mark.applied_by_user_id != user.id and not reason:

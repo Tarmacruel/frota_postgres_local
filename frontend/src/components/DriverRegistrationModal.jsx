@@ -1,3 +1,4 @@
+import GuidedForm from './GuidedForm'
 import { useId, useRef, useState } from 'react'
 import { driversAPI } from '../api/drivers'
 import { useAuth } from '../context/AuthContext'
@@ -44,7 +45,7 @@ export default function DriverRegistrationModal({ driver, onSaved, onClose }) {
       canClose={!submitting}
       initialFocusRef={inputRef}
     >
-      <form className="stack" onSubmit={handleSubmit}>
+      <GuidedForm busy={submitting} className="stack" onSubmit={handleSubmit}>
         <div className="alert alert-info">Informe a matrícula deste condutor para continuar.</div>
         <div className="form-field">
           <strong>{driver.nome_completo}</strong>
@@ -53,7 +54,7 @@ export default function DriverRegistrationModal({ driver, onSaved, onClose }) {
         {canEditDriver ? (
           <div className="form-field">
             <label htmlFor={inputId}>Matrícula (obrigatória)</label>
-            <input ref={inputRef} id={inputId} className="app-input" required maxLength={30} value={matricula} disabled={submitting} onChange={(event) => setMatricula(event.target.value)} />
+            <input ref={inputRef} id={inputId} className="app-input" required data-required-message="Informe a matrícula do condutor para prosseguir." maxLength={30} value={matricula} disabled={submitting} onChange={(event) => setMatricula(event.target.value)} />
           </div>
         ) : <div className="alert alert-error" role="alert">Você não tem permissão para editar condutores. Solicite o preenchimento da matrícula a um usuário autorizado antes de prosseguir.</div>}
         {error ? <div className="alert alert-error" role="alert">{error}</div> : null}
@@ -61,7 +62,7 @@ export default function DriverRegistrationModal({ driver, onSaved, onClose }) {
           {canEditDriver ? <button className="app-button" type="submit" disabled={submitting}>{submitting ? 'Salvando...' : 'Salvar e continuar'}</button> : null}
           <button className="ghost-button" type="button" disabled={submitting} onClick={onClose}>Cancelar</button>
         </div>
-      </form>
+      </GuidedForm>
     </Modal>
   )
 }

@@ -27,7 +27,7 @@ export const loanEventLabels = {
   RETURN_REJECTED: 'Devolução rejeitada', RETURN_CANCELLED: 'Solicitação de devolução retirada',
 }
 export function canRepresent(user, loan, side) {
-  return user?.role === 'ADMIN' || (user?.role === 'PRODUCAO' && Boolean(user.organization_id) && user.organization_id === loan[`${side}_organization_id`])
+  return user?.role === 'SUPERUSER' || (['ADMIN', 'PRODUCAO'].includes(user?.role) && Boolean(user.organization_id) && user.organization_id === loan[`${side}_organization_id`])
 }
 export function availableLoanActions(user, loan) {
   return Object.entries(loanActions).filter(([, action]) => action.statuses.includes(loan.status) && canRepresent(user, loan, action.side))

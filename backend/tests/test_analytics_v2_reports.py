@@ -155,7 +155,7 @@ async def test_export_permission_and_driver_source_permission(monkeypatch):
         raise AssertionError('service should not run')
     monkeypatch.setattr(routes.AnalyticsV2Drivers, 'get', summary)
     params = {'date_from': '2026-09-01', 'date_to': '2026-09-30', 'profile': 'drivers', 'export_format': 'pdf'}
-    async with AsyncClient(transport=ASGITransport(app=_app(analytics_allowed=False)), base_url='http://test') as client:
+    async with AsyncClient(transport=ASGITransport(app=_app(role=UserRole.PADRAO, analytics_allowed=False)), base_url='http://test') as client:
         assert (await client.get('/api/analytics/v2/export', params=params)).status_code == 403
     async with AsyncClient(transport=ASGITransport(app=_app(drivers_view=False)), base_url='http://test') as client:
         assert (await client.get('/api/analytics/v2/export', params=params)).status_code == 403

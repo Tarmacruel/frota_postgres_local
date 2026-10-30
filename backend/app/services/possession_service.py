@@ -1519,7 +1519,7 @@ class PossessionService:
         return f"https://www.openstreetmap.org/?mlat={latitude:.6f}&mlon={longitude:.6f}#map=18/{latitude:.6f}/{longitude:.6f}"
 
     def _can_view_location(self, current_user: User | None) -> bool:
-        return bool(current_user and current_user.role in {UserRole.ADMIN, UserRole.PRODUCAO})
+        return bool(current_user and current_user.role in {UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO})
 
     def _can_view_personal_data(self, current_user: User | None) -> bool:
-        return bool(current_user and current_user.role in {UserRole.ADMIN, UserRole.PRODUCAO})
+        return bool(current_user and current_user.role in {UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO})

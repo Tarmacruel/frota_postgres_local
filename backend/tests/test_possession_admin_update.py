@@ -18,7 +18,7 @@ from app.services.document_signature_service import DocumentSignatureService
 from app.services.possession_service import PossessionService
 
 
-def _user(role: UserRole = UserRole.ADMIN):
+def _user(role: UserRole = UserRole.SUPERUSER):
     return SimpleNamespace(
         id=uuid4(),
         name="Administrador de teste",
@@ -210,7 +210,7 @@ async def test_rectification_endpoint_permissions(endpoint, role, can_edit):
         await role_guard(current_user=user)
         await permission_guard(db=db, current_user=user)
 
-    if role in {UserRole.ADMIN, UserRole.PRODUCAO} and can_edit is not False:
+    if role == UserRole.SUPERUSER or role in {UserRole.ADMIN, UserRole.PRODUCAO} and can_edit is not False:
         await authorize()
     else:
         with pytest.raises(HTTPException) as exc:

@@ -54,8 +54,8 @@ export default function AnalyticsAlerts({ enabled = true, organizations = [], on
     <form className="analytics-cockpit-filters analytics-alert-filters" aria-label="Filtros dos alertas" onSubmit={apply}>
       <label>De<input type="date" value={draft.date_from} min="1901-01-01" max={maxDate} required disabled={busy} onChange={(e) => setDraft({ ...draft, date_from: e.target.value })} /></label>
       <label>Até<input type="date" value={draft.date_to} min="1901-01-01" max={maxDate} required disabled={busy} onChange={(e) => setDraft({ ...draft, date_to: e.target.value })} /></label>
-      <label>Secretaria<select value={draft.organization} disabled={busy || auth?.isProduction} onChange={(e) => setDraft({ ...draft, organization: e.target.value })}>
-        <option value="">{auth?.isProduction ? 'Minha secretaria' : 'Todas no meu escopo'}</option>{organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}</select></label>
+      <label>Secretaria<select value={draft.organization} disabled={busy || auth?.isOrganizationScoped} onChange={(e) => setDraft({ ...draft, organization: e.target.value })}>
+        <option value="">{auth?.isOrganizationScoped ? 'Minha secretaria' : 'Todas no meu escopo'}</option>{organizations.map((org) => <option key={org.id} value={org.id}>{org.name}</option>)}</select></label>
       <label>Estado<select value={draft.status} disabled={busy} onChange={(e) => setDraft({ ...draft, status: e.target.value })}>
         <option value="">Abertos (novos e em análise)</option>{Object.entries(ALERT_STATES).map(([key, label]) => <option key={key} value={key}>{label}</option>)}</select></label>
       <label>Severidade<select value={draft.severity} disabled={busy} onChange={(e) => setDraft({ ...draft, severity: e.target.value })}>

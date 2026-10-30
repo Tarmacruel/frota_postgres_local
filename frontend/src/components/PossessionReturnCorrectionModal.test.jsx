@@ -1,3 +1,4 @@
+import { reviewGuidedForm } from '../test/guidedForms'
 import { render, screen } from '@testing-library/react'
 import { expect, it, vi } from 'vitest'
 import PossessionReturnCorrectionModal from './PossessionReturnCorrectionModal'
@@ -23,6 +24,7 @@ it('explica o append-only e exige novo aceite na correção administrativa', () 
   expect(screen.getByText(/versão atual 2/)).toBeInTheDocument()
   expect(screen.getByText(/não será alterada nem apagada/)).toBeInTheDocument()
   expect(screen.getByLabelText(/Data e hora da devolução corrigidas/)).toHaveValue('2026-07-27T17:00')
+  reviewGuidedForm()
   expect(screen.getByRole('checkbox')).not.toBeChecked()
   expect(screen.getByRole('button', { name: 'Criar nova versão' })).toBeDisabled()
 })

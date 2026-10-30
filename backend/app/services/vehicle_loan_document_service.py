@@ -25,7 +25,7 @@ def representative(document, user):
 
 def may_sign(document, user):
     item = representative(document, user)
-    return bool(item and (user.role == UserRole.ADMIN or (user.role == UserRole.PRODUCAO
+    return bool(item and (user.role == UserRole.SUPERUSER or (user.role in (UserRole.ADMIN, UserRole.PRODUCAO)
                 and str(user.organization_id) == item['organization_id'])))
 
 
@@ -53,6 +53,9 @@ async def create_handoff_document(db, loan, actor, *, returning=False):
         'title': title, 'loan': view, 'representatives': reps, 'declaration': DECLARATION,
         'effective_at': loan.returned_at if returning else loan.started_at,
         'test_environment': settings.APP_ENV != 'production'})
+    from copy import deepcopy
+    from app.services.system_settings_service import runtime_settings
+    snapshot['institutional_identity'] = deepcopy(runtime_settings())
     context = signatures._build_context_payload(snapshot=snapshot, source_type=SOURCE,
         organization_id=loan.origin_organization_id, title=title, public_validation_code=None, public_validation_path=None)
     now = datetime.now(timezone.utc)

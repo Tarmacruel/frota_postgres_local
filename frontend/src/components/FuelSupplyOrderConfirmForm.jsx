@@ -1,5 +1,6 @@
+import GuidedForm, { FormSection as GuidedSection } from './GuidedForm'
 import MoneyInput from './MoneyInput'
-import { useId, useMemo, useRef, useState } from 'react'
+import { useId, useMemo, useState } from 'react'
 import { fuelSupplyOrdersAPI } from '../api/fuelSupplyOrders'
 import { getApiErrorMessage } from '../utils/apiError'
 import { toDateTimeLocalValue } from '../utils/datetime'
@@ -7,9 +8,8 @@ import { ADDITIVE_TYPE_OPTIONS, FUEL_TYPE_OPTIONS, resolveOptionValue } from '..
 import { formatContractMoney as brl } from '../utils/contractBalance'
 import useFuelItemAllocation from '../hooks/useFuelItemAllocation'
 import FuelItemAllocationFields from './contracts/FuelItemAllocationFields'
+import ReceiptAttachmentField from './ReceiptAttachmentField'
 
-const MAX_RECEIPT_SIZE_BYTES = 8 * 1024 * 1024
-const ALLOWED_RECEIPT_TYPES = ['application/pdf', 'image/jpeg', 'image/png', 'image/webp']
 const fuelKey = (value) => String(value || '').trim().replace(/\s+/g, ' ').toUpperCase()
 
 export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }) {
@@ -31,38 +31,11 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
   const [receiptError, setReceiptError] = useState('')
   const [error, setError] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const receiptRef = useRef(null)
   const fuelType = resolveOptionValue(form.fuel_type, form.fuel_type_other)
   const fuelChanged = Boolean(order?.requested_fuel_type && fuelType && fuelKey(fuelType) !== fuelKey(order.requested_fuel_type))
   const allocation=useFuelItemAllocation({funding:order?.contract_funding,contractId:order?.contract_id,providerId:order?.contract_provider_id,fuelType,liters:form.liters,totalAmount:form.total_amount,additiveType:form.additive_enabled?resolveOptionValue(form.additive_type,form.additive_type_other):'',additiveLiters:form.additive_enabled?form.additive_quantity_liters:''})
 
   const submitLabel = useMemo(() => (submitting ? 'Confirmando...' : 'Confirmar abastecimento'), [submitting])
-
-  function handleReceiptChange(event) {
-    const file = event.target.files?.[0] || null
-    if (!file) {
-      setReceiptFile(null)
-      setReceiptError('')
-      return
-    }
-
-    if (!ALLOWED_RECEIPT_TYPES.includes(file.type)) {
-      setReceiptFile(null)
-      setReceiptError('Comprovante deve ser PDF, JPG, PNG ou WEBP.')
-      if (receiptRef.current) receiptRef.current.value = ''
-      return
-    }
-
-    if (file.size > MAX_RECEIPT_SIZE_BYTES) {
-      setReceiptFile(null)
-      setReceiptError('Comprovante deve ter no máximo 8 MB.')
-      if (receiptRef.current) receiptRef.current.value = ''
-      return
-    }
-
-    setReceiptFile(file)
-    setReceiptError('')
-  }
 
   async function handleSubmit(event) {
     event.preventDefault()
@@ -131,7 +104,7 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
   }
 
   return (
-    <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
+    <GuidedForm busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid">
       {order?.requested_fuel_type || order?.requested_liters || order?.contract_funding ? <p className="alert alert-info modal-field-span">
         {order.requested_fuel_type || order.requested_liters ? <>
           <strong>Pedido original: </strong>{order.requested_fuel_type || 'Combustível não informado'}
@@ -143,7 +116,8 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
       </p> : null}
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
 
-      <div className="form-field">
+      <GuidedSection title="Dados reais" description="Confira a quilometragem, os litros e o valor efetivamente abastecido.">
+<div className="form-field">
         <label htmlFor={`${formId}-odometer`}>Odômetro real (km)</label>
         <input id={`${formId}-odometer`} type="number" min="0" step="0.1" className="app-input" value={form.odometer_km} onChange={(event) => setForm((current) => ({ ...current, odometer_km: event.target.value }))} required />
       </div>
@@ -179,7 +153,10 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
         </div>
       ) : null}
 
-      <div className="form-field">
+
+</GuidedSection>
+<GuidedSection title="Complementos" description="Confirme a data e os aditivos fornecidos, se houver.">
+<div className="form-field">
         <label htmlFor={`${formId}-supplied-at`}>Data/hora real</label>
         <input id={`${formId}-supplied-at`} type="datetime-local" className="app-input" value={form.supplied_at} onChange={(event) => setForm((current) => ({ ...current, supplied_at: event.target.value }))} required />
       </div>
@@ -217,11 +194,10 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
         </>
       ) : null}
 
-      <div className="form-field modal-field-span">
-        <label htmlFor={`${formId}-receipt`}>Comprovante</label>
-        <input id={`${formId}-receipt`} ref={receiptRef} type="file" accept=".pdf,image/jpeg,image/png,image/webp" onChange={handleReceiptChange} required />
-        {receiptError ? <small className="form-error">{receiptError}</small> : null}
-      </div>
+
+</GuidedSection>
+<GuidedSection title="Comprovante e itens" description="Anexe o documento e confira os itens realizados antes de confirmar.">
+<ReceiptAttachmentField id={`${formId}-receipt`} required file={receiptFile} error={receiptError} disabled={submitting} onChange={(file) => { setReceiptFile(file); setReceiptError('') }} />
 
       <div className="form-field modal-field-span">
         <label htmlFor={`${formId}-notes`}>Observações</label>
@@ -229,10 +205,11 @@ export default function FuelSupplyOrderConfirmForm({ order, onClose, onSuccess }
       </div>
 
       <FuelItemAllocationFields allocation={allocation}/>
+</GuidedSection>
       <div className="actions-inline modal-actions">
         <button className="app-button" type="submit" disabled={submitting}>{submitLabel}</button>
         <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>
       </div>
-    </form>
+    </GuidedForm>
   )
 }

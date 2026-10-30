@@ -1,5 +1,6 @@
 // A shared drawing language, with a distinct silhouette for each destination.
 const glyphs = {
+  settings: <><path className="module-icon__accent" d="m9 3-1 3-3 1-2 5 2 5 3 1 1 3h6l1-3 3-1 2-5-2-5-3-1-1-3Z" /><path d="m9 3-1 3-3 1-2 5 2 5 3 1 1 3h6l1-3 3-1 2-5-2-5-3-1-1-3Z" /><circle cx="12" cy="12" r="3" /></>,
   home: <><path className="module-icon__accent" d="m3.5 10 8.5-7 8.5 7v10H4Z" /><path d="m3 10 9-7 9 7M5 9v11h14V9M9.5 20v-6h5v6" /></>,
   fleet: <><path className="module-icon__accent" d="m6.5 5.5-2 6h15l-2-6Z" /><path d="m4.5 11.5 2-6h11l2 6M4.5 11.5h15l1 2v5h-17v-5ZM5 18.5V21m14-2.5V21M7 14.5h2m6 0h2" /></>,
   loans: <><path className="module-icon__accent" d="M4 6h14v5H4ZM6 13h14v5H6Z" /><path d="M3 7h17m-4-4 4 4-4 4M21 17H4m4-4-4 4 4 4" /></>,

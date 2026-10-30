@@ -1,3 +1,4 @@
+import GuidedForm, { FormSection as GuidedSection } from './GuidedForm'
 import JustificationField from './JustificationField'
 import { useRef } from 'react'
 import Modal from './Modal'
@@ -21,11 +22,12 @@ export default function PossessionReturnCorrectionModal({ record, context, form,
       canClose={!saving}
       initialFocusRef={endDateRef}
     >
-      <form onSubmit={onSubmit} className="form-grid modal-form-grid possession-return-form">
+      <GuidedForm busy={saving} onSubmit={onSubmit} className="form-grid modal-form-grid possession-return-form">
         <div className="alert alert-warning modal-field-span">
           A versão atual não será alterada nem apagada. A correção criará uma nova versão e registrará a justificativa na auditoria.
         </div>
-        <div className="form-field">
+        <GuidedSection title="Correção" description="Confira a data, a quilometragem e as condições corrigidas.">
+<div className="form-field">
           <label htmlFor="correction-end-date">Data e hora da devolução corrigidas</label>
           <input ref={endDateRef} id="correction-end-date" className="app-input" type="datetime-local" required value={form.end_date} onChange={(event) => onChange({ end_date: event.target.value })} disabled={saving} />
         </div>
@@ -37,7 +39,10 @@ export default function PossessionReturnCorrectionModal({ record, context, form,
           <label htmlFor="correction-condition">Condições do veículo corrigidas</label>
           <textarea id="correction-condition" className="app-textarea" rows="4" minLength="3" maxLength="4000" required value={form.vehicle_condition_notes} onChange={(event) => onChange({ vehicle_condition_notes: event.target.value })} disabled={saving} />
         </div>
-        <div className="form-field modal-field-span">
+
+</GuidedSection>
+<GuidedSection title="Justificativa" description="Explique a alteração e confirme a declaração da nova versão.">
+<div className="form-field modal-field-span">
           <label htmlFor="correction-reason">Justificativa administrativa</label>
           <JustificationField context="possession_return" id="correction-reason" className="app-textarea" rows="3" minLength="8" maxLength="1000" required value={form.correction_reason} onChange={(event) => onChange({ correction_reason: event.target.value })} disabled={saving} />
         </div>
@@ -45,7 +50,7 @@ export default function PossessionReturnCorrectionModal({ record, context, form,
           <div className="possession-return-declaration-heading"><strong id="correction-declaration-title">Declaração v{context.declaration.version}</strong></div>
           <p>{context.declaration.text}</p>
           <label className="checkbox-line possession-return-acceptance">
-            <input type="checkbox" checked={form.declaration_accepted} onChange={(event) => onChange({ declaration_accepted: event.target.checked })} disabled={saving} />
+            <input type="checkbox" required checked={form.declaration_accepted} onChange={(event) => onChange({ declaration_accepted: event.target.checked })} disabled={saving} />
             <span>Li integralmente e confirmo a declaração para esta nova versão.</span>
           </label>
         </section>
@@ -53,11 +58,12 @@ export default function PossessionReturnCorrectionModal({ record, context, form,
           {saving ? <span className="helper-text">Criando nova versão…</span> : null}
           {error ? <div className="alert alert-error">{error}</div> : null}
         </div>
+</GuidedSection>
         <div className="actions-inline modal-actions modal-field-span">
           <button type="submit" className="app-button" disabled={saving || !ready}>{saving ? 'Salvando…' : 'Criar nova versão'}</button>
           <button type="button" className="ghost-button" onClick={onClose} disabled={saving}>Cancelar</button>
         </div>
-      </form>
+      </GuidedForm>
     </Modal>
   )
 }

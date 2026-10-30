@@ -1,3 +1,4 @@
+import { reviewGuidedForm } from '../test/guidedForms'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import FuelSupplyOrderConfirmForm from './FuelSupplyOrderConfirmForm'
@@ -24,7 +25,8 @@ function addReceipt() {
 }
 
 function submit() {
-  fireEvent.submit(screen.getByRole('button', { name: 'Confirmar abastecimento' }).closest('form'))
+  reviewGuidedForm()
+  fireEvent.submit(screen.getByRole('button', { name: 'Confirmar abastecimento' , hidden: true }).closest('form'))
 }
 
 it.each([
@@ -83,4 +85,43 @@ it('preserva os dados reais após erro de gravação para permitir nova tentativ
   submit()
   await waitFor(() => expect(fuelSupplyOrdersAPI.confirmSupply).toHaveBeenCalledTimes(2))
   expect(fuelSupplyOrdersAPI.confirmSupply.mock.calls[1][1].get('receipt').name).toBe('teste.png')
+})
+
+it('acompanha câmera e remoção no progresso, bloqueia sem anexo e envia somente o arquivo atual', async () => {
+  render(<FuelSupplyOrderConfirmForm order={order} />)
+  fillActuals('Etanol', 28, 126)
+  const progress = screen.getByRole('progressbar')
+  expect(progress).toHaveAttribute('aria-valuemax', '6')
+  expect(progress).toHaveAttribute('aria-valuenow', '5')
+  const cameraPhoto = new File(['foto fictícia'], 'camera.jpg', { type: 'image/jpeg' })
+  fireEvent.change(screen.getByLabelText('Fotografar comprovante'), { target: { files: [cameraPhoto] } })
+  expect(progress).toHaveAttribute('aria-valuemax', '6')
+  expect(progress).toHaveAttribute('aria-valuenow', '6')
+  reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button', { name: 'Remover comprovante' }))
+  expect(progress).toHaveAttribute('aria-valuemax', '6')
+  expect(progress).toHaveAttribute('aria-valuenow', '5')
+  submit()
+  expect(fuelSupplyOrdersAPI.confirmSupply).not.toHaveBeenCalled()
+  expect(screen.getByText('Envie o comprovante para confirmar o abastecimento.')).toBeInTheDocument()
+  expect(screen.getByLabelText('Litros abastecidos')).toHaveValue(28)
+  const pdf = new File(['nota fictícia'], 'nota.pdf', { type: 'application/pdf' })
+  fireEvent.change(screen.getByLabelText('Comprovante'), { target: { files: [pdf] } })
+  submit()
+  await waitFor(() => expect(fuelSupplyOrdersAPI.confirmSupply).toHaveBeenCalledOnce())
+  expect(fuelSupplyOrdersAPI.confirmSupply.mock.calls[0][1].get('receipt').name).toBe('nota.pdf')
+  expect(fuelSupplyOrdersAPI.confirmSupply.mock.calls[0][1].get('fuel_type')).toBe('Etanol')
+})
+
+it('envia a foto escolhida pela câmera no mesmo campo receipt da API atual', async () => {
+  render(<FuelSupplyOrderConfirmForm order={order} />)
+  fillActuals('Gasolina comum', 30, 183)
+  const cameraPhoto = new File(['foto fictícia'], 'camera.jpg', { type: 'image/jpeg' })
+  fireEvent.change(screen.getByLabelText('Fotografar comprovante'), { target: { files: [cameraPhoto] } })
+  submit()
+  await waitFor(() => expect(fuelSupplyOrdersAPI.confirmSupply).toHaveBeenCalledOnce())
+  const payload = fuelSupplyOrdersAPI.confirmSupply.mock.calls[0][1]
+  expect(payload.get('receipt').name).toBe('camera.jpg')
+  expect(payload.get('receipt').type).toBe('image/jpeg')
+  expect(payload.getAll('receipt')).toHaveLength(1)
 })

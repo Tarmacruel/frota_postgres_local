@@ -43,6 +43,7 @@ export function normalizePermissions(permissions = {}) {
 }
 
 export function hasPermission(user, module, action = 'view') {
+  if (user?.role === 'SUPERUSER') return true
   const field = action.startsWith('can_') ? action : `can_${action}`
   return Boolean(user?.permissions?.[module]?.[field])
 }

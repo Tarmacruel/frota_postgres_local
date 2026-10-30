@@ -100,7 +100,7 @@ async def test_standard_paginated_search_never_delegates_personal_filters():
     service = PossessionService(db=None)
     service.possessions = SimpleNamespace(list_paginated=AsyncMock(return_value=([], 0)))
     driver_id = uuid4()
-    actor = SimpleNamespace(id=uuid4(), role=UserRole.PADRAO, organization_id=None)
+    actor = SimpleNamespace(id=uuid4(), role=UserRole.PADRAO, organization_id=uuid4())
 
     result = await service.list_paginated(
         page=1,
@@ -268,7 +268,7 @@ async def test_standard_profile_cannot_download_integral_possession_document():
     with pytest.raises(HTTPException) as exc:
         await service.get_document_file(uuid4(), current_user=actor)
 
-    assert exc.value.status_code == 403
+    assert exc.value.status_code == 404  # No secretaria means no record visibility.
 
 
 def test_production_profile_has_operational_personal_data_and_location_access():

@@ -1,3 +1,5 @@
+import { officialBrand } from '../constants/officialBrand'
+import GuidedForm from '../components/GuidedForm'
 import IndicatorBar from '../components/ui/IndicatorBar'
 import { useInteractiveKpis } from '../hooks/useInteractiveKpis'
 import PageHeader from '../components/ui/PageHeader'
@@ -604,7 +606,7 @@ export default function DataImportsPage() {
       const options = {
         fileName: entityType === 'VEHICLE' ? 'frota-veiculos-oficiais' : 'frota-condutores-oficiais',
         sheetName: entityType === 'VEHICLE' ? 'Veículos' : 'Condutores',
-        title: entityType === 'VEHICLE' ? 'Frota PMTF - Veículos oficiais' : 'Frota PMTF - Condutores oficiais',
+        title: entityType === 'VEHICLE' ? `${officialBrand.systemName} - Veículos oficiais` : `${officialBrand.systemName} - Condutores oficiais`,
         columns,
         rows: rowsToExport,
       }
@@ -641,7 +643,7 @@ export default function DataImportsPage() {
     const options = {
       fileName: 'frota-revisao-importacao',
       sheetName: 'Revisão',
-      title: 'Frota PMTF - Revisão de importação',
+      title: `${officialBrand.systemName} - Revisão de importação`,
       columns,
       rows: reportRows,
     }
@@ -952,7 +954,7 @@ export default function DataImportsPage() {
       </div>
 
       <section className="toolbar-card data-import-panel">
-        <form className="data-import-upload-form" onSubmit={handleUpload}>
+        <GuidedForm className="data-import-upload-form" onSubmit={handleUpload}>
           <input
             type="file"
             className="app-input"
@@ -967,7 +969,7 @@ export default function DataImportsPage() {
             <button type="button" className="secondary-button" onClick={() => downloadUrl(dataImportsAPI.templateUrl('DRIVER'))}>Modelo condutores</button>
             <button type="button" className="secondary-button" onClick={() => downloadUrl(dataImportsAPI.templateUrl('FINE'))}>Modelo multas</button>
           </div>
-        </form>
+        </GuidedForm>
       </section>
 
       <div className="data-import-stack">
@@ -1200,7 +1202,7 @@ export default function DataImportsPage() {
       </div>
 
       <Modal open={Boolean(editingRow)} title="Ajustar linha de importação" description={editingRow ? `Linha ${editingRow.row_number}` : ''} onClose={() => setEditingRow(null)}>
-        <form className="data-import-edit-form" onSubmit={saveEditRow}>
+        <GuidedForm className="data-import-edit-form" onSubmit={saveEditRow}>
           {catalogError ? <div className="alert alert-error">{catalogError}</div> : null}
           {editingRow?.conflicts?.length || editingRow?.validation_errors?.length ? (
             <section className="data-import-edit-section">
@@ -1228,7 +1230,7 @@ export default function DataImportsPage() {
             <button type="button" className="secondary-button" onClick={resetEditDraft}>Restaurar dados da linha</button>
             <button type="button" className="ghost-button" onClick={() => setEditingRow(null)}>Cancelar</button>
           </div>
-        </form>
+        </GuidedForm>
       </Modal>
     </div>
   )

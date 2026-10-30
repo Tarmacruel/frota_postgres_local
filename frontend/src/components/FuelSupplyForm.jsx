@@ -1,3 +1,4 @@
+import GuidedForm, { FormSection as GuidedSection } from './GuidedForm'
 import MoneyInput from './MoneyInput'
 import { useMemo, useRef, useState } from 'react'
 import SearchableSelect from './SearchableSelect'
@@ -164,11 +165,12 @@ export default function FuelSupplyForm({ vehicles, onVehicleOptionsOpen, drivers
   }
 
   return (
-    <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
+    <GuidedForm busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid">
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
-      <div className="form-field">
+      <GuidedSection title="Identificação" description="Identifique o veículo e quando o abastecimento ocorreu.">
+<div className="form-field">
         <label>Veículo</label>
-        <SearchableSelect value={form.vehicle_id} onOpen={onVehicleOptionsOpen} onChange={(value) => setForm({ ...form, vehicle_id: value })} options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(buildVehicleOption)} placeholder="Selecione o veículo" searchPlaceholder="Buscar veículo" />
+        <SearchableSelect required value={form.vehicle_id} onOpen={onVehicleOptionsOpen} onChange={(value) => setForm({ ...form, vehicle_id: value })} options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(buildVehicleOption)} placeholder="Selecione o veículo" searchPlaceholder="Buscar veículo" />
       </div>
       <div className="form-field">
         <label>Condutor</label>
@@ -180,9 +182,12 @@ export default function FuelSupplyForm({ vehicles, onVehicleOptionsOpen, drivers
       </div>
       <div className="form-field">
         <label>Data/hora</label>
-        <input type="datetime-local" className="app-input" value={form.supplied_at} onChange={(event) => setForm({ ...form, supplied_at: event.target.value })} />
+        <input required type="datetime-local" className="app-input" value={form.supplied_at} onChange={(event) => setForm({ ...form, supplied_at: event.target.value })} />
       </div>
-      <div className="form-field">
+
+</GuidedSection>
+<GuidedSection title="Abastecimento" description="Informe os dados reais do abastecimento e do posto.">
+<div className="form-field">
         <label>Odômetro (km)</label>
         <input type="number" min="0" step="0.1" className="app-input" value={form.odometer_km} onChange={(event) => setForm({ ...form, odometer_km: event.target.value })} required />
       </div>
@@ -243,7 +248,10 @@ export default function FuelSupplyForm({ vehicles, onVehicleOptionsOpen, drivers
         </>
       ) : null}
 
-      <div className="form-field modal-field-span">
+
+</GuidedSection>
+<GuidedSection title="Comprovante e contrato" description="Anexe o comprovante e confira o vínculo contratual antes de registrar.">
+<div className="form-field modal-field-span">
         <label>Comprovante (obrigatório)</label>
         <input ref={receiptRef} type="file" accept=".pdf,image/jpeg,image/png,image/webp" onChange={handleReceiptChange} required />
         {receiptError ? <small className="form-error">{receiptError}</small> : null}
@@ -256,10 +264,11 @@ export default function FuelSupplyForm({ vehicles, onVehicleOptionsOpen, drivers
 
       <ContractFundingFields funding={funding} externalFuelType />
       <FuelItemAllocationFields allocation={allocation}/>
+</GuidedSection>
       <div className="actions-inline modal-actions">
         <button className="app-button" type="submit" disabled={submitting || !funding.ready}>{submitLabel}</button>
         <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>
       </div>
-    </form>
+    </GuidedForm>
   )
 }

@@ -23,8 +23,9 @@ async def list_users(
     skip: int = Query(default=0, ge=0),
     limit: int = Query(default=50, ge=1, le=200),
     db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_admin),
 ):
-    return await UserService(db).list(skip=skip, limit=limit)
+    return await UserService(db).list(skip=skip, limit=limit, current_user=current_user)
 
 
 @router.get("/paginated", response_model=UserListResponse, dependencies=[Depends(require_admin)])
@@ -37,9 +38,10 @@ async def list_users_paginated(
     without_organization: bool = Query(default=False),
     kpis: IndicatorRequest = Depends(indicator_context('users')),
     db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_admin),
 ):
     rows, total, summary = await UserService(db).list_paginated(
-        page=page, limit=limit, search=search, role=role,
+        current_user=current_user, page=page, limit=limit, search=search, role=role,
         organization_id=organization_id, without_organization=without_organization,
     )
     return kpis.attach({"data": rows, "pagination": build_pagination(page, limit, total), "summary": summary})
@@ -105,7 +107,7 @@ async def get_user_permissions(
     db: AsyncSession = Depends(get_db_session),
     _current_user: User = Depends(require_admin),
 ):
-    return {"permissions": await UserService(db).get_permissions(user_id)}
+    return {"permissions": await UserService(db).get_permissions(user_id, _current_user)}
 
 
 @router.put("/{user_id}/permissions", response_model=UserPermissionsOut)

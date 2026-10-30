@@ -31,7 +31,7 @@ export function LoanActionForm({ operation, loan, context, catalog, user, onClos
   const blocked = blockedLoanAction(user, loan, action, context)
   const returnRequest = operation === 'request-return'
   const represented = loan[`${action.side}_organization_name`]
-  const requiredReason = user.role === 'ADMIN' || action.reason
+  const requiredReason = user.role === 'SUPERUSER' || action.reason
   const validation = [
     ...(returnRequest && !catalog.allocations.some((item) => item.id === allocation && item.organization_id === loan.origin_organization_id) ? [['return_allocation_id', 'Selecione uma lotação de retorno na lista de resultados.']] : []),
     ...(returnRequest && !validLoanOdometer(odometer, context?.minimum_odometer_km ?? 0) ? [['return_odometer_km', `A referência mínima é ${context?.minimum_odometer_km ?? 0} km; use até uma casa decimal.`]] : []),

@@ -272,7 +272,7 @@ async def test_user_update_role_to_producao_resets_default_permissions():
     await service.update(
         user_id,
         SimpleNamespace(model_dump=lambda exclude_unset=True: {"role": UserRole.PRODUCAO}),
-        current_user=SimpleNamespace(id=uuid4(), role=UserRole.ADMIN),
+        current_user=SimpleNamespace(id=uuid4(), role=UserRole.SUPERUSER),
     )
 
     permissions = {entry.module: entry for entry in user.permission_entries}

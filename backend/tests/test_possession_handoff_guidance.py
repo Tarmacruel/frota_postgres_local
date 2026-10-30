@@ -33,7 +33,7 @@ def history(monkeypatch):
     monkeypatch.setattr(operational_scope, 'lock_vehicle_handoff', AsyncMock())
     return SimpleNamespace(repo=repo, origin=origin, periods=periods,
         db=SimpleNamespace(no_autoflush=nullcontext()),
-        user=SimpleNamespace(role=UserRole.ADMIN, organization_id=origin))
+        user=SimpleNamespace(role=UserRole.SUPERUSER, organization_id=origin))
 
 
 async def attribute(history, start, end=None):
@@ -61,7 +61,7 @@ async def test_returned_history_explains_real_case_in_institutional_timezone(his
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('start', ['16:45:44.415276', '16:46:00'])
-@pytest.mark.parametrize('role', [UserRole.ADMIN, UserRole.PRODUCAO])
+@pytest.mark.parametrize('role', [UserRole.SUPERUSER, UserRole.PRODUCAO])
 async def test_possession_after_return_is_attributed_to_origin(history, start, role):
     history.user.role = role
     record = await attribute(history, instant(start))

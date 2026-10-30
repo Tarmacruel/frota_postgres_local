@@ -6,6 +6,9 @@ from uuid import UUID
 from fastapi import APIRouter, Depends, Query
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.api.deps import require_admin
+from app.core.organization_scope import production_scope_is_empty, scoped_organization_id
+from app.core.roles import is_superuser
+from app.models.user import User
 from app.db.session import get_db_session
 from app.schemas.audit import AuditLogOut, AuditListResponse
 from app.schemas.common import build_pagination
@@ -25,10 +28,13 @@ async def list_audit_logs_paginated(
     without_organization: bool = Query(default=False),
     kpis: IndicatorRequest = Depends(indicator_context('audit')),
     db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_admin),
 ):
+    if production_scope_is_empty(current_user):
+        return kpis.attach({'data': [], 'pagination': build_pagination(page, limit, 0), 'deleted': 0})
     rows, total, deleted = await AuditService(db).list_paginated(
         page=page, limit=limit, search=search, action=action, entity_type=entity_type,
-        organization_id=organization_id, without_organization=without_organization,
+        organization_id=scoped_organization_id(current_user, organization_id), without_organization=without_organization and is_superuser(current_user),
     )
     return kpis.attach({"data": rows, "pagination": build_pagination(page, limit, total), "deleted": deleted})
 
@@ -40,10 +46,14 @@ async def list_audit_logs(
     action: str | None = Query(default=None),
     actor_user_id: UUID | None = Query(default=None),
     db: AsyncSession = Depends(get_db_session),
+    current_user: User = Depends(require_admin),
 ):
+    if production_scope_is_empty(current_user):
+        return []
     return await AuditService(db).list(
         limit=limit,
         entity_type=entity_type,
         action=action,
         actor_user_id=actor_user_id,
+        organization_id=scoped_organization_id(current_user),
     )

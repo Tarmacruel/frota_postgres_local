@@ -1,3 +1,4 @@
+import GuidedForm, { FormSection as GuidedSection } from './GuidedForm'
 import JustificationField from './JustificationField'
 import { useEffect, useRef, useState } from 'react'
 import { possessionAPI } from '../api/possession'
@@ -536,7 +537,7 @@ export default function PossessionForm({ vehicles, onVehicleOptionsOpen, onClose
         : 'Capturar foto e localização'
 
   return (
-    <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
+    <GuidedForm module="possession" busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid">
       <div className="sr-status" aria-live="assertive" aria-atomic="true">{error}</div>
       {error ? <div className="alert alert-error modal-field-span" role="alert">{error}</div> : null}
 
@@ -574,9 +575,10 @@ export default function PossessionForm({ vehicles, onVehicleOptionsOpen, onClose
         </section>
       ) : null}
 
-      <div className="form-field">
+      <GuidedSection title="Veículo e início" description="Confira o veículo, a data e a quilometragem inicial.">
+<div className="form-field">
         <label>Veículo</label>
-        <SearchableSelect
+        <SearchableSelect required
           value={form.vehicle_id} onOpen={onVehicleOptionsOpen}
           onChange={handleVehicleChange}
           options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(buildVehicleOption)}
@@ -588,7 +590,7 @@ export default function PossessionForm({ vehicles, onVehicleOptionsOpen, onClose
 
       <div className="form-field">
         <label htmlFor="possession-start">Início da posse</label>
-        <input
+        <input required
           id="possession-start"
           type="datetime-local"
           className="app-input"
@@ -626,9 +628,12 @@ export default function PossessionForm({ vehicles, onVehicleOptionsOpen, onClose
         </div>
       </div>
 
-      <div className="form-field">
+
+</GuidedSection>
+<GuidedSection title="Condutor" description="Selecione o condutor e confira os dados do cadastro.">
+<div className="form-field">
         <label>Condutor cadastrado</label>
-        <DriverSelect
+        <DriverSelect required
           value={form.driver_id}
           onChange={(driver) => setForm({
             ...form,
@@ -662,7 +667,10 @@ export default function PossessionForm({ vehicles, onVehicleOptionsOpen, onClose
         />
       </div>
 
-      <InitialTripFields
+
+</GuidedSection>
+<GuidedSection title="Rota e observações" description="Informe a rota inicial quando houver e o contexto da posse.">
+<InitialTripFields
         enabled={initialTripEnabled}
         onEnabledChange={handleInitialTripEnabled}
         trip={initialTrip}
@@ -683,7 +691,10 @@ export default function PossessionForm({ vehicles, onVehicleOptionsOpen, onClose
         <span className="helper-text">Informe somente fatos operacionais necessários; não inclua dados pessoais desnecessários.</span>
       </div>
 
-      <div className="form-field modal-field-span">
+
+</GuidedSection>
+<GuidedSection title="Evidências" description="Fotos e documento da entrega permanecem opcionais.">
+<div className="form-field modal-field-span">
         <label>Evidência (opcional)</label>
         <div className="evidence-shell">
           <div className="evidence-copy">
@@ -801,6 +812,7 @@ export default function PossessionForm({ vehicles, onVehicleOptionsOpen, onClose
           )}
         </div>
       </div>
+</GuidedSection>
 
       <div className="actions-inline modal-actions">
         <button
@@ -812,6 +824,6 @@ export default function PossessionForm({ vehicles, onVehicleOptionsOpen, onClose
         </button>
         <button className="ghost-button" type="button" onClick={onClose}>Cancelar</button>
       </div>
-    </form>
+    </GuidedForm>
   )
 }

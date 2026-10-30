@@ -15,7 +15,7 @@ const loan = { id: 'loan', version: 1, vehicle_id: 'vehicle', vehicle_plate: 'AB
   origin_organization_id: 'origin', recipient_organization_id: 'recipient',
   origin_organization_name: 'Saúde', recipient_organization_name: 'Educação',
   origin_allocation_name: 'Garagem', destination_allocation_name: 'Escola', reason: 'Transporte escolar' }
-const user = { id: 'admin', role: 'ADMIN' }
+const user = { id: 'admin', role: 'SUPERUSER' }
 const context = { version: 1, minimum_odometer_km: 100, blockers: { open_possessions: 0, open_trips: 0, open_fuel_orders: 0 } }
 function mount(overrides = {}) {
   const props = { detail: loan, context, events: [], catalogReady: true, editable: true,

@@ -1,3 +1,4 @@
+import GuidedForm from './GuidedForm'
 import { useEffect, useMemo, useState } from 'react'
 import { documentSignaturesAPI, SIGNATURE_METHODS } from '../api/documentSignatures'
 import { environmentFlagEnabled } from '../config/environment'
@@ -450,10 +451,10 @@ export default function DocumentSignaturePanel({ documentType, sourceId, summary
           ) : null}
 
           {signatureMethod === SIGNATURE_METHODS.INTERNAL_PASSWORD || !certificateEnabled ? (
-            <form className="signature-form" onSubmit={handleSign}>
+            <GuidedForm busy={loading} className="signature-form" onSubmit={handleSign}>
               <label>
                 <span>{pendingForMe ? 'Assinar solicitação pendente' : 'Registrar assinatura eletrônica'}</span>
-                <input
+                <input required minLength={8}
                   className="app-input"
                   type="password"
                   placeholder="Confirme sua senha atual"
@@ -465,7 +466,7 @@ export default function DocumentSignaturePanel({ documentType, sourceId, summary
               <button type="submit" className="app-button" disabled={loading || password.length < 8}>
                 {loading ? 'Processando...' : 'Assinar com senha'}
               </button>
-            </form>
+            </GuidedForm>
           ) : (
             <CertificateSignatureFlow
               documentId={documentSummary.document_id}
@@ -483,14 +484,14 @@ export default function DocumentSignaturePanel({ documentType, sourceId, summary
       ) : null}
 
       {!readOnly && hasDocument ? (
-        <form className="signature-form signature-request-form" onSubmit={handleRequestSignature}>
-          <SearchableSelect
+        <GuidedForm busy={loading} className="signature-form signature-request-form" onSubmit={handleRequestSignature}>
+          <label>Servidor para coassinatura<SearchableSelect required ariaLabel="Servidor para coassinatura"
             value={selectedSignerId}
             onChange={setSelectedSignerId}
             options={signerOptions}
             placeholder="Solicitar coassinatura"
             searchPlaceholder="Buscar servidor"
-          />
+          /></label>
           <input
             className="app-input"
             value={message}
@@ -500,7 +501,7 @@ export default function DocumentSignaturePanel({ documentType, sourceId, summary
           <button type="submit" className="secondary-button" disabled={loading || !selectedSignerId}>
             Solicitar
           </button>
-        </form>
+        </GuidedForm>
       ) : null}
     </section>
   )

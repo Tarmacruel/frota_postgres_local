@@ -10,7 +10,8 @@ from reportlab.lib.units import mm
 from reportlab.pdfgen.canvas import Canvas
 from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
-from app.core.official_identity import MUNICIPALITY_NAME, MUNICIPALITY_CNPJ, crest_path, ensure_pdf_fonts, institutional_datetime
+from app.core.official_identity import crest_path, ensure_pdf_fonts, institutional_datetime
+from app.core import official_identity
 
 
 def display_date(value):
@@ -19,6 +20,7 @@ def display_date(value):
 
 class VehicleLoanPdfService:
     @staticmethod
+    @official_identity.frozen_document_brand
     def build(snapshot, *, content_hash, signatures=None, document_id=None):
         """Canonical bytes omit live signatures; evidence exports append a dated signature section."""
         regular, bold = ensure_pdf_fonts()
@@ -34,7 +36,7 @@ class VehicleLoanPdfService:
         if snapshot.get('test_environment'):
             story.append(p('AMBIENTE DE TESTES - SEM VALIDADE PARA OPERAÇÃO OFICIAL', small))
         header = Table([[Image(str(crest_path()), width=17*mm, height=21*mm),
-                         p(MUNICIPALITY_NAME + '\nCNPJ ' + MUNICIPALITY_CNPJ, small)]], colWidths=[23*mm, 151*mm])
+                         p(official_identity.MUNICIPALITY_NAME + '\nCNPJ ' + official_identity.MUNICIPALITY_CNPJ, small)]], colWidths=[23*mm, 151*mm])
         header.setStyle(TableStyle([('VALIGN', (0,0), (-1,-1), 'MIDDLE'), ('LEFTPADDING', (0,0), (-1,-1), 0)]))
         story.extend([header, Spacer(1, 8*mm), p(snapshot['title'], heading)])
         fields = [('Identificação do empréstimo', loan['id']), ('Veículo', loan['vehicle_plate']),
@@ -83,10 +85,10 @@ class VehicleLoanPdfService:
             if doc.page > 1:
                 label = ('TESTES | ' if snapshot.get('test_environment') else '') + snapshot['title']
                 canvas.drawString(18*mm, A4[1]-10*mm, label)
-            canvas.drawString(18*mm, 13*mm, 'Frota PMTF | Termos entre secretarias | Modelo v1')
+            canvas.drawString(18*mm, 13*mm, f'{official_identity.SYSTEM_NAME} | Termos entre secretarias | Modelo v1')
             canvas.drawRightString(A4[0]-18*mm, 13*mm, f'Página {doc.page}')
             canvas.restoreState()
         doc = SimpleDocTemplate(output, pagesize=A4, leftMargin=18*mm, rightMargin=18*mm,
-            topMargin=16*mm, bottomMargin=23*mm, title=snapshot['title'], author=MUNICIPALITY_NAME, invariant=1)
+            topMargin=16*mm, bottomMargin=23*mm, title=snapshot['title'], author=official_identity.MUNICIPALITY_NAME, invariant=1)
         doc.build(story, onFirstPage=footer, onLaterPages=footer, canvasmaker=partial(Canvas, invariant=1))
         return output.getvalue()

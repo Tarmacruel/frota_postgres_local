@@ -469,3 +469,57 @@ Clicar em uma célula da linha abre o painel de detalhes; botão e entrada por t
 629 testes/86 arquivos, oito regressões adicionadas e 57 direcionados finais/4 arquivos aprovados; lint zero erros/39 avisos anteriores e build homologation aprovado. QA no veículo GTN8C43, edição manual da lotação, clique na célula do empréstimo cancelado TML4E34, retorno à lista e Enter. Desktop claro, formulário mobile claro390×843 e painel mobile escuro390×843/360×800, sem overflow e com rodapés visíveis. Console sem erros. Nenhum registro salvo na QA; tema/viewport restaurados e guia atual preservada.
 
 Fonte final bf8f794 na branch fix/loan-origin-location-row-open-hml-20261028, publicada às 13:56:26 só no frontend, entrada index-Cl_6b_nt.js e nove assets conferidos. 75 tabelas, backend/schema/configurações/PIDs preservados; produção limpa31543d4/PID2512. Backup/capturas/reversão privados em storage/backups/20261028-loan-location-row-open. [ExecPlan e evidências](../EXECPLAN_LOAN_LOCATION_ROW_OPEN_HML_20261028.md).
+
+## Promoção de HML e formulários globais — 28/10/2026
+
+As melhorias anteriores foram promovidas primeiro à produção pela PR81, merge 0cd053c, às14:37:16. Migração aditiva, backup/reversão e validação produtiva concluídos sem copiar dados HML ou confirmar saldos/quantidades. [Publicação e validação](../EXECPLAN_PRODUCTION_PROMOTION_20261028.md).
+
+Depois da promoção, a nova identidade foi aplicada somente na homologação: 55 formulários de cadastro, edição e ações, com etapas por assunto nos extensos e uma tela nos curtos. Progresso por preenchimento válido, obrigatórios vermelhos, links de correção com foco, mensagem original do servidor e dados/anexos preservados. Assistentes recentes de empréstimos/pagamentos mantidos; revisão explícita de permissões sem alteração de regras. Busca/filtros continuam compactos. Backend, APIs, payloads, permissões, schemas e cálculos financeiros preservados.
+
+643 testes/87 arquivos aprovados, lint zero erros/39 avisos anteriores, build homologation. QA por famílias, desktop1280×900 e mobile390×843/360×800, claro/escuro, Tab/Escape/retorno de foco e console sem erros. Sem overflow lateral; ações acessíveis e labels obrigatórios na mesma linha. Nenhum cadastro/pedido/pagamento/assinatura/permissão submetido pela QA. Tema/viewport restaurados e guias do usuário preservadas.
+
+Fonte66a8fb7 na branch feature/guided-forms-global-hml-20261028, publicada às17:55:19 só no frontend, entrada index-B2K1JZAJ.js e nove assets locais conferidos; entrada confirmada na navegação HTTPS. APIs6969/PID21432 e8000/PID5804 preservadas, produção limpa0cd053c, rotina06h intacta. 71/75 tabelas idênticas; diferenças de uso concorrente em condutor/posse/auditoria e expiração automática de uma ordem documentadas sem restaurar dados. Contratos, saldos, quantidades, faturas e pagamentos preservados. Backup/capturas/reversão privados em storage/backups/20261028-global-guided-forms. [ExecPlan e evidências](../EXECPLAN_GLOBAL_GUIDED_FORMS_HML_20261028.md).
+
+## Correção do alerta e primeira tecla — 28/10/2026 — somente HML
+
+Reproduzidas as duas falhas informadas: SVG sem classe media546px; a inspeção de progresso em microtask durante capture podia restaurar o valor anterior antes de onChange. Inspeção agora agendada para o próximo frame após propagação, coalescida, com função atualizada e cancelamento ao desmontar; atualização do campo continua imediata. Classe app-icon explícita nos alertas local/servidor e check de etapa, com18px/12px. Sem mudança em AppIcon global, handlers, payloads ou regras.
+
+Dois novos testes reproduziram as falhas antes da correção;16 direcionados e645 completos/87 arquivos aprovados, lint zero erros/39 avisos anteriores e build HML. QA real com teclas isoladas, limpar/reiniciar, Marca/Modelo, seletor SUV, avançar/voltar e Nome do condutor. Desktop1280×900, mobile390×843 claro/360×800 escuro, alertas compactos, sem overflow, rodapé acessível e console sem erros. Nenhum cadastro salvo; tema/viewport restaurados e guias do usuário preservadas.
+
+Fonte115a6d7 na branch fix/guided-form-input-alert-hml-20261028, publicada às23:35:48 só no frontend, entrada index-CexbYAw6.js e nove assets conferidos.75/75 tabelas idênticas após QA; configurações, backend, APIs6969/PID21432 e8000/PID5804, PostgreSQL e rotina06h intactos. Produção limpa0cd053c. Backup/reversão/capturas em storage/backups/20261028-guided-form-input-alert. [ExecPlan e evidências](../EXECPLAN_GUIDED_FORM_INPUT_ALERT_HML_20261028.md).
+
+## Comprovante com foto e remoção — 29/10/2026 — somente HML
+
+Confirmação de abastecimento ganhou Anexar arquivo/Trocar arquivo, Tirar foto em dispositivo compatível, prévia ampliável, nome/tamanho e Remover. A seleção permanece local até a confirmação existente; cancelar seletor mantém o arquivo, remover devolve foco e torna o comprovante pendente. PDF/JPG/PNG/WEBP e8MB mantidos, com mensagem para arquivo vazio/inválido. Um comprovante por confirmação, sem excluir documento salvo ou alterar API/saldo/permissões.
+
+Obrigatório acompanha as duas entradas sem duplicar contagem:5/6 sem anexo,6/6 com foto e5/6 ao remover; bloqueio sem arquivo e FormData receipt com somente o arquivo atual cobertos por regressões.654 testes/88 arquivos,14 direcionados (nove novos), lint zero erros/39 avisos anteriores e build HML aprovados.
+
+QA com fixtures fictícias PNG/JPEG, prévia/ampliação, remover, orientação de obrigatório, entrada da câmera por seletor sem captura física e substituição. Desktop1280×900 e mobile390×843 claro/360×800 escuro, ações acessíveis, sem overflow e console sem erros. Nenhuma operação confirmada ou arquivo salvo no servidor. Tema/viewport restaurados e guia do usuário preservada.
+
+Fonte2200b69 em feature/fuel-receipt-picker-hml-20261029, publicada às07:15:58 só no frontend, entrada index-C8K7OL_1.js e nove assets conferidos.75/75 tabelas idênticas após QA, backend/configurações/PIDs preservados; HML6969/PID5344 após rotina06h, produção limpa0cd053c/8000/PID5804. Backup/reversão/capturas em storage/backups/20261029-fuel-receipt-picker. [ExecPlan e evidências](../EXECPLAN_FUEL_RECEIPT_PICKER_HML_20261029.md).
+
+## Login direto — 29/10/2026 — somente HML
+
+Exceção solicitada pelo usuário para a tela de acesso: LoginPage.jsx voltou ao form nativo compacto, sem GuidedForm, barra/contador de preenchimento, rodapé ou Rever obrigatórios. Identidade institucional e campos permanecem. Obrigatórios nativos, mensagem de erro acessível por role=alert e bloqueio de reenvio enquanto submitting preservados; serviço de autenticação, payload e permissões intactos. Nenhum componente compartilhado ou CSS alterado.
+
+654 testes/88 arquivos, lint zero erros/39 avisos anteriores e build homologation aprovados. QA do acesso público sem efetuar login: ausência de todos os elementos guiados, dois campos com required/validity.valueMissing, desktop1600×900 e mobile390×843 sem overflow. Estilos/temas existentes preservados. Console sem erros; viewport restaurado, guia temporária fechada e guias/preenchimentos do usuário mantidos. Capturas login-desktop.png/login-mobile.png, com campos vazios.
+
+Fonte03a2b8a em fix/login-simple-hml-20261029, publicada às09:36:47 só no frontend, entrada index-RpX_Zbx1.js e nove assets conferidos.75/75 tabelas idênticas após QA; APIs6969/PID5344 e8000/PID5804, backend/configurações/rotina06h intactos. Produção limpa0cd053c. Backup, capturas, gates e reversão em storage/backups/20261029-login-simple; retorno disponível ao frontend anterior index-C8K7OL_1.js.
+
+## Superusuário, parâmetros e inativação guiada —29/10/2026 — publicado somente em HML
+
+SUPERUSER com acesso global, inicialmente somente jonatas@sousa; ADMIN limitado à própria secretaria, mantendo contratos e análises. Área Parâmetros com identidade, cores/ícones, prévia interativa, configuração/campos adicionais e administração auditada de15 módulos. Identidade de documentos já emitidos congelada no snapshot. Inativação exige conferência dos efeitos, resolve entregas pelo fluxo próprio e estorna/restabelece consumo e quantidades com histórico; faturas conciliadas exigem cancelamento e desvinculação explícitos. Permissões em tela única com tabela preenchendo o modal; celular com controles por módulo, sem cabeçalhos duplicados.
+
+Backend767 testes completos aprovados; PostgreSQL104; empréstimos HTTP18 e migration3; frontend661 completos mais dois de inativação e14 direcionados; lint zero erros/39 avisos anteriores e build aprovados. QA descartável desktop/mobile390px, claro/escuro; inativar/reativar, prévia/publicação fictícia, campo adicional e escopo do ADMIN conferidos; console sem erros.
+
+Backup/restauração e migration0062→0063 ensaiados em cópia descartável do banco HML. Fonte1abfe29 publicada às13:58:22(Brasília), após autorização elevada do Windows; entrada index-DPwbNbDI.js e hash do frontend servido conferidos. HML6969/PID2096, banco0063 e exatamente um SUPERUSER, jonatas@sousa, com acesso integral verificado em conexão somente leitura. ADMIN por secretaria e rotas privadas/autenticação conferidos. Sessão do navegador expirada ao abrir parâmetros depois da publicação; nenhum login artificial foi criado. Tarefa06h Ready, resultado0 e preflight aprovado; preserva papel e parâmetros HML mesmo quando a produção já possuir sua própria configuração. Produção permanece limpa0cd053c/8000/PID5804, sem alterações de ambiente ou frontend. [ExecPlan e evidências](../EXECPLAN_SUPERUSER_SETTINGS_HML_20261029.md).
+
+## Revisão visual e funcional de Parâmetros — 29/10/2026 — somente HML
+
+Revisadas Identidade, Aparência, Formulários e Registros. Corrigidas prévia de densidade, contraste para cores personalizadas e hover, identificação permanente de campos adicionais, validação entre abas, carregamento com repetição e conflitos preservando rascunhos. Conferência mostra valores publicados/novos e impacto de remoção ou troca de tipo. Ícones recolhidos para aproximar a prévia no celular; alvos de toque maiores. Administração recupera conflitos, descarta respostas obsoletas após trocar filtros/módulo e informa falhas de histórico. Um único asterisco nos campos obrigatórios, inclusive captions aninhadas.
+
+QA com duas abas reproduziu token CSRF desatualizado e logout travado. Frontend renova e repete apenas uma vez quando recebe CSRF_TOKEN_INVALID, recusa explícita do middleware antes do endpoint. Erros de origem, permissão, rede e execução não são repetidos. Falha de logout destrava a tela e oferece nova tentativa; autorização e backend permanecem intactos.
+
+687 testes frontend e 104 integrações PostgreSQL aprovados; 59 dirigidos como subconjunto, lint zero erros/39 avisos anteriores, build e diff-check aprovados. QA descartável: upload válido/inválido, persistência, duas sessões, nove catálogos, edição, booleano, inativação/reativação e restrição de ADMIN. Desktop 1280/1600 e celular 360/390, claro/escuro, teclado e sem overflow; console da nova guia publicada limpo.
+
+Fonte 3c28261 em fix/parameters-review-hml-20261029, publicada às 19:21:06, frontend index-C2Ck_Gb6.js e hash servido conferido. Configuração HML revisão 3 e produção limpa 0cd053c preservadas; APIs 6969/PID2096 e 8000/PID5804 sem reinício. Backup, rollback, gates e capturas em storage/backups/20261029-parameters-review. [ExecPlan](../../.agent/execplan-parameters-review-20261029.md).

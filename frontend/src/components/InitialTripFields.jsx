@@ -1,8 +1,9 @@
+import { FormFields } from './GuidedForm'
 import TripDestinationEditor from './TripDestinationEditor'
 
 export default function InitialTripFields({ enabled, onEnabledChange, trip, onChange, disabled = false }) {
   return (
-    <section className="initial-trip-section modal-field-span">
+    <FormFields><section className="initial-trip-section modal-field-span">
       <label className="trip-toggle" htmlFor="possession-initial-trip-enabled">
         <input
           id="possession-initial-trip-enabled"
@@ -90,6 +91,6 @@ export default function InitialTripFields({ enabled, onEnabledChange, trip, onCh
           />
         </div>
       ) : null}
-    </section>
+    </section></FormFields>
   )
 }

@@ -173,7 +173,7 @@ async def test_user_create_links_secretaria_and_records_audit():
                 password="Senha@123",
             role=UserRole.PADRAO,
         ),
-        current_user=SimpleNamespace(id=uuid4(), email="admin@frota.local", role=UserRole.ADMIN),
+        current_user=SimpleNamespace(id=uuid4(), email="admin@frota.local", role=UserRole.SUPERUSER),
     )
 
     assert user.organization_id == organization.id
@@ -198,7 +198,7 @@ async def test_user_create_rejects_unknown_secretaria():
                 password="Senha@123",
                 role=UserRole.PADRAO,
             ),
-            current_user=SimpleNamespace(id=uuid4(), email="admin@frota.local", role=UserRole.ADMIN),
+            current_user=SimpleNamespace(id=uuid4(), email="admin@frota.local", role=UserRole.SUPERUSER),
         )
 
     assert exc.value.status_code == 404
@@ -223,7 +223,7 @@ async def test_driver_create_links_secretaria_and_records_audit():
             cnh_categoria=DriverLicenseCategory.B,
             cnh_validade=None,
         ),
-        current_user=SimpleNamespace(id=uuid4(), email="admin@frota.local", role=UserRole.ADMIN),
+        current_user=SimpleNamespace(id=uuid4(), email="admin@frota.local", role=UserRole.SUPERUSER),
     )
 
     assert driver["organization_id"] == organization.id
@@ -391,7 +391,7 @@ async def test_driver_update_for_producao_allows_other_secretaria():
 
 
 @pytest.mark.asyncio
-async def test_master_data_catalog_include_all_for_producao_returns_all_secretarias():
+async def test_master_data_catalog_include_all_does_not_expand_producao_scope():
     user_organization = Organization(id=uuid4(), name="Chefia de Governo")
     other_organization = Organization(id=uuid4(), name="Secretaria de Educacao")
     repository = FakeCatalogRepository([user_organization, other_organization])
@@ -404,8 +404,8 @@ async def test_master_data_catalog_include_all_for_producao_returns_all_secretar
     assert scoped["organizations"] == [user_organization]
 
     global_catalog = await service.get_catalog(current_user=current_user, include_all=True)
-    assert repository.last_organization_id is None
-    assert global_catalog["organizations"] == [user_organization, other_organization]
+    assert repository.last_organization_id == user_organization.id
+    assert global_catalog["organizations"] == [user_organization]
 
 
 @pytest.mark.asyncio

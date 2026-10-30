@@ -1,3 +1,4 @@
+import { FormFields } from '../GuidedForm'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Modal from '../Modal'
 import MoneyInput from '../MoneyInput'
@@ -14,7 +15,7 @@ const day = (value) => new Date(value).toLocaleDateString('pt-BR', { timeZone: '
 const month = (value) => value ? value.split('-').reverse().join('/') : 'A informar'
 
 function Field({ label, children, hint }) {
-  return <label className="payment-composer__field"><span>{label}</span>{children}{hint ? <small>{hint}</small> : null}</label>
+  return <FormFields><label className="payment-composer__field"><span>{label}</span>{children}{hint ? <small>{hint}</small> : null}</label></FormFields>
 }
 
 export default function PaymentProcessDialog({ record, contractId = '', operationId = '', contracts = [], suppliers = [], organizations = [], user, onClose, onSaved }) {
@@ -161,7 +162,7 @@ export default function PaymentProcessDialog({ record, contractId = '', operatio
     return <Field label={label}><Input ref={key === 'process_number' ? invoiceRef : undefined} className="app-input" type={type} value={form[key]} onChange={(event) => change(key, event.target.value)} {...props} /></Field>
   }
 
-  return <Modal open title={record ? 'Editar processo' : 'Novo processo de pagamento'} onClose={close} canClose={!saving} className="payment-composer" backdropClassName="payment-composer-backdrop">
+  return <FormFields><Modal open title={record ? 'Editar processo' : 'Novo processo de pagamento'} onClose={close} canClose={!saving} className="payment-composer" backdropClassName="payment-composer-backdrop">
     {!record ? <ol className="payment-composer__steps" aria-label="Etapas do cadastro"><li aria-current={step === 'source' ? 'step' : undefined}><span>1</span>Origem e serviços</li><li aria-current={step === 'invoice' ? 'step' : undefined}><span>2</span>Dados da fatura</li></ol> : <p className="payment-composer__intro">Atualize os dados deste processo. A etapa e as operações conciliadas permanecem acessíveis no acompanhamento.</p>}
     {error ? <div ref={errorRef} tabIndex={-1} className="alert alert-error" role="alert">{error}</div> : null}
     {created ? <div className="alert alert-warning" role="status"><strong>Processo {created.process_number} já foi criado.</strong><p>A conciliação ainda precisa ser confirmada. Tentar novamente usa este mesmo processo.</p></div> : null}
@@ -221,5 +222,5 @@ export default function PaymentProcessDialog({ record, contractId = '', operatio
           : <button className="app-button" type="submit" disabled={saving || uncertain || sourceLoading || (hasDifference && (!confirmedDifference || reason.trim().length < 10))}>{saving ? 'Salvando…' : created ? 'Tentar conciliação novamente' : integrated ? 'Salvar e conciliar' : 'Salvar processo'}</button>}
       </div></footer>
     </form>
-  </Modal>
+  </Modal></FormFields>
 }

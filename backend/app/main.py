@@ -39,6 +39,7 @@ from app.api.routes.possession import router as possession_router
 from app.api.routes.vehicle_loans import router as vehicle_loans_router
 from app.api.routes.search import router as search_router
 from app.api.routes.users import router as users_router
+from app.api.routes.system_settings import router as system_settings_router, records_router as record_admin_router
 from app.api.routes.vehicles import router as vehicles_router
 from app.core.config import settings
 from app.core.database import engine
@@ -76,6 +77,8 @@ redoc_url = None if settings.APP_ENV == "production" else "/redoc"
 openapi_url = None if settings.APP_ENV == "production" else "/openapi.json"
 
 app = FastAPI(title="Sistema de Frota PMTF", version="1.0.0", docs_url=docs_url, redoc_url=redoc_url, openapi_url=openapi_url)
+app.include_router(system_settings_router)
+app.include_router(record_admin_router)
 PROJECT_ROOT = Path(__file__).resolve().parents[2]
 FRONTEND_DIST = PROJECT_ROOT / "frontend" / "dist"
 FRONTEND_INDEX = FRONTEND_DIST / "index.html"
@@ -86,7 +89,7 @@ app.add_middleware(
     allow_origins=settings.CORS_ORIGINS,
     allow_credentials=True,
     allow_methods=["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", REQUEST_ID_HEADER],
+    allow_headers=["Authorization", "Content-Type", "X-CSRF-Token", "X-Form-Fields", REQUEST_ID_HEADER],
     expose_headers=[REQUEST_ID_HEADER, "X-Document-Content-SHA256"],
 )
 app.add_middleware(RequestBodyLimitMiddleware, max_body_bytes=settings.MAX_REQUEST_BODY_BYTES)

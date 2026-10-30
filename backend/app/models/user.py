@@ -12,6 +12,7 @@ from app.db.base import Base
 
 
 class UserRole(str, enum.Enum):
+    SUPERUSER = "SUPERUSER"
     ADMIN = "ADMIN"
     PRODUCAO = "PRODUCAO"
     PADRAO = "PADRAO"
@@ -64,6 +65,8 @@ class User(Base):
     @property
     def permissions(self) -> dict[str, dict[str, bool]]:
         permissions = default_permissions_for_role(self.role.value if self.role else "")
+        if self.role == UserRole.SUPERUSER:
+            return permissions
         for entry in self.permission_entries:
             permissions[entry.module] = apply_role_permission_ceiling(
                 self.role.value if self.role else "",

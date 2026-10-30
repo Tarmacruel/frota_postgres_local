@@ -1,3 +1,4 @@
+import GuidedForm from './GuidedForm'
 import JustificationField from './JustificationField'
 import { useEffect, useRef, useState } from 'react'
 import { possessionAPI } from '../api/possession'
@@ -358,24 +359,24 @@ export default function PossessionTripsModal({
         ) : null}
 
         {view === 'create' ? (
-          <form className="form-grid modal-form-grid" onSubmit={handleCreateTrip}>
+          <GuidedForm busy={submitting} className="form-grid modal-form-grid" onSubmit={handleCreateTrip}>
             <p className="trip-action-context modal-field-span">A rota será vinculada à posse ativa. O retorno futuro encerrará apenas esta rota.</p>
             <div className="form-field">
               <label htmlFor="trip-create-origin">Origem</label>
-              <input ref={firstFieldRef} id="trip-create-origin" className="app-input" value={tripForm.origin} onChange={(event) => setTripForm({ ...tripForm, origin: event.target.value })} maxLength={255} aria-describedby={fieldErrors.origin ? 'trip-create-origin-error' : undefined} />
+              <input required ref={firstFieldRef} id="trip-create-origin" className="app-input" value={tripForm.origin} onChange={(event) => setTripForm({ ...tripForm, origin: event.target.value })} maxLength={255} aria-describedby={fieldErrors.origin ? 'trip-create-origin-error' : undefined} />
               {fieldErrors.origin ? <span id="trip-create-origin-error" className="field-error">{fieldErrors.origin}</span> : null}
             </div>
             <div className="form-field">
               <label htmlFor="trip-create-purpose">Finalidade</label>
-              <input id="trip-create-purpose" className="app-input" value={tripForm.purpose} onChange={(event) => setTripForm({ ...tripForm, purpose: event.target.value })} maxLength={500} />
+              <input required id="trip-create-purpose" className="app-input" value={tripForm.purpose} onChange={(event) => setTripForm({ ...tripForm, purpose: event.target.value })} maxLength={500} />
             </div>
             <div className="form-field">
               <label htmlFor="trip-create-departure">Saída</label>
-              <input id="trip-create-departure" type="datetime-local" className="app-input" value={tripForm.departure_at} onChange={(event) => setTripForm({ ...tripForm, departure_at: event.target.value })} />
+              <input required id="trip-create-departure" type="datetime-local" className="app-input" value={tripForm.departure_at} onChange={(event) => setTripForm({ ...tripForm, departure_at: event.target.value })} />
             </div>
             <div className="form-field">
               <label htmlFor="trip-create-odometer">Hodômetro inicial (km)</label>
-              <input id="trip-create-odometer" type="number" min="0" step="0.1" className="app-input" value={tripForm.start_odometer_km} onChange={(event) => setTripForm({ ...tripForm, start_odometer_km: event.target.value })} />
+              <input required id="trip-create-odometer" type="number" min="0" step="0.1" className="app-input" value={tripForm.start_odometer_km} onChange={(event) => setTripForm({ ...tripForm, start_odometer_km: event.target.value })} />
             </div>
             <div className="form-field modal-field-span">
               <label htmlFor="trip-create-observation">Observação</label>
@@ -387,11 +388,11 @@ export default function PossessionTripsModal({
               <button type="submit" className="app-button" disabled={submitting}>{submitting ? 'Iniciando...' : 'Iniciar rota'}</button>
               <button type="button" className="ghost-button" onClick={returnToTimeline} disabled={submitting}>Voltar às rotas</button>
             </div>
-          </form>
+          </GuidedForm>
         ) : null}
 
         {view === 'add' ? (
-          <form className="form-grid modal-form-grid" onSubmit={handleAddDestinations}>
+          <GuidedForm busy={submitting} className="form-grid modal-form-grid" onSubmit={handleAddDestinations}>
             <p className="trip-action-context modal-field-span">Os novos destinos serão acrescentados ao final da rota {selectedTrip?.sequence_number}, sem alterar paradas anteriores.</p>
             <div ref={firstFieldRef} tabIndex={-1} className="modal-field-span">
               <TripDestinationEditor idPrefix="trip-add" destinations={destinationDrafts} onChange={setDestinationDrafts} disabled={submitting} />
@@ -400,22 +401,22 @@ export default function PossessionTripsModal({
               <button type="submit" className="app-button" disabled={submitting}>{submitting ? 'Adicionando...' : 'Adicionar destino(s)'}</button>
               <button type="button" className="ghost-button" onClick={returnToTimeline} disabled={submitting}>Voltar às rotas</button>
             </div>
-          </form>
+          </GuidedForm>
         ) : null}
 
         {view === 'end' ? (
-          <form className="form-grid modal-form-grid" onSubmit={handleEndTrip}>
+          <GuidedForm busy={submitting} className="form-grid modal-form-grid" onSubmit={handleEndTrip}>
             <div className="trip-return-notice modal-field-span" role="note">
               <strong>Esta ação encerra apenas a rota.</strong>
               <span>A posse continuará ativa e poderá receber uma nova rota depois.</span>
             </div>
             <div className="form-field">
               <label htmlFor="trip-end-return">Data e hora do retorno</label>
-              <input ref={firstFieldRef} id="trip-end-return" type="datetime-local" className="app-input" value={endForm.return_at} onChange={(event) => setEndForm({ ...endForm, return_at: event.target.value })} />
+              <input required ref={firstFieldRef} id="trip-end-return" type="datetime-local" className="app-input" value={endForm.return_at} onChange={(event) => setEndForm({ ...endForm, return_at: event.target.value })} />
             </div>
             <div className="form-field">
               <label htmlFor="trip-end-odometer">Hodômetro final (km)</label>
-              <input id="trip-end-odometer" type="number" min={selectedTrip?.start_odometer_km || 0} step="0.1" className="app-input" value={endForm.end_odometer_km} onChange={(event) => setEndForm({ ...endForm, end_odometer_km: event.target.value })} />
+              <input required id="trip-end-odometer" type="number" min={selectedTrip?.start_odometer_km || 0} step="0.1" className="app-input" value={endForm.end_odometer_km} onChange={(event) => setEndForm({ ...endForm, end_odometer_km: event.target.value })} />
             </div>
             <div className="form-field modal-field-span">
               <label htmlFor="trip-end-observation">Observação do retorno</label>
@@ -426,25 +427,25 @@ export default function PossessionTripsModal({
               <button type="submit" className="app-button" disabled={submitting}>{submitting ? 'Registrando...' : 'Registrar retorno da rota'}</button>
               <button type="button" className="ghost-button" onClick={returnToTimeline} disabled={submitting}>Voltar às rotas</button>
             </div>
-          </form>
+          </GuidedForm>
         ) : null}
 
         {view === 'cancel' ? (
-          <form className="form-grid modal-form-grid" onSubmit={handleCancelTrip}>
+          <GuidedForm busy={submitting} className="form-grid modal-form-grid" onSubmit={handleCancelTrip}>
             <div className="trip-critical-notice modal-field-span" role="note">
               <strong>O cancelamento não apaga a rota.</strong>
               <span>Destinos e histórico serão preservados com a justificativa informada.</span>
             </div>
             <div className="form-field modal-field-span">
               <label htmlFor="trip-cancel-reason">Justificativa do cancelamento</label>
-              <JustificationField context="trip_cancel" ref={firstFieldRef} id="trip-cancel-reason" className="app-textarea" rows="4" minLength={8} maxLength={1000} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} aria-describedby="trip-cancel-help" />
+              <JustificationField required context="trip_cancel" ref={firstFieldRef} id="trip-cancel-reason" className="app-textarea" rows="4" minLength={8} maxLength={1000} value={cancelReason} onChange={(event) => setCancelReason(event.target.value)} aria-describedby="trip-cancel-help" />
               <span id="trip-cancel-help" className="helper-text">Entre 8 e 1.000 caracteres. A justificativa será auditada.</span>
             </div>
             <div className="actions-inline modal-actions">
               <button type="submit" className="app-button danger-button" disabled={submitting || cancelReason.trim().length < 8}>{submitting ? 'Cancelando...' : 'Confirmar cancelamento da rota'}</button>
               <button type="button" className="ghost-button" onClick={returnToTimeline} disabled={submitting}>Voltar às rotas</button>
             </div>
-          </form>
+          </GuidedForm>
         ) : null}
       </div>
     </Modal>

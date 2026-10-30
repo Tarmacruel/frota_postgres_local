@@ -53,7 +53,7 @@ async def test_legacy_registration_update_is_saved_and_audited():
     service = DriverService(AsyncMock())
     service.drivers = SimpleNamespace(get_by_id=AsyncMock(return_value=driver))
     service.audit = SimpleNamespace(record=AsyncMock())
-    actor = SimpleNamespace(id=uuid4(), role=UserRole.ADMIN)
+    actor = SimpleNamespace(id=uuid4(), role=UserRole.SUPERUSER)
     result = await service.update(driver.id, DriverUpdate(matricula=" 000123 "), actor)
     assert result["matricula"] == "000123"
     details = service.audit.record.call_args.kwargs["details"]
@@ -69,7 +69,7 @@ async def test_operations_reject_legacy_driver_until_registration_is_saved(opera
     monkeypatch.setattr("app.services.fine_service.attribute_operation", AsyncMock())
     driver = Driver(id=uuid4(), nome_completo="Condutor legado", matricula=matricula,
                     documento="12345678900", cnh_categoria=DriverLicenseCategory.B, ativo=True)
-    actor = SimpleNamespace(id=uuid4(), role=UserRole.ADMIN)
+    actor = SimpleNamespace(id=uuid4(), role=UserRole.SUPERUSER)
     vehicle_id = uuid4()
     db = AsyncMock()
     if operation == "possession":

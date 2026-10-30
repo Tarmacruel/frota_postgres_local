@@ -36,9 +36,9 @@ def permitted(user, module, action='view'):
 def authorize(user, *, mutation=False, reconcile=False):
     if not permitted(user, 'analytics') or not permitted(user, 'fuel_supplies'):
         raise HTTPException(403, 'Permissão insuficiente para casos de abastecimento')
-    if mutation and (role(user) not in ('ADMIN', 'PRODUCAO') or not permitted(user, 'analytics', 'edit')):
+    if mutation and (role(user) not in ('SUPERUSER', 'ADMIN', 'PRODUCAO') or not permitted(user, 'analytics', 'edit')):
         raise HTTPException(403, 'Permissão insuficiente para tratar alertas')
-    if reconcile and role(user) != 'ADMIN':
+    if reconcile and role(user) not in ('SUPERUSER', 'ADMIN'):
         raise HTTPException(403, 'Reconciliação exige administrador autorizado')
 
 
@@ -72,7 +72,7 @@ def effective_scope(user, requested=None):
 
 
 def evidence_visible(user, context):
-    if role(user) != 'PRODUCAO':
+    if role(user) not in ('ADMIN', 'PRODUCAO'):
         return True
     return user.organization_id is not None and context.get('organization') == str(user.organization_id)
 
@@ -90,7 +90,7 @@ class AnalyticsAlerts:
             FuelSupply.supplied_at.label('source_occurred_at'),
             (Case.last_evaluated_at > last_decision).label('reappeared')).select_from(Case).outerjoin(
             FuelSupply, FuelSupply.id == Case.source_id).outerjoin(Vehicle, Vehicle.id == Case.vehicle_id)
-        if role(user) != 'ADMIN':
+        if role(user) != 'SUPERUSER':
             query = query.where(FuelSupply.id.is_not(None), Case.organization_id.is_not(None),
                 FuelSupply.vehicle_id == Case.vehicle_id, FuelSupply.driver_id.is_not_distinct_from(Case.driver_id))
         if scope is not None:
@@ -119,7 +119,7 @@ class AnalyticsAlerts:
             'evaluation_context': context if visible else None,
             'evidence_unavailable': not visible,
             'allowed_states': TRANSITIONS[case.status] if permitted(user, 'analytics', 'edit')
-                and role(user) in ('ADMIN', 'PRODUCAO') else [],
+                and role(user) in ('SUPERUSER', 'ADMIN', 'PRODUCAO') else [],
             'can_view_vehicle': permitted(user, 'vehicles'),
         })
 
@@ -139,7 +139,7 @@ class AnalyticsAlerts:
         return row
 
     def _event_scope(self, user):
-        if role(user) == 'PRODUCAO':
+        if role(user) in ('ADMIN', 'PRODUCAO'):
             return Event.evaluation_context['organization'].astext == str(effective_scope(user))
         return text('true')
 

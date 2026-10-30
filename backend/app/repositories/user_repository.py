@@ -6,7 +6,7 @@ from uuid import UUID
 from sqlalchemy import String, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
-from app.models.user import User
+from app.models.user import User, UserRole
 from app.models.master_data import Organization
 
 
@@ -14,9 +14,15 @@ class UserRepository:
     def __init__(self, db: AsyncSession):
         self.db = db
 
-    async def list(self, skip: int = 0, limit: int = 50) -> list[User]:
+    async def list(self, skip: int = 0, limit: int = 50, organization_id=None, exclude_superuser=False) -> list[User]:
+        filters = []
+        if organization_id:
+            filters.append(User.organization_id == organization_id)
+        if exclude_superuser:
+            filters.append(User.role != UserRole.SUPERUSER)
         result = await self.db.execute(
             select(User)
+            .where(*filters)
             .options(joinedload(User.organization))
             .options(selectinload(User.permission_entries))
             .offset(skip)
@@ -27,8 +33,10 @@ class UserRepository:
 
     async def list_paginated(self, *, page: int, limit: int, search: str | None = None,
                              role: str | None = None, organization_id: UUID | None = None,
-                             without_organization: bool = False) -> tuple[list[User], int, dict]:
+                             without_organization: bool = False, exclude_superuser: bool = False) -> tuple[list[User], int, dict]:
         filters = []
+        if exclude_superuser:
+            filters.append(User.role != UserRole.SUPERUSER)
         if search and search.strip():
             term = f"%{search.strip()}%"
             filters.append(or_(User.name.ilike(term), User.email.ilike(term),
@@ -46,10 +54,11 @@ class UserRepository:
         rows = await self.db.execute(base.options(joinedload(User.organization), selectinload(User.permission_entries))
                                      .order_by(User.created_at.desc(), User.id.desc())
                                      .offset((page - 1) * limit).limit(limit))
-        summary_rows = await self.db.execute(select(User.role, func.count()).group_by(User.role))
+        scoped = base.subquery()
+        summary_rows = await self.db.execute(select(scoped.c.role, func.count()).group_by(scoped.c.role))
         summary = {role.value: count for role, count in summary_rows.all()}
-        summary["must_change_password"] = (await self.db.execute(select(func.count()).where(User.must_change_password.is_(True)))).scalar_one()
-        summary["must_register_cpf"] = (await self.db.execute(select(func.count()).where(User.cpf.is_(None)))).scalar_one()
+        summary["must_change_password"] = (await self.db.execute(select(func.count()).select_from(scoped).where(scoped.c.must_change_password.is_(True)))).scalar_one()
+        summary["must_register_cpf"] = (await self.db.execute(select(func.count()).select_from(scoped).where(scoped.c.cpf.is_(None)))).scalar_one()
         return list(rows.scalars().unique().all()), total, summary
 
     async def list_signers(self, *, organization_id: UUID | None = None, exclude_user_id: UUID | None = None, limit: int = 200) -> list[User]:

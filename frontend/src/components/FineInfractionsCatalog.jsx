@@ -1,3 +1,4 @@
+import GuidedForm from './GuidedForm'
 import MoneyInput from './MoneyInput'
 import { useCallback, useEffect, useRef, useState } from 'react'
 import Pagination from './Pagination'
@@ -146,7 +147,7 @@ export default function FineInfractionsCatalog() {
       {error ? <div className="alert alert-error" role="alert" style={{ marginBottom: 16 }}>{error}</div> : null}
       {feedback ? <div className="alert alert-info" role="status" aria-live="polite" style={{ marginBottom: 16 }}>{feedback}</div> : null}
 
-      <form className="form-grid" onSubmit={saveInfraction}>
+      <GuidedForm busy={submitting} className="form-grid" onSubmit={saveInfraction}>
         <div className="form-field">
           <label htmlFor="fine-infraction-code">Código</label>
           <input id="fine-infraction-code" className="app-input" maxLength={40} value={form.code} onChange={(event) => setForm({ ...form, code: event.target.value })} required />
@@ -197,7 +198,7 @@ export default function FineInfractionsCatalog() {
           </button>
           {form.id ? <button className="ghost-button" type="button" onClick={resetForm}>Cancelar edição</button> : null}
         </div>
-      </form>
+      </GuidedForm>
 
       <div className="filter-inline" style={{ margin: '18px 0 12px' }}>
         <input

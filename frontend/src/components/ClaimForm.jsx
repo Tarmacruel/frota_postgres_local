@@ -1,3 +1,4 @@
+import GuidedForm, { FormSection as GuidedSection } from './GuidedForm'
 import MoneyInput from './MoneyInput'
 import JustificationField from './JustificationField'
 import { useState } from 'react'
@@ -120,12 +121,13 @@ export default function ClaimForm({
   }
 
   return (
-    <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
+    <GuidedForm module="claims" recordId={initialData?.id} busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid">
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
 
-      <div className="form-field modal-field-span">
+      <GuidedSection title="Identificação" description="Identifique o veículo, o condutor e quando ocorreu.">
+<div className="form-field modal-field-span">
         <label>Veículo</label>
-        <SearchableSelect
+        <SearchableSelect required
           value={form.vehicle_id} onOpen={onVehicleOptionsOpen}
           onChange={(value) => setForm({ ...form, vehicle_id: value })}
           options={vehicles.filter((vehicle) => vehicle.can_operate_vehicle !== false).map(vehicleOption)}
@@ -145,7 +147,7 @@ export default function ClaimForm({
 
       <div className="form-field">
         <label htmlFor="claim-date">Data e hora</label>
-        <input id="claim-date" type="datetime-local" className="app-input" value={form.data_ocorrencia} onChange={(event) => setForm({ ...form, data_ocorrencia: event.target.value })} />
+        <input required id="claim-date" type="datetime-local" className="app-input" value={form.data_ocorrencia} onChange={(event) => setForm({ ...form, data_ocorrencia: event.target.value })} />
       </div>
 
       <div className="form-field">
@@ -162,14 +164,17 @@ export default function ClaimForm({
         </select>
       </div>
 
-      <div className="form-field modal-field-span">
+
+</GuidedSection>
+<GuidedSection title="Relato" description="Descreva o ocorrido e confira o local e o valor estimado.">
+<div className="form-field modal-field-span">
         <label htmlFor="claim-description">Descrição</label>
-        <textarea id="claim-description" className="app-textarea" rows="4" value={form.descricao} onChange={(event) => setForm({ ...form, descricao: event.target.value })} />
+        <textarea required minLength={20} maxLength={4000} id="claim-description" className="app-textarea" rows="4" value={form.descricao} onChange={(event) => setForm({ ...form, descricao: event.target.value })} />
       </div>
 
       <div className="form-field modal-field-span">
         <label htmlFor="claim-location">Local</label>
-        <input id="claim-location" className="app-input" value={form.local} onChange={(event) => setForm({ ...form, local: event.target.value })} />
+        <input required minLength={5} maxLength={200} id="claim-location" className="app-input" value={form.local} onChange={(event) => setForm({ ...form, local: event.target.value })} />
       </div>
 
       <div className="form-field">
@@ -182,7 +187,10 @@ export default function ClaimForm({
         <MoneyInput id="claim-value" type="number" min="0" step="0.01" className="app-input" value={form.valor_estimado} onChange={(event) => setForm({ ...form, valor_estimado: event.target.value })} />
       </div>
 
-      <div className="form-field modal-field-span">
+
+</GuidedSection>
+<GuidedSection title="Evidências" description="Acrescente a justificativa de encerramento quando necessária e os anexos disponíveis.">
+<div className="form-field modal-field-span">
         <label htmlFor="claim-justification">Justificativa de encerramento</label>
         <JustificationField context="claim_close" id="claim-justification" className="app-textarea" rows="3" value={form.justificativa_encerramento} onChange={(event) => setForm({ ...form, justificativa_encerramento: event.target.value })} disabled={submitting || !canSubmit} />
       </div>
@@ -202,6 +210,7 @@ export default function ClaimForm({
           canManage={canSubmit}
         />
       </div>
+</GuidedSection>
 
       <div className="actions-inline modal-actions">
         <button className="app-button" type="submit" disabled={submitting || !form.vehicle_id || !canSubmit}>
@@ -211,6 +220,6 @@ export default function ClaimForm({
         </button>
         <button className="ghost-button" type="button" disabled={submitting} onClick={onClose}>Cancelar</button>
       </div>
-    </form>
+    </GuidedForm>
   )
 }

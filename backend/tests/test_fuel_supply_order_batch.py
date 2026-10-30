@@ -76,7 +76,7 @@ class FakeAudit:
 def make_user():
     return SimpleNamespace(
         id=uuid4(),
-        role=UserRole.ADMIN,
+        role=UserRole.SUPERUSER,
         name="Admin de homologacao",
         email="admin@example.test",
     )

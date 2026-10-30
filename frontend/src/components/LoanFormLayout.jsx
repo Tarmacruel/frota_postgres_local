@@ -1,6 +1,7 @@
 import { cloneElement, useEffect, useId, useRef } from 'react'
 import Modal from './Modal'
 import { AppIcon } from './AppIcon'
+import { useSystemSettings } from '../hooks/useSystemSettings'
 
 export function LoanFormLayout({ title, steps, step, complete, onStep, onSubmit, busy, onClose, children, footer, formRef }) {
   const contentRef = useRef(null)
@@ -12,7 +13,12 @@ export function LoanFormLayout({ title, steps, step, complete, onStep, onSubmit,
   }, [step])
   const count = complete.filter(Boolean).length
   return <Modal open title={title} onClose={onClose} canClose={!busy} className="loan-editor" backdropClassName="loan-editor-backdrop">
-    <form ref={formRef} className="loan-editor__form" onSubmit={onSubmit} noValidate>
+    <form ref={formRef} className="loan-editor__form" onSubmit={(event) => {
+      const custom = event.currentTarget.querySelector('[data-custom-fields-module]')
+      const invalid = custom && [...custom.querySelectorAll('input,select,textarea')].find((field) => !field.disabled && !field.checkValidity())
+      if (invalid) { event.preventDefault(); invalid.reportValidity(); invalid.focus(); return }
+      onSubmit(event)
+    }} noValidate>
       <header className="loan-editor__progress">
         <div className="loan-editor__progress-caption"><span>Preenchimento</span><strong aria-live="polite">{count} de {steps.length} etapas preenchidas</strong></div>
         <div className="loan-editor__bar" role="progressbar" aria-label="Preenchimento do formulário" aria-valuemin={0} aria-valuemax={steps.length} aria-valuenow={count}>
@@ -37,6 +43,11 @@ export function LoanFormStep({ title, description, hidden, children }) {
 
 export function LoanField({ name, label, hint, error, wide, children }) {
   const hintId = useId()
+  const { values } = useSystemSettings()
+  const rule = values.forms?.vehicle_loans?.fields?.[name]
+  if (rule?.visible === false && !children.props.required && name !== 'delivery_condition') return null
+  label = rule?.label || label
+  children = rule?.required ? cloneElement(children, { required: true }) : children
   return <div className={`loan-field ${wide ? 'loan-editor__wide' : ''}`} data-loan-field={name} data-invalid={Boolean(error)}>
     <label htmlFor={`${hintId}-input`}><LoanFieldLabel label={label} required={children.props.required} /></label>{cloneElement(children, { id: `${hintId}-input`, 'aria-label': children.props['aria-label'] || label, 'aria-invalid': Boolean(error), 'aria-describedby': error || hint ? hintId : undefined })}{error ? <small id={hintId} className="loan-editor__field-error">{error}</small> : hint ? <small id={hintId}>{hint}</small> : null}
   </div>

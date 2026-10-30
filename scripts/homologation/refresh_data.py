@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.util
 from datetime import datetime, timedelta
 import hashlib
 import json
@@ -20,6 +21,10 @@ from sqlalchemy.engine import make_url
 
 PROD = Path(r'D:\FROTAS\frota_certificado_homologacao')
 HML = Path(r'D:\FROTAS\frota_emprestimos_testes')
+sys.path.insert(0, str(HML / 'backend'))
+_overlay_spec = importlib.util.spec_from_file_location('frota_hml_admin_overlay', HML / 'scripts/homologation/admin_overlay.py')
+overlay_service = importlib.util.module_from_spec(_overlay_spec)
+_overlay_spec.loader.exec_module(overlay_service)
 CONTROL = Path(r'D:\FROTAS\02-HOMOLOGACAO\sincronizacao')
 PG = Path(r'C:\Program Files\PostgreSQL\16\bin')
 BACKUPS = HML / 'storage/backups/sincronizacao-producao'
@@ -138,14 +143,14 @@ def tables(db):
     return [row[0] for row in db.execute("SELECT tablename FROM pg_tables WHERE schemaname='public' ORDER BY tablename")]
 
 
-def fingerprints(db, names=None, excluded=None):
+def fingerprints(db, names=None, excluded=None, admin_overlay=None):
     result = {}
     for table in names or tables(db):
         exclude = (excluded or {}).get(table, [])
-        query = sql.SQL('SELECT payload FROM (SELECT (to_jsonb(t) - %s::text[])::text AS payload FROM {} AS t) AS rows ORDER BY payload COLLATE "C"').format(sql.Identifier(table))
+        query, parameters = overlay_service.fingerprint_query(table, exclude, admin_overlay)
         checksum = hashlib.sha256(); count = 0
         with db.cursor() as cursor:
-            cursor.execute(query, (exclude,))
+            cursor.execute(query, parameters)
             for (payload,) in cursor:
                 checksum.update(payload.encode('utf-8')); checksum.update(b'\n'); count += 1
         result[table] = {'count': count, 'sha256': checksum.hexdigest()}
@@ -177,7 +182,7 @@ def migrate_stage(cfg, database, source_revision, folder):
     return json.loads(result.stdout.strip().splitlines()[-1])
 
 
-def projected_business_fingerprints(db, original, source_columns, excluded):
+def projected_business_fingerprints(db, original, source_columns, excluded, admin_overlay=None):
     current_columns = column_inventory(db)
     names = [name for name in original if name != 'alembic_version']
     require(set(names).issubset(current_columns), 'A migration removed source business tables; refresh refused.')
@@ -185,7 +190,7 @@ def projected_business_fingerprints(db, original, source_columns, excluded):
     for name in names:
         require(set(source_columns[name]).issubset(current_columns[name]), 'A migration removed source columns; refresh requires review.')
         projected_exclusions[name] = list(set(excluded.get(name, [])) | (set(current_columns[name])-set(source_columns[name])))
-    return fingerprints(db, names=names, excluded=projected_exclusions)
+    return fingerprints(db, names=names, excluded=projected_exclusions, admin_overlay=admin_overlay)
 
 
 def copy_files(source, destination):
@@ -317,6 +322,8 @@ def refresh(daily=False, migrate=None):
     save(folder / 'state.json', state); save(RUNTIME / 'last-attempt.json', state)
     activated = False
     try:
+        with target_connection(cfg) as current_hml:
+            hml_overlay = overlay_service.capture(current_hml)
         with source_connection(cfg) as source:
             source.execute('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ, READ ONLY')
             require(source.execute('SHOW transaction_read_only').fetchone()[0] == 'on', 'Production connection is not read-only.')
@@ -354,6 +361,10 @@ def refresh(daily=False, migrate=None):
                     'Staging did not reach the expected HML schema.')
             db.execute('GRANT SELECT, INSERT, UPDATE, DELETE ON ALL TABLES IN SCHEMA public TO loan_test_app')
             db.execute('GRANT USAGE, SELECT ON ALL SEQUENCES IN SCHEMA public TO loan_test_app')
+            applied_overlay = overlay_service.apply(db, hml_overlay, database_name=stage_name)
+            require(projected_business_fingerprints(db, original, source_columns, excluded, applied_overlay) == expected_business,
+                    'HML configuration overlay changed source business data outside its exact audited role delta.')
+        identity_files = overlay_service.copy_logos(cfg['target_storage'], folder / 'new-storage')
         assert_configs(cfg)
         state.update(source_schema=revision, target_schema=migration_result['target_revision'], migrations=migration_result,
                      schema=migration_result['target_revision'], tables_verified=len(original), files_copied=len(files), paths=path_result, counts={name: original[name]['count'] for name in ['vehicles', 'drivers', 'vehicle_possession', 'users', 'vehicle_tags']})
@@ -371,10 +382,13 @@ def refresh(daily=False, migrate=None):
         within(folder / 'new-storage', BACKUPS).rename(cfg['target_storage'])
         api('Start', folder); verify_ready(cfg)
         with target_connection(cfg) as db:
-            require(projected_business_fingerprints(db, original, source_columns, excluded) == expected_business, 'Post-activation data integrity failed.')
+            overlay_service.validate(db, applied_overlay)
+            require(projected_business_fingerprints(db, original, source_columns, excluded, applied_overlay) == expected_business, 'Post-activation data integrity failed.')
             require(db.execute('SELECT version_num FROM alembic_version').fetchone()[0] == migration_result['target_revision'], 'Active HML schema differs from the verified staging schema.')
         assert_configs(cfg)
-        state.update(status='complete', finished_at=datetime.now(TZ).isoformat(), production_read_only=True, business_fingerprints_match=True, configuration_preserved=True, backup_dump_sha256=digest(folder / 'previous.dump'))
+        state.update(status='complete', finished_at=datetime.now(TZ).isoformat(), production_read_only=True, business_fingerprints_match=True, configuration_preserved=True, backup_dump_sha256=digest(folder / 'previous.dump'),
+                     admin_overlay={'superusers_preserved': len(applied_overlay['principals']), 'audited_role_changes': len(applied_overlay['roles_before']),
+                                    'settings_preserved': bool(applied_overlay['settings_sha256']), 'identity_files_preserved': identity_files})
         save(folder / 'state.json', state); save(success, state); save(RUNTIME / 'last-attempt.json', state)
         try: prune(cfg, run_id)
         except Exception as error: save(folder / 'retention-warning.json', {'error_type': type(error).__name__, 'message': str(error)})

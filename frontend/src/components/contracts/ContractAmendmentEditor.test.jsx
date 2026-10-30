@@ -1,3 +1,4 @@
+import { reviewGuidedForm } from '../../test/guidedForms'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import ContractAmendmentEditor, { ContractAmendmentReport } from './ContractAmendmentEditor'
@@ -22,11 +23,13 @@ async function fillPrice(price='6.21'){
   fireEvent.change(screen.getByLabelText('Número do instrumento'),{target:{value:'2TA-TESTE'}})
   fireEvent.change(screen.getByLabelText('Assinatura'),{target:{value:'2026-01-12'}})
   fireEvent.change(screen.getByLabelText('Processo / documento de referência'),{target:{value:'DOC-TESTE'}})
+  fireEvent.click(screen.getByRole('button', {name: 'O que será alterado', exact:true}))
   fireEvent.click(screen.getByLabelText('Prazo'))
   fireEvent.click(screen.getByLabelText('Preços'))
-  await screen.findByRole('option',{name:/03 · Diesel S10/})
   fireEvent.change(screen.getByLabelText('Natureza da alteração'),{target:{value:'REBALANCE'}})
   fireEvent.change(screen.getByLabelText('Efeito no valor global'),{target:{value:'NONE'}})
+  fireEvent.click(screen.getByRole('button', {name:'Itens afetados', exact:true}))
+  await screen.findByRole('option',{name:/03 · Diesel S10/})
   fireEvent.change(screen.getByLabelText('Adicionar item à alteração'),{target:{value:'diesel'}})
   fireEvent.change(screen.getByLabelText('Número do item neste documento'),{target:{value:'001'}})
   fireEvent.change(screen.getByLabelText('Novo preço DIESEL'),{target:{value:price}})
@@ -34,7 +37,8 @@ async function fillPrice(price='6.21'){
 }
 it('altera um único item, preserva seu ID e diferencia a numeração do documento',async()=>{
   render(<ContractAmendmentEditor contract={contract} providers={providers} onClose={vi.fn()}/>)
-  await fillPrice();fireEvent.click(screen.getByRole('button',{name:'Conferir impactos'}))
+  await fillPrice();reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button',{name:'Conferir impactos', hidden: true }))
   await waitFor(()=>expect(contractControlAPI.amendmentPreview).toHaveBeenCalled())
   const [,data]=contractControlAPI.amendmentPreview.mock.calls[0]
   expect(data.change_types).toEqual(['PRICE']);expect(data.lines).toHaveLength(1)
@@ -44,7 +48,8 @@ it('altera um único item, preserva seu ID e diferencia a numeração do documen
 })
 it('confirma com a mesma identificação e abre o demonstrativo persistido',async()=>{
   const onSuccess=vi.fn();render(<ContractAmendmentEditor contract={contract} providers={providers} onClose={vi.fn()} onSuccess={onSuccess}/>)
-  await fillPrice();fireEvent.click(screen.getByRole('button',{name:'Conferir impactos'}))
+  await fillPrice();reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button',{name:'Conferir impactos', hidden: true }))
   fireEvent.click(await screen.findByRole('button',{name:'Confirmar alteração e ver relatório'}))
   await screen.findByRole('heading',{name:'Demonstrativo de alterações contratuais'})
   expect(onSuccess).toHaveBeenCalledTimes(1)
@@ -53,15 +58,17 @@ it('confirma com a mesma identificação e abre o demonstrativo persistido',asyn
 it('preserva campos quando a confirmação rejeita uma prévia desatualizada',async()=>{
   paymentContractsAPI.createAmendment.mockRejectedValue({response:{status:409,data:{detail:'O saldo mudou. Confira novamente.'}}})
   render(<ContractAmendmentEditor contract={contract} providers={providers} onClose={vi.fn()}/>)
-  await fillPrice();fireEvent.click(screen.getByRole('button',{name:'Conferir impactos'}));fireEvent.click(await screen.findByRole('button',{name:'Confirmar alteração e ver relatório'}))
+  await fillPrice();reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button',{name:'Conferir impactos', hidden: true }));fireEvent.click(await screen.findByRole('button',{name:'Confirmar alteração e ver relatório'}))
   await screen.findByRole('alert');expect(screen.getByLabelText('Número do instrumento')).toHaveValue('2TA-TESTE');expect(screen.getByLabelText('Novo preço DIESEL')).toHaveValue('6,21')
-  expect(screen.getByRole('button',{name:'Conferir impactos'})).toBeEnabled()
+  expect(screen.getByRole('button',{name:'Conferir impactos', hidden: true })).toBeEnabled()
 })
 it('preserva seis casas no preço por item ao editar em reais e solicitar a prévia',async()=>{
   render(<ContractAmendmentEditor contract={contract} providers={providers} onClose={vi.fn()}/>)
   await fillPrice('6,210123');fireEvent.blur(screen.getByLabelText('Novo preço DIESEL'))
   expect(screen.getByLabelText('Novo preço DIESEL')).toHaveValue('R$ 6,210123')
-  fireEvent.click(screen.getByRole('button',{name:'Conferir impactos'}))
+  reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button',{name:'Conferir impactos', hidden: true }))
   await waitFor(()=>expect(contractControlAPI.amendmentPreview).toHaveBeenCalled())
   expect(contractControlAPI.amendmentPreview.mock.calls[0][1].lines[0]).toMatchObject({
     new_reference_price:'6.210123',prices:[{provider_id:'provider',unit_price:'6.210123'}],

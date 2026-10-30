@@ -91,7 +91,8 @@ class DocumentSignatureService:
         now = datetime.now(timezone.utc)
 
         existing = await self._get_active_document(data.document_type, data.source_id, for_update=True)
-        if existing and existing.content_hash == context["content_hash"]:
+        existing_context = self._identity_context(context, (getattr(existing, 'snapshot', None) or {}).get('institutional_identity')) if existing else context
+        if existing and existing.content_hash == existing_context["content_hash"]:
             from app.services.document_artifact_service import DocumentArtifactService
 
             if settings.CANONICAL_DOCUMENT_ARTIFACTS_ENABLED and DocumentArtifactService.supports_canonical_artifact(
@@ -108,6 +109,9 @@ class DocumentSignatureService:
         if existing:
             await self._supersede_document(existing, current_user=current_user, reason="SOURCE_CHANGED", now=now)
 
+        from copy import deepcopy
+        from app.services.system_settings_service import runtime_settings
+        context = self._identity_context(context, deepcopy(runtime_settings()))
         document = DigitalDocument(
             document_type=data.document_type,
             source_type=context["source_type"],
@@ -164,7 +168,7 @@ class DocumentSignatureService:
         document = await self._require_document(document_id)
         self._ensure_module_permission(current_user, document.document_type, "view")
         await self._ensure_document_visible(document, current_user)
-        include_restricted = current_user.role in {UserRole.ADMIN, UserRole.PRODUCAO}
+        include_restricted = current_user.role in {UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO}
         payload = self._serialize_document(
             document,
             include_snapshot=include_restricted,
@@ -186,7 +190,7 @@ class DocumentSignatureService:
         document = await self._require_document(document_id)
         self._ensure_module_permission(current_user, document.document_type, "view")
         await self._ensure_document_visible(document, current_user)
-        if require_evidence_access and current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
+        if require_evidence_access and current_user.role not in {UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO}:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Acesso ao artefato probatório restrito a perfis autorizados",
@@ -497,7 +501,7 @@ class DocumentSignatureService:
         await self._ensure_document_visible(initial_request.document, current_user)
         if initial_request.status != DocumentSignatureRequestStatus.PENDING:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Solicitação não está pendente")
-        if current_user.role != UserRole.ADMIN and initial_request.requested_by_user_id != current_user.id:
+        if current_user.role != UserRole.SUPERUSER and initial_request.requested_by_user_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas o solicitante ou administrador pode cancelar")
         await self._lock_source(initial_request.document.document_type, initial_request.document.source_id)
         await self._lock_document(initial_request.document.id)
@@ -508,7 +512,7 @@ class DocumentSignatureService:
             self._ensure_possession_term_mutation_allowed(current_user, request.document.document_type)
         if request.status != DocumentSignatureRequestStatus.PENDING:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Solicitação não está pendente")
-        if current_user.role != UserRole.ADMIN and request.requested_by_user_id != current_user.id:
+        if current_user.role != UserRole.SUPERUSER and request.requested_by_user_id != current_user.id:
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Apenas o solicitante ou administrador pode cancelar")
         if request.document:
             await self._ensure_document_visible(
@@ -946,6 +950,8 @@ class DocumentSignatureService:
             )
         else:
             context = None
+        if context:
+            context = self._identity_context(context, document.snapshot.get('institutional_identity'))
         if context and document.status in {DigitalDocumentStatus.PENDING, DigitalDocumentStatus.COMPLETED}:
             if document.content_hash != context["content_hash"]:
                 if supersede_stale:
@@ -967,11 +973,19 @@ class DocumentSignatureService:
 
     def _ensure_module_permission(self, user: User, document_type: str, action: str) -> None:
         module = self._permission_module_for_document_type(document_type)
-        if module == 'vehicle_loans' and user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
+        if module == 'vehicle_loans' and user.role not in {UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO}:
             raise HTTPException(403, 'Perfil não autorizado para termos entre secretarias')
         field = f"can_{action}"
         if not bool(user.permissions.get(module, {}).get(field)):
             raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Permissão insuficiente para o documento")
+
+    def _identity_context(self, context, identity):
+        if not identity:
+            return context
+        snapshot = {**context['snapshot'], 'institutional_identity': identity}
+        content_hash = self.build_hash_for_snapshot(snapshot)
+        return {**context, 'snapshot': snapshot, 'content_hash': content_hash,
+                'evidence_hmac': self._build_evidence_hmac(context['source_type'], context.get('public_validation_code'), content_hash)}
 
     def _ensure_possession_term_mutation_allowed(self, user: User, document_type: str) -> None:
         if document_type not in {
@@ -980,7 +994,7 @@ class DocumentSignatureService:
             DigitalDocumentType.POSSESSION_RETURN_TERM,
         }:
             return
-        if user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
+        if user.role not in {UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO}:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail="Perfil autorizado apenas para consulta do termo de posse",
@@ -990,7 +1004,7 @@ class DocumentSignatureService:
         from app.services.vehicle_loan_document_service import LOAN_DOCUMENT_TYPES, may_sign
         if document.document_type in LOAN_DOCUMENT_TYPES:
             return may_sign(document, current_user)
-        if current_user.role == UserRole.ADMIN:
+        if current_user.role == UserRole.SUPERUSER:
             return True
         org = scoped_organization_id(current_user)
         responsible = getattr(document, "organization_id", None)
@@ -1029,7 +1043,7 @@ class DocumentSignatureService:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Servidor selecionado precisa regularizar a senha antes de assinar")
         if not requested_signer.cpf:
             raise HTTPException(status_code=status.HTTP_409_CONFLICT, detail="Servidor selecionado precisa informar o CPF antes de assinar")
-        if current_user.role == UserRole.ADMIN:
+        if current_user.role == UserRole.SUPERUSER:
             return
         current_org = getattr(current_user, "organization_id", None)
         if current_org is None or requested_signer.organization_id != current_org:

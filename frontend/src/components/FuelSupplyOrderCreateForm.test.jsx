@@ -1,3 +1,4 @@
+import { reviewGuidedForm } from '../test/guidedForms'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
 import FuelSupplyOrderCreateForm from './FuelSupplyOrderCreateForm'
@@ -30,7 +31,8 @@ it('envia os padrões da nova ordem: 30 litros, secretaria do usuário e primeir
   expect(screen.getByRole('button', { name: 'Órgão solicitante' })).toHaveTextContent('Segurança')
   expect(screen.getByRole('button', { name: 'Posto', exact: true })).toHaveTextContent('Primeiro posto')
   await choose('Veículo', /ABC1234/)
-  fireEvent.click(screen.getByRole('button', { name: 'Criar ordem' }))
+  reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button', { name: 'Criar ordem' , hidden: true }))
   await waitFor(() => expect(fuelSupplyOrdersAPI.create).toHaveBeenCalledWith(expect.objectContaining({
     vehicle_id: 'car', organization_id: 'org-2', fuel_station_id: 'station-1', requested_liters: 30,
   })))
@@ -47,7 +49,8 @@ it('preenche após carregar os catálogos e preserva valores editados ou apagado
   rerender(<FuelSupplyOrderCreateForm {...catalogs} fuelStations={[...catalogs.fuelStations]} />)
   expect(screen.getByRole('button', { name: 'Posto', exact: true })).toHaveTextContent('Segundo posto')
   expect(screen.getByRole('button', { name: 'Órgão solicitante' })).toHaveTextContent('Não informado')
-  fireEvent.click(screen.getByRole('button', { name: 'Criar ordem' }))
+  reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button', { name: 'Criar ordem' , hidden: true }))
   await waitFor(() => expect(fuelSupplyOrdersAPI.create).toHaveBeenCalledOnce())
   expect(fuelSupplyOrdersAPI.create.mock.calls[0][0]).toMatchObject({ requested_liters: 42.5, fuel_station_id: 'station-2' })
   expect(fuelSupplyOrdersAPI.create.mock.calls[0][0]).not.toHaveProperty('organization_id')
@@ -61,7 +64,8 @@ it('não inventa secretaria ou posto quando não estão disponíveis e permite a
   fireEvent.change(screen.getByLabelText('Litros previstos'), { target: { value: '' } })
   rerender(<FuelSupplyOrderCreateForm {...catalogs} />)
   await choose('Veículo', /ABC1234/)
-  fireEvent.click(screen.getByRole('button', { name: 'Criar ordem' }))
+  reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button', { name: 'Criar ordem' , hidden: true }))
   await waitFor(() => expect(fuelSupplyOrdersAPI.create).toHaveBeenCalledOnce())
   expect(fuelSupplyOrdersAPI.create.mock.calls[0][0]).not.toHaveProperty('requested_liters')
 })

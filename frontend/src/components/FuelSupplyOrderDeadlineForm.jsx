@@ -1,3 +1,4 @@
+import GuidedForm from './GuidedForm'
 import { hasContractFunding } from '../utils/contractBalance'
 import JustificationField from './JustificationField'
 import { useMemo, useState } from 'react'
@@ -69,7 +70,7 @@ function ExistingFuelSupplyOrderDeadlineForm({ order, onClose, onSuccess }) {
   }
 
   return (
-    <form onSubmit={handleSubmit} className="form-grid modal-form-grid">
+    <GuidedForm busy={submitting} onSubmit={handleSubmit} className="form-grid modal-form-grid">
       {error ? <div className="alert alert-error modal-field-span">{error}</div> : null}
       <div className="alert alert-info modal-field-span">
         {isExpired
@@ -89,6 +90,6 @@ function ExistingFuelSupplyOrderDeadlineForm({ order, onClose, onSuccess }) {
         <button className="app-button" type="submit" disabled={submitting}>{submitLabel}</button>
         <button className="ghost-button" type="button" onClick={onClose} disabled={submitting}>Cancelar</button>
       </div>
-    </form>
+    </GuidedForm>
   )
 }

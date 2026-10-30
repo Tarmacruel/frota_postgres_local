@@ -1,3 +1,4 @@
+import GuidedForm from '../components/GuidedForm'
 import PageHeader from '../components/ui/PageHeader'
 import { useEffect, useMemo, useState } from 'react'
 import SearchableSelect from '../components/SearchableSelect'
@@ -630,10 +631,10 @@ export default function CadastrosPage() {
           ) : null}
 
           {canWrite ? (
-            <form onSubmit={handleSubmitOrganization} className="form-grid">
+            <GuidedForm busy={submitting} onSubmit={handleSubmitOrganization} className="form-grid">
               <div className="form-field">
                 <label htmlFor="organization-name">Nome do órgão</label>
-                <input
+                <input required
                   id="organization-name"
                   className="app-input"
                   placeholder="Ex.: Secretaria de Saúde"
@@ -651,7 +652,7 @@ export default function CadastrosPage() {
                   </button>
                 ) : null}
               </div>
-            </form>
+            </GuidedForm>
           ) : null}
 
           <div className="table-wrap">
@@ -731,10 +732,10 @@ export default function CadastrosPage() {
             <>
 
           {canWrite ? (
-            <form onSubmit={handleSubmitDepartment} className="form-grid">
+            <GuidedForm busy={submitting} onSubmit={handleSubmitDepartment} className="form-grid">
               <div className="form-field">
                 <label>Órgão</label>
-                <SearchableSelect
+                <SearchableSelect required
                   value={departmentForm.organization_id}
                   onChange={(value) => setDepartmentForm({ ...departmentForm, organization_id: value })}
                   options={organizationOptions}
@@ -744,7 +745,7 @@ export default function CadastrosPage() {
               </div>
               <div className="form-field">
                 <label htmlFor="department-name">Nome do departamento</label>
-                <input
+                <input required
                   id="department-name"
                   className="app-input"
                   placeholder="Ex.: Transporte Sanitário"
@@ -762,7 +763,7 @@ export default function CadastrosPage() {
                   </button>
                 ) : null}
               </div>
-            </form>
+            </GuidedForm>
           ) : null}
 
           <div className="filter-inline operation-toolbar">
@@ -870,10 +871,10 @@ export default function CadastrosPage() {
             <>
 
           {canWrite ? (
-            <form onSubmit={handleSubmitAllocation} className="form-grid">
+            <GuidedForm busy={submitting} onSubmit={handleSubmitAllocation} className="form-grid">
               <div className="form-field">
                 <label>Órgão</label>
-                <SearchableSelect
+                <SearchableSelect required
                   value={allocationForm.organization_id}
                   onChange={(value) => setAllocationForm({ ...allocationForm, organization_id: value, department_id: '' })}
                   options={organizationOptions}
@@ -883,7 +884,7 @@ export default function CadastrosPage() {
               </div>
               <div className="form-field">
                 <label>Departamento</label>
-                <SearchableSelect
+                <SearchableSelect required
                   value={allocationForm.department_id}
                   onChange={(value) => setAllocationForm({ ...allocationForm, department_id: value })}
                   options={allocationDepartmentOptions}
@@ -894,7 +895,7 @@ export default function CadastrosPage() {
               </div>
               <div className="form-field">
                 <label htmlFor="allocation-name">Nome da lotação</label>
-                <input
+                <input required
                   id="allocation-name"
                   className="app-input"
                   placeholder="Ex.: Garagem Central"
@@ -916,7 +917,7 @@ export default function CadastrosPage() {
                   </button>
                 ) : null}
               </div>
-            </form>
+            </GuidedForm>
           ) : null}
 
           <div className="filter-inline operation-toolbar">

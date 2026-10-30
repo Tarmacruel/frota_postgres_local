@@ -15,6 +15,7 @@ export default function SearchableSelect({
   allowClear = false,
   clearLabel = 'Limpar seleção',
   ariaLabel,
+  required = false,
   panelClassName = '',
   ariaDescribedBy,
   invalid = false,
@@ -148,6 +149,9 @@ export default function SearchableSelect({
           setOpen((current) => !current)
         }}
         disabled={disabled}
+        data-form-required={required ? 'true' : undefined}
+        data-form-value={required ? String(value ?? '') : undefined}
+        aria-required={required || undefined}
         aria-label={ariaLabel}
         aria-describedby={ariaDescribedBy}
         aria-invalid={invalid || undefined}

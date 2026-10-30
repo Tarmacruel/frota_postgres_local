@@ -28,6 +28,7 @@ export default function DriverSelect({
   disabled = false,
   placeholder = 'Selecione o condutor',
   ariaLabel = 'Condutor',
+  required = false,
   allowClear = false,
   clearLabel = 'Limpar seleção',
   requireRegistration = true,
@@ -195,6 +196,7 @@ export default function DriverSelect({
   return (
     <>
       <SearchableSelect
+        required={required}
         value={value}
         onChange={handleSelect}
         options={options}

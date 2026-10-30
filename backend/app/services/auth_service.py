@@ -22,6 +22,11 @@ class AuthService:
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário não encontrado")
         if not verify_password(data.password, user.password_hash):
             raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Senha incorreta")
+        from sqlalchemy import select
+        from app.models.system_settings import RecordControl
+        if await self.db.scalar(select(RecordControl.record_id).where(RecordControl.module == 'users',
+                RecordControl.record_id == user.id, RecordControl.inactive.is_(True))):
+            raise HTTPException(status_code=403, detail='Esta conta está inativa. Solicite a reativação ao superusuário do sistema.')
         return user
 
     async def change_password(self, *, user: User, current_password: str, new_password: str) -> None:

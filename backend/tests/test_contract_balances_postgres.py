@@ -58,7 +58,7 @@ async def pg(monkeypatch):
     async with AsyncSession(engine, expire_on_commit=False) as db:
         suffix = str(uuid4())[:8]
         now = datetime.now(timezone.utc)
-        actor = User(id=uuid4(), name='Teste Contratos '+suffix, email=suffix+'@contract.test', password_hash='test-only', role=UserRole.ADMIN)
+        actor = User(id=uuid4(), name='Teste Contratos '+suffix, email=suffix+'@contract.test', password_hash='test-only', role=UserRole.SUPERUSER)
         vehicle = Vehicle(id=uuid4(), plate='TC'+suffix[:5].upper(), brand='TESTE', model='DADOS FICTICIOS')
         supplier = PaymentSupplier(id=uuid4(), name='Prestador teste '+suffix, active=True)
         station = FuelStation(id=uuid4(), name='Posto teste '+suffix, address='Ambiente isolado', active=True)
@@ -858,7 +858,7 @@ async def test_api_contract_balances_quotes_and_secretaria_drilldown(pg):
         await c.service.settle(reservation.id, source_type='FUEL_SUPPLY', source_id=uuid4(), amount=amount,
             occurred_at=datetime.now(timezone.utc), actor=c.actor)
     await c.db.commit()
-    actor = SimpleNamespace(id=c.actor.id, role=UserRole.ADMIN, organization_id=None)
+    actor = SimpleNamespace(id=c.actor.id, role=UserRole.SUPERUSER, organization_id=None)
     async def session():
         async with AsyncSession(c.engine, expire_on_commit=False) as db:
             yield db

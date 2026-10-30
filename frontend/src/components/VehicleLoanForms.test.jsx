@@ -68,9 +68,9 @@ describe('Proposta e ações de empréstimo', () => {
     expect(saved).toHaveBeenCalled()
   })
 
-  it('administrador precisa justificar a secretaria representada', async () => {
+  it('superusuário precisa justificar a secretaria representada', async () => {
     const actor = userEvent.setup()
-    render(<LoanProposalForm loan={loan} catalog={catalog} user={{ ...user, role: 'ADMIN' }} onSaved={vi.fn()} />)
+    render(<LoanProposalForm loan={loan} catalog={catalog} user={{ ...user, role: 'SUPERUSER' }} onSaved={vi.fn()} />)
     await actor.click(screen.getByRole('button', { name: 'Continuar' }))
     await actor.click(screen.getByRole('button', { name: 'Continuar' }))
     await actor.click(screen.getByRole('button', { name: 'Salvar rascunho' }))
@@ -142,7 +142,7 @@ describe('Ações por secretaria e situação', () => {
     expect(availableLoanActions(user, { ...loan, status: 'RETURNED' })).toEqual([])
   })
   it('proíbe autoaceite inclusive pelo administrador', () => {
-    expect(blockedLoanAction({ ...user, role: 'ADMIN' }, loan, loanActions.accept, context)).toMatch('Outro usuário')
+    expect(blockedLoanAction({ ...user, role: 'SUPERUSER' }, loan, loanActions.accept, context)).toMatch('Outro usuário')
   })
   it('bloqueia transições sem contexto, com pendências ou contexto de outra versão', () => {
     expect(blockedLoanAction(user, loan, loanActions.submit, null)).toMatch('Atualize')

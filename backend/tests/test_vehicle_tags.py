@@ -20,7 +20,7 @@ from app.schemas.vehicle_tag import VehicleTagWrite, VehicleTagApply, VehicleTag
 from app.services.vehicle_tag_service import VehicleTagService, with_vehicle_tags
 
 
-def actor(name='Ana', role=UserRole.ADMIN, org=None, edit=True):
+def actor(name='Ana', role=UserRole.SUPERUSER, org=None, edit=True):
     return SimpleNamespace(id=uuid4(), name=name, role=role, organization_id=org,
                            permissions={'vehicles': {'can_edit': edit}})
 
@@ -114,8 +114,8 @@ async def test_remove_is_author_only_and_admin_requires_reason(data):
     carlos.role = UserRole.PADRAO
     with pytest.raises(HTTPException) as error:
         await service.remove(vehicle_id, mark_id, VehicleTagRemove(), carlos)
-    assert error.value.status_code == 403
-    carlos.role = UserRole.ADMIN
+    assert error.value.status_code == 404  # A standard user without secretaria sees no vehicle.
+    carlos.role = UserRole.SUPERUSER
     with pytest.raises(HTTPException) as error:
         await service.remove(vehicle_id, mark_id, VehicleTagRemove(), carlos)
     assert error.value.status_code == 400

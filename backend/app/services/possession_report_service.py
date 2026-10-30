@@ -1,4 +1,5 @@
 from __future__ import annotations
+from html import escape
 
 from dataclasses import dataclass
 from datetime import datetime, timezone
@@ -19,19 +20,8 @@ from reportlab.platypus import Image, Paragraph, SimpleDocTemplate, Spacer, Tabl
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.organization_scope import production_scope_is_empty, scoped_organization_id
-from app.core.official_identity import (
-    ADMINISTRATION_SECRETARIAT,
-    COLOR_BORDER,
-    COLOR_MUTED,
-    COLOR_NAVY,
-    FLEET_DEPARTMENT,
-    MUNICIPALITY_ADDRESS,
-    MUNICIPALITY_CNPJ,
-    MUNICIPALITY_NAME,
-    crest_path,
-    ensure_pdf_fonts,
-    institutional_datetime,
-)
+from app.core.official_identity import COLOR_BORDER, COLOR_MUTED, crest_path, ensure_pdf_fonts, institutional_datetime
+from app.core import official_identity
 from app.models.possession import VehiclePossession
 from app.models.possession_trip import VehiclePossessionTrip
 from app.models.user import User, UserRole
@@ -132,7 +122,7 @@ class PossessionReportService:
         return {
             "default_mode": PossessionReportMode.POSSESSION.value,
             "default_preset": PossessionReportPreset.SUMMARY.value,
-            "can_export_xlsx": role in {UserRole.ADMIN, UserRole.PRODUCAO},
+            "can_export_xlsx": role in {UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO},
             "limits": {
                 "maximum_period_days": 366,
                 "pdf_rows": PDF_MAX_ROWS,
@@ -182,7 +172,7 @@ class PossessionReportService:
     async def render_xlsx(self, data: PossessionReportRequest, current_user: User) -> tuple[bytes, str]:
         started = perf_counter()
         role = self._role(current_user)
-        if role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
+        if role not in {UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO}:
             exc = HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail={
@@ -244,7 +234,7 @@ class PossessionReportService:
                 filters=data.filters,
                 organization_id=scoped_organization_id(current_user, data.filters.organization_id),
                 limit=row_limit,
-                include_operational_search=role in {UserRole.ADMIN, UserRole.PRODUCAO},
+                include_operational_search=role in {UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO},
             )
         if len(records) > row_limit:
             raise HTTPException(
@@ -434,7 +424,7 @@ class PossessionReportService:
             topMargin=12 * mm,
             bottomMargin=21 * mm,
             title="Relatório configurável de posses",
-            author=MUNICIPALITY_NAME,
+            author=official_identity.MUNICIPALITY_NAME,
         )
         styles = getSampleStyleSheet()
         styles["BodyText"].fontName = font_regular
@@ -446,7 +436,7 @@ class PossessionReportService:
             fontName=font_bold,
             fontSize=8.5,
             leading=10,
-            textColor=colors.HexColor(COLOR_NAVY),
+            textColor=colors.HexColor(official_identity.COLOR_NAVY),
         )
         institution_detail = ParagraphStyle(
             "ReportInstitutionDetail",
@@ -459,14 +449,14 @@ class PossessionReportService:
             fontName=font_bold,
             fontSize=15,
             leading=18,
-            textColor=colors.HexColor(COLOR_NAVY),
+            textColor=colors.HexColor(official_identity.COLOR_NAVY),
             spaceAfter=2 * mm,
         )
         available_width = page_size[0] - 24 * mm
         crest = Image(str(crest_path()), width=10 * mm, height=12.6 * mm)
         identity = [
-            Paragraph(MUNICIPALITY_NAME.upper(), institution),
-            Paragraph(f"{ADMINISTRATION_SECRETARIAT} · {FLEET_DEPARTMENT}", institution_detail),
+            Paragraph(escape(official_identity.MUNICIPALITY_NAME.upper()), institution),
+            Paragraph(f"{official_identity.ADMINISTRATION_SECRETARIAT} · {official_identity.FLEET_DEPARTMENT}", institution_detail),
         ]
         identity_header = Table([[crest, identity]], colWidths=[14 * mm, available_width - 14 * mm], hAlign="LEFT")
         identity_header.setStyle(TableStyle([
@@ -475,7 +465,7 @@ class PossessionReportService:
             ("RIGHTPADDING", (0, 0), (-1, -1), 0),
             ("TOPPADDING", (0, 0), (-1, -1), 0),
             ("BOTTOMPADDING", (0, 0), (-1, -1), 3 * mm),
-            ("LINEBELOW", (0, 0), (-1, -1), 0.8, colors.HexColor(COLOR_NAVY)),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.8, colors.HexColor(official_identity.COLOR_NAVY)),
         ]))
         issued_at = institutional_datetime(datetime.now(timezone.utc))
         story = [
@@ -503,7 +493,7 @@ class PossessionReportService:
         table.setStyle(
             TableStyle(
                 [
-                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(COLOR_NAVY)),
+                    ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor(official_identity.COLOR_NAVY)),
                     ("GRID", (0, 0), (-1, -1), 0.35, colors.HexColor(COLOR_BORDER)),
                     ("VALIGN", (0, 0), (-1, -1), "TOP"),
                     ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#F5F7F9")]),
@@ -519,22 +509,22 @@ class PossessionReportService:
         def footer(canvas, doc):
             canvas.saveState()
             if doc.page > 1:
-                canvas.setFillColor(colors.HexColor(COLOR_NAVY))
+                canvas.setFillColor(colors.HexColor(official_identity.COLOR_NAVY))
                 canvas.setFont(font_bold, 7.2)
-                canvas.drawString(12 * mm, page_size[1] - 8 * mm, MUNICIPALITY_NAME.upper())
+                canvas.drawString(12 * mm, page_size[1] - 8 * mm, official_identity.MUNICIPALITY_NAME.upper())
                 canvas.setFont(font_regular, 7.2)
                 canvas.drawRightString(
                     page_size[0] - 12 * mm,
                     page_size[1] - 8 * mm,
                     "RELATÓRIO DE POSSES E ROTAS · CONTINUAÇÃO",
                 )
-            canvas.setStrokeColor(colors.HexColor(COLOR_NAVY))
+            canvas.setStrokeColor(colors.HexColor(official_identity.COLOR_NAVY))
             canvas.setLineWidth(0.45)
             canvas.line(12 * mm, 15 * mm, page_size[0] - 12 * mm, 15 * mm)
             canvas.setFillColor(colors.HexColor(COLOR_MUTED))
             canvas.setFont(font_regular, 6.2)
-            canvas.drawString(12 * mm, 11.5 * mm, f"{MUNICIPALITY_NAME} · CNPJ {MUNICIPALITY_CNPJ}")
-            canvas.drawString(12 * mm, 8.5 * mm, MUNICIPALITY_ADDRESS)
+            canvas.drawString(12 * mm, 11.5 * mm, f"{official_identity.MUNICIPALITY_NAME} · CNPJ {official_identity.MUNICIPALITY_CNPJ}")
+            canvas.drawString(12 * mm, 8.5 * mm, official_identity.MUNICIPALITY_ADDRESS)
             canvas.drawRightString(page_size[0] - 12 * mm, 11.5 * mm, f"Página {doc.page}")
             canvas.restoreState()
 
@@ -543,9 +533,9 @@ class PossessionReportService:
 
     def _build_xlsx(self, prepared: PreparedReport, current_user: User) -> bytes:
         workbook = Workbook()
-        workbook.properties.creator = MUNICIPALITY_NAME
+        workbook.properties.creator = official_identity.MUNICIPALITY_NAME
         workbook.properties.title = "Relatório de posses e rotas"
-        workbook.properties.subject = f"{ADMINISTRATION_SECRETARIAT} · {FLEET_DEPARTMENT}"
+        workbook.properties.subject = f"{official_identity.ADMINISTRATION_SECRETARIAT} · {official_identity.FLEET_DEPARTMENT}"
         workbook.properties.description = "Documento oficial de gestão da frota municipal"
         worksheet = workbook.active
         worksheet.title = "Posses" if prepared.request.mode == PossessionReportMode.POSSESSION else "Rotas"
@@ -568,10 +558,10 @@ class PossessionReportService:
         metadata = workbook.create_sheet("Metadados")
         issued_at = institutional_datetime(datetime.now(timezone.utc))
         metadata_rows = [
-            ("Órgão emissor", MUNICIPALITY_NAME),
-            ("Unidade", f"{ADMINISTRATION_SECRETARIAT} · {FLEET_DEPARTMENT}"),
-            ("CNPJ", MUNICIPALITY_CNPJ),
-            ("Endereço", MUNICIPALITY_ADDRESS),
+            ("Órgão emissor", official_identity.MUNICIPALITY_NAME),
+            ("Unidade", f"{official_identity.ADMINISTRATION_SECRETARIAT} · {official_identity.FLEET_DEPARTMENT}"),
+            ("CNPJ", official_identity.MUNICIPALITY_CNPJ),
+            ("Endereço", official_identity.MUNICIPALITY_ADDRESS),
             ("Relatório", "Posses e rotas"),
             ("Modo", self._mode_title(prepared.request.mode)),
             ("Modelo", self._preset_title(prepared.request.preset)),
@@ -659,8 +649,8 @@ class PossessionReportService:
     @staticmethod
     def _preset_is_available(role: UserRole, preset: PossessionReportPreset) -> bool:
         if preset in {PossessionReportPreset.SUMMARY, PossessionReportPreset.CUSTOM}:
-            return role in {UserRole.ADMIN, UserRole.PRODUCAO, UserRole.PADRAO}
-        return role in {UserRole.ADMIN, UserRole.PRODUCAO}
+            return role in {UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO, UserRole.PADRAO}
+        return role in {UserRole.SUPERUSER, UserRole.ADMIN, UserRole.PRODUCAO}
 
     @staticmethod
     def _role(current_user: User) -> UserRole:

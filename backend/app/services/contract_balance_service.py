@@ -910,6 +910,9 @@ class ContractBalanceService:
                         vehicle_id=None, provider_id=None, start=None, end=None, status=None):
         await self.contract(contract_id)
         conditions = [ContractMovement.contract_id == contract_id]
+        if getattr(actor.role, 'value', actor.role) != 'SUPERUSER':
+            from app.core.record_visibility import visible_source
+            conditions.append(visible_source(ContractMovement.source_id, ContractMovement.vehicle_id))
         scope = scoped_organization_id(actor, organization_id)
         if production_scope_is_empty(actor):
             return dict(data=[], total=0, page=page, pages=0)
@@ -945,6 +948,9 @@ class ContractBalanceService:
         if production_scope_is_empty(actor):
             return dict(data=[], total=0, page=page, pages=0)
         conditions = [ContractReservation.contract_id == contract_id, ContractReservation.status == 'HELD']
+        if getattr(actor.role, 'value', actor.role) != 'SUPERUSER':
+            from app.core.record_visibility import visible_source
+            conditions.append(visible_source(ContractReservation.source_id, ContractReservation.vehicle_id))
         scope = scoped_organization_id(actor, organization_id)
         if scope:
             conditions.append(ContractReservation.organization_id == scope)
@@ -972,6 +978,9 @@ class ContractBalanceService:
     async def operations(self, contract_id, actor, *, unbilled=False, process_id=None, page=1, limit=50,
                          organization_id=None, vehicle_search=None, provider_id=None, start=None, end=None):
         conditions = [ContractOperation.contract_id == contract_id]
+        if getattr(actor.role, 'value', actor.role) != 'SUPERUSER':
+            from app.core.record_visibility import visible_source
+            conditions.append(visible_source(ContractOperation.source_id, ContractOperation.vehicle_id))
         if production_scope_is_empty(actor):
             return dict(data=[], total=0, page=page, pages=0)
         scope = scoped_organization_id(actor, organization_id)

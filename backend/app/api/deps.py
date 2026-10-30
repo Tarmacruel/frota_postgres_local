@@ -11,6 +11,7 @@ from app.db.session import get_db_session
 from app.models.user import User, UserRole
 from app.models.user_permission import UserPermission
 from app.repositories.user_repository import UserRepository
+from app.core.roles import is_administrator, is_operator, is_superuser
 
 
 PASSWORD_CHANGE_REQUIRED_DETAIL = {
@@ -48,6 +49,12 @@ async def get_current_user(
     user = await UserRepository(db).get_by_id(user_uuid)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Usuário não encontrado")
+    db.info['visibility_role'] = user.role.value
+    db.info['organization_id'] = user.organization_id
+    db.info['actor_id'] = user.id
+    db.info['audit_actor'] = user
+    from app.core.record_visibility import guard_inactive_inputs
+    await guard_inactive_inputs(db, request, user)
     return user
 
 
@@ -60,14 +67,20 @@ async def get_current_user_ready(current_user: User = Depends(get_current_user))
 
 
 async def require_admin(current_user: User = Depends(get_current_user_ready)) -> User:
-    if current_user.role != UserRole.ADMIN:
+    if not is_administrator(current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso restrito a administradores")
     return current_user
 
 
 async def require_writer(current_user: User = Depends(get_current_user_ready)) -> User:
-    if current_user.role not in {UserRole.ADMIN, UserRole.PRODUCAO}:
+    if not is_operator(current_user):
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Acesso restrito a operadores de posse")
+    return current_user
+
+
+async def require_superuser(current_user: User = Depends(get_current_user_ready)) -> User:
+    if not is_superuser(current_user):
+        raise HTTPException(status_code=403, detail="Acesso exclusivo do superusuário")
     return current_user
 
 
@@ -78,6 +91,8 @@ def require_permission(module: str, action: str):
         db: AsyncSession = Depends(get_db_session),
         current_user: User = Depends(get_current_user_ready),
     ) -> User:
+        if is_superuser(current_user):
+            return current_user
         result = await db.execute(
             select(UserPermission).where(
                 UserPermission.user_id == current_user.id,

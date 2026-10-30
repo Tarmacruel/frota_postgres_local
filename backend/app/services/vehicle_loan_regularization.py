@@ -27,7 +27,7 @@ from app.services.vehicle_loan_service import VehicleLoanService, conflict
 
 
 def require_regularization_admin(user):
-    if user.role != UserRole.ADMIN:
+    if user.role not in (UserRole.SUPERUSER, UserRole.ADMIN):
         raise HTTPException(403, 'Regularização retroativa restrita a administradores')
 
 
@@ -35,7 +35,7 @@ async def regularization_catalog(db, user):
     require_regularization_admin(user)
     from app.services.vehicle_loan_presentation import loan_catalog
     catalog = await loan_catalog(db, user)
-    vehicles = (await db.scalars(select(Vehicle).order_by(Vehicle.plate))).all()
+    vehicles = (await db.scalars(select(Vehicle).where(*([] if user.role == UserRole.SUPERUSER else [Vehicle.owner_organization_id == user.organization_id] if user.organization_id else [False])).order_by(Vehicle.plate))).all()
     catalog['vehicles'] = [{'id': v.id, 'plate': v.plate, 'owner_organization_id': v.owner_organization_id} for v in vehicles]
     from app.services.vehicle_tag_service import with_vehicle_tags
     catalog['vehicles'] = await with_vehicle_tags(db, catalog['vehicles'], user)
@@ -52,6 +52,8 @@ class VehicleLoanRegularizationService:
         now = datetime.now(timezone.utc)
         vehicle = await self.loans.locked_vehicle(data.vehicle_id)
         origin = await self.loans.allocation(data.origin_allocation_id)
+        if user.role != UserRole.SUPERUSER and (not user.organization_id or user.organization_id != origin.organization_id):
+            raise HTTPException(403, 'A regularização pertence à secretaria de origem. Selecione um veículo e uma lotação da sua secretaria.')
         destination = await self.loans.allocation(data.destination_allocation_id)
         if origin.organization_id == destination.organization_id:
             raise HTTPException(422, 'Origem e destino devem pertencer a secretarias diferentes')

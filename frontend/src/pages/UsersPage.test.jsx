@@ -1,3 +1,4 @@
+import { reviewGuidedForm } from '../test/guidedForms'
 import { MemoryRouter } from 'react-router-dom'
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { beforeEach, expect, it, vi } from 'vitest'
@@ -5,6 +6,7 @@ import UsersPage from './UsersPage'
 import { exportRowsToXlsx } from '../utils/exportData'
 
 const api = vi.hoisted(() => ({ get: vi.fn(), post: vi.fn(), put: vi.fn() }))
+vi.mock('../context/AuthContext', () => ({ useAuth: () => ({ isSuperUser: true, user: { id: 'actor', role: 'SUPERUSER' } }) }))
 vi.mock('../api/client', () => ({ default: api }))
 vi.mock('../hooks/useMasterDataCatalog', () => ({
   useMasterDataCatalog: () => ({ organizations: [{ id: 'org', name: 'Secretaria teste' }] }),
@@ -22,8 +24,14 @@ beforeEach(() => {
 it('impede envio de CPF inválido e indica o campo para correção', () => {
   render(<MemoryRouter><UsersPage /></MemoryRouter>)
   fireEvent.click(screen.getByRole('button', { name: 'Novo usuário' }))
+  fireEvent.change(screen.getByLabelText('Nome completo'), {target:{value:'Pessoa de teste'}})
+  fireEvent.change(screen.getByLabelText('E-mail'), {target:{value:'teste@local'}})
   fireEvent.change(screen.getByLabelText('CPF'), { target: { value: '52998224724' } })
-  fireEvent.click(screen.getByRole('button', { name: 'Criar usuário' }))
+  fireEvent.click(screen.getByRole('button', {name:'Acesso',exact:true}))
+  fireEvent.change(screen.getByLabelText('Senha provisória'), {target:{value:'SenhaFicticia123!'}})
+  fireEvent.click(screen.getByRole('button', {name:'Selecionar secretaria'}))
+  reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button', { name: 'Criar usuário' , hidden: true }))
   expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('os dígitos verificadores não conferem')
   expect(screen.getByLabelText('CPF')).toHaveAttribute('aria-invalid', 'true')
   expect(screen.getByLabelText('CPF')).toHaveFocus()
@@ -36,7 +44,8 @@ it('impede envio de CPF inválido e indica o campo para correção', () => {
 it('mostra validação local dentro do modal e limpa ao reabrir', async () => {
   render(<MemoryRouter><UsersPage /></MemoryRouter>)
   fireEvent.click(screen.getByRole('button', { name: 'Novo usuário' }))
-  fireEvent.click(screen.getByRole('button', { name: 'Criar usuário' }))
+  reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button', { name: 'Criar usuário' , hidden: true }))
   expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('Informe o CPF')
   expect(api.post).not.toHaveBeenCalled()
   fireEvent.click(screen.getByRole('button', { name: 'Cancelar' }))
@@ -55,8 +64,12 @@ it.each(['cadastro', 'edição'])('preserva os dados e mostra erro da API no mod
   else fireEvent.click(screen.getByRole('button', { name: 'Novo usuário' }))
   fireEvent.change(screen.getByLabelText('Nome completo'), { target: { value: 'Pessoa teste' } })
   fireEvent.change(screen.getByLabelText(mode === 'edição' ? 'Substituir CPF (opcional)' : 'CPF'), { target: { value: '52998224725' } })
+  fireEvent.change(screen.getByLabelText('E-mail'), {target:{value:'teste@local'}})
+  fireEvent.click(screen.getByRole('button', {name:'Acesso',exact:true}))
+  if (mode === 'cadastro') fireEvent.change(screen.getByLabelText('Senha provisória'), {target:{value:'SenhaFicticia123!'}})
   fireEvent.click(screen.getByRole('button', { name: 'Selecionar secretaria' }))
-  fireEvent.click(screen.getByRole('button', { name: mode === 'edição' ? 'Atualizar usuário' : 'Criar usuário' }))
+  reviewGuidedForm()
+  fireEvent.click(screen.getByRole('button', { name: mode === 'edição' ? 'Atualizar usuário' : 'Criar usuário' , hidden: true }))
   await waitFor(() => expect(within(screen.getByRole('dialog')).getByRole('alert')).toHaveTextContent('CPF inválido'))
   expect(screen.getAllByRole('alert')).toHaveLength(1)
   expect(screen.getByRole('alert')).toHaveTextContent('test-ref')
@@ -102,4 +115,22 @@ it('filtra pelo KPI na API, mantém os totais completos e permite limpar', async
   expect(button).toHaveAttribute('aria-pressed', 'true')
   fireEvent.click(screen.getByRole('button', { name: 'Limpar indicador' }))
   await waitFor(() => expect(api.get).toHaveBeenLastCalledWith('/users/paginated', { params: expect.objectContaining({ page: 1, indicator: undefined }) }))
+})
+
+it('edita permissões em uma única tela, sem etapas ou conferência duplicada', async () => {
+  api.get.mockImplementation(async (path) => ({ data: path.endsWith('/permissions')
+    ? { permissions: { vehicles: { can_view: true, can_create: true, can_edit: false, can_delete: false } } }
+    : { data: [{ id: 'operator', name: 'Operador exemplo', email: 'operador@test.local', role: 'PRODUCAO', organization_id: 'org' }], pagination: { page: 1, pages: 1, total: 1 }, summary: {} } }))
+  api.put.mockResolvedValue({ data: {} })
+  render(<MemoryRouter><UsersPage /></MemoryRouter>)
+  await screen.findByText('Operador exemplo')
+  fireEvent.click(screen.getByRole('button', { name: 'Permissões' }))
+  const dialog = await screen.findByRole('dialog', { name: /Permissões de Operador exemplo/ })
+  await within(dialog).findByRole('table')
+  expect(within(dialog).queryByRole('progressbar')).not.toBeInTheDocument()
+  expect(within(dialog).queryByRole('button', { name: 'Continuar' })).not.toBeInTheDocument()
+  expect(within(dialog).queryByText('Conferência')).not.toBeInTheDocument()
+  fireEvent.click(within(dialog).getByRole('checkbox', { name: 'Veículos: Editar' }))
+  fireEvent.click(within(dialog).getByRole('button', { name: 'Salvar permissões' }))
+  await waitFor(() => expect(api.put).toHaveBeenCalledWith('/users/operator/permissions', { permissions: expect.objectContaining({ vehicles: expect.objectContaining({ can_edit: true }) }) }))
 })

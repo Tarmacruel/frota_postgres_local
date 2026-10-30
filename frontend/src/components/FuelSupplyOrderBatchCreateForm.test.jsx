@@ -56,7 +56,7 @@ describe('FuelSupplyOrderBatchCreateForm', () => {
     render(<FuelSupplyOrderBatchCreateForm vehicles={vehicles} organizations={organizations} fuelStations={fuelStations} />)
 
     await user.click(screen.getByRole('checkbox', { name: /ABC1D23/ }))
-    await user.click(screen.getByRole('button', { name: 'Revisar 1 ordem' }))
+    await user.click(screen.getByRole('button', { name: 'Continuar' }))
 
     expect(screen.getByRole('alert')).toHaveTextContent('Selecione pelo menos dois veículos')
     expect(fuelSupplyOrdersAPI.createBatch).not.toHaveBeenCalled()
@@ -78,12 +78,14 @@ describe('FuelSupplyOrderBatchCreateForm', () => {
 
     await user.click(screen.getByRole('checkbox', { name: /ABC1D23/ }))
     await user.click(screen.getByRole('checkbox', { name: /DEF4G56/ }))
+    await user.click(screen.getByRole('button', {name: 'Continuar'}))
     expect(screen.getByRole('spinbutton', { name: 'Litros previstos padrão' })).toHaveValue(30)
 
     const individualLiters = screen.getByRole('spinbutton', { name: 'Litros previstos para DEF4G56' })
     await user.clear(individualLiters)
     await user.type(individualLiters, '42.5')
 
+    await user.click(screen.getByRole('button', {name:'Continuar'}))
     await user.click(screen.getByRole('button', { name: 'Revisar 2 ordens' }))
 
     expect(screen.getByRole('heading', { name: 'Revise antes de emitir' })).toBeInTheDocument()
