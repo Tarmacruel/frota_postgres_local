@@ -47,7 +47,7 @@ class AuditRepository:
                              organization_id: UUID | None = None,
                              without_organization: bool = False) -> tuple[list[dict], int, int]:
         base = select(AuditLog, Organization.name.label("organization_name"),
-                      Organization.id.label("organization_id"))
+                      Organization.id.label("actor_organization_id"))
         base = base.outerjoin(User, User.id == AuditLog.actor_user_id).outerjoin(
             Organization, Organization.id == User.organization_id)
         if action:

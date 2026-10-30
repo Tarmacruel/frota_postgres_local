@@ -66,6 +66,35 @@ async def test_users_and_all_summary_counts_are_scoped_even_with_forged_filter(c
 
 
 @pytest.mark.asyncio
+async def test_audit_pagination_and_global_kpis_preserve_distinct_organization_columns(context):
+    from app.repositories.audit_repository import AuditRepository
+    from app.repositories.interactive_kpis import IndicatorRequest, STATE_KEY
+    c = context
+    c.db.add_all([
+        AuditLog(actor_user_id=c.admin.id, actor_name='Admin A', actor_role='ADMIN',
+                 organization_id=c.own.id, action='CREATE', entity_type='VEHICLE',
+                 entity_id=uuid4(), entity_label='Registro A'),
+        AuditLog(actor_user_id=c.foreign.id, actor_name='Admin B', actor_role='ADMIN',
+                 organization_id=c.other.id, action='DELETE', entity_type='VEHICLE',
+                 entity_id=uuid4(), entity_label='Registro B'),
+    ])
+    await c.db.commit()
+    repository = AuditRepository(c.db)
+    rows, total, deleted = await repository.list_paginated(page=1, limit=1)
+    assert len(rows) == 1 and total == 2 and deleted == 1
+    assert rows[0]['organization_id'] in {c.own.id, c.other.id}
+    selected = IndicatorRequest('audit', 'deleted')
+    c.db.info[STATE_KEY] = selected
+    rows, total, deleted = await repository.list_paginated(page=1, limit=1)
+    assert total == 1 and deleted == 1 and rows[0]['entity_label'] == 'Registro B'
+    assert selected.result['population'] == 2
+    c.db.info[STATE_KEY] = IndicatorRequest('audit', 'total')
+    rows, total, deleted = await repository.list_paginated(page=1, limit=20, organization_id=c.own.id)
+    assert total == 1 and deleted == 0 and rows[0]['entity_label'] == 'Registro A'
+    assert c.db.info[STATE_KEY].result['population'] == 1
+
+
+@pytest.mark.asyncio
 async def test_settings_review_is_versioned_audited_and_does_not_drop_data_on_stale_save(context):
     c = context; service = SystemSettingsService(c.db)
     values = deepcopy(DEFAULT_SETTINGS); values['identity']['systemName'] = 'Frota de teste'

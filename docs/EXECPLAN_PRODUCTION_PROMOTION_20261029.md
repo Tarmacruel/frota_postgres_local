@@ -19,7 +19,7 @@ Não copiar banco ou registros/configurações de teste para produção; não co
 
 ## Passos de implementação
 - [x] Inventariar ambientes, diferenças, autorização e ancestralidade.
-- [ ] Backup consistente de banco/fontes/build/configurações/anexos; exportar candidato limpo.
+- [x] Backup consistente de banco/fontes/build/configurações/anexos; exportar candidato limpo.
 - [ ] Ensaiar0062→0063 e promoção exata do usuário em cópia descartável, comparando todos os dados anteriores e somente os deltas autorizados.
 - [ ] Gates, build production e CI/PR; conferir árvore aprovada.
 - [ ] Pausar somente watchdog/API produtivos, backup final, fast-forward, migration, promoção auditada, readiness e frontend.
@@ -33,6 +33,8 @@ Reutilizar evidências cuja árvore seja idêntica e revalidar candidato/CI. Bac
 
 ## Resultado
 Em preparação.
+
+30/10: ensaio inicial preservou todos os dados e promoveu somente a conta autorizada na cópia, mas a consulta paginada de auditoria encontrou colisão de nomes entre a nova AuditLog.organization_id e o id projetado da secretaria do ator. Corrigido somente o alias interno, mantendo formato/escopo da resposta; adicionada regressão PostgreSQL para paginação, contagens globais, indicador e secretaria. Repetir gates/ensaio antes de ativar. Rotina HML das06h concluiu com integridade/configurações preservadas; API HML agora PID13212. Produção continua0cd053c/PID5804 sem alteração.
 
 ## Pendências / decisões
 Parâmetros próprios e banco HML não serão copiados. A identidade inicial produtiva continua baseada nos valores oficiais existentes. O usuário poderá editar parâmetros em produção depois da promoção. Backup fresco será capturado novamente com a API parada para preservar as últimas gravações.
