@@ -3,6 +3,7 @@ from __future__ import annotations
 import secrets
 from datetime import datetime, timedelta, timezone
 from typing import Any
+from uuid import UUID
 from jose import jwt
 from passlib.context import CryptContext
 from fastapi import Response
@@ -19,9 +20,11 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-def create_access_token(subject: str, role: str, expires_delta: timedelta | None = None) -> str:
+def create_access_token(subject: str, role: str, expires_delta: timedelta | None = None, *, audit_session_id: UUID | None = None) -> str:
     expire = datetime.now(timezone.utc) + (expires_delta or timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES))
     to_encode: dict[str, Any] = {"sub": subject, "role": role, "exp": expire}
+    if audit_session_id is not None:
+        to_encode["audit_sid"] = str(audit_session_id)
     return jwt.encode(to_encode, settings.SECRET_KEY, algorithm=settings.ALGORITHM)
 
 
