@@ -61,7 +61,7 @@ function summarizeEvent(log) {
 }
 
 export default function AuditPage() {
-  const { isSuperUser } = useAuth()
+  const isSuperUser = useAuth()?.isSuperUser === true
   const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
 
   const [logs, setLogs] = useState([])
