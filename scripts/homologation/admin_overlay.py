@@ -88,8 +88,8 @@ def apply(db, overlay, *, database_name):
         prior_settings = db.execute('SELECT to_jsonb(s) FROM system_settings s WHERE id=1').fetchone()
         result['settings_before'] = prior_settings[0] if prior_settings else None
         # Strict product validation prevents a copied draft from becoming code/markup.
-        from app.schemas.system_settings import SettingsValues
-        SettingsValues.model_validate(config['values'])
+        from app.schemas.system_settings import StoredSettingsValues
+        StoredSettingsValues.model_validate(config['values'])
         updater = config['updated_by']
         if updater and not db.execute('SELECT 1 FROM users WHERE id=%s', (updater,)).fetchone(): updater = None
         db.execute('''INSERT INTO system_settings(id,revision,"values",updated_by,updated_at) VALUES(1,%s,%s,%s,%s)

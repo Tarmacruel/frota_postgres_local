@@ -1,18 +1,21 @@
 from copy import deepcopy
-from datetime import datetime, timezone
+from datetime import date, datetime, time as time_of_day, timedelta, timezone
 import io
 from pathlib import Path
 import re
 import time
 from uuid import UUID, uuid4
+from zoneinfo import ZoneInfo
 
 from fastapi import HTTPException, UploadFile
 from PIL import Image, UnidentifiedImageError
 from sqlalchemy import select, text
 
 from app.core.config import settings
-from app.core.settings_catalog import DEFAULT_SETTINGS, FORM_FIELDS, ICON_KEYS, NAVIGATION, merged_settings
+from app.core.settings_catalog import DEFAULT_SETTINGS, FORM_FIELDS, ICON_KEYS, NAVIGATION, SEASONAL_THEMES, merged_settings
 from app.models.system_settings import SystemSettings
+
+SEASONAL_TIMEZONE = ZoneInfo('America/Sao_Paulo')
 
 _runtime_values = merged_settings()
 _loaded_at = 0.0
@@ -48,38 +51,102 @@ def logo_file(token):
     return path
 
 
+def _theme_entry(theme_id):
+    preset = SEASONAL_THEMES[theme_id]
+    return {'id': theme_id, 'name': preset['name'], 'style': preset['style']}
+
+
+def _seasonal_catalog(today):
+    themes = []
+    for theme_id, preset in SEASONAL_THEMES.items():
+        end = date(today.year, *preset['annual_end'])
+        if end < today:
+            end = end.replace(year=today.year + 1)
+        if (end - today).days > 60:
+            end = today + timedelta(days=14)
+        themes.append({**_theme_entry(theme_id), 'suggested_ends_on': end.isoformat()})
+    return {'today': today.isoformat(), 'themes': themes}
+
+
+def _seasonal_theme(stored, now, *, include_expired=False):
+    if not stored or stored['id'] not in SEASONAL_THEMES:
+        return None
+    next_day = date.fromisoformat(stored['ends_on']) + timedelta(days=1)
+    expires_at = datetime.combine(next_day, time_of_day.min, tzinfo=SEASONAL_TIMEZONE).astimezone(timezone.utc)
+    if not include_expired and expires_at <= now:
+        return None
+    return {**_theme_entry(stored['id']), 'ends_on': stored['ends_on'], 'expires_at': expires_at.isoformat()}
+
+
 class SystemSettingsService:
     def __init__(self, db):
         self.db = db
 
     async def get(self, *, catalog=False):
         row = await self.db.get(SystemSettings, 1)
-        values = merged_settings(row.values if row else None)
+        stored = row.values if row else {}
+        values = merged_settings(stored)
         publish_runtime(values)
+        now = datetime.now(timezone.utc)
         response = {'revision': row.revision if row else 0, 'values': values,
+                    'seasonal_theme': _seasonal_theme(stored.get('seasonal_theme'), now, include_expired=catalog),
                     'updated_at': row.updated_at if row else None,
                     'form_catalog': {module: [{'key': key, 'label': label, 'required': required, 'locked_visibility': module == 'vehicle_loans' and key == 'delivery_condition'}
                                              for key, label, required in fields] for module, fields in FORM_FIELDS.items()}}
         if catalog:
             response.update(defaults=deepcopy(DEFAULT_SETTINGS), icons=list(ICON_KEYS), navigation=NAVIGATION,
+                            seasonal_catalog=_seasonal_catalog(now.astimezone(SEASONAL_TIMEZONE).date()),
                             form_catalog={module: [{'key': key, 'label': label, 'required': required, 'locked_visibility': module == 'vehicle_loans' and key == 'delivery_condition'}
                                                    for key, label, required in fields] for module, fields in FORM_FIELDS.items()})
         return response
 
-    async def update(self, data, actor):
-        from app.services.audit_service import AuditService
+    async def _lock_record(self, expected_revision):
         # Serialize first insert as well as updates without lost writes.
         await self.db.execute(text("SELECT pg_advisory_xact_lock(630029001)"))
         row = await self.db.scalar(select(SystemSettings).where(SystemSettings.id == 1).with_for_update()
                                    .execution_options(populate_existing=True))
         revision = row.revision if row else 0
-        if revision != data.expected_revision:
+        if revision != expected_revision:
             raise HTTPException(409, 'Os parâmetros foram alterados por outra sessão. Seu rascunho foi mantido; atualize a referência e confira as diferenças antes de salvar.')
+        return row
+
+    async def update(self, data, actor):
+        row = await self._lock_record(data.expected_revision)
         values = data.values.model_dump()
         logo = values['identity']['logoPath']
         if logo != '/brasao-pmtf.png':
             logo_file(logo.rsplit('/', 1)[-1])
-        before = merged_settings(row.values if row else None)
+        stored = row.values if row else {}
+        next_values = dict(values)
+        if 'seasonal_theme' in stored:
+            next_values['seasonal_theme'] = stored['seasonal_theme']
+        return await self._save_settings(row, next_values, actor, 'Parâmetros do sistema', {
+            'before': merged_settings(stored), 'after': values, 'justification': data.justification,
+        })
+
+    async def update_seasonal_theme(self, data, actor):
+        row = await self._lock_record(data.expected_revision)
+        values = dict(row.values) if row else merged_settings()
+        previous = values.get('seasonal_theme')
+        if data.theme is not None:
+            today = datetime.now(SEASONAL_TIMEZONE).date()
+            if data.theme.ends_on < today:
+                raise HTTPException(422, 'Escolha hoje ou uma data futura para encerrar o tema.')
+            selection = data.theme.model_dump(mode='json')
+            values['seasonal_theme'] = selection
+        else:
+            selection = None
+            values.pop('seasonal_theme', None)
+        if selection == previous:
+            return await self.get(catalog=True)
+        return await self._save_settings(row, values, actor, 'Temas temporários', {
+            'before': {'seasonal_theme': previous}, 'after': {'seasonal_theme': selection},
+            'justification': 'Atualização do tema temporário pelo superusuário.',
+        })
+
+    async def _save_settings(self, row, values, actor, label, changes):
+        from app.services.audit_service import AuditService
+
         if row is None:
             row = SystemSettings(id=1, values=values, revision=1)
             self.db.add(row)
@@ -89,8 +156,7 @@ class SystemSettingsService:
         row.updated_by = actor.id
         row.updated_at = datetime.now(timezone.utc)
         await AuditService(self.db).record(actor=actor, action='UPDATE', entity_type='SYSTEM_SETTINGS',
-            entity_id=UUID(int=1), entity_label='Parâmetros do sistema',
-            details={'before': before, 'after': values, 'revision': row.revision, 'justification': data.justification})
+            entity_id=UUID(int=1), entity_label=label, details={**changes, 'revision': row.revision})
         await self.db.commit()
         publish_runtime(values)
         return await self.get(catalog=True)

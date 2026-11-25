@@ -7,7 +7,7 @@ from app.core.record_catalog import record_modules
 from app.db.session import get_db_session
 from app.models.user import User
 from app.models.system_settings import RecordControl
-from app.schemas.system_settings import RecordAction, SettingsUpdate
+from app.schemas.system_settings import RecordAction, SeasonalThemeUpdate, SettingsUpdate
 from app.services.system_settings_service import SystemSettingsService, logo_file
 from app.services.record_admin_service import RecordAdminService, field_catalog, spec_for
 
@@ -28,6 +28,12 @@ async def get_settings(db: AsyncSession = Depends(get_db_session), actor: User =
 @router.put('')
 async def update_settings(data: SettingsUpdate, db: AsyncSession = Depends(get_db_session), actor: User = Depends(require_superuser)):
     return await SystemSettingsService(db).update(data, actor)
+
+
+@router.put('/seasonal-theme')
+async def update_seasonal_theme(data: SeasonalThemeUpdate, db: AsyncSession = Depends(get_db_session),
+                                actor: User = Depends(require_superuser)):
+    return await SystemSettingsService(db).update_seasonal_theme(data, actor)
 
 
 @router.post('/logo')

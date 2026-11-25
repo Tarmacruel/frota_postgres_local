@@ -1,0 +1,236 @@
+:root[data-seasonal-theme='christmas'] {
+  --site-festoon-height: 46px;
+}
+
+[data-seasonal-theme='christmas'] {
+  --christmas-wreath: url('../assets/christmas/guirlanda.webp');
+  --christmas-trim: color-mix(in srgb, var(--seasonal-accent) 46%, transparent);
+}
+
+.christmas-festoon {
+  --foliage-depth: 23px;
+  container-type: inline-size;
+  position: relative;
+  min-inline-size: 0;
+  inline-size: 100%;
+  block-size: var(--site-festoon-height, 46px);
+  overflow: hidden;
+  pointer-events: none;
+}
+
+.app-christmas-festoon {
+  grid-column: 1 / -1;
+  border-radius: var(--ui-radius-card);
+  background: var(--ui-surface);
+  box-shadow: inset 0 0 0 1px var(--ui-border-soft);
+}
+
+:root[data-seasonal-theme='christmas'] body.internal-app-active .app-shell { align-content: start; }
+
+@media (min-width: 1180px) {
+  :root[data-seasonal-theme='christmas'] body.internal-app-active .app-shell .app-sidebar {
+    height: calc(100dvh - 24px - var(--nav-banner-offset) - var(--site-festoon-height));
+  }
+}
+
+:root[data-seasonal-theme='christmas'] .login-shell {
+  position: relative;
+  padding-top: calc(18px + var(--site-festoon-height));
+  background: radial-gradient(ellipse at 55% 10%, #1b3940, #101f2f 57%, #0c1826);
+}
+
+:root[data-seasonal-theme='christmas'] .login-card-panel-brand {
+  background:
+    radial-gradient(ellipse at 12% 2%, rgb(223 188 123 / .12), transparent 55%),
+    linear-gradient(145deg, #142d2d, #164637 63%, #17363e);
+}
+
+.login-christmas-festoon {
+  position: absolute;
+  inset: 0 0 auto;
+  z-index: 2;
+}
+
+.settings-preview__festoon {
+  --foliage-depth: 19px;
+  block-size: 34px;
+  background: var(--ui-surface);
+  border-bottom: 1px solid var(--ui-border-soft);
+}
+
+.christmas-festoon__strand {
+  display: flex;
+  block-size: 100%;
+}
+
+.christmas-festoon__section {
+  position: relative;
+  min-inline-size: 0;
+  flex: 1 1 0;
+}
+
+.christmas-festoon__section::before {
+  position: absolute;
+  inset: -1px -5px auto;
+  block-size: var(--foliage-depth);
+  background: url('../assets/christmas/festao.webp') center / 100% 100% no-repeat;
+  content: '';
+}
+
+.christmas-festoon__section:nth-child(2n)::before { transform: scaleX(-1); }
+.christmas-festoon__section:nth-child(n + 3) { display: none; }
+@container (min-width: 530px) { .christmas-festoon__section:nth-child(3) { display: block; } }
+@container (min-width: 805px) { .christmas-festoon__section:nth-child(4) { display: block; } }
+@container (min-width: 1080px) { .christmas-festoon__section:nth-child(5) { display: block; } }
+@container (min-width: 1355px) { .christmas-festoon__section:nth-child(6) { display: block; } }
+@container (min-width: 1630px) { .christmas-festoon__section:nth-child(7) { display: block; } }
+
+.christmas-festoon__bulb {
+  --bulb-core: #ffedb6;
+  --bulb-color: #b87722;
+  --bulb-glow: #ffba58;
+  position: absolute;
+  inset-block-start: calc(var(--foliage-depth) * var(--drop));
+  inset-inline-start: var(--hang);
+  inline-size: 6px;
+  block-size: 10px;
+  transform: translateX(-50%) rotate(var(--tilt, 0deg));
+  border-radius: 44% 44% 53% 53% / 26% 26% 74% 74%;
+  background: radial-gradient(ellipse at 36% 35%, var(--bulb-core), var(--bulb-glow) 36%, var(--bulb-color) 81%);
+  box-shadow: inset 0 0 0 1px rgb(9 18 25 / .16);
+}
+
+.christmas-festoon__bulb[data-color='wine'] { --bulb-core: #ffe1dc; --bulb-color: #a12842; --bulb-glow: #ff637a; }
+.christmas-festoon__bulb[data-color='sage'] { --bulb-core: #e0ffe2; --bulb-color: #28735b; --bulb-glow: #72e8b1; }
+.christmas-festoon__bulb:nth-child(1) { --hang: 7%; --drop: .42; --tilt: -12deg; --cycle: -1s; }
+.christmas-festoon__bulb:nth-child(2) { --hang: 21%; --drop: .68; --tilt: -9deg; --cycle: -4s; }
+.christmas-festoon__bulb:nth-child(3) { --hang: 35%; --drop: .92; --tilt: -5deg; --cycle: -2s; }
+.christmas-festoon__bulb:nth-child(4) { --hang: 50%; --drop: .98; --cycle: -5s; }
+.christmas-festoon__bulb:nth-child(5) { --hang: 65%; --drop: .88; --tilt: 5deg; --cycle: -3s; }
+.christmas-festoon__bulb:nth-child(6) { --hang: 79%; --drop: .69; --tilt: 9deg; --cycle: -2.5s; }
+.christmas-festoon__bulb:nth-child(7) { --hang: 93%; --drop: .43; --tilt: 12deg; --cycle: -.5s; }
+
+.christmas-festoon__bulb::before {
+  position: absolute;
+  inset: -2px 1px auto;
+  block-size: 3px;
+  border-radius: 1px;
+  background: #635842;
+  content: '';
+}
+
+.christmas-festoon__bulb::after {
+  position: absolute;
+  inset: -6px -7px;
+  border-radius: 50%;
+  background: radial-gradient(ellipse, color-mix(in srgb, var(--bulb-glow) 49%, transparent), transparent 68%);
+  opacity: .52;
+  content: '';
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .christmas-festoon__bulb::after {
+    animation: christmas-lamp-glow 6s ease-in-out var(--cycle) infinite alternate;
+  }
+  .christmas-festoon__section:nth-child(even) .christmas-festoon__bulb::after { animation-duration: 7.5s; }
+}
+
+@keyframes christmas-lamp-glow {
+  from { opacity: .38; }
+  to { opacity: .82; }
+}
+
+.christmas-festoon__ornament {
+  --orb-highlight: #fff1d2;
+  --orb-mid: #c6a774;
+  --orb-shade: #735329;
+  position: absolute;
+  inset: 24px auto auto 0;
+  inline-size: 9px;
+  block-size: 10px;
+  border-radius: 50%;
+  transform: translateX(-50%);
+  background: radial-gradient(circle at 32% 24%, var(--orb-highlight), var(--orb-mid) 38%, var(--orb-shade) 80%);
+  box-shadow: 0 2px 3px rgb(13 20 31 / .2);
+}
+.christmas-festoon__ornament[data-color='wine'] { --orb-highlight: #ffe4d9; --orb-mid: #a73b52; --orb-shade: #55152c; }
+.christmas-festoon__ornament::before {
+  position: absolute;
+  inset: -17px auto 100% 50%;
+  inline-size: 1px;
+  background: color-mix(in srgb, #a0814e 82%, transparent);
+  content: '';
+}
+
+.settings-preview__festoon .christmas-festoon__bulb,
+.christmas-festoon[data-compact] .christmas-festoon__bulb { inline-size: 5px; block-size: 8px; }
+.settings-preview__festoon .christmas-festoon__ornament { inset-block-start: 20px; }
+
+@container (max-width: 529px) {
+  .christmas-festoon__bulb { inline-size: 5px; block-size: 8px; }
+  .christmas-festoon__bulb:is(:nth-child(2), :nth-child(6)) { display: none; }
+  .christmas-festoon__bulb:nth-child(3) { --hang: 28%; --drop: .78; }
+  .christmas-festoon__bulb:nth-child(5) { --hang: 72%; --drop: .77; }
+  .christmas-festoon__ornament { inset-block-start: 18px; inline-size: 7px; block-size: 8px; }
+  .christmas-festoon__ornament::before { inset-block-start: -12px; }
+}
+
+@media (max-width: 720px) {
+  :root[data-seasonal-theme='christmas'] { --site-festoon-height: 32px; }
+  .christmas-festoon { --foliage-depth: 17px; }
+  .app-christmas-festoon { border-radius: 0; }
+}
+
+.christmas-festoon[data-compact] {
+  --foliage-depth: 14px;
+  block-size: 27px;
+}
+
+/* The center of the divider is sized to the wreath on each shell. */
+:root[data-seasonal-theme='christmas'] body.internal-app-active .app-sidebar .sidebar-head,
+.settings-preview[data-seasonal-theme='christmas'] .settings-preview__brand {
+  --wreath-size: 38px;
+  position: relative;
+  padding-bottom: 25px;
+}
+
+:root[data-seasonal-theme='christmas'] body.internal-app-active .app-sidebar .sidebar-head { border-bottom-color: transparent; }
+
+:root[data-seasonal-theme='christmas'] body.internal-app-active .app-sidebar.is-compact .sidebar-head {
+  --wreath-size: 32px;
+  padding-bottom: 21px;
+}
+
+.settings-preview[data-seasonal-theme='christmas'] .settings-preview__brand {
+  --wreath-size: 27px;
+  padding-bottom: 20px;
+  margin-bottom: -4px;
+}
+
+:root[data-seasonal-theme='christmas'] body.internal-app-active .sidebar-head::before,
+.settings-preview[data-seasonal-theme='christmas'] .settings-preview__brand::before {
+  --divider-gap: calc(var(--wreath-size) * .49);
+  content: '';
+  position: absolute;
+  inset: auto 0 0;
+  height: 1px;
+  background: linear-gradient(to right, transparent,
+    var(--christmas-trim) calc(50% - var(--divider-gap)),
+    transparent calc(50% - var(--divider-gap) + 1px),
+    transparent calc(50% + var(--divider-gap) - 1px),
+    var(--christmas-trim) calc(50% + var(--divider-gap)), transparent);
+  pointer-events: none;
+}
+
+:root[data-seasonal-theme='christmas'] body.internal-app-active .sidebar-head::after,
+.settings-preview[data-seasonal-theme='christmas'] .settings-preview__brand::after {
+  content: '';
+  position: absolute;
+  inset: auto auto calc(var(--wreath-size) / -2) 50%;
+  width: var(--wreath-size);
+  height: var(--wreath-size);
+  transform: translateX(-50%);
+  background: var(--christmas-wreath) center / contain no-repeat;
+  filter: drop-shadow(0 2px 3px rgb(0 0 0 / .38));
+  pointer-events: none;
+}

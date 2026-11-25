@@ -44,6 +44,78 @@ it('muda cores e formato na prévia sem alterar os parâmetros publicados', asyn
   expect(api.put).not.toHaveBeenCalled()
 })
 
+it('prevê e publica o Natal em um clique, preservando as alterações da aparência padrão', async () => {
+  const theme = { id: 'christmas', name: 'Natal', style: { primary: '#145943', sidebar: '#3b202b', accent: '#dab46f' },
+    suggested_ends_on: '2027-01-06' }
+  const withCatalog = { ...config, seasonal_catalog: { today: '2026-11-24', themes: [theme] } }
+  api.get.mockResolvedValue({ data: withCatalog })
+  api.put.mockImplementation(async (_path, body) => ({ data: {
+    ...withCatalog, revision: body.expected_revision + 1,
+    seasonal_theme: body.theme ? { ...theme, ...body.theme, expires_at: new Date(Date.now() + 60_000).toISOString() } : null,
+  } }))
+  const actor = userEvent.setup()
+  mount('?section=appearance')
+  await actor.click(await screen.findByRole('button', { name: 'Verde' }))
+  const preview = screen.getByLabelText('Prévia da identidade do sistema')
+  await actor.click(screen.getByRole('button', { name: 'Ver prévia' }))
+  expect(preview).toHaveAttribute('data-seasonal-theme', 'christmas')
+  expect(preview.style.getPropertyValue('--brand-sidebar')).toBe(theme.style.sidebar)
+  expect(preview.querySelector('.settings-preview__festoon')).toBeInTheDocument()
+  expect(screen.getByRole('button', { name: 'Luzes', exact: true })).toHaveAttribute('aria-pressed', 'true')
+  expect(preview.querySelector('.settings-preview__snow')).not.toBeInTheDocument()
+
+  const systemMode = document.documentElement.dataset.theme
+  await actor.click(screen.getByRole('button', { name: 'Escuro', exact: true }))
+  expect(preview).toHaveAttribute('data-theme', 'dark')
+  await actor.click(screen.getByRole('button', { name: 'Claro', exact: true }))
+  expect(preview).toHaveAttribute('data-theme', 'light')
+  expect(document.documentElement.dataset.theme).toBe(systemMode)
+
+  await actor.click(screen.getByRole('button', { name: 'Luzes com neve' }))
+  const previewNav = within(screen.getByRole('navigation', { name: 'Navegação da prévia' }))
+  const home = previewNav.getByRole('button', { name: 'Início' })
+  expect(home).toHaveAttribute('aria-pressed', 'true')
+  expect(preview.querySelector('.settings-preview__snow')).toBeInTheDocument()
+  await actor.click(previewNav.getByRole('button', { name: 'Veículos' }))
+  expect(preview.querySelector('.settings-preview__snow')).not.toBeInTheDocument()
+  await actor.click(home)
+  expect(preview.querySelector('.settings-preview__snow')).toBeInTheDocument()
+
+  await actor.click(screen.getByRole('button', { name: 'Luzes', exact: true }))
+  expect(preview.querySelector('.settings-preview__snow')).not.toBeInTheDocument()
+
+  await actor.click(screen.getByRole('button', { name: 'Celular', exact: true }))
+  expect(preview).toHaveClass('settings-preview--mobile')
+  expect(publish).not.toHaveBeenCalled()
+  expect(api.put).not.toHaveBeenCalled()
+
+  expect(screen.getByLabelText('Encerrar em')).toHaveValue('2027-01-06')
+  await actor.click(screen.getByRole('button', { name: 'Ativar Natal' }))
+  await screen.findByText('Ativo até 06/01/2027')
+  expect(api.put).toHaveBeenNthCalledWith(1, '/system-settings/seasonal-theme', {
+    expected_revision: 2, theme: { id: 'christmas', ends_on: '2027-01-06' },
+  })
+  expect(publish).toHaveBeenCalledOnce()
+  expect(screen.getByRole('button', { name: 'Conferir e publicar' })).toBeEnabled()
+  expect(screen.getByLabelText('Código de Cor principal')).toHaveValue('#087f5b')
+
+  fireEvent.change(screen.getByLabelText('Encerrar em'), { target: { value: '2027-01-08' } })
+  await actor.click(screen.getByRole('button', { name: 'Salvar término' }))
+  await screen.findByText('Ativo até 08/01/2027')
+  expect(api.put).toHaveBeenNthCalledWith(2, '/system-settings/seasonal-theme', {
+    expected_revision: 3, theme: { id: 'christmas', ends_on: '2027-01-08' },
+  })
+
+  await actor.click(screen.getByRole('button', { name: 'Desativar' }))
+  await screen.findByRole('button', { name: 'Ativar Natal' })
+  expect(api.put).toHaveBeenNthCalledWith(3, '/system-settings/seasonal-theme', { expected_revision: 4, theme: null })
+  expect(preview).not.toHaveAttribute('data-seasonal-theme')
+  expect(preview).not.toHaveAttribute('data-theme')
+  expect(preview.querySelector('.settings-preview__festoon')).not.toBeInTheDocument()
+  expect(screen.queryByRole('group', { name: 'Efeitos da prévia de Natal' })).not.toBeInTheDocument()
+  expect(preview.style.getPropertyValue('--brand-primary')).toBe('#087f5b')
+})
+
 it('protege identificação obrigatória e permite ocultar campo opcional e criar campo adicional', async () => {
   const actor = userEvent.setup(); mount('?section=forms')
   expect(await screen.findByLabelText('Exibir Placa')).toBeDisabled()

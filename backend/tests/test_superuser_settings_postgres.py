@@ -22,7 +22,7 @@ from app.models.audit_log import AuditLog
 from app.models.contract_balance import ContractControl, ContractMovement, ContractOperation
 from app.models.payment_process import PaymentContract, PaymentSupplier, PaymentProcessKind
 from app.models.system_settings import SystemSettings, RecordControl
-from app.schemas.system_settings import SettingsUpdate, RecordAction
+from app.schemas.system_settings import SettingsUpdate, RecordAction, SeasonalThemeUpdate, StoredSettingsValues
 from app.services.system_settings_service import SystemSettingsService, publish_runtime
 from app.services.record_admin_service import RecordAdminService
 from app.services.contract_balance_service import ContractBalanceService
@@ -106,6 +106,47 @@ async def test_settings_review_is_versioned_audited_and_does_not_drop_data_on_st
     await c.db.rollback()
     assert (await service.get())['values']['identity']['systemName'] == 'Frota de teste'
     assert await c.db.scalar(select(func.count()).select_from(AuditLog).where(AuditLog.entity_type == 'SYSTEM_SETTINGS')) == 1
+
+
+@pytest.mark.asyncio
+async def test_seasonal_theme_preserves_institutional_settings_and_shares_the_revision(context):
+    c = context
+    service = SystemSettingsService(c.db)
+    assert (await service.get())['seasonal_theme'] is None
+    end = datetime.now(timezone.utc).date() + timedelta(days=2)
+    selection = {'id': 'christmas', 'ends_on': end.isoformat()}
+    activation = SeasonalThemeUpdate(expected_revision=0, theme=selection)
+    activated = await service.update_seasonal_theme(activation, c.superuser)
+    assert activated['revision'] == 1
+    assert activated['values'] == DEFAULT_SETTINGS
+    assert (await service.get())['seasonal_theme']['id'] == 'christmas'
+    stored = await c.db.get(SystemSettings, 1)
+    assert StoredSettingsValues.model_validate(stored.values).seasonal_theme.ends_on == end
+
+    values = deepcopy(DEFAULT_SETTINGS)
+    values['appearance']['primary'] = '#193658'
+    draft = {'values': values, 'justification': 'Atualização da cor institucional'}
+    with pytest.raises(HTTPException) as conflict:
+        await service.update(SettingsUpdate(expected_revision=0, **draft), c.superuser)
+    assert conflict.value.status_code == 409
+    await c.db.rollback()
+    await c.db.refresh(c.superuser)
+    saved = await service.update(SettingsUpdate(expected_revision=1, **draft), c.superuser)
+    assert saved['seasonal_theme']['ends_on'] == end.isoformat()
+    assert (await service.get())['values']['appearance']['primary'] == '#193658'
+
+    past = SeasonalThemeUpdate(expected_revision=2, theme={'id': 'christmas', 'ends_on': '2020-01-01'})
+    with pytest.raises(HTTPException) as invalid:
+        await service.update_seasonal_theme(past, c.superuser)
+    assert invalid.value.status_code == 422
+    await c.db.rollback()
+    await c.db.refresh(c.superuser)
+    ended = await service.update_seasonal_theme(SeasonalThemeUpdate(expected_revision=2, theme=None), c.superuser)
+    assert ended['revision'] == 3 and ended['seasonal_theme'] is None
+    assert ended['values'] == values
+    audit = (await c.db.scalars(select(AuditLog).where(AuditLog.entity_label == 'Temas temporários')
+                               .order_by(AuditLog.created_at))).all()
+    assert [entry.details['after']['seasonal_theme'] for entry in audit] == [selection, None]
 
 
 @pytest.mark.asyncio

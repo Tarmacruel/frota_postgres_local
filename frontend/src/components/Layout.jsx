@@ -1,4 +1,5 @@
 import { useSystemSettings } from '../hooks/useSystemSettings'
+import { PublishedChristmasFestoon } from './ChristmasFestoon'
 import GuidedForm from './GuidedForm'
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate } from 'react-router-dom'
@@ -496,6 +497,7 @@ export default function Layout() {
 
   return (
     <div className={`app-shell${sidebarCompact ? ' sidebar-compact' : ''}`}>
+      <PublishedChristmasFestoon className="app-christmas-festoon" />
       <VehicleTagsGuide key={user?.id} userId={user?.id} enabled={!accessBlocked && (!canCreateFuelSupplyOrders || fuelSupplyOrdersBatchGuideChecked)} />
       <SearchOverlay open={!accessBlocked && searchOpen} onClose={() => setSearchOpen(false)} onSelect={(result) => navigate(result.route)} />
 

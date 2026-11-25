@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext'
 import { getApiErrorMessage } from '../utils/apiError'
 import { AppIcon } from '../components/AppIcon'
 import { StatCard } from '../components/ui'
+import ChristmasSnow from '../components/ChristmasSnow'
 
 function formatDate(value) {
   if (!value) return 'Atual'
@@ -103,6 +104,7 @@ export default function DashboardPage() {
 
   return (
     <div className="surface-panel dashboard-page">
+      <ChristmasSnow className="christmas-snow--dashboard" />
       <header className="dashboard-intro">
         <div>
           <p className="dashboard-intro__eyebrow">Visão geral da operação</p>

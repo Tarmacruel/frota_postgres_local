@@ -135,7 +135,13 @@ function RecordEditor({ module, record, onClose, onSaved }) {
           {deleting ? <label className="form-field">Digite EXCLUIR para confirmar<input required pattern="EXCLUIR" className="app-input" value={confirmation} onChange={(event) => setConfirmation(event.target.value)} /></label> : null}
         </details>
       </FormSection>
-      <div className="modal-actions"><button className="secondary-button" type="button" disabled={saving} onClick={onClose}>Cancelar</button><button className={deleting ? 'danger-button' : 'primary-button'} disabled={saving || stale || Boolean(conflict) || (!deleting && changingVisibility && (!lifecycle.can_confirm || lifecycle.has_effects && !effectConfirmed))} type="submit">{saving ? 'Salvando…' : deleting ? 'Excluir registro' : changingVisibility ? inactive ? 'Concluir inativação' : 'Concluir reativação' : 'Salvar alterações'}</button></div>
+      <div className="modal-actions settings-actions">
+        <button className="secondary-button" type="button" disabled={saving} onClick={onClose}>Cancelar</button>
+        <button className={deleting ? 'app-button settings-action--danger' : 'app-button'} type="submit"
+          disabled={saving || stale || Boolean(conflict) || (!deleting && changingVisibility && (!lifecycle.can_confirm || lifecycle.has_effects && !effectConfirmed))}>
+          {saving ? 'Salvando…' : deleting ? 'Excluir registro' : changingVisibility ? inactive ? 'Concluir inativação' : 'Concluir reativação' : 'Salvar alterações'}
+        </button>
+      </div>
     </GuidedForm>
   </Modal>
 }

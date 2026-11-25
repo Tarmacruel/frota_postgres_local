@@ -36,13 +36,22 @@ function readableAccent(color, surfaces, target) {
   return target
 }
 
-export function brandingStyles(values) {
-  const primary = safeColor(values.appearance.primary)
-  const sidebar = safeColor(values.appearance.sidebar, '#071426')
+export function activeSeasonalTheme(theme, now = Date.now()) {
+  return theme && Date.parse(theme.expires_at) > now ? theme : null
+}
+
+export function formatSeasonalDate(day) {
+  return day.split('-').reverse().join('/')
+}
+
+export function brandingStyles(values, seasonalStyle) {
+  const primary = safeColor(seasonalStyle?.primary ?? values.appearance.primary)
+  const sidebar = safeColor(seasonalStyle?.sidebar ?? values.appearance.sidebar, '#071426')
   const ink = readableInk(primary)
   const hover = blend(primary, ink === '#000000' ? '#ffffff' : '#000000', .16)
   return { '--brand-primary': primary, '--brand-on-primary': ink, '--brand-sidebar': sidebar,
     '--brand-on-sidebar': readableInk(sidebar), '--brand-primary-hover': hover,
+    '--seasonal-accent': safeColor(seasonalStyle?.accent, 'transparent'),
     '--brand-accent-light': readableAccent(primary, ['#ffffff', '#f1f5fb'], '#000000'),
     '--brand-accent-dark': readableAccent(primary, ['#0d192b', '#14253d'], '#ffffff'),
     '--ui-primary': 'var(--brand-accent)', '--ui-action-bg': primary,
