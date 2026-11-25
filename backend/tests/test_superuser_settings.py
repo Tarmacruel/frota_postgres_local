@@ -144,7 +144,7 @@ def test_frozen_document_identity_survives_a_later_brand_change():
 
 @pytest.mark.asyncio
 @pytest.mark.parametrize('method,path', [('get', '/api/system-settings'), ('put', '/api/system-settings'),
-    ('get', '/api/record-admin/catalog'), ('get', '/api/record-admin/drivers'),
+    ('put', '/api/system-settings/seasonal-theme'), ('get', '/api/record-admin/catalog'), ('get', '/api/record-admin/drivers'),
     ('get', '/api/record-admin/drivers/' + str(uuid4())), ('patch', '/api/record-admin/drivers/' + str(uuid4())),
     ('delete', '/api/record-admin/drivers/' + str(uuid4()))])
 async def test_admin_cannot_access_settings_or_administrative_bypass_endpoints(method, path):
@@ -154,6 +154,20 @@ async def test_admin_cannot_access_settings_or_administrative_bypass_endpoints(m
     async with AsyncClient(transport=ASGITransport(app=app), base_url='http://test') as client:
         response = await client.request(method, path, json={})
         assert response.status_code == 403
+
+
+def test_seasonal_catalog_suggests_january_and_theme_expires_at_brasilia_midnight():
+    from datetime import date, datetime, timezone
+    from app.services.system_settings_service import _seasonal_catalog, _seasonal_theme
+
+    config = _seasonal_catalog(date(2026, 11, 24))
+    assert config['themes'][0]['suggested_ends_on'] == '2027-01-06'
+    selection = {'id': 'christmas', 'ends_on': '2027-01-06'}
+    active = _seasonal_theme(selection, datetime(2027, 1, 7, 2, 59, 59, tzinfo=timezone.utc))
+    assert active['expires_at'] == '2027-01-07T03:00:00+00:00'
+    midnight = datetime(2027, 1, 7, 3, tzinfo=timezone.utc)
+    assert _seasonal_theme(selection, midnight) is None
+    assert _seasonal_theme(selection, midnight, include_expired=True) == active
 
 
 @pytest.mark.asyncio

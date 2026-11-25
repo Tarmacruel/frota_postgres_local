@@ -4,6 +4,8 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { officialBrand } from '../constants/officialBrand'
 import { getApiErrorMessage } from '../utils/apiError'
+import ChristmasSnow from '../components/ChristmasSnow'
+import { PublishedChristmasFestoon } from '../components/ChristmasFestoon'
 
 const accessNotes = [
   'Credenciais liberadas somente para servidores e setores autorizados.',
@@ -41,6 +43,8 @@ export default function LoginPage() {
 
   return (
     <div className="login-shell">
+      <ChristmasSnow className="christmas-snow--login" />
+      <PublishedChristmasFestoon className="login-christmas-festoon" />
       <div className="login-stage">
         <div className="login-card">
           <section className="login-card-panel login-card-panel-brand">

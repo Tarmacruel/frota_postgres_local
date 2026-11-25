@@ -1,7 +1,8 @@
+from datetime import date
 import re
 from typing import Literal
-from pydantic import BaseModel, ConfigDict, Field, model_validator
-from app.core.settings_catalog import DEFAULT_SETTINGS, FORM_FIELDS, ICON_KEYS, NAVIGATION, merged_settings
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
+from app.core.settings_catalog import FORM_FIELDS, ICON_KEYS, NAVIGATION, SEASONAL_THEMES
 
 
 class StrictModel(BaseModel):
@@ -80,6 +81,34 @@ class SettingsValues(StrictModel):
             if len(keys) != len(set(keys)) or set(keys) & set(allowed):
                 raise ValueError('Cada campo adicional precisa de um código único.')
         return self
+
+
+class SeasonalThemeSelection(StrictModel):
+    id: str = Field(pattern=r'^[a-z][a-z0-9-]{0,39}$')
+    ends_on: date
+
+    @field_validator('ends_on')
+    @classmethod
+    def valid_end_day(cls, value):
+        if value == date.max:
+            raise ValueError('Informe uma data de encerramento válida.')
+        return value
+
+
+class StoredSettingsValues(SettingsValues):
+    seasonal_theme: SeasonalThemeSelection | None = None
+
+
+class SeasonalThemeUpdate(StrictModel):
+    expected_revision: int = Field(ge=0)
+    theme: SeasonalThemeSelection | None
+
+    @field_validator('theme')
+    @classmethod
+    def known_theme(cls, value):
+        if value is not None and value.id not in SEASONAL_THEMES:
+            raise ValueError('Selecione um tema temporário do catálogo.')
+        return value
 
 
 class SettingsUpdate(StrictModel):

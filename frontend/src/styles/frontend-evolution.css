@@ -5,7 +5,8 @@
  * Não altera tokens legados, páginas, tabelas ou o shell existente.
  */
 
-:root {
+:root,
+.settings-preview[data-theme='light'] {
   --ui-app-bg: #f3f6fb;
   --ui-sidebar-bg: #071426;
   --ui-surface: #ffffff;
@@ -49,7 +50,8 @@
   --ui-table-row-min: 52px;
 }
 
-:root[data-theme='dark'] {
+:root[data-theme='dark'],
+.settings-preview[data-theme='dark'] {
   --ui-app-bg: #07111f;
   --ui-sidebar-bg: #06101f;
   --ui-surface: #0d192b;

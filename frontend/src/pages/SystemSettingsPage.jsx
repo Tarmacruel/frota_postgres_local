@@ -1,12 +1,16 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import api from '../api/client'
-import { brandingStyles, isBrandColor } from '../utils/systemBranding'
+import { activeSeasonalTheme, brandingStyles, formatSeasonalDate, isBrandColor } from '../utils/systemBranding'
 import { mergeSettingsDraft, newCustomFieldKey, settingNames, settingsDifferences } from '../utils/settingsDraft'
 import { useSystemSettings } from '../hooks/useSystemSettings'
+import { AppIcon } from '../components/AppIcon'
+import ChristmasFestoon from '../components/ChristmasFestoon'
+import ChristmasSnow from '../components/ChristmasSnow'
 import ModuleIcon from '../components/ModuleIcon'
 import Modal from '../components/Modal'
 import RecordAdministration from '../components/RecordAdministration'
+import SeasonalThemes from '../components/SeasonalThemes'
 import SettingsComparison, { SettingsConflictChoices } from '../components/SettingsComparison'
 import { getApiErrorMessage } from '../utils/apiError'
 
@@ -47,29 +51,75 @@ function validateSettings(values, catalog) {
   return issues
 }
 
-export function SettingsPreview({ values, mobile = false }) {
-  const [active, setActive] = useState('fleet')
-  const style = brandingStyles(values)
-  const navigation = [{ key: 'home', label: 'Início' }, { key: 'fleet', label: 'Veículos' }, { key: 'loans', label: 'Empréstimos' },
-    { key: 'driver', label: 'Condutores' }, { key: 'fuel', label: 'Abastecimentos' }, { key: 'contract', label: 'Contratos e saldos' }]
-  return <div className={`settings-preview ${mobile ? 'settings-preview--mobile' : ''}`} data-preview-density={values.appearance.density} style={style} aria-label="Prévia da identidade do sistema">
-    <div className="settings-preview__frame">
-      <aside>
-        <div className="settings-preview__brand"><img src={values.identity.logoPath} alt="Logo na prévia" /><span><strong>{values.identity.systemName}</strong><small>{values.identity.city}</small></span></div>
-        <nav aria-label="Navegação da prévia">{navigation.map((item) => <button key={item.key} type="button" aria-pressed={active === item.key} onClick={() => setActive(item.key)}>
-          <ModuleIcon name={values.icons[item.key] || item.key} /><span>{item.label}</span></button>)}</nav>
-      </aside>
-      <div className="settings-preview__main"><div className="settings-preview__topbar"><ModuleIcon name={values.icons[active] || active} /><strong>{navigation.find((item) => item.key === active)?.label}</strong><span>JD</span></div>
-        <section><div className="settings-preview__title"><h4>{navigation.find((item) => item.key === active)?.label}</h4><button type="button" className="settings-preview__action">Novo registro</button></div>
-          <div className="settings-preview__filters">Buscar por placa ou nome…</div>
-          <div className="settings-preview__summary"><strong>24 <small>Ativos</small></strong><strong>3 <small>Pendentes</small></strong></div>
-          <div className="settings-preview__table"><span>REGISTRO</span><span>SITUAÇÃO</span><strong>Veículo de exemplo</strong><small>Ativo</small><strong>Veículo de exemplo</strong><small>Ativo</small><strong>Veículo de exemplo</strong><small>Pendente</small></div>
-        </section>
-        <footer>{values.identity.municipality}</footer>
-      </div>
-    </div>
-    <p className="helper-text">Prévia interativa · dados ilustrativos · alterações ainda não publicadas</p>
+const previewNavigation = [
+  { key: 'home', label: 'Início' }, { key: 'fleet', label: 'Veículos' }, { key: 'loans', label: 'Empréstimos' },
+  { key: 'driver', label: 'Condutores' }, { key: 'fuel', label: 'Abastecimentos' }, { key: 'contract', label: 'Contratos e saldos' },
+]
+const previewFormats = [{ key: 'desktop', label: 'Desktop' }, { key: 'mobile', label: 'Celular' }]
+const previewModes = [{ key: 'light', label: 'Claro' }, { key: 'dark', label: 'Escuro' }]
+const previewEffects = [{ key: 'lights', label: 'Luzes' }, { key: 'snow', label: 'Luzes com neve' }]
+
+function PreviewOptions({ name, options, selected, onSelect }) {
+  return <div role="group" aria-label={name}>
+    {options.map(({ key, label }) => <button key={key} type="button" aria-pressed={selected === key} onClick={() => onSelect(key)}>{label}</button>)}
   </div>
+}
+
+function SettingsPreview({ values, mobile, onMobileChange, seasonalTheme, previewRef }) {
+  const [active, setActive] = useState('fleet')
+  const [mode, setMode] = useState(null)
+  const [effect, setEffect] = useState('lights')
+  const christmas = seasonalTheme?.id === 'christmas'
+  const home = active === 'home'
+  const showSnow = christmas && home && effect === 'snow'
+  const label = previewNavigation.find((item) => item.key === active)?.label
+  const style = brandingStyles(values, seasonalTheme?.style)
+  const previewMode = mode ?? (document.documentElement.dataset.theme === 'dark' ? 'dark' : 'light')
+
+  function selectEffect(option) {
+    setEffect(option)
+    if (option === 'snow') setActive('home')
+  }
+
+  return <aside className="settings-preview-column" ref={previewRef}>
+    <header>
+      <strong>{seasonalTheme ? `Prévia · ${seasonalTheme.name}` : 'Prévia ao vivo'}</strong>
+      <PreviewOptions name="Formato da prévia" options={previewFormats} selected={mobile ? 'mobile' : 'desktop'}
+        onSelect={(format) => onMobileChange(format === 'mobile')} />
+    </header>
+    {christmas && <div className="settings-preview-options">
+      <PreviewOptions name="Efeitos da prévia de Natal" options={previewEffects} selected={effect} onSelect={selectEffect} />
+      <PreviewOptions name="Aparência da prévia" options={previewModes} selected={previewMode} onSelect={setMode} />
+    </div>}
+    <div className={`settings-preview${mobile ? ' settings-preview--mobile' : ''}`}
+      data-preview-density={values.appearance.density} data-seasonal-theme={seasonalTheme?.id}
+      data-theme={christmas ? previewMode : undefined} style={style} aria-label="Prévia da identidade do sistema">
+      <div className="settings-preview__frame">
+        {christmas && <ChristmasFestoon compact={mobile} className="settings-preview__festoon" />}
+        <div className="settings-preview__body">
+          <aside>
+            <div className="settings-preview__brand"><img src={values.identity.logoPath} alt="Logo na prévia" /><span><strong>{values.identity.systemName}</strong><small>{values.identity.city}</small></span></div>
+            <nav aria-label="Navegação da prévia">{previewNavigation.map((item) => <button key={item.key} type="button" aria-label={item.label} aria-pressed={active === item.key} onClick={() => setActive(item.key)}>
+              <ModuleIcon name={values.icons[item.key] || item.key} /><span>{item.label}</span></button>)}</nav>
+          </aside>
+          <div className="settings-preview__main">
+            <div className="settings-preview__topbar"><ModuleIcon name={values.icons[active] || active} /><strong>{label}</strong><span>JD</span></div>
+            <section className={showSnow ? 'settings-preview__snow-scene' : undefined}>
+              {showSnow && <ChristmasSnow preview compact={mobile} className="settings-preview__snow" />}
+              <div className="settings-preview__title"><h4>{label}</h4>{!home && <button type="button" className="settings-preview__action">Novo registro</button>}</div>
+              {!home && <div className="settings-preview__filters">Buscar por placa ou nome…</div>}
+              <div className="settings-preview__summary"><strong>24 <small>Ativos</small></strong><strong>3 <small>Pendentes</small></strong></div>
+              {home
+                ? <div className="settings-preview__recent"><strong>Pendências recentes</strong><small>Vistorias programadas</small></div>
+                : <div className="settings-preview__table"><span>REGISTRO</span><span>SITUAÇÃO</span><strong>Veículo de exemplo</strong><small>Ativo</small><strong>Veículo de exemplo</strong><small>Ativo</small><strong>Veículo de exemplo</strong><small>Pendente</small></div>}
+            </section>
+            <footer>{values.identity.municipality}</footer>
+          </div>
+        </div>
+      </div>
+      <p className="helper-text">{christmas ? 'Dados ilustrativos. A neve aparece no acesso e no Início.' : 'Prévia interativa · dados ilustrativos · alterações ainda não publicadas'}</p>
+    </div>
+  </aside>
 }
 
 function FormsEditor({ values, catalog, update, module, setModule, showErrors }) {
@@ -126,6 +176,7 @@ export default function SystemSettingsPage() {
   const [review, setReview] = useState(false)
   const [reason, setReason] = useState('')
   const [mobilePreview, setMobilePreview] = useState(false)
+  const [seasonalPreviewId, setSeasonalPreviewId] = useState(null)
   const [formModule, setFormModule] = useState('vehicles')
   const [showErrors, setShowErrors] = useState(false)
   const [loading, setLoading] = useState(true)
@@ -135,6 +186,7 @@ export default function SystemSettingsPage() {
   const [choices, setChoices] = useState({})
   const [leaveTo, setLeaveTo] = useState(null)
   const fileRef = useRef(null)
+  const previewRef = useRef(null)
   async function load() {
     setLoading(true)
     try { const { data } = await api.get('/system-settings'); setSaved(data); setDraft(copy(data.values)); setError('') }
@@ -167,6 +219,8 @@ export default function SystemSettingsPage() {
     if (!saved || !draft) return []
     return ['identity', 'appearance', 'icons', 'forms'].filter((key) => JSON.stringify(saved.values[key]) !== JSON.stringify(draft[key]))
   }, [saved, draft])
+  const seasonalPreview = section === 'appearance'
+    ? saved?.seasonal_catalog?.themes.find((theme) => theme.id === seasonalPreviewId) : undefined
   function update(key, value) { setDraft((current) => ({ ...current, [key]: value })); setFeedback('') }
   function goToIssue(issue) {
     setParams((current) => { const next = new URLSearchParams(current); next.set('section', issue.section); return next })
@@ -210,6 +264,34 @@ export default function SystemSettingsPage() {
     } catch (cause) { setError(getApiErrorMessage(cause, 'Não foi possível salvar. Seu rascunho foi mantido.')); setStale(cause.response?.status === 409) }
     finally { setSaving(false) }
   }
+  function showSeasonalPreview(themeId) {
+    setSeasonalPreviewId(themeId)
+    if (themeId && window.matchMedia?.('(max-width: 800px)').matches) {
+      setMobilePreview(true)
+      previewRef.current?.scrollIntoView({ block: 'start' })
+    }
+  }
+  async function publishSeasonalTheme(theme) {
+    if (saving || stale) return false
+    setSaving(true)
+    setError('')
+    setFeedback('')
+    try {
+      const { data } = await api.put('/system-settings/seasonal-theme', { expected_revision: saved.revision, theme })
+      system.publish(data)
+      setSaved(data)
+      setSeasonalPreviewId(theme?.id ?? null)
+      const active = activeSeasonalTheme(data.seasonal_theme)
+      setFeedback(active ? `${active.name} publicado até ${formatSeasonalDate(active.ends_on)}.` : 'Tema desativado. A aparência padrão está em uso.')
+      return true
+    } catch (cause) {
+      setError(getApiErrorMessage(cause, 'Não foi possível atualizar o tema temporário.'))
+      setStale(cause.response?.status === 409)
+      return false
+    } finally {
+      setSaving(false)
+    }
+  }
   return <div className="surface-panel operation-page system-settings-page">
     <header className="settings-page-header"><div><span className="settings-eyebrow">Administração do sistema</span><h2>Parâmetros</h2></div><span className="settings-badge settings-badge--private">Superusuário</span></header>
     <nav className="settings-tabs" aria-label="Áreas dos parâmetros">{tabs.map((tab) => <button type="button" key={tab.key} aria-current={section === tab.key ? 'page' : undefined} onClick={() => setParams((current) => { const next = new URLSearchParams(current); next.set('section', tab.key); return next })}><ModuleIcon name={tab.icon} />{tab.label}</button>)}</nav>
@@ -219,13 +301,17 @@ export default function SystemSettingsPage() {
     {showErrors && issues.length ? <div className="settings-validation" role="alert"><strong>Revise os campos antes de publicar</strong><ul>{issues.map((issue) => <li key={`${issue.section}-${issue.module || ''}-${issue.key}`}><button type="button" onClick={() => goToIssue(issue)}>{issue.message}</button></li>)}</ul></div> : null}
     {section === 'records' ? <RecordAdministration initialModule={params.get('module') || 'vehicles'} initialRecordId={params.get('record_id') || ''} /> : !draft ? <div className="settings-load-state">{loading ? <p role="status">Carregando configuração…</p> : <button type="button" className="secondary-button" onClick={load}>Tentar carregar novamente</button>}</div> : <>
       <div className={`settings-workspace ${section === 'forms' ? 'settings-workspace--forms' : ''}`}>
+        <div className="settings-edit-column">
+          {section === 'appearance' && saved.seasonal_catalog ? <SeasonalThemes catalog={saved.seasonal_catalog}
+            published={saved.seasonal_theme} previewId={seasonalPreviewId} disabled={saving || stale}
+            onPreview={showSeasonalPreview} onPublish={publishSeasonalTheme} /> : null}
         <form id="system-settings-draft" className="settings-editor" noValidate onSubmit={openReview}>
           {section === 'identity' ? <>
             <header className="settings-section-heading"><h3>Identidade institucional</h3><p>Usada na navegação, no acesso e nos novos relatórios.</p></header>
             <div className="settings-logo-editor"><div><img src={draft.identity.logoPath} alt="Logo selecionada" /></div><section><strong>Logo ou brasão</strong><p>PNG, JPG ou WEBP · até 2 MB</p><div><button className="secondary-button" type="button" disabled={uploading} onClick={() => fileRef.current?.click()}>{uploading ? 'Enviando…' : 'Trocar imagem'}</button><button className="ghost-button" type="button" disabled={uploading || draft.identity.logoPath === saved.defaults.identity.logoPath} onClick={() => update('identity', { ...draft.identity, logoPath: saved.defaults.identity.logoPath })}>Restaurar brasão</button></div></section><input ref={fileRef} hidden type="file" accept="image/png,image/jpeg,image/webp" onChange={upload} /></div>
             <div className="settings-field-grid">{identityFields.map((field) => <label className={`form-field ${field.key === 'municipality' || field.key === 'addressLine' ? 'settings-field-wide' : ''}`} key={field.key}><span>{field.label}{field.required ? <span className="guided-form__required"> *</span> : null}</span><input className="app-input" required={field.required} aria-invalid={showErrors && issues.some((issue) => issue.section === 'identity' && issue.key === field.key) || undefined} minLength={field.required ? field.key === 'municipality' ? 3 : 2 : undefined} maxLength={field.max} pattern={field.key === 'state' ? '[A-Z]{2}' : undefined} value={draft.identity[field.key]} onChange={(event) => update('identity', { ...draft.identity, [field.key]: field.key === 'state' ? event.target.value.toUpperCase() : event.target.value })} /></label>)}</div>
           </> : section === 'appearance' ? <>
-            <header className="settings-section-heading"><h3>Cores e navegação</h3><p>Confira a combinação nos dois formatos antes de publicar.</p></header>
+            <header className="settings-section-heading"><h3>Cores e navegação</h3><p>Configure a aparência padrão usada entre campanhas.</p></header>
             <div className="settings-palette">{palettes.map((palette) => <button key={palette.color} className={draft.appearance.primary === palette.color ? 'is-selected' : ''} type="button" title={palette.label} aria-label={palette.label} aria-pressed={draft.appearance.primary === palette.color} style={{ '--swatch': palette.color }} onClick={() => update('appearance', { ...draft.appearance, primary: palette.color })}><span />{palette.label}</button>)}</div>
             <div className="settings-field-grid">{[{ key: 'primary', label: 'Cor principal' }, { key: 'sidebar', label: 'Menu lateral' }].map((field) => <label className="form-field" key={field.key}>{field.label}<span className="settings-color-input"><input type="color" aria-label={`Escolher ${field.label}`} value={isBrandColor(draft.appearance[field.key]) ? draft.appearance[field.key] : saved.values.appearance[field.key]} onChange={(event) => update('appearance', { ...draft.appearance, [field.key]: event.target.value })} /><input className="app-input" required aria-label={`Código de ${field.label}`} aria-invalid={showErrors && !isBrandColor(draft.appearance[field.key]) || undefined} pattern="#[0-9a-fA-F]{6}" maxLength={7} value={draft.appearance[field.key]} onChange={(event) => update('appearance', { ...draft.appearance, [field.key]: event.target.value })} /></span></label>)}</div>
             <p className="helper-text">A cor escolhida é mantida nos botões. Textos e ícones recebem contraste adequado nos temas claro e escuro.</p>
@@ -235,32 +321,60 @@ export default function SystemSettingsPage() {
             </details>
           </> : <FormsEditor values={draft} catalog={saved.form_catalog} update={update} module={formModule} setModule={setFormModule} showErrors={showErrors} />}
         </form>
-        {section !== 'forms' ? <aside className="settings-preview-column"><header><strong>Prévia ao vivo</strong><div role="group" aria-label="Formato da prévia"><button type="button" className={!mobilePreview ? 'is-selected' : ''} aria-pressed={!mobilePreview} onClick={() => setMobilePreview(false)}>Desktop</button><button type="button" className={mobilePreview ? 'is-selected' : ''} aria-pressed={mobilePreview} onClick={() => setMobilePreview(true)}>Celular</button></div></header><SettingsPreview values={draft} mobile={mobilePreview} /></aside> : null}
+        </div>
+        {section !== 'forms' && <SettingsPreview previewRef={previewRef} values={draft} mobile={mobilePreview}
+          onMobileChange={setMobilePreview} seasonalTheme={seasonalPreview} />}
       </div>
-      <footer className="settings-savebar"><span role="status">{dirty ? `${changes.length} área(s) com alterações não publicadas` : `Configuração publicada · versão ${saved.revision}`}</span><div><button className="secondary-button" type="button" disabled={!dirty || saving} onClick={() => { setDraft(copy(saved.values)); setError(''); setShowErrors(false); setFeedback('') }}>Descartar alterações</button><button form="system-settings-draft" type="submit" className="primary-button" disabled={!dirty || uploading || saving || stale}>Conferir e publicar</button></div></footer>
+      <footer className="settings-savebar">
+        <span className="settings-savebar__status" role="status">
+          <AppIcon name={dirty ? 'catalog' : 'check'} className="app-icon" />{dirty ? `${changes.length} área(s) com alterações não publicadas` : `Configuração publicada · versão ${saved.revision}`}
+        </span>
+        <div className="settings-actions">
+          <button className="secondary-button" type="button" disabled={!dirty || saving}
+            onClick={() => { setDraft(copy(saved.values)); setError(''); setShowErrors(false); setFeedback('') }}>
+            Descartar alterações
+          </button>
+          <button form="system-settings-draft" type="submit" className="app-button" disabled={!dirty || uploading || saving || stale}>
+            Conferir e publicar <AppIcon name="chevron-right" className="app-icon" />
+          </button>
+        </div>
+      </footer>
       <Modal open={review} title="Conferir alterações" onClose={saving ? () => {} : () => setReview(false)} className="settings-review">
         <form onSubmit={save} className="settings-review__form"><p>As alterações serão aplicadas aos usuários do sistema após a publicação.</p>
           <SettingsComparison rows={comparison} />
           {error ? <p className="form-error" role="alert">{error}</p> : null}
           {stale ? <button className="secondary-button" type="button" disabled={reconciling} onClick={reconcile}>{reconciling ? 'Consultando…' : 'Atualizar referência sem perder rascunho'}</button> : null}
           <label className="form-field"><span>Justificativa <span className="guided-form__required">*</span></span><textarea required minLength={8} maxLength={1000} className="app-input" value={reason} onChange={(event) => setReason(event.target.value)} placeholder="Descreva o motivo da atualização" /></label>
-          <div className="form-actions"><button className="secondary-button" type="button" disabled={saving} onClick={() => setReview(false)}>Voltar à prévia</button><button className="primary-button" type="submit" disabled={saving || stale || reason.trim().length < 8}>{saving ? 'Publicando…' : 'Publicar parâmetros'}</button></div>
+          <div className="form-actions settings-actions">
+            <button className="secondary-button" type="button" disabled={saving} onClick={() => setReview(false)}>Voltar à prévia</button>
+            <button className="app-button" type="submit" disabled={saving || stale || reason.trim().length < 8}>
+              {!saving && <AppIcon name="check" className="app-icon" />}
+              {saving ? 'Publicando…' : 'Publicar parâmetros'}
+            </button>
+          </div>
         </form>
       </Modal>
     </>}
     <Modal open={Boolean(conflict)} title="Conciliar versões dos parâmetros" onClose={() => setConflict(null)} className="settings-review">
       {conflict ? <div className="settings-review__form"><p>Outra sessão alterou os mesmos campos. Escolha o valor de cada conflito. As demais alterações serão combinadas sem perder dados.</p>
         <SettingsConflictChoices conflicts={conflict.conflicts} choices={choices} onChoose={(key, value) => setChoices((current) => ({ ...current, [key]: value }))} describe={(entry) => entry.path.map((key) => settingNames[key] || moduleLabels[key] || saved.navigation[key] || draft.forms?.[entry.path[1]]?.custom?.find((field) => field.key === key)?.label || key).filter((key) => !['custom', 'fields'].includes(key)).join(' · ')} />
-        <div className="form-actions"><button type="button" className="secondary-button" onClick={() => setConflict(null)}>Manter rascunho sem conciliar</button><button type="button" className="primary-button" disabled={conflict.conflicts.some((entry) => !choices[entry.key])} onClick={() => {
-          const merged = mergeSettingsDraft(conflict.base, conflict.local, conflict.remote.values, choices)
-          setSaved(conflict.remote); setDraft(copy(merged.values)); setConflict(null); setStale(false); setError('')
-          setFeedback('Versões conciliadas no rascunho. Confira novamente antes de publicar.')
-        }}>Aplicar escolhas ao rascunho</button></div>
+        <div className="form-actions settings-actions">
+          <button type="button" className="secondary-button" onClick={() => setConflict(null)}>Manter rascunho sem conciliar</button>
+          <button type="button" className="app-button" disabled={conflict.conflicts.some((entry) => !choices[entry.key])} onClick={() => {
+            const merged = mergeSettingsDraft(conflict.base, conflict.local, conflict.remote.values, choices)
+            setSaved(conflict.remote); setDraft(copy(merged.values)); setConflict(null); setStale(false); setError('')
+            setFeedback('Versões conciliadas no rascunho. Confira novamente antes de publicar.')
+          }}>Aplicar escolhas ao rascunho</button>
+        </div>
       </div> : null}
     </Modal>
-    <Modal open={Boolean(leaveTo)} title="Sair com alterações não publicadas?" onClose={() => setLeaveTo(null)}>
+    <Modal open={Boolean(leaveTo)} title="Sair com alterações não publicadas?" onClose={() => setLeaveTo(null)} className="settings-review">
       <p>Você tem alterações na prévia. Continue editando para conferir e publicar, ou descarte para sair.</p>
-      <div className="form-actions"><button className="secondary-button" type="button" onClick={() => setLeaveTo(null)}>Continuar editando</button><button className="primary-button" type="button" onClick={() => { const path = leaveTo; setLeaveTo(null); navigate(path) }}>Descartar e sair</button></div>
+      <div className="form-actions settings-actions">
+        <button className="secondary-button" type="button" onClick={() => setLeaveTo(null)}>Continuar editando</button>
+        <button className="app-button settings-action--danger" type="button"
+          onClick={() => { const path = leaveTo; setLeaveTo(null); navigate(path) }}>Descartar e sair</button>
+      </div>
     </Modal>
   </div>
 }

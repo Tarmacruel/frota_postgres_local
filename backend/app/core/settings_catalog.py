@@ -14,6 +14,13 @@ DEFAULT_SETTINGS = {
     'appearance': {'primary': '#2452e8', 'sidebar': '#071426', 'density': 'comfortable'},
     'icons': {}, 'forms': {},
 }
+SEASONAL_THEMES = {
+    'christmas': {
+        'name': 'Natal',
+        'style': {'primary': '#145943', 'sidebar': '#3b202b', 'accent': '#dab46f'},
+        'annual_end': (1, 6),
+    },
+}
 ICON_KEYS = ('home', 'fleet', 'loans', 'keys', 'driver', 'wrench', 'incident', 'ticket',
              'fuel', 'orders', 'registry', 'station', 'contract', 'chart', 'transfer', 'access', 'audit', 'settings')
 NAVIGATION = {'home': 'Início', 'fleet': 'Veículos', 'loans': 'Empréstimos', 'keys': 'Posses',

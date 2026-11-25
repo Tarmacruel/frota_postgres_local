@@ -12,6 +12,7 @@ import './styles/kpi-tones.css'
 import './styles/operation-workspaces.css'
 import './styles/guided-forms.css'
 import './styles/system-settings.css'
+import './styles/christmas.css'
 import { SystemSettingsProvider } from './context/SystemSettingsContext'
 
 const savedTheme = window.localStorage.getItem('frota-theme') === 'dark' ? 'dark' : 'light'
