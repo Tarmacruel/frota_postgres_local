@@ -53,6 +53,7 @@ async def get_current_user(
     db.info['organization_id'] = user.organization_id
     db.info['actor_id'] = user.id
     db.info['audit_actor'] = user
+    db.info['audit_session_id'] = payload.get("audit_sid")
     from app.core.record_visibility import guard_inactive_inputs
     await guard_inactive_inputs(db, request, user)
     return user

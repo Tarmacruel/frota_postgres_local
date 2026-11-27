@@ -44,6 +44,7 @@ class Settings(BaseSettings):
     COOKIE_SECURE: bool = False
     TRUSTED_PROXY_NETWORKS: list[str] = []
     MAX_USER_AGENT_LENGTH: int = Field(default=256, ge=64, le=1024)
+    AUDIT_IP_CITY_MMDB: Path | None = None
     MAX_REQUEST_BODY_BYTES: int = Field(default=64 * 1024 * 1024, ge=1024 * 1024, le=100 * 1024 * 1024)
     TRUSTED_HOSTS: list[str] = [
         "localhost",
@@ -101,6 +102,7 @@ class Settings(BaseSettings):
         return value
 
     @field_validator(
+        "AUDIT_IP_CITY_MMDB",
         "DIGITAL_DOCUMENT_ARTIFACTS_DIR",
         "SIGNATURE_PREPARED_STATE_DIR",
         "ICP_BRASIL_TRUST_STORE_DIR",

@@ -9,17 +9,20 @@ import { useMasterDataCatalog } from '../hooks/useMasterDataCatalog'
 import { getApiErrorMessage } from '../utils/apiError'
 import { exportRowsToXlsx, previewRowsToPdf } from '../utils/exportData'
 import { getRoleLabel } from '../utils/roles'
+import { useAuth } from '../context/AuthContext'
+import { AuditAccessDetails, accessActions, describeBrowser } from '../components/AuditAccessDetails'
 
 const actionOptions = ['TODAS', 'CREATE', 'UPDATE', 'DELETE', 'RECTIFY', 'POSSESSION_CREATE', 'POSSESSION_REPLACE_ACTIVE', 'POSSESSION_RETURN_CONFIRMATION', 'POSSESSION_RETURN_CORRECTION', 'TERM_PREVIEW', 'TERM_DOWNLOAD', 'TRIP_CREATE', 'TRIP_DESTINATION_ADD', 'TRIP_END', 'TRIP_CANCEL', 'DELETE_DENIED', 'ORDER_CREATED', 'ORDER_CONFIRMED', 'ORDER_CONFIRM_RECTIFIED', 'ORDER_CANCELLED', 'ORDER_EXPIRED', 'ORDER_REOPENED', 'ORDER_DEADLINE_EXTENDED']
 const entityOptions = ['TODOS', 'USER', 'VEHICLE', 'MAINTENANCE', 'POSSESSION', 'POSSESSION_TRIP', 'FUEL_STATION', 'FUEL_STATION_USER', 'FUEL_SUPPLY', 'FUEL_SUPPLY_ORDER']
 
 function formatDate(value) {
   if (!value) return '-'
-  return new Date(value).toLocaleString('pt-BR')
+  return new Date(value).toLocaleString('pt-BR', { timeZone: 'America/Bahia' })
 }
 
 function summarizeDetails(details) {
   if (!details) return 'Sem detalhes adicionais'
+  if (details.password_changed) return 'Senha alterada'
   if (details.event === 'END_POSSESSION') {
     return `Encerramento registrado para ${details.end_date ? formatDate(details.end_date) : 'agora'}`
   }
@@ -47,10 +50,18 @@ function summarizeDetails(details) {
   if (details.driver_contact || details.driver_document) {
     return [details.driver_document, details.driver_contact].filter(Boolean).join(' | ')
   }
-  return JSON.stringify(details)
+  const fields = Object.fromEntries(Object.entries(details).filter(([key]) => !['request_context', 'audit_session_id'].includes(key)))
+  return Object.keys(fields).length ? JSON.stringify(fields) : 'Sem detalhes adicionais'
+}
+
+function summarizeEvent(log) {
+  if (log.entity_type !== 'AUTH_ACCESS') return summarizeDetails(log.details)
+  const context = log.details?.request_context
+  return [context?.ip_address, describeBrowser(context?.user_agent)].filter(Boolean).join(' · ')
 }
 
 export default function AuditPage() {
+  const isSuperUser = useAuth()?.isSuperUser === true
   const { selected: indicator, metadata: indicatorMetadata, setMetadata: setIndicators, select: selectIndicator } = useInteractiveKpis()
 
   const [logs, setLogs] = useState([])
@@ -63,6 +74,8 @@ export default function AuditPage() {
   const [actionFilter, setActionFilter] = useState('TODAS')
   const [entityFilter, setEntityFilter] = useState('TODOS')
   const [organizationFilter, setOrganizationFilter] = useState('TODAS')
+  const [dateFrom, setDateFrom] = useState('')
+  const [dateTo, setDateTo] = useState('')
   const { organizations } = useMasterDataCatalog({ organizationsOnly: true })
 
   function getActorOrganization(log) {
@@ -70,6 +83,10 @@ export default function AuditPage() {
   }
 
   const filteredLogs = logs
+  const reportDates = [
+    ...(dateFrom ? [{ label: 'Data inicial', value: dateFrom }] : []),
+    ...(dateTo ? [{ label: 'Data final', value: dateTo }] : []),
+  ]
 
   const queryParams = useCallback((page = 1, limit = 20) => ({ indicator: indicator === 'total' ? undefined : indicator,
       page, limit, search: search.trim() || undefined,
@@ -77,7 +94,9 @@ export default function AuditPage() {
       entity_type: entityFilter !== 'TODOS' ? entityFilter : undefined,
       organization_id: !['TODAS', 'SEM_SECRETARIA'].includes(organizationFilter) ? organizationFilter : undefined,
       without_organization: organizationFilter === 'SEM_SECRETARIA' || undefined,
-  }), [search, actionFilter, entityFilter, organizationFilter, indicator])
+      date_from: dateFrom || undefined,
+      date_to: dateTo || undefined,
+  }), [search, actionFilter, entityFilter, organizationFilter, indicator, dateFrom, dateTo])
 
   async function allFilteredLogs() {
     const records = []
@@ -94,13 +113,17 @@ export default function AuditPage() {
 
   const exportColumns = [
     { header: 'Data', value: (log) => formatDate(log.created_at) },
-    { header: 'Ação', value: (log) => log.action },
-    { header: 'Entidade', value: (log) => log.entity_type },
+    { header: 'Ação', value: (log) => accessActions[log.action] || log.action },
+    { header: 'Entidade', value: (log) => log.entity_type === 'AUTH_ACCESS' ? 'Acesso' : log.entity_type },
     { header: 'Registro', value: (log) => log.entity_label },
     { header: 'Ator', value: (log) => `${log.actor_name}${log.actor_email ? ` <${log.actor_email}>` : ''}` },
     { header: 'Perfil', value: (log) => getRoleLabel(log.actor_role) },
     { header: 'Secretaria', value: (log) => getActorOrganization(log).name },
-    { header: 'Detalhes', value: (log) => summarizeDetails(log.details) },
+    { header: 'Detalhes', value: summarizeEvent },
+    { header: 'IP', value: (log) => log.details?.request_context?.ip_address || '' },
+    { header: 'ID da requisição', value: (log) => log.details?.request_context?.request_id || '' },
+    { header: 'Ray ID informado', value: (log) => log.details?.request_context?.cloudflare_ray || '' },
+    { header: 'ID de auditoria da sessão', value: (log) => log.details?.audit_session_id || '' },
   ]
 
   const loadAudit = useCallback(async (page = 1) => {
@@ -150,6 +173,7 @@ export default function AuditPage() {
                   ? 'Sem secretaria'
                   : organizations.find((organization) => organization.id === organizationFilter)?.name || organizationFilter,
           },
+          ...reportDates,
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
@@ -186,6 +210,7 @@ export default function AuditPage() {
                   ? 'Sem secretaria'
                   : organizations.find((organization) => organization.id === organizationFilter)?.name || organizationFilter,
           },
+          ...reportDates,
           ...(search.trim() ? [{ label: 'Busca', value: search.trim() }] : []),
         ],
       })
@@ -207,9 +232,14 @@ export default function AuditPage() {
 
       <div className="toolbar-row operation-toolbar">
         <div className="filter-inline">
+          {isSuperUser && <button
+            className="ghost-button" type="button" aria-pressed={entityFilter === 'AUTH_ACCESS'}
+            onClick={() => { setEntityFilter(entityFilter === 'AUTH_ACCESS' ? 'TODOS' : 'AUTH_ACCESS'); setActionFilter('TODAS'); setOrganizationFilter('TODAS'); selectIndicator('total') }}
+          >Acessos</button>}
           <input
             className="app-input"
-            placeholder="Buscar por ator, secretaria, entidade, ação ou detalhes"
+            aria-label="Buscar na auditoria"
+            placeholder="Buscar por conta, IP ou ID da sessão"
             value={search}
             onChange={(event) => setSearch(event.target.value)}
           />
@@ -221,15 +251,17 @@ export default function AuditPage() {
             ))}
           </select>
           <select className="app-select" value={actionFilter} onChange={(event) => setActionFilter(event.target.value)}>
-            {actionOptions.map((option) => (
-              <option key={option} value={option}>{option}</option>
+            {[...actionOptions, ...(isSuperUser ? Object.keys(accessActions) : [])].map((option) => (
+              <option key={option} value={option}>{accessActions[option] || option}</option>
             ))}
           </select>
           <select className="app-select" value={entityFilter} onChange={(event) => setEntityFilter(event.target.value)}>
-            {entityOptions.map((option) => (
-              <option key={option} value={option}>{option}</option>
+            {[...entityOptions, ...(isSuperUser ? ['AUTH_ACCESS'] : [])].map((option) => (
+              <option key={option} value={option}>{option === 'AUTH_ACCESS' ? 'Acessos' : option}</option>
             ))}
           </select>
+          <label>De <input className="app-input" type="date" max={dateTo || undefined} value={dateFrom} onChange={(event) => setDateFrom(event.target.value)} /></label>
+          <label>Até <input className="app-input" type="date" min={dateFrom || undefined} value={dateTo} onChange={(event) => setDateTo(event.target.value)} /></label>
         </div>
       </div>
 
@@ -266,8 +298,8 @@ export default function AuditPage() {
                 filteredLogs.map((log) => (
                   <tr key={log.id}>
                     <td data-label="Data">{formatDate(log.created_at)}</td>
-                    <td data-label="Ação"><span className={`status-badge audit-action-${log.action}`}>{log.action}</span></td>
-                    <td data-label="Entidade">{log.entity_type}</td>
+                    <td data-label="Ação"><span className={`status-badge audit-action-${log.action}`}>{accessActions[log.action] || log.action}</span></td>
+                    <td data-label="Entidade">{log.entity_type === 'AUTH_ACCESS' ? 'Acesso' : log.entity_type}</td>
                     <td data-label="Registro"><strong>{log.entity_label}</strong></td>
                     <td data-label="Ator">
                       <div className="stack">
@@ -277,7 +309,10 @@ export default function AuditPage() {
                         <span className="muted">{getActorOrganization(log).name}</span>
                       </div>
                     </td>
-                    <td data-label="Detalhes">{summarizeDetails(log.details)}</td>
+                    <td data-label="Detalhes">
+                      {summarizeEvent(log)}
+                      <AuditAccessDetails event={log} canLocate={isSuperUser} />
+                    </td>
                   </tr>
                 ))
               )}

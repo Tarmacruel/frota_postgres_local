@@ -1,0 +1,39 @@
+.audit-access {
+  margin-top: .45rem;
+  max-width: 32rem;
+}
+
+.audit-access summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.audit-access__facts {
+  display: grid;
+  gap: .5rem;
+  margin: .75rem 0;
+}
+
+.audit-access__facts dt {
+  font-size: .78rem;
+  font-weight: 600;
+}
+
+.audit-access__facts dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.audit-access__location {
+  display: grid;
+  gap: .35rem;
+}
+
+.audit-access__map {
+  isolation: isolate;
+  width: min(100%, 27rem);
+  min-width: 10rem;
+  height: 10rem;
+  background: #d6e9f5;
+  border-radius: .55rem;
+}

@@ -3,6 +3,7 @@ from __future__ import annotations
 from app.repositories.interactive_kpis import populate_indicators
 
 from uuid import UUID
+from datetime import datetime
 from sqlalchemy import String, cast, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from app.models.audit_log import AuditLog
@@ -27,8 +28,11 @@ class AuditRepository:
         action: str | None = None,
         actor_user_id: UUID | None = None,
         organization_id: UUID | None = None,
+        include_access: bool = False,
     ) -> list[AuditLog]:
         stmt = select(AuditLog).order_by(AuditLog.created_at.desc()).limit(limit)
+        if not include_access:
+            stmt = stmt.where(AuditLog.entity_type != "AUTH_ACCESS")
 
         if entity_type:
             stmt = stmt.where(AuditLog.entity_type == entity_type.upper())
@@ -45,11 +49,18 @@ class AuditRepository:
     async def list_paginated(self, *, page: int, limit: int, search: str | None = None,
                              action: str | None = None, entity_type: str | None = None,
                              organization_id: UUID | None = None,
-                             without_organization: bool = False) -> tuple[list[dict], int, int]:
+                             without_organization: bool = False, include_access: bool = False,
+                             since: datetime | None = None, until: datetime | None = None) -> tuple[list[dict], int, int]:
         base = select(AuditLog, Organization.name.label("organization_name"),
                       Organization.id.label("actor_organization_id"))
         base = base.outerjoin(User, User.id == AuditLog.actor_user_id).outerjoin(
             Organization, Organization.id == User.organization_id)
+        if not include_access:
+            base = base.where(AuditLog.entity_type != "AUTH_ACCESS")
+        if since:
+            base = base.where(AuditLog.created_at >= since)
+        if until:
+            base = base.where(AuditLog.created_at < until)
         if action:
             base = base.where(AuditLog.action == action.upper())
         if entity_type:

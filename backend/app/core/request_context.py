@@ -16,6 +16,7 @@ from app.core.config import settings
 
 REQUEST_ID_HEADER = "X-Request-ID"
 REQUEST_ID_PATTERN = re.compile(r"^[A-Za-z0-9][A-Za-z0-9._-]{7,63}$")
+CLOUDFLARE_RAY_PATTERN = re.compile(r"^[0-9a-fA-F]{16,32}-[A-Z]{3}$")
 MAX_FORWARDED_HOPS = 20
 MAX_PATH_LENGTH = 512
 
@@ -28,10 +29,13 @@ class RequestAuditContext:
     method: str
     path: str
     timestamp: datetime
+    cloudflare_ray: str | None = None
 
     def as_dict(self) -> dict[str, str]:
         data = asdict(self)
         data["timestamp"] = self.timestamp.isoformat()
+        if self.cloudflare_ray is None:
+            data.pop("cloudflare_ray")
         return data
 
 
@@ -109,6 +113,7 @@ def _normalize_limited_text(value: str | None, limit: int) -> str:
 
 
 def build_request_audit_context(request: Request) -> RequestAuditContext:
+    ray = request.headers.get("CF-Ray", "").strip()
     return RequestAuditContext(
         request_id=normalize_request_id(request.headers.get(REQUEST_ID_HEADER)),
         ip_address=resolve_client_ip(request),
@@ -116,6 +121,7 @@ def build_request_audit_context(request: Request) -> RequestAuditContext:
         method=request.method.upper()[:10],
         path=_normalize_limited_text(request.url.path, MAX_PATH_LENGTH) or "/",
         timestamp=datetime.now(timezone.utc),
+        cloudflare_ray=ray if CLOUDFLARE_RAY_PATTERN.fullmatch(ray) else None,
     )
 
 

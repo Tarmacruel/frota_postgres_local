@@ -90,6 +90,7 @@ class AuditService:
         action: str | None = None,
         actor_user_id: UUID | None = None,
         organization_id: UUID | None = None,
+        include_access: bool = False,
     ) -> list[AuditLog]:
         return await self.audit_logs.list(
             limit=limit,
@@ -97,6 +98,7 @@ class AuditService:
             action=action,
             actor_user_id=actor_user_id,
             organization_id=organization_id,
+            include_access=include_access,
         )
 
     async def list_paginated(self, **filters):
@@ -119,6 +121,8 @@ class AuditService:
         context = request_context or get_request_audit_context()
         if context is not None:
             sanitized_details["request_context"] = context.as_dict()
+        if session_id := getattr(self.db, "info", {}).get("audit_session_id"):
+            sanitized_details["audit_session_id"] = str(session_id)
         audit_log = AuditLog(
             actor_user_id=actor.id,
             actor_name=actor.name,
